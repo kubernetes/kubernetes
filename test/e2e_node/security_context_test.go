@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/blang/semver"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -381,21 +380,10 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		BeforeEach(func() {
 			if framework.TestContext.ContainerRuntime == "docker" {
-				// parse the docker version
-				out, err := exec.Command("docker", "-v").CombinedOutput()
-				if err != nil {
-					framework.Failf("checking docker version failed output %s: %v", string(out), err)
-				}
-				parts := strings.Split(string(out), ",")
-				parts = strings.Split(parts[0], " ")
-				dversion := parts[len(parts)-1]
-				version, err := semver.New(dversion)
-				if err != nil {
-					framework.Failf("parsing docker version %q failed: %v", dversion, err)
-				}
-				if version.LT(semver.Version{Major: 1, Minor: 11}) {
-					// make sure its >= 1.11 thats when "no-new-privileges" was added
-					framework.Skipf("Skipping no_new_privs tests, docker version is < 1.11 it is %s", version.String())
+				isSupported, err := isDockerNoNewPrivilegesSupported()
+				framework.ExpectNoError(err)
+				if !isSupported {
+					framework.Skipf("Skipping because no_new_privs is not supported in this docker")
 				}
 			}
 		})

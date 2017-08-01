@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	defaultDockerEndpoint = "unix:///var/run/docker.sock"
-
 	//TODO (dashpole): Once dynamic config is possible, test different values for maxPerPodContainer and maxContainers
 	// Currently using default values for maxPerPodContainer and maxTotalContainers
 	maxPerPodContainer = 1
