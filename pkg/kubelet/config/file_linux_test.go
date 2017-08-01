@@ -80,7 +80,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 				t.Fatalf("unable to create temp dir: %v", err)
 			}
 			defer os.RemoveAll(dirName)
-			file := testCase.writeToFile(dirName, "test_pod_config", t)
+			file := testCase.writeToFile(dirName, "test_pod_manifest", t)
 
 			ch := make(chan interface{})
 			NewSourceFile(file, hostname, time.Millisecond, ch)
@@ -130,7 +130,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	}
 	defer os.RemoveAll(dirName)
 
-	fileName := filepath.Join(dirName, "test_pod_config")
+	fileName := filepath.Join(dirName, "test_pod_manifest")
 	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
 	if err != nil {
 		t.Fatalf("unable to write test file %#v", err)
@@ -254,7 +254,7 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
-	fileNamePre := "test_pod_config"
+	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
 			dirName, err := utiltesting.MkTmpdir("dir-test")
@@ -292,7 +292,7 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
-	fileNamePre := "test_pod_config"
+	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
 		func() {
 			dirName, err := utiltesting.MkTmpdir("dir-test")

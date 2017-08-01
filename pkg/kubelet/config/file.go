@@ -73,7 +73,7 @@ func new(path string, nodeName types.NodeName, period time.Duration, updates cha
 
 func (s *sourceFile) run() {
 	if err := s.watch(); err != nil {
-		glog.Errorf("unable to read config path %q: %v", s.path, err)
+		glog.Errorf("Unable to read manifest path %q: %v", s.path, err)
 	}
 }
 
@@ -118,7 +118,7 @@ func (s *sourceFile) resetStoreFromPath() error {
 	}
 }
 
-// Get as many pod configs as we can from a directory. Return an error if and only if something
+// Get as many pod manifests as we can from a directory. Return an error if and only if something
 // prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
 func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
@@ -136,29 +136,29 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	for _, path := range dirents {
 		statInfo, err := os.Stat(path)
 		if err != nil {
-			glog.V(1).Infof("Can't get metadata for %q: %v", path, err)
+			glog.Errorf("Can't get metadata for %q: %v", path, err)
 			continue
 		}
 
 		switch {
 		case statInfo.Mode().IsDir():
-			glog.V(1).Infof("Not recursing into config path %q", path)
+			glog.Errorf("Not recursing into manifest path %q", path)
 		case statInfo.Mode().IsRegular():
 			pod, err := s.extractFromFile(path)
 			if err != nil {
-				glog.V(1).Infof("Can't process config file %q: %v", path, err)
+				glog.Errorf("Can't process manifest file %q: %v", path, err)
 			} else {
 				pods = append(pods, pod)
 			}
 		default:
-			glog.V(1).Infof("Config path %q is not a directory or file: %v", path, statInfo.Mode())
+			glog.Errorf("Manifest path %q is not a directory or file: %v", path, statInfo.Mode())
 		}
 	}
 	return pods, nil
 }
 
 func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
-	glog.V(3).Infof("Reading config file %q", filename)
+	glog.V(3).Infof("Reading manifest file %q", filename)
 	defer func() {
 		if err == nil && pod != nil {
 			objKey, keyErr := cache.MetaNamespaceKeyFunc(pod)
@@ -193,7 +193,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file.\n", filename, podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check manifest file.\n", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {
