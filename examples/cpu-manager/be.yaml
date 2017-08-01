@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: be
+spec:
+  containers:
+  - image: quay.io/connordoyle/cpuset-visualizer
+    name: be
