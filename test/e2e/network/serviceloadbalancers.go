@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package network
 
 import (
 	"fmt"
@@ -213,7 +213,7 @@ func (s *ingManager) test(path string) error {
 	})
 }
 
-var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
+var _ = SIGDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
 	var client clientset.Interface

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package network
 
 import (
 	"fmt"
@@ -131,7 +131,7 @@ func checknosnatURL(proxy, pip string, ips []string) string {
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
-var _ = framework.KubeDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
+var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
