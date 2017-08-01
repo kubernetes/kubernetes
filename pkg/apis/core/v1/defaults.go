@@ -178,6 +178,31 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.SchedulerName = v1.DefaultSchedulerName
 	}
 }
+
+func SetDefaults_Affinity(obj *v1.Affinity) {
+	if obj == nil {
+		return
+	}
+
+	if obj.PodAntiAffinity != nil {
+		for i := range obj.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			term := &obj.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[i]
+			if term.NumOfMatchingPods == 0 {
+				term.NumOfMatchingPods = 1
+			}
+		}
+		// Ignore PreferredDuringSchedulingIgnoredDuringExecution which is not implemented yet.
+	}
+
+	if obj.PodAffinity != nil {
+		for i := range obj.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			term := &obj.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[i]
+			term.NumOfMatchingPods = 1
+		}
+		// Ignore PreferredDuringSchedulingIgnoredDuringExecution which is not implemented yet.
+	}
+}
+
 func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
