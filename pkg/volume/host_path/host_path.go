@@ -107,7 +107,7 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 
 	path := hostPathVolumeSource.Path
 	return &hostPathMounter{
-		hostPath: &hostPath{path: path, pathType: hostPathVolumeSource.Type},
+		hostPath: &hostPath{path: path, pathType: hostPathVolumeSource.Type, containerized: opts.Containerized},
 		readOnly: readOnly,
 	}, nil
 }
@@ -176,8 +176,9 @@ func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin
 // HostPath volumes represent a bare host file or directory mount.
 // The direct at the specified path will be directly exposed to the container.
 type hostPath struct {
-	path     string
-	pathType *v1.HostPathType
+	path          string
+	pathType      *v1.HostPathType
+	containerized bool
 	volume.MetricsNil
 }
 
@@ -217,7 +218,7 @@ func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 	if *b.pathType == v1.HostPathUnset {
 		return nil
 	}
-	return checkType(b.GetPath(), b.pathType)
+	return checkType(b.GetPath(), b.pathType, b.containerized)
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
@@ -441,10 +442,22 @@ func newOSFileTypeChecker(path string, checker fileTypeChecker) (hostPathTypeChe
 	return &ftc, nil
 }
 
-func checkType(path string, pathType *v1.HostPathType) error {
-	ftc, err := newOSFileTypeChecker(path, &defaultFileTypeChecker{})
-	if err != nil {
-		return err
+func checkType(path string, pathType *v1.HostPathType, containerized bool) error {
+	var ftc hostPathTypeChecker
+	var err error
+	if containerized {
+		// For a containerized kubelet, use nsenter to run commands in
+		// the host's mount namespace.
+		// TODO(dixudx): setns into docker's mount namespace, and then run the exact same go code for checks/setup
+		ftc, err = newNsenterFileTypeChecker(path)
+		if err != nil {
+			return err
+		}
+	} else {
+		ftc, err = newOSFileTypeChecker(path, &defaultFileTypeChecker{})
+		if err != nil {
+			return err
+		}
 	}
 	return checkTypeInternal(ftc, pathType)
 }
