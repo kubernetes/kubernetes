@@ -165,3 +165,74 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
 }
+
+func NewNoNewPrivsAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
+	return &noNewPrivsAdmitHandler{
+		Runtime: runtime,
+	}
+}
+
+type noNewPrivsAdmitHandler struct {
+	kubecontainer.Runtime
+}
+
+func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
+	if attrs.Pod.Status.Phase != v1.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// If the containers in a pod do not require no-new-privs, admit it.
+	if !noNewPrivsRequired(attrs.Pod) {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Make sure it is either docker or rkt runtimes.
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime && a.Runtime.Type() != kubetypes.RktContainerRuntime {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %s runtime not supported", a.Runtime.Type()),
+		}
+	}
+
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+		// Make sure docker api version is valid.
+		rversion, err := a.Runtime.APIVersion()
+		if err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "NoNewPrivs",
+				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
+			}
+		}
+		v, err := rversion.Compare("1.23")
+		if err != nil {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "NoNewPrivs",
+				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
+			}
+		}
+		// If the version is less than 1.23 it will return -1 above.
+		if v == -1 {
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "NoNewPrivs",
+				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
+			}
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func noNewPrivsRequired(pod *v1.Pod) bool {
+	// Iterate over pod containers and check if we added no-new-privs.
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.AllowPrivilegeEscalation != nil && !*c.SecurityContext.AllowPrivilegeEscalation {
+			return true
+		}
+	}
+	return false
+}

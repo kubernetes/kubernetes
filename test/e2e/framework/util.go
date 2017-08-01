@@ -1385,15 +1385,20 @@ func podNotPending(c clientset.Interface, podName, namespace string) wait.Condit
 	}
 }
 
-// waitForPodTerminatedInNamespace returns an error if it took too long for the pod
-// to terminate or if the pod terminated with an unexpected reason.
+// waitForPodTerminatedInNamespace returns an error if it takes too long for the pod to terminate,
+// if the pod Get api returns an error (IsNotFound or other), or if the pod failed (and thus did not
+// terminate) with an unexpected reason. Typically called to test that the passed-in pod is fully
+// terminated (reason==""), but may be called to detect if a pod did *not* terminate according to
+// the supplied reason.
 func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, namespace string) error {
 	return WaitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		// Only consider Failed pods. Successful pods will be deleted and detected in
+		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodFailed {
-			if pod.Status.Reason == reason {
+			if pod.Status.Reason == reason { // short-circuit waitForPodCondition's loop
 				return true, nil
 			} else {
-				return true, fmt.Errorf("Expected pod %v in namespace %v to be terminated with reason %v, got reason: %v", podName, namespace, reason, pod.Status.Reason)
+				return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 			}
 		}
 		return false, nil

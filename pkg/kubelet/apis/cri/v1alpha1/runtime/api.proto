@@ -514,6 +514,9 @@ message LinuxContainerSecurityContext {
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
     string seccomp_profile_path = 10;
+    // no_new_privs defines if the flag for no_new_privs should be set on the
+    // container.
+    bool no_new_privs = 11;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -982,7 +985,7 @@ message FilesystemUsage {
     // The underlying storage of the filesystem.
     StorageIdentifier storage_id = 2;
     // UsedBytes represents the bytes used for images on the filesystem.
-    // This may differ from the total bytes used on the filesystem and may not 
+    // This may differ from the total bytes used on the filesystem and may not
     // equal CapacityBytes - AvailableBytes.
     UInt64Value used_bytes = 3;
     // InodesUsed represents the inodes used by the images.

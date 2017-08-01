@@ -113,6 +113,10 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 	}
 	hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, apparmorSecurityOpts...)
 
+	if sc.NoNewPrivs {
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "no-new-privileges")
+	}
+
 	return nil
 }
 

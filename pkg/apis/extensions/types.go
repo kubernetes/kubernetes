@@ -922,6 +922,14 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool
+	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
+	// process can gain more privileges than its parent process.
+	// +optional
+	DefaultAllowPrivilegeEscalation *bool
+	// AllowPrivilegeEscalation determines if a pod can request to allow
+	// privilege escalation.
+	// +optional
+	AllowPrivilegeEscalation bool
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy

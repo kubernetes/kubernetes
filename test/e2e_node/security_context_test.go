@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/blang/semver"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -375,4 +376,87 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		})
 	})
+
+	Context("when creating containers with AllowPrivilegeEscalation", func() {
+
+		BeforeEach(func() {
+			if framework.TestContext.ContainerRuntime == "docker" {
+				// parse the docker version
+				out, err := exec.Command("docker", "-v").CombinedOutput()
+				if err != nil {
+					framework.Failf("checking docker version failed output %s: %v", string(out), err)
+				}
+				parts := strings.Split(string(out), ",")
+				parts = strings.Split(parts[0], " ")
+				dversion := parts[len(parts)-1]
+				version, err := semver.New(dversion)
+				if err != nil {
+					framework.Failf("parsing docker version %q failed: %v", dversion, err)
+				}
+				if version.LT(semver.Version{Major: 1, Minor: 11}) {
+					// make sure its >= 1.11 thats when "no-new-privileges" was added
+					framework.Skipf("Skipping no_new_privs tests, docker version is < 1.11 it is %s", version.String())
+				}
+			}
+		})
+
+		makeAllowPrivilegeEscalationPod := func(podName string, allowPrivilegeEscalation *bool, uid int64) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/google_containers/nonewprivs:1.2",
+							Name:  podName,
+							SecurityContext: &v1.SecurityContext{
+								AllowPrivilegeEscalation: allowPrivilegeEscalation,
+								RunAsUser:                &uid,
+							},
+						},
+					},
+				},
+			}
+		}
+		createAndMatchOutput := func(podName, output string, allowPrivilegeEscalation *bool, uid int64) error {
+			podClient.Create(makeAllowPrivilegeEscalationPod(podName,
+				allowPrivilegeEscalation,
+				uid,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+
+			if err := podClient.MatchContainerOutput(podName, podName, output); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		It("should allow privilege escalation when not explicitly set and uid != 0", func() {
+			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
+			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
+				framework.Failf("Match output for pod %q failed: %v", podName, err)
+			}
+		})
+
+		It("should not allow privilege escalation when false", func() {
+			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
+			apeFalse := false
+			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
+				framework.Failf("Match output for pod %q failed: %v", podName, err)
+			}
+		})
+
+		It("should allow privilege escalation when true", func() {
+			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
+			apeTrue := true
+			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
+				framework.Failf("Match output for pod %q failed: %v", podName, err)
+			}
+		})
+	})
+
 })

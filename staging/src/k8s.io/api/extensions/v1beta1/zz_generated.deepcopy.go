@@ -1321,6 +1321,15 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	in.RunAsUser.DeepCopyInto(&out.RunAsUser)
 	in.SupplementalGroups.DeepCopyInto(&out.SupplementalGroups)
 	in.FSGroup.DeepCopyInto(&out.FSGroup)
+	if in.DefaultAllowPrivilegeEscalation != nil {
+		in, out := &in.DefaultAllowPrivilegeEscalation, &out.DefaultAllowPrivilegeEscalation
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 

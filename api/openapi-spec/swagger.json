@@ -57500,6 +57500,10 @@
    "io.k8s.api.core.v1.SecurityContext": {
     "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
     "properties": {
+     "allowPrivilegeEscalation": {
+      "description": "AllowPrivilegeEscalation controls whether a process can gain more privileges than it's parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN",
+      "type": "boolean"
+     },
      "capabilities": {
       "description": "The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.",
       "$ref": "#/definitions/io.k8s.api.core.v1.Capabilities"
@@ -58938,6 +58942,10 @@
      "fsGroup"
     ],
     "properties": {
+     "allowPrivilegeEscalation": {
+      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation.",
+      "type": "boolean"
+     },
      "allowedCapabilities": {
       "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
       "type": "array",
@@ -58951,6 +58959,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "defaultAllowPrivilegeEscalation": {
+      "description": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than it's parent process.",
+      "type": "boolean"
      },
      "fsGroup": {
       "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",

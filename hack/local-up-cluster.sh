@@ -76,8 +76,7 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
-ENABLE_RBAC=${ENABLE_RBAC:-true}
-AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-""}
+AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -199,6 +198,7 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
+ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
@@ -434,13 +434,7 @@ function start_apiserver {
     fi
 
     authorizer_arg=""
-    if [[ "${ENABLE_RBAC}" = true ]]; then
-      authorizer_arg="--authorization-mode=RBAC "
-    fi
     if [[ -n "${AUTHORIZATION_MODE}" ]]; then
-      if [[ "${ENABLE_RBAC}" = true ]]; then
-        warning "AUTHORIZATION_MODE=$AUTHORIZATION_MODE overrode ENABLE_RBAC=true"
-      fi
       authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
     fi
     priv_arg=""
@@ -457,6 +451,9 @@ function start_apiserver {
     advertise_address=""
     if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
+    fi
+    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+        advertise_address="--advertise_address=${ADVERTISE_ADDRESS}"
     fi
 
     # Create CA signers
@@ -902,7 +899,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ -n "${PSP_ADMISSION}" && ("${ENABLE_RBAC}" = true || "${AUTHORIZATION_MODE}" = *RBAC* ) ]]; then
+if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 

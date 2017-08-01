@@ -66,6 +66,8 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, groups...)
 	}
 
+	synthesized.NoNewPrivs = securitycontext.AddNoNewPrivileges(effectiveSc)
+
 	return synthesized
 }
 
