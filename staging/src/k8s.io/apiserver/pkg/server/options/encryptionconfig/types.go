@@ -45,6 +45,11 @@ type ProviderConfig struct {
 	Secretbox *SecretboxConfig `json:"secretbox,omitempty"`
 	// identity is the (empty) configuration for the identity transformer.
 	Identity *IdentityConfig `json:"identity,omitempty"`
+	// kms contains the name, cache size and path to configuration file for a KMS based envelope transformer.
+	KMS *KMSConfig `json:"kms,omitempty"`
+	// cloudProvidedKMSConfig contains the name and cache size for a KMS based envelope transformer which uses
+	// the KMS provided by the cloud.
+	CloudProvidedKMS *CloudProvidedKMSConfig `json:"cloudprovidedkms,omitempty"`
 }
 
 // AESConfig contains the API configuration for an AES transformer.
@@ -71,3 +76,25 @@ type Key struct {
 
 // IdentityConfig is an empty struct to allow identity transformer in provider configuration.
 type IdentityConfig struct{}
+
+// CoreKMSConfig contains the name and cache sized for a KMS based envelope transformer.
+type CoreKMSConfig struct {
+	// name is the name of the KMS plugin to be used.
+	Name string `json:"name"`
+	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
+	// +optional
+	CacheSize int `json:"cachesize,omitempty"`
+}
+
+// KMSConfig contains the name, cache size and path to configuration file for a KMS based envelope transformer.
+type KMSConfig struct {
+	*CoreKMSConfig
+	// configfile is the path to the configuration file for the named KMS provider.
+	ConfigFile string `json:"configfile"`
+}
+
+// CloudProvidedKMSConfig contains the name and cache size for a KMS based envelope transformer which uses
+// the KMS provided by the cloud.
+type CloudProvidedKMSConfig struct {
+	*CoreKMSConfig
+}
