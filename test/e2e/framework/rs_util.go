@@ -27,10 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/kubectl"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -81,15 +79,7 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 // Delete a ReplicaSet and all pods it spawned
 func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
 	By(fmt.Sprintf("deleting ReplicaSet %s in namespace %s", name, ns))
-	rc, err := clientset.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Logf("ReplicaSet %s was already deleted: %v", name, err)
-			return nil
-		}
-		return err
-	}
-	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("ReplicaSet"), internalClientset)
+	rs, err := clientset.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("ReplicaSet %s was already deleted: %v", name, err)
@@ -98,7 +88,7 @@ func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalc
 		return err
 	}
 	startTime := time.Now()
-	err = reaper.Stop(ns, name, 0, nil)
+	err = clientset.ExtensionsV1beta1().ReplicaSets(ns).Delete(name, &metav1.DeleteOptions{})
 	if apierrs.IsNotFound(err) {
 		Logf("ReplicaSet %s was already deleted: %v", name, err)
 		return nil
@@ -106,7 +96,7 @@ func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalc
 	deleteRSTime := time.Now().Sub(startTime)
 	Logf("Deleting RS %s took: %v", name, deleteRSTime)
 	if err == nil {
-		err = waitForReplicaSetPodsGone(clientset, rc)
+		err = waitForReplicaSetPodsGone(clientset, rs)
 	}
 	terminatePodTime := time.Now().Sub(startTime) - deleteRSTime
 	Logf("Terminating ReplicaSet %s pods took: %v", name, terminatePodTime)
