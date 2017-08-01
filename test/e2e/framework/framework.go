@@ -325,10 +325,11 @@ func (f *Framework) AfterEach() {
 		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
-	if TestContext.GatherMetricsAfterTest {
+	if TestContext.GatherMetricsAfterTest != "false" {
 		By("Gathering metrics")
-		// Grab apiserver, scheduler, controller-manager metrics and nodes' kubelet metrics (for non-kubemark case).
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, !ProviderIs("kubemark"), true, true, true)
+		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
+		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, grabMetricsFromKubelets, true, true, true)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
