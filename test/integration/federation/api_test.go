@@ -270,7 +270,7 @@ func testCoreResourceList(t *testing.T, host string) {
 	}
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 8, len(apiResourceList.APIResources), "ResourceList: %v", apiResourceList.APIResources)
+	assert.Equal(t, 12, len(apiResourceList.APIResources), "ResourceList: %v", apiResourceList.APIResources)
 
 	// Verify services.
 	found := findResource(apiResourceList.APIResources, "services")
@@ -303,6 +303,16 @@ func testCoreResourceList(t *testing.T, host string) {
 
 	// Verify config maps.
 	found = findResource(apiResourceList.APIResources, "configmaps")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
+	// Verify nodes.
+	found = findResource(apiResourceList.APIResources, "nodes")
+	assert.NotNil(t, found)
+	assert.False(t, found.Namespaced)
+
+	// Verify pods.
+	found = findResource(apiResourceList.APIResources, "pods")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }
