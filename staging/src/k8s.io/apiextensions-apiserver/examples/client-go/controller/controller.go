@@ -19,10 +19,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -50,12 +53,66 @@ func (c *ExampleController) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
+type debugWatch struct {
+	w          watch.Interface
+	once       sync.Once
+	resultChan chan watch.Event
+}
+
+func (d *debugWatch) Stop() {
+	fmt.Println("DEBUG: Stop()")
+	d.w.Stop()
+}
+
+func (d *debugWatch) ResultChan() <-chan watch.Event {
+	d.once.Do(func() {
+		// create our result channel
+		d.resultChan = make(chan watch.Event)
+		// copy from the underlying channel into it
+		go func() {
+			for result := range d.w.ResultChan() {
+				fmt.Printf("DEBUG: %#v\n", result)
+				d.resultChan <- result
+			}
+			fmt.Println("DEBUG: closing")
+			close(d.resultChan)
+		}()
+	})
+	return d.resultChan
+}
+
 func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller, error) {
-	source := cache.NewListWatchFromClient(
-		c.ExampleClient,
-		crv1.ExampleResourcePlural,
-		apiv1.NamespaceAll,
-		fields.Everything())
+	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+		options.FieldSelector = fields.Everything().String()
+		obj, err := c.ExampleClient.Get().
+			Namespace(apiv1.NamespaceAll).
+			Resource(crv1.ExampleResourcePlural).
+			VersionedParams(&options, metav1.ParameterCodec).
+			Do().
+			Get()
+		if err != nil {
+			fmt.Println("DEBUG:", err)
+		} else {
+			fmt.Printf("DEBUG: %#v\n", obj)
+		}
+		return obj, err
+	}
+	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
+		options.Watch = true
+		options.FieldSelector = fields.Everything().String()
+		watch, err := c.ExampleClient.Get().
+			Namespace(apiv1.NamespaceAll).
+			Resource(crv1.ExampleResourcePlural).
+			VersionedParams(&options, metav1.ParameterCodec).
+			Watch()
+		if err != nil {
+			fmt.Println("DEBUG:", err)
+		} else {
+			watch = &debugWatch{w: watch}
+		}
+		return watch, err
+	}
+	source := &cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
 
 	_, controller := cache.NewInformer(
 		source,
@@ -80,7 +137,11 @@ func (c *ExampleController) watchExamples(ctx context.Context) (cache.Controller
 }
 
 func (c *ExampleController) onAdd(obj interface{}) {
-	example := obj.(*crv1.Example)
+	example, ok := obj.(*crv1.Example)
+	if !ok {
+		fmt.Printf("[CONTROLLER] onAdd unknown type %T\n", obj)
+		return
+	}
 	fmt.Printf("[CONTROLLER] OnAdd %s\n", example.ObjectMeta.SelfLink)
 
 	// NEVER modify objects from the store. It's a read-only, local cache.
@@ -114,13 +175,25 @@ func (c *ExampleController) onAdd(obj interface{}) {
 }
 
 func (c *ExampleController) onUpdate(oldObj, newObj interface{}) {
-	oldExample := oldObj.(*crv1.Example)
-	newExample := newObj.(*crv1.Example)
+	oldExample, ok := oldObj.(*crv1.Example)
+	if !ok {
+		fmt.Printf("[CONTROLLER] onUpdate unknown type %T\n", oldObj)
+		return
+	}
+	newExample, ok := newObj.(*crv1.Example)
+	if !ok {
+		fmt.Printf("[CONTROLLER] onUpdate unknown type %T\n", newObj)
+		return
+	}
 	fmt.Printf("[CONTROLLER] OnUpdate oldObj: %s\n", oldExample.ObjectMeta.SelfLink)
 	fmt.Printf("[CONTROLLER] OnUpdate newObj: %s\n", newExample.ObjectMeta.SelfLink)
 }
 
 func (c *ExampleController) onDelete(obj interface{}) {
-	example := obj.(*crv1.Example)
+	example, ok := obj.(*crv1.Example)
+	if !ok {
+		fmt.Printf("[CONTROLLER] onDelete unknown type %T\n", obj)
+		return
+	}
 	fmt.Printf("[CONTROLLER] OnDelete %s\n", example.ObjectMeta.SelfLink)
 }

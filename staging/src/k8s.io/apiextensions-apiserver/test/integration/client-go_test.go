@@ -87,6 +87,7 @@ func TestClientGoCustomResourceExample(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create an instance of the custom resource: %v", err)
 	}
+	t.Logf("Created version %s", result.ResourceVersion)
 
 	t.Logf("Waiting instance to be processed by the controller")
 	if err := exampleclient.WaitForExampleInstanceProcessed(exampleClient, "example1"); err != nil {

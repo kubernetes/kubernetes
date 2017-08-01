@@ -272,6 +272,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
 	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
+		fmt.Println("DEBUG: startCaching err: ", err)
 		glog.Errorf("unexpected ListAndWatch error: %v", err)
 	}
 }
@@ -291,6 +292,10 @@ func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, pre
 	return c.storage.Delete(ctx, key, out, preconditions)
 }
 
+func (c *Cacher) debug(msg ...interface{}) {
+	fmt.Println("DEBUG:", fmt.Sprint(msg...))
+}
+
 // Implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {
 	watchRV, err := ParseWatchResourceVersion(resourceVersion)
@@ -298,6 +303,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		return nil, err
 	}
 
+	c.debug("before wait", watchRV)
 	c.ready.wait()
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
@@ -305,10 +311,13 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	// on return from this function.
 	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
 	// underlying watchCache is calling processEvent under its lock.
+	c.debug("before rlock", watchRV)
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
+	c.debug("before GetAllEventsSinceThreadUnsafe", watchRV)
 	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
 	if err != nil {
+		c.debug("GetAllEventsSinceThreadUnsafe err", err)
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
 		// rather than a directly returned error.
@@ -338,11 +347,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		chanSize = 1000
 	}
 
+	c.debug("before lock", watchRV)
 	c.Lock()
 	defer c.Unlock()
+	c.debug("before forgetWatcher", watchRV)
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
+	c.debug("before newCacheWatcher", watchRV)
 	watcher := newCacheWatcher(c.copier, watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
 
+	c.debug("before addWatcher", watchRV)
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
 	return watcher, nil
@@ -372,7 +385,9 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 	if getRV == 0 && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
-		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
+		err := c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
+		fmt.Printf("DEBUG: Get %s bypassed the watch cache, got %v\n", key, err)
+		return err
 	}
 
 	// Do not create a trace - it's not for free and there are tons
@@ -423,7 +438,9 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	if listRV == 0 && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
-		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
+		err := c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
+		fmt.Printf("DEBUG: GetToList %s bypassed the watch cache, got %v\n", key, err)
+		return err
 	}
 
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
@@ -485,7 +502,9 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	if listRV == 0 && !c.ready.check() {
 		// If Cacher is not yet initialized and we don't require any specific
 		// minimal resource version, simply forward the request to storage.
-		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
+		err := c.storage.List(ctx, key, resourceVersion, pred, listObj)
+		fmt.Printf("DEBUG: List %s bypassed the watch cache, got %v\n", key, err)
+		return err
 	}
 
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
@@ -584,6 +603,7 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 		// Monitor if this gets backed up, and how much.
 		glog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
+	c.debug("processEvent", *event)
 	c.incoming <- *event
 }
 
@@ -592,8 +612,10 @@ func (c *Cacher) dispatchEvents() {
 		select {
 		case event, ok := <-c.incoming:
 			if !ok {
+				c.debug("dispatchEvent return")
 				return
 			}
+			c.debug("dispatchEvents", event)
 			c.dispatchEvent(&event)
 		case <-c.stopCh:
 			return
@@ -604,10 +626,13 @@ func (c *Cacher) dispatchEvents() {
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	triggerValues, supported := c.triggerValues(event)
 
+	c.debug("dispatchEvent before lock", event)
 	c.Lock()
 	defer c.Unlock()
 	// Iterate over "allWatchers" no matter what the trigger function is.
+	c.debug("dispatchEvent before iterate", event)
 	for _, watcher := range c.watchers.allWatchers {
+		c.debug("dispatchEvent add to watcher", event)
 		watcher.add(event, c.dispatchTimeoutBudget)
 	}
 	if supported {
@@ -722,13 +747,16 @@ func newCacherListerWatcher(storage Interface, resourcePrefix string, newListFun
 func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
 	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", Everything, list); err != nil {
+		fmt.Printf("DEBUG: cacherListerWatcher list %s from %s, got error %v\n", lw.resourcePrefix, "", err)
 		return nil, err
 	}
+	fmt.Printf("DEBUG: cacherListerWatcher list %s from %s, got list %#v\n", lw.resourcePrefix, "", list)
 	return list, nil
 }
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	fmt.Printf("DEBUG: cacherListerWatcher watch %s from %s\n", lw.resourcePrefix, options.ResourceVersion)
 	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, options.ResourceVersion, Everything)
 }
 
@@ -942,6 +970,7 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 	for _, event := range initEvents {
+		fmt.Printf("DEBUG: process(): sending initEvent: %#v\n", event)
 		c.sendWatchCacheEvent(event)
 	}
 	processingTime := time.Since(startTime)
@@ -956,13 +985,18 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 	defer close(c.result)
 	defer c.Stop()
 	for {
+		fmt.Printf("DEBUG: process(): waiting for new event\n")
 		event, ok := <-c.input
 		if !ok {
+			fmt.Printf("DEBUG: process(): input closed, returning\n")
 			return
 		}
 		// only send events newer than resourceVersion
 		if event.ResourceVersion > resourceVersion {
+			fmt.Printf("DEBUG: process(): sending event: %#v\n", event)
 			c.sendWatchCacheEvent(event)
+		} else {
+			fmt.Printf("DEBUG: process(): discarding event older than %d (%d): %#v\n", resourceVersion, event.ResourceVersion, event)
 		}
 	}
 }
