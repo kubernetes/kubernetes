@@ -20,7 +20,11 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
+	"math/rand"
+	"strings"
 	"sync"
+	"time"
 )
 
 // GaugeMetric represents a single numerical value that can arbitrarily go up
@@ -94,11 +98,13 @@ var metricsFactory = struct {
 	metricsProvider: noopMetricsProvider{},
 }
 
-func newReflectorMetrics(name string) *reflectorMetrics {
+func newReflectorMetrics(basename string) *reflectorMetrics {
 	var ret *reflectorMetrics
-	if len(name) == 0 {
+	if len(basename) == 0 {
 		return ret
 	}
+	name := makeValidPromethusMetricName(basename)
+
 	return &reflectorMetrics{
 		numberOfLists:        metricsFactory.metricsProvider.NewListsMetric(name),
 		listDuration:         metricsFactory.metricsProvider.NewListDurationMetric(name),
@@ -109,6 +115,28 @@ func newReflectorMetrics(name string) *reflectorMetrics {
 		numberOfItemsInWatch: metricsFactory.metricsProvider.NewItemsInWatchMetric(name),
 		lastResourceVersion:  metricsFactory.metricsProvider.NewLastResourceVersionMetric(name),
 	}
+}
+
+// prometheus name are globals, so we need to be globally unique
+// this all needs to be threadsafe and we don't want to get a duplicate and die
+var nameLock sync.Mutex
+var takenNumbers = map[int]bool{}
+var random = rand.New(rand.NewSource(int64(time.Now().UnixNano())))
+
+func makeValidPromethusMetricName(base string) string {
+	// this isn't perfect, but it removes our common characters
+	basename := strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(base)
+
+	// we're using random numbers here because we don't want anyone getting used to "reflect for this is number X"
+	nameLock.Lock()
+	defer nameLock.Unlock()
+	randomValue := random.Intn(1000000)
+	for takenNumbers[randomValue] {
+		randomValue = random.Intn(1000000)
+	}
+	takenNumbers[randomValue] = true
+
+	return fmt.Sprintf(basename+"_%07d", randomValue)
 }
 
 // SetReflectorMetricsProvider sets the metrics provider
