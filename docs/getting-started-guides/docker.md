@@ -1,3 +1,5 @@
+**Stop. This guide has been superseded by [Minikube](https://github.com/kubernetes/minikube) which is the recommended method of running Kubernetes on your local machine.**
+
 This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md](https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md)
 
 
