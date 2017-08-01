@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -62,9 +63,10 @@ func (c *PodLoggingController) podAdd(obj interface{}) {
 }
 
 func (c *PodLoggingController) podUpdate(old, new interface{}) {
+	newPod := new.(*v1.Pod)
 	key, err := cache.MetaNamespaceKeyFunc(new)
 	if err == nil {
-		glog.Infof("POD UPDATED. %q", key)
+		glog.Infof("POD UPDATED. %q, %s", key, newPod.Status.Phase)
 	} else {
 		glog.Error(err)
 	}

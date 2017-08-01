@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -25,6 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -33,14 +35,25 @@ import (
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
-func podForTest(r *rand.Rand) *v1.Pod {
+func podForTest(rand *rand.Rand) *v1.Pod {
 	apiObjectFuzzer := fuzzer.FuzzerFor(
 		kapitesting.FuzzerFuncs,
-		r,
+		rand,
 		api.Codecs,
 	)
 	var p v1.Pod
 	apiObjectFuzzer.Fuzz(&p)
+
+	p.SetName(fmt.Sprintf("Pod%d", rand.Intn(10)))
+	p.SetNamespace(fmt.Sprintf("Namespace%d", rand.Intn(10)))
+	phases := []v1.PodPhase{
+		"creating",
+		"starting",
+		"running",
+		"stopping",
+		"deleting",
+	}
+	p.Status.Phase = phases[rand.Intn(len(phases))]
 	p.Spec.InitContainers = nil
 	p.Status.InitContainerStatuses = nil
 	return &p
@@ -64,28 +77,14 @@ func TestMain(t *testing.T) {
 		t.Error(err)
 	}
 
-	f := func(p *v1.Pod) bool {
-		// initialLineCount := glog.Stats.Info.Lines()
-		// for _, pod := range tc.initial {
-		//	fakeWatch.Delete(pod)
-		// }
-		// <-time.After(1 * time.Second)
-		// actualLineCount := glog.Stats.Info.Lines() - initialLineCount
-		// if tc.expectedLineCount != actualLineCount {
-		//	t.Errorf(
-		//		"Line count mismatch. Expected %d. Got %d",
-		//		tc.expectedLineCount,
-		//		actualLineCount,
-		//	)
-		// }
-		fakeWatch.Add(p)
-		// key, err := cache.MetaNamespaceKeyFunc(p)
-		// if err == nil {
-		//	t.Log(key)
-		// } else {
-		//	t.Error(err)
-		// }
+	f := func(p *v1.Pod, operation func(runtime.Object)) bool {
+		operation(p)
 		return true
+	}
+
+	operations := []func(runtime.Object){
+		fakeWatch.Add,
+		fakeWatch.Delete,
 	}
 
 	err = quick.Check(
@@ -95,6 +94,8 @@ func TestMain(t *testing.T) {
 			Values: func(values []reflect.Value, r *rand.Rand) {
 				p := podForTest(r)
 				values[0] = reflect.ValueOf(p)
+				operation := operations[rand.Intn(len(operations))]
+				values[1] = reflect.ValueOf(operation)
 			},
 		},
 	)
