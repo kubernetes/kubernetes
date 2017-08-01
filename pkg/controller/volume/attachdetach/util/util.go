@@ -201,7 +201,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
-		glog.V(10).Infof(
+		glog.V(4).Infof(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,
