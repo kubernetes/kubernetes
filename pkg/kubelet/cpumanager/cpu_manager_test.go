@@ -452,26 +452,3 @@ func TestReconcileState(t *testing.T) {
 		}
 	}
 }
-
-func TestGetReservedCpus(t *testing.T) {
-	var reservedCPUTests = []struct {
-		cpuCapacity     string
-		cpuAllocatable  string
-		expReservedCpus int
-	}{
-		{cpuCapacity: "1000m", cpuAllocatable: "1000m", expReservedCpus: 0},
-		{cpuCapacity: "8000m", cpuAllocatable: "7500m", expReservedCpus: 0},
-		{cpuCapacity: "16000m", cpuAllocatable: "14100m", expReservedCpus: 1},
-		{cpuCapacity: "8000m", cpuAllocatable: "5500m", expReservedCpus: 2},
-		{cpuCapacity: "8000m", cpuAllocatable: "900m", expReservedCpus: 7},
-	}
-
-	for idx, test := range reservedCPUTests {
-		tmpNodeStaus := prepareCPUNodeStatus(test.cpuCapacity, test.cpuAllocatable)
-		gotReservedCpus := getReservedCPUs(tmpNodeStaus)
-		if test.expReservedCpus != gotReservedCpus {
-			t.Errorf("(Case %d) Expected reserved cpus %d, got %d",
-				idx, test.expReservedCpus, gotReservedCpus)
-		}
-	}
-}
