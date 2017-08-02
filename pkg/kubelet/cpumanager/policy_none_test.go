@@ -22,18 +22,18 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
-func TestNoopPolicyName(t *testing.T) {
-	policy := &noopPolicy{}
+func TestNonePolicyName(t *testing.T) {
+	policy := &nonePolicy{}
 
 	policyName := policy.Name()
-	if policyName != "noop" {
-		t.Errorf("NoopPolicy Name() error. expected: noop, returned: %v",
+	if policyName != "none" {
+		t.Errorf("NonePolicy Name() error. expected: none, returned: %v",
 			policyName)
 	}
 }
 
-func TestNoopPolicyRegister(t *testing.T) {
-	policy := &noopPolicy{}
+func TestNonePolicyRegister(t *testing.T) {
+	policy := &nonePolicy{}
 
 	st := &mockState{
 		assignments:   map[string]cpuset.CPUSet{},
@@ -45,12 +45,12 @@ func TestNoopPolicyRegister(t *testing.T) {
 	container := &testPod.Spec.Containers[0]
 	err := policy.RegisterContainer(st, testPod, container, "fakeID")
 	if err != nil {
-		t.Errorf("NoopPolicy Register() error. expected register no error but got: %v", err)
+		t.Errorf("NonePolicy Register() error. expected register no error but got: %v", err)
 	}
 }
 
-func TestNoopPolicyUnRegister(t *testing.T) {
-	policy := &noopPolicy{}
+func TestNonePolicyUnRegister(t *testing.T) {
+	policy := &nonePolicy{}
 
 	st := &mockState{
 		assignments:   map[string]cpuset.CPUSet{},
@@ -59,6 +59,6 @@ func TestNoopPolicyUnRegister(t *testing.T) {
 
 	err := policy.UnregisterContainer(st, "fakeID")
 	if err != nil {
-		t.Errorf("NoopPolicy UnRegister() error. expected no error but got %v", err)
+		t.Errorf("NonePolicy UnRegister() error. expected no error but got %v", err)
 	}
 }

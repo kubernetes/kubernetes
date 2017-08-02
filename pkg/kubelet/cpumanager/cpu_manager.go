@@ -94,8 +94,8 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
-	case PolicyNoop:
-		policy = NewNoopPolicy()
+	case PolicyNone:
+		policy = NewNonePolicy()
 	case PolicyStatic:
 		machineInfo, err := kletGetter.GetCachedMachineInfo()
 		if err != nil {
@@ -116,8 +116,8 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 		}
 		policy = NewStaticPolicy(topo)
 	default:
-		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNoop)
-		policy = NewNoopPolicy()
+		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNone)
+		policy = NewNonePolicy()
 	}
 
 	manager := &manager{
@@ -133,7 +133,7 @@ func NewManager(cpuPolicyName string, cr runtimeService, kletGetter kletGetter, 
 func (m *manager) Start() {
 	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
 	m.policy.Start(m.state)
-	if m.policy.Name() == string(PolicyNoop) {
+	if m.policy.Name() == string(PolicyNone) {
 		return
 	}
 	go wait.Until(func() { m.reconcileState() }, time.Second, wait.NeverStop)

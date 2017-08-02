@@ -629,7 +629,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.statusManager,
 			klet.containerManager)
 		if err != nil {
-			glog.Infof("[cpumanager] failed to initialized cpu manager: %v", err)
+			glog.Infof("[cpumanager] failed to initialize cpu manager: %v", err)
 			return nil, err
 		}
 		klet.cpuManager = cpuManager

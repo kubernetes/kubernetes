@@ -30,7 +30,7 @@ go_library(
         "cpu_manager.go",
         "fake_cpu_manager.go",
         "policy.go",
-        "policy_noop.go",
+        "policy_none.go",
         "policy_static.go",
     ],
     tags = ["automanaged"],

@@ -33,7 +33,7 @@ func (m *fakeManager) Start() {
 
 func (m *fakeManager) Policy() Policy {
 	glog.Info("[fake cpumanager] Policy()")
-	return NewNoopPolicy()
+	return NewNonePolicy()
 }
 
 func (m *fakeManager) RegisterContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
