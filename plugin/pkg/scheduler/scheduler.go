@@ -185,14 +185,14 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 }
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asnychronous.
-func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
+// assume modifies `assumed`.
+func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
-	assumed := *pod
 	assumed.Spec.NodeName = host
-	if err := sched.config.SchedulerCache.AssumePod(&assumed); err != nil {
+	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
 		// TODO: This means that a given pod is already in cache (which means it
 		// is either assumed or already added). This is most probably result of a
@@ -207,7 +207,7 @@ func (sched *Scheduler) assume(pod *v1.Pod, host string) error {
 	// predicates in equivalence cache.
 	// If the binding fails, these invalidated item will not break anything.
 	if sched.config.Ecache != nil {
-		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(pod, host)
+		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(assumed, host)
 	}
 	return nil
 }
@@ -264,15 +264,17 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	err = sched.assume(pod, suggestedHost)
+	assumedPod := *pod
+	// assume modifies `assumedPod` by setting NodeName=suggestedHost
+	err = sched.assume(&assumedPod, suggestedHost)
 	if err != nil {
 		return
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
-		err := sched.bind(pod, &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
+		err := sched.bind(&assumedPod, &v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
 			Target: v1.ObjectReference{
 				Kind: "Node",
 				Name: suggestedHost,
