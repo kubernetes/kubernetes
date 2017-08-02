@@ -1599,7 +1599,20 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		glog.Errorf("Failed to execute iptables-restore: %v", err)
-		glog.V(2).Infof("Rules:\n%s", proxier.iptablesData.Bytes())
+		// ~rough approximation, assume ~100 chars per line
+		// we log first 1000 bytes, but full list at higher levels
+		rules := proxier.iptablesData.Bytes()
+		if len(rules) > 1000 {
+			abridgedRules := rules[:1000]
+			if glog.V(4) {
+				glog.V(4).Infof("Rules:\n%s", rules)
+			} else {
+				glog.V(2).Infof("Rules (abridged):\n%s", abridgedRules)
+			}
+		} else {
+			glog.V(2).Infof("Rules:\n%s", rules)
+		}
+
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
