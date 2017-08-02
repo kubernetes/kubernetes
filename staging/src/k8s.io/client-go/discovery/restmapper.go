@@ -96,8 +96,19 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 				if !resource.Namespaced {
 					scope = meta.RESTScopeRoot
 				}
-				versionMapper.Add(gv.WithKind(resource.Kind), scope)
-				// TODO only do this if it supports listing
+
+				// this is for legacy resources and servers which don't list singular forms.  For those we must still guess.
+				if len(resource.SingularName) == 0 {
+					versionMapper.Add(gv.WithKind(resource.Kind), scope)
+					// TODO this is producing unsafe guesses that don't actually work, but it matches previous behavior
+					versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
+					continue
+				}
+
+				plural := gv.WithResource(resource.Name)
+				singular := gv.WithResource(resource.SingularName)
+				versionMapper.AddSpecific(gv.WithKind(resource.Kind), plural, singular, scope)
+				// TODO this is producing unsafe guesses that don't actually work, but it matches previous behavior
 				versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
 			}
 			// TODO why is this type not in discovery (at least for "v1")
