@@ -128,7 +128,7 @@ func (va *doVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	}
 
 	if len(devicePath) == 0 {
-		return "", fmt.Errorf("WaitForAttach failed for Digital Ocean volume %q: devicePath is empty.",
+		return "", fmt.Errorf("WaitForAttach failed for Digital Ocean volume %q: devicePath is empty",
 			volumeSource.VolumeID)
 	}
 
@@ -150,7 +150,7 @@ func (va *doVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 			}
 			glog.V(5).Infof("Digital Ocean Volume (%q) is not attached yet", volumeSource.VolumeID)
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached Digital Ocean Volume %q. Timeout waiting for mount paths to be created.", volumeSource.VolumeID)
+			return "", fmt.Errorf("Could not find attached Digital Ocean Volume %q. Timeout waiting for mount paths to be created", volumeSource.VolumeID)
 		}
 	}
 }
