@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadm
+package v1beta1
 
 import (
 	"time"
@@ -172,14 +172,36 @@ type MasterPaths struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type NodeConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
-	CACertPath     string
-	DiscoveryFile  string
-	DiscoveryToken string
-	// Currently we only pay attention to one api server but hope to support >1 in the future
-	DiscoveryTokenAPIServers []string
-	NodeName                 string
-	TLSBootstrapToken        string
-	Token                    string
+	Discovery    NodeDiscovery `json:"discovery"`
+	TLSBootstrap TLSBootstrap  `json:"tlsBootstrap"`
+
+	NodeName       string `json:"nodeName"`
+	ShortHandToken string `json:"shortHandToken"`
+}
+
+type NodeDiscovery struct {
+	File  *DiscoveryFile  `json:"file"`
+	Token *DiscoveryToken `json:"token"`
+}
+
+type DiscoveryFile struct {
+	Path string `json:"path"`
+	// TODO: Make it possible to inline the discovery file in this API?
+	// FileBytes []byte `json:"fileBytes"`
+}
+
+type DiscoveryToken struct {
+	Token      string   `json:"token"`
+	APIServers []string `json:"apiServers"`
+}
+
+type TLSBootstrap struct {
+	Token string `json:"token"`
+}
+
+type NodePaths struct {
+	// CACertPath specifies where the CA cert of the cluster should be stored
+	CACertPath string `json:"caCertPath"`
 }
