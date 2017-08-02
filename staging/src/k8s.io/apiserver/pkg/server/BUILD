@@ -108,3 +108,25 @@ go_library(
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/filters:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/healthz:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/httplog:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/mux:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/options:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/routes:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

@@ -30,3 +30,21 @@ go_binary(
     library = ":go_default_library",
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/examples/client-go/client:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/examples/client-go/controller:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

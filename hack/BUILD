@@ -14,6 +14,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//hack/boilerplate:all-srcs",
+        "//hack/cmd/teststale:all-srcs",
         "//hack/e2e-internal:all-srcs",
         "//hack/lib:all-srcs",
     ],
@@ -46,4 +47,23 @@ test_suite(
         "verify-boilerplate",
         #        "verify-gofmt",
     ],
+)
+
+go_binary(
+    name = "hack",
+    library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["e2e_test.go"],
+    library = ":go_default_library",
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["e2e.go"],
+    tags = ["automanaged"],
 )
