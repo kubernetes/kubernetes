@@ -37,7 +37,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/client/retry:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -273,7 +272,7 @@ func controlledHistories(c externalclientset.Interface, namespace, name string) 
 	for i := range historyList.Items {
 		history := historyList.Items[i]
 		// Skip history that doesn't belong to the DaemonSet
-		if controllerRef := controller.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
+		if controllerRef := metav1.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
 			continue
 		}
 		result = append(result, &history)

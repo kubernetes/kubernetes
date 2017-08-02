@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -1770,7 +1769,7 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	controllerRef := controller.GetControllerOf(obj)
+	controllerRef := metav1.GetControllerOf(obj)
 	controllerName := "<none>"
 	if controllerRef != nil {
 		withKind := true

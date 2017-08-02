@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -145,7 +144,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Checking that stateful set pods are created with ControllerRef")
 			pod := pods.Items[0]
-			controllerRef := controller.GetControllerOf(&pod)
+			controllerRef := metav1.GetControllerOf(&pod)
 			Expect(controllerRef).ToNot(BeNil())
 			Expect(controllerRef.Kind).To(Equal(ss.Kind))
 			Expect(controllerRef.Name).To(Equal(ss.Name))
@@ -159,7 +158,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set readopts the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {
 						return false, nil
 					}
@@ -179,7 +178,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set releases the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "released", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef != nil {
 						return false, nil
 					}
@@ -196,7 +195,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set readopts the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {
 						return false, nil
 					}

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -61,7 +60,7 @@ func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
 func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
-	controllerRef := controller.GetControllerOf(&j)
+	controllerRef := metav1.GetControllerOf(&j)
 
 	if controllerRef == nil {
 		return types.UID(""), false

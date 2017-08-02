@@ -170,7 +170,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		set := ssc.resolveControllerRef(pod.Namespace, controllerRef)
 		if set == nil {
 			return
@@ -204,8 +204,8 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
-	curControllerRef := controller.GetControllerOf(curPod)
-	oldControllerRef := controller.GetControllerOf(oldPod)
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -260,7 +260,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -316,7 +316,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 	}
 	hasOrphans := false
 	for i := range revisions {
-		if controller.GetControllerOf(revisions[i]) == nil {
+		if metav1.GetControllerOf(revisions[i]) == nil {
 			hasOrphans = true
 			break
 		}

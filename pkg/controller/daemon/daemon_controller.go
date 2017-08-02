@@ -320,7 +320,7 @@ func (dsc *DaemonSetsController) addHistory(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(history); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(history); controllerRef != nil {
 		ds := dsc.resolveControllerRef(history.Namespace, controllerRef)
 		if ds == nil {
 			return
@@ -352,8 +352,8 @@ func (dsc *DaemonSetsController) updateHistory(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := controller.GetControllerOf(curHistory)
-	oldControllerRef := controller.GetControllerOf(oldHistory)
+	curControllerRef := metav1.GetControllerOf(curHistory)
+	oldControllerRef := metav1.GetControllerOf(oldHistory)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -411,7 +411,7 @@ func (dsc *DaemonSetsController) deleteHistory(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(history)
+	controllerRef := metav1.GetControllerOf(history)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -435,7 +435,7 @@ func (dsc *DaemonSetsController) addPod(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		ds := dsc.resolveControllerRef(pod.Namespace, controllerRef)
 		if ds == nil {
 			return
@@ -478,8 +478,8 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 	changedToReady := !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod)
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
-	curControllerRef := controller.GetControllerOf(curPod)
-	oldControllerRef := controller.GetControllerOf(oldPod)
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -539,7 +539,7 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -1068,7 +1068,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 		}
 		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
-		if controllerRef := controller.GetControllerOf(pod); controllerRef != nil && controllerRef.UID == ds.UID {
+		if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && controllerRef.UID == ds.UID {
 			continue
 		}
 		pods = append(pods, pod)
