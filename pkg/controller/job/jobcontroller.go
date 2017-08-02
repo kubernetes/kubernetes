@@ -430,77 +430,50 @@ func (jm *JobController) syncJob(key string) error {
 	}
 
 	var manageJobErr error
-	if pastActiveDeadline(&job) {
-		// TODO: below code should be replaced with pod termination resulting in
-		// pod failures, rather than killing pods. Unfortunately none such solution
-		// exists ATM. There's an open discussion in the topic in
-		// https://github.com/kubernetes/kubernetes/issues/14602 which might give
-		// some sort of solution to above problem.
-		// kill remaining active pods
-		wait := sync.WaitGroup{}
-		errCh := make(chan error, int(active))
-		wait.Add(int(active))
-		for i := int32(0); i < active; i++ {
-			go func(ix int32) {
-				defer wait.Done()
-				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
-					defer utilruntime.HandleError(err)
-					glog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", activePods[ix].Name, job.Namespace, job.Name)
-					errCh <- err
-				}
-			}(i)
-		}
-		wait.Wait()
 
-		select {
-		case manageJobErr = <-errCh:
-			if manageJobErr != nil {
-				break
+	jobTimeout := pastActiveDeadline(&job)
+
+	// first check if job is complete, to avoid mark a just complete job as timeout
+	if jobNeedsSync && job.DeletionTimestamp == nil && !jobTimeout {
+		active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+	}
+	completions := succeeded
+	jobComplete := false
+	if job.Spec.Completions == nil {
+		// This type of job is complete when any pod exits with success.
+		// Each pod is capable of
+		// determining whether or not the entire Job is done.  Subsequent pods are
+		// not expected to fail, but if they do, the failure is ignored.  Once any
+		// pod succeeds, the controller waits for remaining pods to finish, and
+		// then the job is complete.
+		if succeeded > 0 && active == 0 {
+			jobComplete = true
+		}
+	} else {
+		if completions >= *job.Spec.Completions {
+			jobComplete = true
+			if active > 0 {
+				manageJobErr = jm.cleanupActivePods(&job, activePods)
+				jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
 			}
-		default:
+			if completions > *job.Spec.Completions {
+				jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+			}
 		}
+	}
 
+	// then check if job is timeout
+	if jobComplete {
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
+		now := metav1.Now()
+		job.Status.CompletionTime = &now
+	} else if jobTimeout {
+		manageJobErr = jm.cleanupActivePods(&job, activePods)
 		// update status values accordingly
 		failed += active
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
 		jm.recorder.Event(&job, v1.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
-	} else {
-		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
-		}
-		completions := succeeded
-		complete := false
-		if job.Spec.Completions == nil {
-			// This type of job is complete when any pod exits with success.
-			// Each pod is capable of
-			// determining whether or not the entire Job is done.  Subsequent pods are
-			// not expected to fail, but if they do, the failure is ignored.  Once any
-			// pod succeeds, the controller waits for remaining pods to finish, and
-			// then the job is complete.
-			if succeeded > 0 && active == 0 {
-				complete = true
-			}
-		} else {
-			// Job specifies a number of completions.  This type of job signals
-			// success by having that number of successes.  Since we do not
-			// start more pods than there are remaining completions, there should
-			// not be any remaining active pods once this count is reached.
-			if completions >= *job.Spec.Completions {
-				complete = true
-				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
-				}
-				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
-				}
-			}
-		}
-		if complete {
-			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-			now := metav1.Now()
-			job.Status.CompletionTime = &now
-		}
 	}
 
 	// no need to update the job if the status hasn't changed since last time
@@ -514,6 +487,38 @@ func (jm *JobController) syncJob(key string) error {
 		}
 	}
 	return manageJobErr
+}
+
+func (jm *JobController) cleanupActivePods(job *batch.Job, activePods []*v1.Pod) error {
+	// TODO: below code should be replaced with pod termination resulting in
+	// pod failures, rather than killing pods. Unfortunately none such solution
+	// exists ATM. There's an open discussion in the topic in
+	// https://github.com/kubernetes/kubernetes/issues/14602 which might give
+	// some sort of solution to above problem.
+	// kill remaining active pods
+	wait := sync.WaitGroup{}
+	errCh := make(chan error, len(activePods))
+	wait.Add(len(activePods))
+	for _, pod := range activePods {
+		go func(pod *v1.Pod) {
+			defer wait.Done()
+			if err := jm.podControl.DeletePod(job.Namespace, pod.Name, job); err != nil {
+				defer utilruntime.HandleError(err)
+				glog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", pod.Name, job.Namespace, job.Name)
+				errCh <- err
+			}
+		}(pod)
+	}
+	wait.Wait()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+	default:
+	}
+	return nil
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
