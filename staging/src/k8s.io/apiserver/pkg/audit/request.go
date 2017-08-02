@@ -97,7 +97,8 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 			Name:        attribs.GetName(),
 			Resource:    attribs.GetResource(),
 			Subresource: attribs.GetSubresource(),
-			APIVersion:  attribs.GetAPIGroup() + "/" + attribs.GetAPIVersion(),
+			APIGroup:    attribs.GetAPIGroup(),
+			APIVersion:  attribs.GetAPIVersion(),
 		}
 	}
 
@@ -132,6 +133,7 @@ func LogRequestObject(ae *audit.Event, obj runtime.Object, gvr schema.GroupVersi
 	}
 	// TODO: ObjectRef should include the API group.
 	if len(ae.ObjectRef.APIVersion) == 0 {
+		ae.ObjectRef.APIGroup = gvr.Group
 		ae.ObjectRef.APIVersion = gvr.Version
 	}
 	if len(ae.ObjectRef.Resource) == 0 {

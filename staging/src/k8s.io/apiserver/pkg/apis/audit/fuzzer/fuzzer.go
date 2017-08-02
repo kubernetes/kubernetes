@@ -50,5 +50,20 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
+		func(o *audit.ObjectReference, c fuzz.Continue) {
+			c.FuzzNoCustom(o)
+			switch c.Intn(3) {
+			case 0:
+				// core api group
+				o.APIGroup = ""
+				o.APIVersion = "v1"
+			case 1:
+				// other group
+				o.APIGroup = "rbac.authorization.k8s.io"
+				o.APIVersion = "v1beta1"
+			default:
+				// use random value.
+			}
+		},
 	}
 }

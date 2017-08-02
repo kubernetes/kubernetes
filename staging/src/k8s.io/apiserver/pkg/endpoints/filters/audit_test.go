@@ -923,6 +923,12 @@ func TestAuditJson(t *testing.T) {
 			} else if expectedID != event.AuditID {
 				t.Errorf("[%s] Audits for one request should share the same AuditID, %s differs from %s", test.desc, expectedID, event.AuditID)
 			}
+			if event.ObjectRef.APIVersion != "v1" {
+				t.Errorf("[%s] Unexpected apiVersion: %s", test.desc, event.ObjectRef.APIVersion)
+			}
+			if event.ObjectRef.APIGroup != "" {
+				t.Errorf("[%s] Unexpected apiGroup: %s", test.desc, event.ObjectRef.APIGroup)
+			}
 			if (event.ResponseStatus == nil) != (expect.ResponseStatus == nil) {
 				t.Errorf("[%s] Unexpected ResponseStatus: %v", test.desc, event.ResponseStatus)
 				continue
