@@ -102,7 +102,7 @@ var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 		By("Creating the Client Pod")
 		clientPod, err = framework.CreateClientPod(c, ns, pvc)
 		Expect(err).NotTo(HaveOccurred())
-		node := types.NodeName(clientPod.Spec.NodeName)
+		node = types.NodeName(clientPod.Spec.NodeName)
 
 		By("Verify disk should be attached to the node")
 		isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, node)
