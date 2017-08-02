@@ -630,7 +630,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nod
 
 		nodesToPodCount := make(map[string]int)
 		for _, pod := range pods {
-			if controllerRef := metav1.GetControllerOf(&pod); controllerRef == nil || controllerRef.UID != ds.UID {
+			if !metav1.IsControlledBy(&pod, ds) {
 				continue
 			}
 			if pod.DeletionTimestamp != nil {
@@ -726,7 +726,7 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.D
 		unavailablePods := 0
 		allImagesUpdated := true
 		for _, pod := range pods {
-			if controllerRef := metav1.GetControllerOf(&pod); controllerRef == nil || controllerRef.UID != ds.UID {
+			if !metav1.IsControlledBy(&pod, ds) {
 				continue
 			}
 			podImage := pod.Spec.Containers[0].Image

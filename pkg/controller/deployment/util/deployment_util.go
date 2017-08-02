@@ -579,8 +579,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList RsListFunc) ([
 	// Only include those whose ControllerRef matches the Deployment.
 	owned := make([]*extensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
-		controllerRef := metav1.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
+		if metav1.IsControlledBy(rs, deployment) {
 			owned = append(owned, rs)
 		}
 	}
@@ -603,8 +602,7 @@ func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSLis
 	// Only include those whose ControllerRef matches the Deployment.
 	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
 	for _, rs := range all {
-		controllerRef := metav1.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == deployment.UID {
+		if metav1.IsControlledBy(rs, deployment) {
 			filtered = append(filtered, rs)
 		}
 	}

@@ -271,11 +271,10 @@ func controlledHistories(c externalclientset.Interface, namespace, name string) 
 	}
 	for i := range historyList.Items {
 		history := historyList.Items[i]
-		// Skip history that doesn't belong to the DaemonSet
-		if controllerRef := metav1.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
-			continue
+		// Only add history that belongs to the DaemonSet
+		if metav1.IsControlledBy(&history, ds) {
+			result = append(result, &history)
 		}
-		result = append(result, &history)
 	}
 	return ds, result, nil
 }

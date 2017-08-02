@@ -1068,7 +1068,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 		}
 		// ignore pods that belong to the daemonset when taking into account whether
 		// a daemonset should bind to a node.
-		if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && controllerRef.UID == ds.UID {
+		if metav1.IsControlledBy(pod, ds) {
 			continue
 		}
 		pods = append(pods, pod)
