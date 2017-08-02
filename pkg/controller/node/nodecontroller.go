@@ -215,7 +215,8 @@ func NewNodeController(
 	allocateNodeCIDRs bool,
 	allocatorType CIDRAllocatorType,
 	runTaintManager bool,
-	useTaintBasedEvictions bool) (*NodeController, error) {
+	useTaintBasedEvictions bool,
+) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -587,8 +588,8 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 			return false, nil
 		}); err != nil {
-			glog.Errorf("Update status  of Node %v from NodeController error : %v. "+
-				"Skipping - no pods will be evicted.", node.Name, err)
+			glog.Errorf("Update status of Node %v from NodeController error: %v. Skipping - no pods will be evicted.",
+				node.Name, err)
 			continue
 		}
 
