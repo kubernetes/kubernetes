@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -441,7 +441,7 @@ func TestAuditJson(t *testing.T) {
 		verb       string
 		auditID    string
 		handler    func(http.ResponseWriter, *http.Request)
-		expected   []auditv1alpha1.Event
+		expected   []auditv1beta1.Event
 		respHeader bool
 	}{
 		// short running requests with read-only verb
@@ -451,7 +451,7 @@ func TestAuditJson(t *testing.T) {
 			"GET",
 			"",
 			func(http.ResponseWriter, *http.Request) {},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "get",
@@ -474,7 +474,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "get",
@@ -497,7 +497,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "get",
@@ -519,7 +519,7 @@ func TestAuditJson(t *testing.T) {
 			"PUT",
 			"",
 			func(http.ResponseWriter, *http.Request) {},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "update",
@@ -543,7 +543,7 @@ func TestAuditJson(t *testing.T) {
 				w.Write([]byte("foo"))
 				time.Sleep(delay)
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "update",
@@ -567,7 +567,7 @@ func TestAuditJson(t *testing.T) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "update",
@@ -590,7 +590,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "update",
@@ -614,7 +614,7 @@ func TestAuditJson(t *testing.T) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "update",
@@ -636,7 +636,7 @@ func TestAuditJson(t *testing.T) {
 			"GET",
 			"",
 			func(http.ResponseWriter, *http.Request) {},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -665,7 +665,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -694,7 +694,7 @@ func TestAuditJson(t *testing.T) {
 			func(http.ResponseWriter, *http.Request) {
 				time.Sleep(delay)
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -724,7 +724,7 @@ func TestAuditJson(t *testing.T) {
 				time.Sleep(delay)
 				w.WriteHeader(403)
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -753,7 +753,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				w.Write([]byte("foo"))
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -783,7 +783,7 @@ func TestAuditJson(t *testing.T) {
 				w.WriteHeader(403)
 				w.Write([]byte("foo"))
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -812,7 +812,7 @@ func TestAuditJson(t *testing.T) {
 			func(w http.ResponseWriter, req *http.Request) {
 				panic("kaboom")
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -836,7 +836,7 @@ func TestAuditJson(t *testing.T) {
 				w.Write([]byte("foo"))
 				panic("kaboom")
 			},
-			[]auditv1alpha1.Event{
+			[]auditv1beta1.Event{
 				{
 					Stage:      auditinternal.StageRequestReceived,
 					Verb:       "watch",
@@ -892,8 +892,8 @@ func TestAuditJson(t *testing.T) {
 		expectedID := types.UID("")
 		for i, expect := range test.expected {
 			// decode events back to check json elements.
-			event := &auditv1alpha1.Event{}
-			decoder := audit.Codecs.UniversalDecoder(auditv1alpha1.SchemeGroupVersion)
+			event := &auditv1beta1.Event{}
+			decoder := audit.Codecs.UniversalDecoder(auditv1beta1.SchemeGroupVersion)
 			if err := runtime.DecodeInto(decoder, []byte(line[i]), event); err != nil {
 				t.Errorf("failed decoding line %s: %v", line[i], err)
 				continue

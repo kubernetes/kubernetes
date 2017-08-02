@@ -35,14 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // newWebhookHandler returns a handler which recieves webhook events and decodes the
 // request body. The caller passes a callback which is called on each webhook POST.
-func newWebhookHandler(t *testing.T, cb func(events *auditv1alpha1.EventList)) http.Handler {
+func newWebhookHandler(t *testing.T, cb func(events *auditv1beta1.EventList)) http.Handler {
 	s := json.NewSerializer(json.DefaultMetaFactory, audit.Scheme, audit.Scheme, false)
 	return &testWebhookHandler{
 		t:          t,
@@ -54,7 +54,7 @@ func newWebhookHandler(t *testing.T, cb func(events *auditv1alpha1.EventList)) h
 type testWebhookHandler struct {
 	t *testing.T
 
-	onEvents func(events *auditv1alpha1.EventList)
+	onEvents func(events *auditv1beta1.EventList)
 
 	serializer runtime.Serializer
 }
@@ -66,13 +66,13 @@ func (t *testWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("read webhook request body: %v", err)
 		}
 
-		obj, _, err := t.serializer.Decode(body, nil, &auditv1alpha1.EventList{})
+		obj, _, err := t.serializer.Decode(body, nil, &auditv1beta1.EventList{})
 		if err != nil {
 			return fmt.Errorf("decode request body: %v", err)
 		}
-		list, ok := obj.(*auditv1alpha1.EventList)
+		list, ok := obj.(*auditv1beta1.EventList)
 		if !ok {
-			return fmt.Errorf("expected *v1alpha1.EventList got %T", obj)
+			return fmt.Errorf("expected *v1beta1.EventList got %T", obj)
 		}
 		t.onEvents(list)
 		return nil
@@ -122,7 +122,7 @@ func TestWebhook(t *testing.T) {
 	gotEvents := false
 	defer func() { require.True(t, gotEvents, "no events received") }()
 
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		gotEvents = true
 	}))
 	defer s.Close()
@@ -151,7 +151,7 @@ func TestBatchWebhookMaxEvents(t *testing.T) {
 	}
 
 	got := make(chan int, 2)
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		got <- len(events.Items)
 	}))
 	defer s.Close()
@@ -183,7 +183,7 @@ func TestBatchWebhookStopCh(t *testing.T) {
 
 	expected := len(events)
 	got := make(chan int, 2)
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		got <- len(events.Items)
 	}))
 	defer s.Close()
@@ -209,7 +209,7 @@ func TestBatchWebhookProcessEventsAfterStop(t *testing.T) {
 	}
 
 	got := make(chan struct{})
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		close(got)
 	}))
 	defer s.Close()
@@ -233,7 +233,7 @@ func TestBatchWebhookShutdown(t *testing.T) {
 	got := make(chan struct{})
 	contReqCh := make(chan struct{})
 	shutdownCh := make(chan struct{})
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		close(got)
 		<-contReqCh
 	}))
@@ -278,7 +278,7 @@ func TestBatchWebhookEmptyBuffer(t *testing.T) {
 
 	expected := len(events)
 	got := make(chan int, 2)
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		got <- len(events.Items)
 	}))
 	defer s.Close()
@@ -311,7 +311,7 @@ func TestBatchBufferFull(t *testing.T) {
 	for i := range events {
 		events[i] = &auditinternal.Event{}
 	}
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		// Do nothing.
 	}))
 	defer s.Close()
@@ -344,7 +344,7 @@ func TestBatchRun(t *testing.T) {
 		close(done)
 	}()
 
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		atomic.AddInt64(got, int64(len(events.Items)))
 		wg.Add(-len(events.Items))
 	}))
@@ -377,7 +377,7 @@ func TestBatchConcurrentRequests(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(len(events))
 
-	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1beta1.EventList) {
 		wg.Add(-len(events.Items))
 
 		// Since the webhook makes concurrent requests, blocking on the webhook response
