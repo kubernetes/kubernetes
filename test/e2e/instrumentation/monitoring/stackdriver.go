@@ -60,7 +60,7 @@ var (
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gke")
+		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
