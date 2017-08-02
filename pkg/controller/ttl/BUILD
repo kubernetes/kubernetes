@@ -10,7 +10,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["ttlcontroller.go"],
+    srcs = ["ttl_controller.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
@@ -46,7 +46,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["ttlcontroller_test.go"],
+    srcs = ["ttl_controller_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
