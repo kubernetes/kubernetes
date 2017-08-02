@@ -10,34 +10,18 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "es.go",
-        "es_kibana.go",
-        "es_utils.go",
         "generic_soak.go",
-        "sd.go",
-        "sd_events.go",
-        "sd_soak.go",
-        "sd_utils.go",
-        "utils.go",
+        "imports.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/instrumentation:go_default_library",
+        "//test/e2e/instrumentation/common:go_default_library",
+        "//test/e2e/instrumentation/logging/elasticsearch:go_default_library",
+        "//test/e2e/instrumentation/logging/stackdrvier:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/golang.org/x/oauth2/google:go_default_library",
-        "//vendor/google.golang.org/api/logging/v2beta1:go_default_library",
-        "//vendor/google.golang.org/api/pubsub/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/client-go/util/integer:go_default_library",
     ],
 )
 
@@ -50,6 +34,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/instrumentation/logging/elasticsearch:all-srcs",
+        "//test/e2e/instrumentation/logging/stackdrvier:all-srcs",
+        "//test/e2e/instrumentation/logging/utils:all-srcs",
+    ],
     tags = ["automanaged"],
 )

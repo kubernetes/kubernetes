@@ -9,12 +9,9 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["imports.go"],
+    srcs = ["framework.go"],
     tags = ["automanaged"],
-    deps = [
-        "//test/e2e/instrumentation/logging:go_default_library",
-        "//test/e2e/instrumentation/monitoring:go_default_library",
-    ],
+    deps = ["//vendor/github.com/onsi/ginkgo:go_default_library"],
 )
 
 filegroup(
@@ -26,11 +23,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//test/e2e/instrumentation/common:all-srcs",
-        "//test/e2e/instrumentation/logging:all-srcs",
-        "//test/e2e/instrumentation/monitoring:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
