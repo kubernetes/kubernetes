@@ -178,6 +178,7 @@ go_test(
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/cpumanager:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/gpu:go_default_library",
         "//pkg/kubelet/images:go_default_library",
