@@ -142,7 +142,7 @@ var map_DeploymentSpec = map[string]string{
 	"template":                "Template describes the pods that will be created.",
 	"strategy":                "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
-	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 2.",
+	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
 	"paused":                  "Indicates that the deployment is paused.",
 	"rollbackTo":              "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
