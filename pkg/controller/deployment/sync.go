@@ -306,7 +306,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			// Make the name deterministic, to ensure idempotence
 			Name:            d.Name + "-" + podTemplateSpecHash,
 			Namespace:       d.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(d)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas:        new(int32),
@@ -650,18 +650,4 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment, rsList 
 		}
 	}
 	return false, nil
-}
-
-// newControllerRef returns a ControllerRef pointing to the deployment.
-func newControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               d.Name,
-		UID:                d.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
 }

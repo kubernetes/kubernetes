@@ -816,7 +816,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, newControllerRef(ds))
+			err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
 			if err != nil && errors.IsTimeout(err) {
 				// Pod is created but its initialization has timed out.
 				// If the initialization is successful eventually, the
@@ -1235,20 +1235,6 @@ func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	}
 
 	return len(reasons) == 0, reasons
-}
-
-// newControllerRef creates a ControllerRef pointing to the given DaemonSet.
-func newControllerRef(ds *extensions.DaemonSet) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               ds.Name,
-		UID:                ds.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
