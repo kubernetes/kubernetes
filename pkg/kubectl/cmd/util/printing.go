@@ -36,7 +36,7 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	AddNonDeprecatedPrinterFlags(cmd)
 
 	cmd.Flags().String("output-version", "", "DEPRECATED: To use a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkDeprecated("output-version", "the resource is used exactly as fetched from the API. To get a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
+	cmd.Flags().MarkDeprecated("output-version", "The resource is used exactly as fetched from the API. To get a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
 	cmd.Flags().MarkHidden("output-version")
 }
 
