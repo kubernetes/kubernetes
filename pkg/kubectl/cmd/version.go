@@ -48,7 +48,10 @@ type VersionOptions struct {
 var (
 	versionExample = templates.Examples(i18n.T(`
 		# Print the client and server versions for the current context
-		kubectl version`))
+		kubectl version
+
+		# Print the client version in yaml format
+		kubectl version --client --output=yaml`))
 )
 
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
