@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "density.go",
         "empty.go",
+        "framework.go",
         "load.go",
     ],
     tags = ["automanaged"],
