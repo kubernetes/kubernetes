@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/system"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -80,7 +80,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 		// Here we don't check for the bound node name since it can land on
 		// any one (this pod doesn't require any of the opaque resource.)
 		predicate := scheduleSuccessEvent(pod.Name, "")
-		success, err := common.ObserveEventAfterAction(f, predicate, action)
+		success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
@@ -105,7 +105,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod.Name, node.Name)
-		success, err := common.ObserveEventAfterAction(f, predicate, action)
+		success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
@@ -123,7 +123,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate := scheduleFailureEvent("over-max-oir")
-		success, err := common.ObserveEventAfterAction(f, predicate, action)
+		success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
@@ -168,7 +168,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod.Name, node.Name)
-		success, err := common.ObserveEventAfterAction(f, predicate, action)
+		success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 
@@ -208,7 +208,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate = scheduleFailureEvent(pod.Name)
-		success, err = common.ObserveEventAfterAction(f, predicate, action)
+		success, err = e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
@@ -234,7 +234,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod1.Name, node.Name)
-		success, err := common.ObserveEventAfterAction(f, predicate, action)
+		success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 
@@ -244,7 +244,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate = scheduleFailureEvent(pod2.Name)
-		success, err = common.ObserveEventAfterAction(f, predicate, action)
+		success, err = e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 
@@ -254,7 +254,7 @@ var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 			return err
 		}
 		predicate = scheduleSuccessEvent(pod2.Name, node.Name)
-		success, err = common.ObserveEventAfterAction(f, predicate, action)
+		success, err = e2e_common.ObserveEventAfterAction(f, predicate, action)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(success).To(Equal(true))
 	})
@@ -274,7 +274,7 @@ func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1
 		return foundCap && capacity.MilliValue() == int64(5000) &&
 			foundAlloc && allocatable.MilliValue() == int64(5000)
 	}
-	success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
+	success, err := e2e_common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(success).To(Equal(true))
 }
@@ -293,7 +293,7 @@ func removeOpaqueResource(f *framework.Framework, nodeName string, opaqueResName
 		By(fmt.Sprintf("Node [%s] has OIR capacity: [%t] (%s), has OIR allocatable: [%t] (%s)", n.Name, foundCap, capacity.String(), foundAlloc, allocatable.String()))
 		return (!foundCap || capacity.IsZero()) && (!foundAlloc || allocatable.IsZero())
 	}
-	success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
+	success, err := e2e_common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(success).To(Equal(true))
 }

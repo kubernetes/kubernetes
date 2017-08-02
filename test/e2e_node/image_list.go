@@ -29,8 +29,8 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
-	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	commontest "k8s.io/kubernetes/test/e2e_common"
 )
 
 const (

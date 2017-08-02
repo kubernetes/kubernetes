@@ -23,8 +23,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -115,7 +115,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
+			e2e_common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -141,9 +141,9 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
-			common.NewSVCByName(c, ns, name)
+			e2e_common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
+			e2e_common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 

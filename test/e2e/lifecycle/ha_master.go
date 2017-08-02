@@ -26,8 +26,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 )
 
 func addMasterReplica(zone string) error {
@@ -73,7 +73,7 @@ func verifyRCs(c clientset.Interface, ns string, names []string) {
 }
 
 func createNewRC(c clientset.Interface, ns string, name string) {
-	_, err := common.NewRCByName(c, ns, name, 1, nil)
+	_, err := e2e_common.NewRCByName(c, ns, name, 1, nil)
 	framework.ExpectNoError(err)
 }
 

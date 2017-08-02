@@ -34,8 +34,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	nodepkg "k8s.io/kubernetes/pkg/controller/node"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -236,9 +236,9 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
-			common.NewSVCByName(c, ns, name)
+			e2e_common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
+			e2e_common.NewRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
@@ -301,9 +301,9 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 			name := "my-hostname-net"
 			gracePeriod := int64(30)
 
-			common.NewSVCByName(c, ns, name)
+			e2e_common.NewSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
+			e2e_common.NewRCByName(c, ns, name, replicas, &gracePeriod)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
@@ -377,7 +377,7 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 			nn := framework.TestContext.CloudConfig.NumNodes
 			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
 			framework.ExpectNoError(err)
-			common.RestartNodes(f.ClientSet, nodeNames)
+			e2e_common.RestartNodes(f.ClientSet, nodeNames)
 
 			By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)

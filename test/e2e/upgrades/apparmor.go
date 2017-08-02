@@ -19,8 +19,8 @@ package upgrades
 import (
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,7 +36,7 @@ func (AppArmorUpgradeTest) Name() string { return "apparmor-upgrade" }
 
 func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 	supportedImages := make(map[string]bool)
-	for _, d := range common.AppArmorDistros {
+	for _, d := range e2e_common.AppArmorDistros {
 		supportedImages[d] = true
 	}
 
@@ -51,11 +51,11 @@ func (AppArmorUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 	By("Loading AppArmor profiles to nodes")
-	common.LoadAppArmorProfiles(f)
+	e2e_common.LoadAppArmorProfiles(f)
 
 	// Create the initial test pod.
 	By("Creating a long-running AppArmor enabled pod.")
-	t.pod = common.CreateAppArmorTestPod(f, false)
+	t.pod = e2e_common.CreateAppArmorTestPod(f, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -91,7 +91,7 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	By("Verifying an AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, true)
+	e2e_common.CreateAppArmorTestPod(f, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

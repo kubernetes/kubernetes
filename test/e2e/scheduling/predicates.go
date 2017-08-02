@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -623,7 +623,7 @@ func getRequestedCPU(pod v1.Pod) int64 {
 
 // removeTaintFromNodeAction returns a closure that removes the given taint
 // from the given node upon invocation.
-func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) common.Action {
+func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTaint v1.Taint) e2e_common.Action {
 	return func() error {
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		return nil
@@ -631,7 +631,7 @@ func removeTaintFromNodeAction(cs clientset.Interface, nodeName string, testTain
 }
 
 // createPausePodAction returns a closure that creates a pause pod upon invocation.
-func createPausePodAction(f *framework.Framework, conf pausePodConfig) common.Action {
+func createPausePodAction(f *framework.Framework, conf pausePodConfig) e2e_common.Action {
 	return func() error {
 		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
 		return err
@@ -640,12 +640,12 @@ func createPausePodAction(f *framework.Framework, conf pausePodConfig) common.Ac
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action e2e_common.Action, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
 		predicate = scheduleSuccessEvent(podName, "" /* any node */)
 	}
-	success, err := common.ObserveEventAfterAction(f, predicate, action)
+	success, err := e2e_common.ObserveEventAfterAction(f, predicate, action)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(success).To(Equal(true))
 }

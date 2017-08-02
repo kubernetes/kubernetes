@@ -17,8 +17,8 @@ limitations under the License.
 package node
 
 import (
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_common"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -28,8 +28,8 @@ var _ = SIGDescribe("AppArmor", func() {
 
 	Context("load AppArmor profiles", func() {
 		BeforeEach(func() {
-			common.SkipIfAppArmorNotSupported()
-			common.LoadAppArmorProfiles(f)
+			e2e_common.SkipIfAppArmorNotSupported()
+			e2e_common.LoadAppArmorProfiles(f)
 		})
 		AfterEach(func() {
 			if !CurrentGinkgoTestDescription().Failed {
@@ -39,7 +39,7 @@ var _ = SIGDescribe("AppArmor", func() {
 		})
 
 		It("should enforce an AppArmor profile", func() {
-			common.CreateAppArmorTestPod(f, true)
+			e2e_common.CreateAppArmorTestPod(f, true)
 		})
 	})
 })
