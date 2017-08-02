@@ -6303,6 +6303,24 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "invalid duplicate ports (with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(80)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate ports (with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
+			},
+			numErrs: 0,
+		},
+		{
 			name: "invalid duplicate targetports (number with same protocol)",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeClusterIP

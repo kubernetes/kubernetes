@@ -67,7 +67,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, string(y))
 	case "json":
-		y, err := json.Marshal(&v)
+		y, err := json.MarshalIndent(&v, "", "  ")
 		if err != nil {
 			return err
 		}

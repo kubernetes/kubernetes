@@ -239,10 +239,13 @@ function append_or_replace_prefixed_line {
   local -r file="${1:-}"
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
+  local -r dirname="$(dirname ${file})"
+  local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
-  echo "${prefix}${suffix}" >> "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  echo "${prefix}${suffix}" >> "${tmpfile}"
+  mv "${tmpfile}" "${file}"
 }
 
 function create-node-pki {
@@ -359,7 +362,11 @@ function create-master-auth {
     fi
     append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
   fi
+
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+    rm "${known_tokens_csv}"
+  fi
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi

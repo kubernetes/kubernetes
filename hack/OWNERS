@@ -8,6 +8,7 @@ reviewers:
   - spxtr
   - zmerlynn
   - sttts
+  - gmarek
 approvers:
   - deads2k
   - eparis
@@ -22,3 +23,4 @@ approvers:
   - spxtr
   - zmerlynn
   - sttts
+  - gmarek

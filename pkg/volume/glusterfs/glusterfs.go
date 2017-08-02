@@ -463,7 +463,7 @@ func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 
 func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Glusterfs is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.Glusterfs is nil")
 	}
 	return &glusterfsVolumeDeleter{
 		glusterfsMounter: &glusterfsMounter{
