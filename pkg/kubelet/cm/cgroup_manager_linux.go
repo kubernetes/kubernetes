@@ -154,7 +154,7 @@ func (l *libcontainerAdapter) revertName(name string) CgroupName {
 	return CgroupName(driverName)
 }
 
-// adaptName converts a CgroupName identifer to a driver specific conversion value.
+// adaptName converts a CgroupName identifier to a driver specific conversion value.
 // if outputToCgroupFs is true, the result is returned in the cgroupfs format rather than the driver specific form.
 func (l *libcontainerAdapter) adaptName(cgroupName CgroupName, outputToCgroupFs bool) string {
 	if l.cgroupManagerType != libcontainerSystemd {
@@ -229,7 +229,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 	// the presence of alternative control groups not known to runc confuses
 	// the kubelet existence checks.
-	// ideally, we would have a mechaninsm in runc to support Exists() logic
+	// ideally, we would have a mechanism in runc to support Exists() logic
 	// scoped to the set control groups it understands.  this is being discussed
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
@@ -237,7 +237,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
 	for controller, path := range cgroupPaths {
-		// ignore mounts we dont care about
+		// ignore mounts we don't care about
 		if !whitelistControllers.Has(controller) {
 			continue
 		}
