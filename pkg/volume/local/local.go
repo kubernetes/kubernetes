@@ -229,6 +229,13 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			return err
 		}
 		if !notMnt {
+			// Reset Gid of a local volume which will be unmounted next
+			if fsGroup != nil {
+				*fsGroup = 0
+				if err := volume.SetVolumeOwnership(m, fsGroup); err != nil {
+					glog.Errorf("Failed to reset Gid: %v", err)
+				}
+			}
 			if mntErr = m.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
