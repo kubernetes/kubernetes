@@ -2376,6 +2376,35 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "scaleIO.system",
 		},
+		// DOVolume
+		{
+			name: "valid DOVolume",
+			vol: api.Volume{
+				Name: "do-volume",
+				VolumeSource: api.VolumeSource{
+					DOVolume: &api.DOVolumeSource{
+						VolumeID: "do-volume-source-identifier",
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
+		{
+			name: "no ID DOVolume",
+			vol: api.Volume{
+				Name: "do-volume",
+				VolumeSource: api.VolumeSource{
+					DOVolume: &api.DOVolumeSource{
+						VolumeID: "",
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "doVolume.volumeID",
+		},
 	}
 
 	for i, tc := range testCases {

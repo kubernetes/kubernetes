@@ -316,6 +316,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// DOVolume represents a Digital Ocean volume attached and mounted on kubernetes nodes
+	// +optional
+	DOVolume *DOVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -391,6 +394,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
+	// DOVolume represents a Digital Ocean volume attached and mounted on kubernetes nodes
+	// +optional
+	DOVolume *DOVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1216,6 +1222,20 @@ type StorageOSPersistentVolumeSource struct {
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
 	SecretRef *ObjectReference
+}
+
+// DOVolumeSource represents a Volume resource in Digital Ocean.
+type DOVolumeSource struct {
+	// Unique ID for the volume resource at Digital Ocean.
+	VolumeID string
+	// FSType represents the filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. “ext4”, “xfs”. Implicitly inferred to be “ext4” if unspecified.
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
 }
 
 // Adapts a ConfigMap into a volume.

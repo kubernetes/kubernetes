@@ -750,6 +750,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"v1beta1.ResourceAttributes":          "k8s.io/kubernetes/pkg/apis/authorization/v1beta1.ResourceAttributes",
 		"v1.Pod":                              "k8s.io/kubernetes/pkg/api/v1.Pod",
 		"v1.FCVolumeSource":                   "k8s.io/kubernetes/pkg/api/v1.FCVolumeSource",
+		"v1.DOVolumeSource":                   "k8s.io/kubernetes/pkg/api/v1.DOVolumeSource",
 		"v1beta1.SubresourceReference":        "k8s.io/kubernetes/pkg/apis/extensions/v1beta1.SubresourceReference",
 		"v1.ResourceQuotaStatus":              "k8s.io/kubernetes/pkg/api/v1.ResourceQuotaStatus",
 		"v1alpha1.RoleBinding":                "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1.RoleBinding",
