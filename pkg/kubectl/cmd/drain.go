@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -217,7 +218,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	r := o.Factory.NewBuilder(true).
+	r := o.Factory.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("node", args[0]).
 		Do()

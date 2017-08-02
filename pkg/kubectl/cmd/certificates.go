@@ -167,7 +167,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 	if err != nil {
 		return err
 	}
-	r := f.NewBuilder(true).
+	r := f.NewBuilder().
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
 		ResourceNames("certificatesigningrequest", options.csrNames...).

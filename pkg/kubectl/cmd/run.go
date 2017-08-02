@@ -352,7 +352,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 				if err != nil {
 					return err
 				}
-				r := f.NewBuilder(true).
+				r := f.NewBuilder().
 					ContinueOnError().
 					NamespaceParam(namespace).DefaultNamespace().
 					ResourceNames(obj.Mapping.Resource, name).

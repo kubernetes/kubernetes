@@ -148,7 +148,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	if o.taintsToAdd, o.taintsToRemove, err = taintutils.ParseTaints(taintArgs); err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
-	o.builder = f.NewBuilder(true).
+	o.builder = f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {

@@ -142,7 +142,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
-	builder := f.NewBuilder(true).
+	builder := f.NewBuilder().
 		NamespaceParam(namespace).DefaultNamespace()
 
 	switch len(argsIn) {

@@ -143,7 +143,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	builder := f.NewBuilder(!o.Local).
+	builder := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -162,6 +162,8 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		if len(args) > 0 {
 			return resource.LocalResourceError
 		}
+
+		builder = builder.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = builder.Do().Infos()
