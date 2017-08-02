@@ -32,7 +32,6 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
-	apimachineryopenapi "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	clientset "k8s.io/client-go/kubernetes"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -452,7 +452,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		}
 		s.Definitions[k] = spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Ref:         spec.MustCreateRef("#/definitions/" + apimachineryopenapi.EscapeJsonPointer(v)),
+				Ref:         spec.MustCreateRef("#/definitions/" + openapicommon.EscapeJsonPointer(v)),
 				Description: fmt.Sprintf("Deprecated. Please use %s instead.", v),
 			},
 		}

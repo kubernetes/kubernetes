@@ -4,7 +4,7 @@ load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 def openapi_library(name, tags, srcs, openapi_targets=[], vendor_targets=[]):
   deps = [
       "//vendor/github.com/go-openapi/spec:go_default_library",
-      "//vendor/k8s.io/apimachinery/pkg/openapi:go_default_library",
+      "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
   ] + ["//%s:go_default_library" % target for target in openapi_targets] + ["//vendor/%s:go_default_library" % target for target in vendor_targets]
   go_library(
       name=name,

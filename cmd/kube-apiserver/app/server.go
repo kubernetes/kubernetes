@@ -38,7 +38,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -53,6 +52,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	//aggregatorinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
+	openapi "k8s.io/kube-openapi/pkg/common"
 
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"

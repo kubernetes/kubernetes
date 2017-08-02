@@ -27,11 +27,9 @@ import (
 	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -43,9 +41,9 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/apiserver/pkg/server/openapi"
 	"k8s.io/apiserver/pkg/server/routes"
 	restclient "k8s.io/client-go/rest"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 // Info about an API group.
@@ -131,9 +129,6 @@ type GenericAPIServer struct {
 	swaggerConfig *swagger.Config
 	openAPIConfig *openapicommon.Config
 
-	// Enables updating OpenAPI spec using update method.
-	OpenAPIService *openapi.OpenAPIService
-
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error.
@@ -173,9 +168,6 @@ type DelegationTarget interface {
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
-
-	// OpenAPISpec returns the OpenAPI spec of the delegation target if exists, nil otherwise.
-	OpenAPISpec() *spec.Swagger
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -190,9 +182,6 @@ func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 }
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
-}
-func (s *GenericAPIServer) OpenAPISpec() *spec.Swagger {
-	return s.OpenAPIService.GetSpec()
 }
 
 var EmptyDelegate = emptyDelegate{
@@ -218,9 +207,6 @@ func (s emptyDelegate) ListedPaths() []string {
 func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
 }
-func (s emptyDelegate) OpenAPISpec() *spec.Swagger {
-	return nil
-}
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.
 // TODO refactor third party resource storage
@@ -243,20 +229,15 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	if s.swaggerConfig != nil {
 		routes.Swagger{Config: s.swaggerConfig}.Install(s.Handler.GoRestfulContainer)
 	}
-	s.PrepareOpenAPIService()
+	if s.openAPIConfig != nil {
+		routes.OpenAPI{
+			Config: s.openAPIConfig,
+		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+	}
 
 	s.installHealthz()
 
 	return preparedGenericAPIServer{s}
-}
-
-// PrepareOpenAPIService installs OpenAPI handler if it does not exists.
-func (s *GenericAPIServer) PrepareOpenAPIService() {
-	if s.openAPIConfig != nil && s.OpenAPIService == nil {
-		s.OpenAPIService = routes.OpenAPI{
-			Config: s.openAPIConfig,
-		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
-	}
 }
 
 // Run spawns the secure http server. It only returns if stopCh is closed

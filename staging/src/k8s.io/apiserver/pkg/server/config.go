@@ -33,7 +33,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
-	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,6 +60,7 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
