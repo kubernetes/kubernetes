@@ -645,8 +645,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for the rc to be deleted")
-		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
+		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
