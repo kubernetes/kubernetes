@@ -107,7 +107,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Error("Got a nil Mounter")
 	}
 
-	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root#DEFAULT@vol", tmpDir)
+	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root#@vol", tmpDir)
 	if volumePath != expectedPath {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, expectedPath)
 	}
@@ -131,7 +131,7 @@ func TestPluginVolume(t *testing.T) {
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
-			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", Tenant: "DEFAULT"},
+			Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
 		},
 	}
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
@@ -144,7 +144,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", Tenant: "DEFAULT"},
+				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
 			},
 		},
 	}
@@ -159,7 +159,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root", Tenant: "DEFAULT"},
+				Quobyte: &v1.QuobyteVolumeSource{Registry: "reg:7861", Volume: "vol", ReadOnly: false, User: "root", Group: "root"},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
