@@ -40,18 +40,12 @@ type Clientset struct {
 
 // ApiextensionsV1beta1 retrieves the ApiextensionsV1beta1Client
 func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiextensionsV1beta1Client
 }
 
 // Deprecated: Apiextensions retrieves the default version of ApiextensionsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiextensionsV1beta1Client
 }
 

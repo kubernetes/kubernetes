@@ -60,86 +60,56 @@ type Clientset struct {
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingV1Client
 }
 
 // Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
 // Please explicitly pick a version.
 func (c *Clientset) Autoscaling() autoscalingv1.AutoscalingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingV1Client
 }
 
 // BatchV1 retrieves the BatchV1Client
 func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchV1Client
 }
 
 // Deprecated: Batch retrieves the default version of BatchClient.
 // Please explicitly pick a version.
 func (c *Clientset) Batch() batchv1.BatchV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchV1Client
 }
 
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CoreV1Client
 }
 
 // Deprecated: Core retrieves the default version of CoreClient.
 // Please explicitly pick a version.
 func (c *Clientset) Core() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CoreV1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ExtensionsV1beta1Client
 }
 
 // Deprecated: Extensions retrieves the default version of ExtensionsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ExtensionsV1beta1Client
 }
 
 // FederationV1beta1 retrieves the FederationV1beta1Client
 func (c *Clientset) FederationV1beta1() federationv1beta1.FederationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.FederationV1beta1Client
 }
 
 // Deprecated: Federation retrieves the default version of FederationClient.
 // Please explicitly pick a version.
 func (c *Clientset) Federation() federationv1beta1.FederationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.FederationV1beta1Client
 }
 

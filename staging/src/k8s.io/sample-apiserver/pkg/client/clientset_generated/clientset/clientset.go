@@ -40,18 +40,12 @@ type Clientset struct {
 
 // WardleV1alpha1 retrieves the WardleV1alpha1Client
 func (c *Clientset) WardleV1alpha1() wardlev1alpha1.WardleV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.WardleV1alpha1Client
 }
 
 // Deprecated: Wardle retrieves the default version of WardleClient.
 // Please explicitly pick a version.
 func (c *Clientset) Wardle() wardlev1alpha1.WardleV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.WardleV1alpha1Client
 }
 

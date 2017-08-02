@@ -38,9 +38,6 @@ type Clientset struct {
 
 // Wardle retrieves the WardleClient
 func (c *Clientset) Wardle() wardleinternalversion.WardleInterface {
-	if c == nil {
-		return nil
-	}
 	return c.WardleClient
 }
 
