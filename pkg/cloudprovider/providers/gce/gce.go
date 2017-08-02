@@ -290,8 +290,8 @@ func CreateGCECloud(apiEndpoint, projectID, region, zone string, managedZones []
 	// staging API endpoint: https://www.googleapis.com/compute/staging_v1/
 	if apiEndpoint != "" {
 		service.BasePath = fmt.Sprintf("%sprojects/", apiEndpoint)
-		serviceBeta.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "beta", 0))
-		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "alpha", 0))
+		serviceBeta.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "beta", -1))
+		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(apiEndpoint, "v1", "alpha", -1))
 	}
 
 	containerService, err := container.New(client)
