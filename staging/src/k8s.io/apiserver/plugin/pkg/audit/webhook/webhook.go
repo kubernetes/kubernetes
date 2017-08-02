@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/install"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/util/webhook"
 )
@@ -87,8 +87,9 @@ var (
 	//
 	// Can we make these passable to NewGenericWebhook?
 	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	groupVersions        = []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion}
-	registry             = registered.NewOrDie("")
+	// TODO(audit): figure out a general way to let the client choose their preferred version
+	groupVersions = []schema.GroupVersion{auditv1beta1.SchemeGroupVersion}
+	registry      = registered.NewOrDie("")
 )
 
 func init() {

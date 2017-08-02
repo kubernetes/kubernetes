@@ -14,23 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: Delete this file if we generate a clientset.
-package audit
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/audit
+// +k8s:openapi-gen=true
+// +k8s:defaulter-gen=TypeMeta
 
-import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
-)
-
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-
-func init() {
-	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	v1alpha1.AddToScheme(Scheme)
-	v1beta1.AddToScheme(Scheme)
-}
+// +groupName=audit.k8s.io
+package v1beta1 // import "k8s.io/apiserver/pkg/apis/audit/v1beta1"
