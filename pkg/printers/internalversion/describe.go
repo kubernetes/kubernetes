@@ -2006,6 +2006,9 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		if len(service.Spec.ExternalIPs) > 0 {
 			w.Write(LEVEL_0, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
 		}
+		if service.Spec.LoadBalancerIP != "" {
+			w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.LoadBalancerIP)
+		}
 		if service.Spec.ExternalName != "" {
 			w.Write(LEVEL_0, "External Name:\t%s\n", service.Spec.ExternalName)
 		}
@@ -2021,12 +2024,26 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 				name = "<unset>"
 			}
 			w.Write(LEVEL_0, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+			if sp.TargetPort.Type == intstr.Type(intstr.Int) {
+				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.IntVal, sp.Protocol)
+			} else {
+				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.StrVal, sp.Protocol)
+			}
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
 			}
 			w.Write(LEVEL_0, "Endpoints:\t%s\n", formatEndpoints(endpoints, sets.NewString(sp.Name)))
 		}
 		w.Write(LEVEL_0, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
+		if service.Spec.ExternalTrafficPolicy != "" {
+			w.Write(LEVEL_0, "External Traffic Policy:\t%s\n", service.Spec.ExternalTrafficPolicy)
+		}
+		if service.Spec.HealthCheckNodePort != 0 {
+			w.Write(LEVEL_0, "HealthCheck NodePort:\t%d\n", service.Spec.HealthCheckNodePort)
+		}
+		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
+			w.Write(LEVEL_0, "LoadBalancer Source Ranges:\t%v\n", strings.Join(service.Spec.LoadBalancerSourceRanges, ","))
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}

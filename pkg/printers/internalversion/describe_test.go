@@ -172,15 +172,46 @@ func TestDescribeService(t *testing.T) {
 			Name:      "bar",
 			Namespace: "foo",
 		},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			Ports: []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       8080,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(9527),
+				NodePort:   31111,
+			}},
+			Selector:              map[string]string{"blah": "heh"},
+			ClusterIP:             "1.2.3.4",
+			LoadBalancerIP:        "5.6.7.8",
+			SessionAffinity:       "None",
+			ExternalTrafficPolicy: "Local",
+			HealthCheckNodePort:   32222,
+		},
 	})
+	expectedElements := []string{
+		"Name", "bar",
+		"Namespace", "foo",
+		"Selector", "blah=heh",
+		"Type", "LoadBalancer",
+		"IP", "1.2.3.4",
+		"Port", "port-tcp", "8080/TCP",
+		"TargetPort", "9527/TCP",
+		"NodePort", "port-tcp", "31111/TCP",
+		"Session Affinity", "None",
+		"External Traffic Policy", "Local",
+		"HealthCheck NodePort", "32222",
+	}
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
 	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Labels:") || !strings.Contains(out, "bar") {
-		t.Errorf("unexpected out: %s", out)
+	for _, expected := range expectedElements {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
 	}
 }
 
