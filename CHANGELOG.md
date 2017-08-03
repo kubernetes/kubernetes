@@ -890,7 +890,11 @@ filename | sha256 hash
 * Fix Cinder to support http status 300 in pagination ([#47602](https://github.com/kubernetes/kubernetes/pull/47602), [@rootfs](https://github.com/rootfs))
 * Automated cherry pick of [#49079](https://github.com/kubernetes/kubernetes/pull/49079) upstream release 1.7 ([#49254](https://github.com/kubernetes/kubernetes/pull/49254), [@feiskyer](https://github.com/feiskyer))
 * Fixed GlusterFS volumes taking too long to time out ([#48709](https://github.com/kubernetes/kubernetes/pull/48709), [@jsafrane](https://github.com/jsafrane))
-
+* The IP address and port for kube-proxy metrics server is now configurable via flag `--metrics-bind-address` ([#48625](https://github.com/kubernetes/kubernetes/pull/48625), [@mrhohn](https://github.com/mrhohn))
+  * Special notice for kube-proxy in 1.7+ (including 1.7.0):
+    * Healthz server (/healthz) will be served on 0.0.0.0:10256 by default.
+    * Metrics server (/metrics and /proxyMode) will be served on 127.0.0.1:10249 by default.
+    * Metrics server will continue serving /healthz.
 
 
 # v1.7.2
