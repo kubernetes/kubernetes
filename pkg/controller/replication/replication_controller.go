@@ -165,6 +165,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 func (rm *ReplicationManager) getPodControllers(pod *v1.Pod) []*v1.ReplicationController {
 	rcs, err := rm.rcLister.GetPodControllers(pod)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return nil
 	}
 	if len(rcs) > 1 {
@@ -186,6 +187,7 @@ func (rm *ReplicationManager) resolveControllerRef(namespace string, controllerR
 	}
 	rc, err := rm.rcLister.ReplicationControllers(namespace).Get(controllerRef.Name)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return nil
 	}
 	if rc.UID != controllerRef.UID {
@@ -238,6 +240,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 		}
 		rsKey, err := controller.KeyFunc(rc)
 		if err != nil {
+			utilruntime.HandleError(err)
 			return
 		}
 		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
@@ -368,6 +371,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	}
 	rsKey, err := controller.KeyFunc(rc)
 	if err != nil {
+		utilruntime.HandleError(err)
 		return
 	}
 	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
