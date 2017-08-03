@@ -541,6 +541,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
+	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
+	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+
 	if kubeCfg.RemoteRuntimeEndpoint != "" {
 		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
 		if kubeCfg.RemoteImageEndpoint == "" {
@@ -624,10 +627,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 		cpuManager, cpuManagerAdmitHandler, err := cpumanager.NewManager(
 			kubeCfg.CPUManagerPolicy,
-			runtimeService, // runtime service
-			klet,           // kubelet getter interface
+			runtimeService,
+			klet,
 			klet.statusManager,
-			klet.containerManager)
+			klet.containerManager,
+			klet.GetActivePods,
+			killPodNow(klet.podWorkers, kubeDeps.Recorder),
+			kubeDeps.Recorder)
 		if err != nil {
 			glog.Infof("[cpumanager] failed to initialize cpu manager: %v", err)
 			return nil, err
@@ -783,8 +789,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
-	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
