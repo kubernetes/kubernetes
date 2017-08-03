@@ -106,11 +106,11 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
-// PrinterForCommand returns the printer for the outputOptions (if given) or
+// printerForCommand returns the printer for the outputOptions (if given) or
 // returns the default printer for the command. Requires that printer flags have
 // been added to cmd (see AddPrinterFlags).
 // TODO: remove the dependency on cmd object
-func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func printerForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 
 	if outputOpts == nil {
 		outputOpts = extractOutputOptions(cmd)
