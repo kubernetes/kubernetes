@@ -20,9 +20,13 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs, &roundtrip.Exceptions{})
+	roundtrip.RoundTripTestForAPIGroup(t, Install, kubeadmfuzzer.Funcs, &roundtrip.Exceptions{
+		ReflectionConversion: map[schema.GroupVersion]bool{v1alpha1.SchemeGroupVersion: true},
+	})
 }

@@ -37,10 +37,12 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["install_test.go"],
+    srcs = ["roundtrip_test.go"],
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
