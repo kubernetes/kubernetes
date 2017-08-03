@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package network
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
+var _ = SIGDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
 		ns               string
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	framework.KubeDescribe("GCE [Slow] [Feature:Ingress]", func() {
+	SIGDescribe("GCE [Slow] [Feature:Ingress]", func() {
 		var gceController *framework.GCEIngressController
 
 		// Platform specific setup
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	framework.KubeDescribe("[Slow] Nginx", func() {
+	SIGDescribe("[Slow] Nginx", func() {
 		var nginxController *framework.NginxIngressController
 
 		BeforeEach(func() {
