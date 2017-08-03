@@ -109,7 +109,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
 		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 		// Choose the first node
-		node0 = &config.nodes.Items[0]
+		node0 = &nodes.Items[0]
 
 		config = &localTestConfig{
 			ns:     f.Namespace.Name,
