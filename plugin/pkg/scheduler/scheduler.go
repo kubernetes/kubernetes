@@ -17,7 +17,6 @@ limitations under the License.
 package scheduler
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -194,12 +193,20 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	assumed.Spec.NodeName = host
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
-		// TODO: This means that a given pod is already in cache (which means it
-		// is either assumed or already added). This is most probably result of a
-		// BUG in retrying logic. As a temporary workaround (which doesn't fully
-		// fix the problem, but should reduce its impact), we simply return here,
-		// as binding doesn't make sense anyway.
-		// This should be fixed properly though.
+
+		// This is most probably result of a BUG in retrying logic.
+		// We report an error here so that pod scheduling can be retried.
+		// This relies on the fact that Error will check if the pod has been bound
+		// to a node and if so will not add it back to the unscheduled pods queue
+		// (otherwise this would cause an infinite loop).
+		sched.config.Error(assumed, err)
+		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "AssumePod failed: %v", err)
+		sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  "SchedulerError",
+			Message: err.Error(),
+		})
 		return err
 	}
 
@@ -219,10 +226,13 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
 	err := sched.config.Binder.Bind(b)
+	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
+		glog.Errorf("scheduler cache FinishBinding failed: %v", err)
+	}
 	if err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v/%v", assumed.Namespace, assumed.Name)
 		if err := sched.config.SchedulerCache.ForgetPod(assumed); err != nil {
-			return fmt.Errorf("scheduler cache ForgetPod failed: %v", err)
+			glog.Errorf("scheduler cache ForgetPod failed: %v", err)
 		}
 		sched.config.Error(assumed, err)
 		sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "Binding rejected: %v", err)
@@ -232,10 +242,6 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 			Reason: "BindingRejected",
 		})
 		return err
-	}
-
-	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
-		return fmt.Errorf("scheduler cache FinishBinding failed: %v", err)
 	}
 
 	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
