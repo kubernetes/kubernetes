@@ -40,18 +40,12 @@ type Clientset struct {
 
 // MetricsV1alpha1 retrieves the MetricsV1alpha1Client
 func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.MetricsV1alpha1Client
 }
 
 // Deprecated: Metrics retrieves the default version of MetricsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Metrics() metricsv1alpha1.MetricsV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.MetricsV1alpha1Client
 }
 

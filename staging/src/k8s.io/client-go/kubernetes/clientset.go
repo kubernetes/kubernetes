@@ -131,312 +131,201 @@ type Clientset struct {
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
 func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AdmissionregistrationV1alpha1Client
 }
 
 // Deprecated: Admissionregistration retrieves the default version of AdmissionregistrationClient.
 // Please explicitly pick a version.
 func (c *Clientset) Admissionregistration() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AdmissionregistrationV1alpha1Client
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AppsV1beta1Client
 }
 
 // AppsV1beta2 retrieves the AppsV1beta2Client
 func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AppsV1beta2Client
 }
 
 // Deprecated: Apps retrieves the default version of AppsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Apps() appsv1beta2.AppsV1beta2Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AppsV1beta2Client
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
 func (c *Clientset) AuthenticationV1() authenticationv1.AuthenticationV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthenticationV1Client
 }
 
 // Deprecated: Authentication retrieves the default version of AuthenticationClient.
 // Please explicitly pick a version.
 func (c *Clientset) Authentication() authenticationv1.AuthenticationV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthenticationV1Client
 }
 
 // AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
 func (c *Clientset) AuthenticationV1beta1() authenticationv1beta1.AuthenticationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthenticationV1beta1Client
 }
 
 // AuthorizationV1 retrieves the AuthorizationV1Client
 func (c *Clientset) AuthorizationV1() authorizationv1.AuthorizationV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthorizationV1Client
 }
 
 // Deprecated: Authorization retrieves the default version of AuthorizationClient.
 // Please explicitly pick a version.
 func (c *Clientset) Authorization() authorizationv1.AuthorizationV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthorizationV1Client
 }
 
 // AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
 func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthorizationV1beta1Client
 }
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingV1Client
 }
 
 // Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
 // Please explicitly pick a version.
 func (c *Clientset) Autoscaling() autoscalingv1.AutoscalingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingV1Client
 }
 
 // AutoscalingV2alpha1 retrieves the AutoscalingV2alpha1Client
 func (c *Clientset) AutoscalingV2alpha1() autoscalingv2alpha1.AutoscalingV2alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingV2alpha1Client
 }
 
 // BatchV1 retrieves the BatchV1Client
 func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchV1Client
 }
 
 // Deprecated: Batch retrieves the default version of BatchClient.
 // Please explicitly pick a version.
 func (c *Clientset) Batch() batchv1.BatchV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchV1Client
 }
 
 // BatchV2alpha1 retrieves the BatchV2alpha1Client
 func (c *Clientset) BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchV2alpha1Client
 }
 
 // CertificatesV1beta1 retrieves the CertificatesV1beta1Client
 func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CertificatesV1beta1Client
 }
 
 // Deprecated: Certificates retrieves the default version of CertificatesClient.
 // Please explicitly pick a version.
 func (c *Clientset) Certificates() certificatesv1beta1.CertificatesV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CertificatesV1beta1Client
 }
 
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CoreV1Client
 }
 
 // Deprecated: Core retrieves the default version of CoreClient.
 // Please explicitly pick a version.
 func (c *Clientset) Core() corev1.CoreV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.CoreV1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ExtensionsV1beta1Client
 }
 
 // Deprecated: Extensions retrieves the default version of ExtensionsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ExtensionsV1beta1Client
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.NetworkingV1Client
 }
 
 // Deprecated: Networking retrieves the default version of NetworkingClient.
 // Please explicitly pick a version.
 func (c *Clientset) Networking() networkingv1.NetworkingV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.NetworkingV1Client
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client
 func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.PolicyV1beta1Client
 }
 
 // Deprecated: Policy retrieves the default version of PolicyClient.
 // Please explicitly pick a version.
 func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.PolicyV1beta1Client
 }
 
 // RbacV1beta1 retrieves the RbacV1beta1Client
 func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.RbacV1beta1Client
 }
 
 // Deprecated: Rbac retrieves the default version of RbacClient.
 // Please explicitly pick a version.
 func (c *Clientset) Rbac() rbacv1beta1.RbacV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.RbacV1beta1Client
 }
 
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
 func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.RbacV1alpha1Client
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
 func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.SchedulingV1alpha1Client
 }
 
 // Deprecated: Scheduling retrieves the default version of SchedulingClient.
 // Please explicitly pick a version.
 func (c *Clientset) Scheduling() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.SchedulingV1alpha1Client
 }
 
 // SettingsV1alpha1 retrieves the SettingsV1alpha1Client
 func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.SettingsV1alpha1Client
 }
 
 // Deprecated: Settings retrieves the default version of SettingsClient.
 // Please explicitly pick a version.
 func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.SettingsV1alpha1Client
 }
 
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.StorageV1beta1Client
 }
 
 // StorageV1 retrieves the StorageV1Client
 func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.StorageV1Client
 }
 
 // Deprecated: Storage retrieves the default version of StorageClient.
 // Please explicitly pick a version.
 func (c *Clientset) Storage() storagev1.StorageV1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.StorageV1Client
 }
 

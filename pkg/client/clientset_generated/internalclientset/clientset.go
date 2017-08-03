@@ -80,121 +80,76 @@ type Clientset struct {
 
 // Admissionregistration retrieves the AdmissionregistrationClient
 func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
-	if c == nil {
-		return nil
-	}
 	return c.AdmissionregistrationClient
 }
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
-	if c == nil {
-		return nil
-	}
 	return c.CoreClient
 }
 
 // Apps retrieves the AppsClient
 func (c *Clientset) Apps() appsinternalversion.AppsInterface {
-	if c == nil {
-		return nil
-	}
 	return c.AppsClient
 }
 
 // Authentication retrieves the AuthenticationClient
 func (c *Clientset) Authentication() authenticationinternalversion.AuthenticationInterface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthenticationClient
 }
 
 // Authorization retrieves the AuthorizationClient
 func (c *Clientset) Authorization() authorizationinternalversion.AuthorizationInterface {
-	if c == nil {
-		return nil
-	}
 	return c.AuthorizationClient
 }
 
 // Autoscaling retrieves the AutoscalingClient
 func (c *Clientset) Autoscaling() autoscalinginternalversion.AutoscalingInterface {
-	if c == nil {
-		return nil
-	}
 	return c.AutoscalingClient
 }
 
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() batchinternalversion.BatchInterface {
-	if c == nil {
-		return nil
-	}
 	return c.BatchClient
 }
 
 // Certificates retrieves the CertificatesClient
 func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInterface {
-	if c == nil {
-		return nil
-	}
 	return c.CertificatesClient
 }
 
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
-	if c == nil {
-		return nil
-	}
 	return c.ExtensionsClient
 }
 
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
-	if c == nil {
-		return nil
-	}
 	return c.NetworkingClient
 }
 
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() policyinternalversion.PolicyInterface {
-	if c == nil {
-		return nil
-	}
 	return c.PolicyClient
 }
 
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
-	if c == nil {
-		return nil
-	}
 	return c.RbacClient
 }
 
 // Scheduling retrieves the SchedulingClient
 func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
-	if c == nil {
-		return nil
-	}
 	return c.SchedulingClient
 }
 
 // Settings retrieves the SettingsClient
 func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
-	if c == nil {
-		return nil
-	}
 	return c.SettingsClient
 }
 
 // Storage retrieves the StorageClient
 func (c *Clientset) Storage() storageinternalversion.StorageInterface {
-	if c == nil {
-		return nil
-	}
 	return c.StorageClient
 }
 
