@@ -160,6 +160,20 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 	return printer.PrintObj(obj, out)
 }
 
+func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
+	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	if err != nil {
+		return err
+	}
+	if !printer.IsGeneric() {
+		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
+}
+
 // NewBuilder returns a new resource builder.
 // Receives a bool flag and avoids remote calls if set to false
 func (f *ring2Factory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
