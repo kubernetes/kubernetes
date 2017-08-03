@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // NewDefaultRESTMapperFromScheme instantiates a DefaultRESTMapper based on types registered in the given scheme.
@@ -38,6 +40,9 @@ func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, 
 			// We check the import path because we currently stuff both "api" and "extensions" objects
 			// into the same group within Scheme since Scheme has no notion of groups yet.
 			if !strings.Contains(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
+				if strings.HasSuffix(importPathPrefix, "k8s.io") {
+					glog.Errorf("ImportPrefix name in install.go shouldn't have 'k8s.io' suffix.")
+				}
 				continue
 			}
 			scope := RESTScopeNamespace
