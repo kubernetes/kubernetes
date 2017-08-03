@@ -80,6 +80,15 @@ func TestPluginEmptyRootContext(t *testing.T) {
 		expectedTeardownMounts: 0})
 }
 
+func TestPluginHugetlbfs(t *testing.T) {
+	doTestPlugin(t, pluginTestConfig{
+		medium:                        v1.StorageMediumHugepages,
+		expectedSetupMounts:           1,
+		expectedTeardownMounts:        0,
+		shouldBeMountedBeforeTeardown: true,
+	})
+}
+
 type pluginTestConfig struct {
 	medium                        v1.StorageMedium
 	idempotent                    bool
@@ -165,7 +174,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if e, a := config.expectedSetupMounts, len(physicalMounter.Log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
 	} else if config.expectedSetupMounts == 1 &&
-		(physicalMounter.Log[0].Action != mount.FakeActionMount || physicalMounter.Log[0].FSType != "tmpfs") {
+		(physicalMounter.Log[0].Action != mount.FakeActionMount || (physicalMounter.Log[0].FSType != "tmpfs" && physicalMounter.Log[0].FSType != "hugetlbfs")) {
 		t.Errorf("Unexpected physicalMounter action during setup: %#v", physicalMounter.Log[0])
 	}
 	physicalMounter.ResetLog()

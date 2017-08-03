@@ -104,9 +104,11 @@ func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
+
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 	}
+
 	return &emptyDir{
 		pod:             pod,
 		volName:         spec.Name(),
@@ -159,8 +161,9 @@ type mountDetector interface {
 type storageMedium int
 
 const (
-	mediumUnknown storageMedium = 0 // assume anything we don't explicitly handle is this
-	mediumMemory  storageMedium = 1 // memory (e.g. tmpfs on linux)
+	mediumUnknown   storageMedium = 0 // assume anything we don't explicitly handle is this
+	mediumMemory    storageMedium = 1 // memory (e.g. tmpfs on linux)
+	mediumHugepages storageMedium = 2 // hugepages
 )
 
 // EmptyDir volumes are temporary directories exposed to the pod.
@@ -221,6 +224,8 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = ed.setupDir(dir)
 	case v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
+	case v1.StorageMediumHugepages:
+		err = ed.setupHugepages(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
@@ -255,6 +260,29 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 
 	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
+}
+
+// setupHugepages creates a hugepage mount at the specified directory.
+func (ed *emptyDir) setupHugepages(dir string) error {
+	if ed.mounter == nil {
+		return fmt.Errorf("memory storage requested, but mounter is nil")
+	}
+	if err := ed.setupDir(dir); err != nil {
+		return err
+	}
+	// Make SetUp idempotent.
+	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	if err != nil {
+		return err
+	}
+	// If the directory is a mountpoint with medium memory, there is no
+	// work to do since we are already in the desired state.
+	if isMnt && medium == mediumHugepages {
+		return nil
+	}
+
+	glog.V(3).Infof("pod %v: mounting hugepages for volume %v", ed.pod.UID, ed.volName)
+	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{})
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.
@@ -318,9 +346,14 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	if isMnt && medium == mediumMemory {
-		ed.medium = v1.StorageMediumMemory
-		return ed.teardownTmpfs(dir)
+	if isMnt {
+		if medium == mediumMemory {
+			ed.medium = v1.StorageMediumMemory
+			return ed.teardownTmpfsOrHugetlbfs(dir)
+		} else if medium == mediumHugepages {
+			ed.medium = v1.StorageMediumHugepages
+			return ed.teardownTmpfsOrHugetlbfs(dir)
+		}
 	}
 	// assume StorageMediumDefault
 	return ed.teardownDefault(dir)
@@ -336,7 +369,7 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	return nil
 }
 
-func (ed *emptyDir) teardownTmpfs(dir string) error {
+func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
