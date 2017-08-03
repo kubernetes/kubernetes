@@ -27,18 +27,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// Handler wraps all HTTP calls to delegate with nice logging.
-// delegate may use LogOf(w).Addf(...) to write additional info to
-// the per-request log message.
-//
-// Intended to wrap calls to your ServeMux.
-func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer NewLogged(req, &w).StacktraceWhen(pred).Log()
-		delegate.ServeHTTP(w, req)
-	})
-}
-
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
