@@ -30,6 +30,7 @@ go_library(
         "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/vishvananda/netlink:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",

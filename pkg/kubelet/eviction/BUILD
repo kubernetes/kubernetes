@@ -4,21 +4,8 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "cgo_genrule",
     "go_library",
     "go_test",
-)
-
-cgo_genrule(
-    name = "cgo_codegen",
-    srcs = ["threshold_notifier_linux.go"],
-    clinkopts = [
-        "-lz",
-        "-lm",
-        "-lpthread",
-        "-ldl",
-    ],
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -53,9 +40,9 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
+        "threshold_notifier_linux.go",
         "types.go",
     ],
-    library = ":cgo_codegen",
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -72,6 +59,7 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -43,7 +43,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	}
 
 	// Unlink to cleanup the previous socket file.
-	err = syscall.Unlink(addr)
+	err = unix.Unlink(addr)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}

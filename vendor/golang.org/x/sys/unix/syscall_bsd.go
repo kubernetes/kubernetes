@@ -470,25 +470,11 @@ func Sysctl(name string) (string, error) {
 }
 
 func SysctlArgs(name string, args ...int) (string, error) {
-	mib, err := sysctlmib(name, args...)
+	buf, err := SysctlRaw(name, args...)
 	if err != nil {
 		return "", err
 	}
-
-	// Find size.
-	n := uintptr(0)
-	if err := sysctl(mib, nil, &n, nil, 0); err != nil {
-		return "", err
-	}
-	if n == 0 {
-		return "", nil
-	}
-
-	// Read into buffer of that size.
-	buf := make([]byte, n)
-	if err := sysctl(mib, &buf[0], &n, nil, 0); err != nil {
-		return "", err
-	}
+	n := len(buf)
 
 	// Throw away terminating NUL.
 	if n > 0 && buf[n-1] == '\x00' {
