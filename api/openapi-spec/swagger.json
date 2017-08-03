@@ -52583,6 +52583,10 @@
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceAttributes"
      },
+     "uid": {
+      "description": "UID information about the requesting user.",
+      "type": "string"
+     },
      "user": {
       "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
       "type": "string"
@@ -52797,6 +52801,10 @@
      "resourceAttributes": {
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.ResourceAttributes"
+     },
+     "uid": {
+      "description": "UID information about the requesting user.",
+      "type": "string"
      },
      "user": {
       "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups",

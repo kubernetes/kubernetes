@@ -482,6 +482,10 @@
      "extra": {
       "type": "object",
       "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here."
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID information about the requesting user."
      }
     }
    },
