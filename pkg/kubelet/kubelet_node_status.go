@@ -865,14 +865,16 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 	}
 
 	newOODCondition := nodeOODCondition == nil
-	if newOODCondition || nodeOODCondition.Status == v1.ConditionUnknown {
-		nodeOODCondition = &v1.NodeCondition{
-			Type:               v1.NodeOutOfDisk,
-			Status:             v1.ConditionFalse,
-			Reason:             "KubeletHasSufficientDisk",
-			Message:            "kubelet has sufficient disk space available",
-			LastTransitionTime: currentTime,
-		}
+	if newOODCondition {
+		nodeOODCondition = &v1.NodeCondition{}
+	}
+	if nodeOODCondition.Status != v1.ConditionFalse {
+		nodeOODCondition.Type = v1.NodeOutOfDisk
+		nodeOODCondition.Status = v1.ConditionFalse
+		nodeOODCondition.Reason = "KubeletHasSufficientDisk"
+		nodeOODCondition.Message = "kubelet has sufficient disk space available"
+		nodeOODCondition.LastTransitionTime = currentTime
+		kl.recordNodeStatusEvent(v1.EventTypeNormal, "NodeHasSufficientDisk")
 	}
 
 	// Update the heartbeat time irrespective of all the conditions.
