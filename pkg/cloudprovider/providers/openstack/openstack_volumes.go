@@ -215,14 +215,11 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if volume.Status != VolumeAvailableStatus {
 		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
 		glog.Errorf(errmsg)
 		return "", errors.New(errmsg)
-	}
-	cClient, err := os.NewComputeV2()
-	if err != nil {
-		return "", err
 	}
 
 	if volume.AttachedServerId != "" {
@@ -230,25 +227,38 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
-		glog.V(2).Infof("Disk %s is attached to a different instance (%s), detaching", volumeID, volume.AttachedServerId)
-		err = os.DetachDisk(volume.AttachedServerId, volumeID)
+		errmsg := fmt.Sprintf("Disk %s is already attached to a different instance (%s)", volumeID, volume.AttachedServerId)
+		glog.V(2).Infof(errmsg)
+		return "", errors.New(errmsg)
+	}
+
+	alreadyAttached, err := os.DiskIsAttached(instanceID, volumeID)
+	if err != nil {
+		return "", err
+	}
+
+	if !alreadyAttached {
+		cClient, err := os.NewComputeV2()
 		if err != nil {
 			return "", err
 		}
+
+		startTime := time.Now()
+		// add read only flag here if possible spothanis
+		_, err = volumeattach.Create(cClient, instanceID, &volumeattach.CreateOpts{
+			VolumeID: volume.ID,
+		}).Extract()
+
+		timeTaken := time.Since(startTime).Seconds()
+		recordOpenstackOperationMetric("attach_disk", timeTaken, err)
+
+		if err != nil {
+			glog.Errorf("Failed to attach %s volume to %s compute: %v", volumeID, instanceID, err)
+			return "", err
+		}
+		glog.V(2).Infof("Successfully attached %s volume to %s compute", volumeID, instanceID)
 	}
 
-	startTime := time.Now()
-	// add read only flag here if possible spothanis
-	_, err = volumeattach.Create(cClient, instanceID, &volumeattach.CreateOpts{
-		VolumeID: volume.ID,
-	}).Extract()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("attach_disk", timeTaken, err)
-	if err != nil {
-		glog.Errorf("Failed to attach %s volume to %s compute: %v", volumeID, instanceID, err)
-		return "", err
-	}
-	glog.V(2).Infof("Successfully attached %s volume to %s compute", volumeID, instanceID)
 	return volume.ID, nil
 }
 
@@ -258,20 +268,23 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	if err != nil {
 		return err
 	}
+
 	if volume.Status != VolumeInUseStatus {
 		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
 		glog.Errorf(errmsg)
 		return errors.New(errmsg)
 	}
-	cClient, err := os.NewComputeV2()
-	if err != nil {
-		return err
-	}
+
 	if volume.AttachedServerId != instanceID {
 		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", volume.Name, instanceID)
 		glog.Errorf(errMsg)
 		return errors.New(errMsg)
 	} else {
+		cClient, err := os.NewComputeV2()
+		if err != nil {
+			return err
+		}
+		
 		startTime := time.Now()
 		// This is a blocking call and effects kubelet's performance directly.
 		// We should consider kicking it out into a separate routine, if it is bad.
