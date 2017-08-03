@@ -122,7 +122,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/generated/openapi:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor/github.com/go-openapi/loads:go_default_library",
@@ -154,6 +153,7 @@ go_test(
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
