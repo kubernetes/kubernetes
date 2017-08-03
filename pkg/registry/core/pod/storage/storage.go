@@ -135,6 +135,10 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
+func (r *BindingREST) Destroy() {
+	r.store.Destroy()
+}
+
 var _ = rest.Creater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
@@ -207,6 +211,10 @@ type StatusREST struct {
 // New creates a new pod resource
 func (r *StatusREST) New() runtime.Object {
 	return &api.Pod{}
+}
+
+func (r *StatusREST) Destroy() {
+	r.store.Destroy()
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

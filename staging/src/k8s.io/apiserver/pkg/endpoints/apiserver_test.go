@@ -516,6 +516,8 @@ func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
+func (storage *SimpleRESTStorage) Destroy() {}
+
 func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
@@ -618,6 +620,8 @@ var _ = rest.Connecter(&ConnecterRESTStorage{})
 func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
+
+func (s *ConnecterRESTStorage) Destroy() {}
 
 func (s *ConnecterRESTStorage) Connect(ctx request.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
 	s.receivedConnectOptions = options
@@ -741,6 +745,8 @@ type SimpleTypedStorage struct {
 func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
+
+func (storage *SimpleTypedStorage) Destroy() {}
 
 func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
@@ -880,6 +886,8 @@ type UnimplementedRESTStorage struct{}
 func (UnimplementedRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
+
+func (UnimplementedRESTStorage) Destroy() {}
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
 // method, that it is literally not registered with the server.  In the past,
@@ -3866,6 +3874,8 @@ type SimpleXGSubresourceRESTStorage struct {
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
+
+func (storage *SimpleXGSubresourceRESTStorage) Destroy() {}
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil

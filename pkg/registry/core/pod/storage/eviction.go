@@ -70,6 +70,10 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+func (r *EvictionREST) Destroy() {
+	r.store.Destroy()
+}
+
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
 func (r *EvictionREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)

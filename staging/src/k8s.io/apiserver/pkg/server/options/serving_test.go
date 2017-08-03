@@ -40,6 +40,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server"
@@ -487,7 +488,7 @@ NextTest:
 				return
 			}
 
-			s, err := config.Complete().New("test", server.EmptyDelegate)
+			s, err := config.Complete().New("test", server.EmptyDelegate, wait.NeverStop)
 			if err != nil {
 				t.Errorf("%q - failed creating the server: %v", title, err)
 				return

@@ -148,6 +148,9 @@ type GenericAPIServer struct {
 
 	// delegationTarget is the next delegate in the chain or nil
 	delegationTarget DelegationTarget
+	// stopCh is to be used to clean up any resources that the
+	// server creates or maintains.
+	stopCh <-chan struct{}
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -347,6 +350,12 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
+
+	go func() {
+		<-s.stopCh
+		destroyStorage(apiGroupInfo)
+	}()
+
 	return nil
 }
 
@@ -391,6 +400,11 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
 	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.requestContextMapper).WebService())
+
+	go func() {
+		<-s.stopCh
+		destroyStorage(apiGroupInfo)
+	}()
 
 	return nil
 }
@@ -443,5 +457,13 @@ func NewDefaultAPIGroupInfo(group string, registry *registered.APIRegistrationMa
 		Scheme:                 scheme,
 		ParameterCodec:         parameterCodec,
 		NegotiatedSerializer:   codecs,
+	}
+}
+
+func destroyStorage(apiGroupInfo *APIGroupInfo) {
+	for _, stores := range apiGroupInfo.VersionedResourcesStorageMap {
+		for _, store := range stores {
+			store.Destroy()
+		}
 	}
 }

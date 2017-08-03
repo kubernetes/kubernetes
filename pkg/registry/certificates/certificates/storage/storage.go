@@ -81,6 +81,10 @@ func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+func (r *StatusREST) Destroy() {
+	r.store.Destroy()
+}
+
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)
@@ -93,6 +97,10 @@ type ApprovalREST struct {
 
 func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
+}
+
+func (r *ApprovalREST) Destroy() {
+	r.store.Destroy()
 }
 
 // Update alters the approval subset of an object.

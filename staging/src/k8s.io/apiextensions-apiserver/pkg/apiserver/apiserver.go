@@ -114,8 +114,8 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New returns a new instance of CustomResourceDefinitions from the given config.
-func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New("apiextensions-apiserver", delegationTarget) // completion is done in Complete, no need for a second time
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*CustomResourceDefinitions, error) {
+	genericServer, err := c.Config.GenericConfig.SkipComplete().New("apiextensions-apiserver", delegationTarget, stopCh) // completion is done in Complete, no need for a second time
 	if err != nil {
 		return nil, err
 	}

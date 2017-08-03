@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"sync"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
@@ -63,9 +65,23 @@ func StorageWithCacher(defaultCapacity int) generic.StorageDecorator {
 			Codec:                storageConfig.Codec,
 		}
 		cacher := storage.NewCacherFromConfig(cacherConfig)
+
+		// Why do we do need to do this only once and why
+		// here? Storage.Destroy() is responsible for cleanly
+		// shutting down Storage but this Cacher object is not
+		// exposed at the places where we make those calls. We
+		// do the teardown here to protect stopping the cacher
+		// multiple times. Failure to do so will cause
+		// Cacher.Stop() to panic in any subsequent calls as
+		// its underlying stop channel (cacher.stopCh) will
+		// already be closed.
+		once := sync.Once{}
+
 		destroyFunc := func() {
-			cacher.Stop()
-			d()
+			once.Do(func() {
+				cacher.Stop()
+				d()
+			})
 		}
 
 		return cacher, destroyFunc

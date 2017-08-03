@@ -51,6 +51,10 @@ func (r *ProxyREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+func (r *ProxyREST) Destroy() {
+	r.Store.Destroy()
+}
+
 // ConnectMethods returns the list of HTTP methods that can be proxied
 func (r *ProxyREST) ConnectMethods() []string {
 	return proxyMethods
@@ -93,6 +97,10 @@ func (r *AttachREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+func (r *AttachREST) Destroy() {
+	r.Store.Destroy()
+}
+
 // Connect returns a handler for the pod exec proxy
 func (r *AttachREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	attachOpts, ok := opts.(*api.PodAttachOptions)
@@ -130,6 +138,10 @@ func (r *ExecREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+func (r *ExecREST) Destroy() {
+	r.Store.Destroy()
+}
+
 // Connect returns a handler for the pod exec proxy
 func (r *ExecREST) Connect(ctx genericapirequest.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	execOpts, ok := opts.(*api.PodExecOptions)
@@ -165,6 +177,10 @@ var _ = rest.Connecter(&PortForwardREST{})
 // New returns an empty pod object
 func (r *PortForwardREST) New() runtime.Object {
 	return &api.Pod{}
+}
+
+func (r *PortForwardREST) Destroy() {
+	r.Store.Destroy()
 }
 
 // NewConnectOptions returns the versioned object that represents the

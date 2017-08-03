@@ -311,3 +311,5 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 func (p RESTStorageProvider) GroupName() string {
 	return rbac.GroupName
 }
+
+func (p RESTStorageProvider) Destroy() {}

@@ -237,6 +237,13 @@ func (e *Store) New() runtime.Object {
 	return e.NewFunc()
 }
 
+func (e *Store) Destroy() {
+	if e.DestroyFunc != nil {
+		e.DestroyFunc()
+		e.DestroyFunc = nil
+	}
+}
+
 // NewList implements rest.Lister.
 func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()

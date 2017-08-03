@@ -44,6 +44,8 @@ func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
 }
 
+func (rs *REST) Destroy() {}
+
 func (rs *REST) NewList() runtime.Object {
 	return &api.ComponentStatusList{}
 }

@@ -235,7 +235,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.Complete().New("federation", genericapiserver.EmptyDelegate)
+	m, err := genericConfig.Complete().New("federation", genericapiserver.EmptyDelegate, stopCh)
 	if err != nil {
 		return err
 	}
