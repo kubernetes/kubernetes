@@ -27,14 +27,14 @@ import (
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
 //
-var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	var rc *common.ResourceConsumer
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
 	titleUp := "Should scale from 1 pod to 3 pods and from 3 to 5"
 	titleDown := "Should scale from 5 pods to 3 pods and from 3 to 1"
 
-	framework.KubeDescribe("[Serial] [Slow] Deployment", func() {
+	SIGDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("test-deployment", common.KindDeployment, false, rc, f)
@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource
 		})
 	})
 
-	framework.KubeDescribe("[Serial] [Slow] ReplicaSet", func() {
+	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
 		// CPU tests via deployments
 		It(titleUp, func() {
 			scaleUp("rs", common.KindReplicaSet, false, rc, f)
@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource
 	})
 
 	// These tests take ~20 minutes each.
-	framework.KubeDescribe("[Serial] [Slow] ReplicationController", func() {
+	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
 		It(titleUp+" and verify decision stability", func() {
 			scaleUp("rc", common.KindRC, true, rc, f)
@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("[HPA] Horizontal pod autoscaling (scale resource
 		})
 	})
 
-	framework.KubeDescribe("ReplicationController light", func() {
+	SIGDescribe("ReplicationController light", func() {
 		It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,

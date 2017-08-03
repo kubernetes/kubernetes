@@ -75,7 +75,7 @@ const (
 	caOngoingScaleUpStatus = "InProgress"
 )
 
-var _ = framework.KubeDescribe("Cluster size autoscaling [Slow]", func() {
+var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 	var c clientset.Interface
 	var nodeCount int
