@@ -1084,7 +1084,6 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 //     running on that node.
 func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
 	newPod := NewPod(ds, node.Name)
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(newPod)
 
 	// Because these bools require an && of all their required conditions, we start
 	// with all bools set to true and set a bool to false if a condition is not met.
@@ -1095,21 +1094,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 		return false, false, false, nil
 	}
 
-	// TODO: Move it to the predicates
-	for _, c := range node.Status.Conditions {
-		if critical {
-			break
-		}
-		// TODO: There are other node status that the DaemonSet should ideally respect too,
-		//       e.g. MemoryPressure, and DiskPressure
-		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			// the kubelet will evict this pod if it needs to. Let kubelet
-			// decide whether to continue running this pod so leave shouldContinueRunning
-			// set to true
-			shouldSchedule = false
-		}
-	}
-
 	reasons, nodeInfo, err := dsc.simulate(newPod, node, ds)
 	if err != nil {
 		glog.Warningf("DaemonSet Predicates failed on node %s for ds '%s/%s' due to unexpected error: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
@@ -1117,7 +1101,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	}
 
 	var insufficientResourceErr error
-
 	for _, r := range reasons {
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
@@ -1127,6 +1110,11 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			var emitEvent bool
 			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
 			switch reason {
+			case predicates.ErrNodeOutOfDisk:
+				// the kubelet will evict this pod if it needs to. Let kubelet
+				// decide whether to continue running this pod so leave shouldContinueRunning
+				// set to true
+				shouldSchedule = false
 			// intentional
 			case
 				predicates.ErrNodeSelectorNotMatch,
@@ -1203,13 +1191,15 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
 	}
-
 	if critical {
 		// If the pod is marked as critical and support for critical pod annotations is enabled,
 		// check predicates for critical pods only.
 		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
 	} else {
 		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
+		ncFit, ncReasons := NodeConditionPredicates(nodeInfo)
+		fit = ncFit && fit
+		reasons = append(reasons, ncReasons...)
 	}
 	if err != nil {
 		return false, predicateFails, err
@@ -1219,6 +1209,21 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
+}
+
+func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
+	reasons := []algorithm.PredicateFailureReason{}
+
+	for _, c := range nodeInfo.Node().Status.Conditions {
+		// TODO: There are other node status that the DaemonSet should ideally respect too,
+		//       e.g. MemoryPressure, and DiskPressure
+		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
+			reasons = append(reasons, predicates.ErrNodeSelectorNotMatch)
+			break
+		}
+	}
+
+	return len(reasons) == 0, reasons
 }
 
 // newControllerRef creates a ControllerRef pointing to the given DaemonSet.
