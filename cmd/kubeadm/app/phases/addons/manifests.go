@@ -74,6 +74,13 @@ spec:
         - /usr/local/bin/kube-proxy
         - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
         {{ .ClusterCIDR }}
+        livenessProbe:
+          # kube-proxy hosts healthz server on port 10256 by default.
+          httpGet:
+            path: /healthz
+            port: 10256
+            scheme: HTTP
+          initialDelaySeconds: 5
         securityContext:
           privileged: true
         volumeMounts:

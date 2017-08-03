@@ -75,6 +75,13 @@ spec:
     - -c
     - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
+    livenessProbe:
+      # kube-proxy hosts healthz server on port 10256 by default.
+      httpGet:
+        path: /healthz
+        port: 10256
+        scheme: HTTP
+      initialDelaySeconds: 5
     securityContext:
       privileged: true
     volumeMounts:
