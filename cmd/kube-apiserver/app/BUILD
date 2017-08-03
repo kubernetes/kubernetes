@@ -18,7 +18,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//cmd/kube-apiserver/app/preflight:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -95,6 +94,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/etcd3/preflight:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
@@ -118,7 +118,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kube-apiserver/app/options:all-srcs",
-        "//cmd/kube-apiserver/app/preflight:all-srcs",
         "//cmd/kube-apiserver/app/testing:all-srcs",
     ],
     tags = ["automanaged"],

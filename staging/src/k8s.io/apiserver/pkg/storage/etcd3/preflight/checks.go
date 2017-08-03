@@ -36,20 +36,24 @@ type EtcdConnection struct {
 	ServerList []string
 }
 
-func (EtcdConnection) serverReachable(address string) bool {
-	if conn, err := net.DialTimeout("tcp", address, connectionTimeout); err == nil {
+func (EtcdConnection) serverReachable(connURL *url.URL) bool {
+	scheme := connURL.Scheme
+	if scheme == "http" || scheme == "https" || scheme == "tcp" {
+		scheme = "tcp"
+	}
+	if conn, err := net.DialTimeout(scheme, connURL.Host, connectionTimeout); err == nil {
 		defer conn.Close()
 		return true
 	}
 	return false
 }
 
-func parseServerURI(serverURI string) (string, error) {
+func parseServerURI(serverURI string) (*url.URL, error) {
 	connURL, err := url.Parse(serverURI)
 	if err != nil {
-		return "", fmt.Errorf("unable to parse etcd url: %v", err)
+		return &url.URL{}, fmt.Errorf("unable to parse etcd url: %v", err)
 	}
-	return connURL.Host, nil
+	return connURL, nil
 }
 
 // CheckEtcdServers will attempt to reach all etcd servers once. If any
