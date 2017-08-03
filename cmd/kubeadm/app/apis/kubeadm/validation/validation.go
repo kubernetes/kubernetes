@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
@@ -66,6 +67,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
 	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
+	allErrs = append(allErrs, ValidateFeatureFlags(c.FeatureFlags, field.NewPath("feature-flags"))...)
 	return allErrs
 }
 
@@ -280,4 +282,19 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
+}
+
+func ValidateFeatureFlags(featureFlags map[string]bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	validFeatures := features.Keys(features.InitFeatureGates)
+
+	// check valid feature names are provided
+	for k := range featureFlags {
+		if !features.Supports(features.InitFeatureGates, k) {
+			allErrs = append(allErrs, field.Invalid(fldPath, featureFlags,
+				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
+		}
+	}
+
+	return allErrs
 }
