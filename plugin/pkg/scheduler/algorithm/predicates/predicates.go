@@ -781,6 +781,7 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta interface{}, no
 		s.serviceAffinityMetadataProducer(pm)
 		pods, services = pm.serviceAffinityMatchingPodList, pm.serviceAffinityMatchingPodServices
 	}
+	filteredPods := nodeInfo.FilterOutPods(pods)
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -790,8 +791,8 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta interface{}, no
 	// Step 1: If we don't have all constraints, introspect nodes to find the missing constraints.
 	if len(s.labels) > len(affinityLabels) {
 		if len(services) > 0 {
-			if len(pods) > 0 {
-				nodeWithAffinityLabels, err := s.nodeInfo.GetNodeInfo(pods[0].Spec.NodeName)
+			if len(filteredPods) > 0 {
+				nodeWithAffinityLabels, err := s.nodeInfo.GetNodeInfo(filteredPods[0].Spec.NodeName)
 				if err != nil {
 					return false, nil, err
 				}

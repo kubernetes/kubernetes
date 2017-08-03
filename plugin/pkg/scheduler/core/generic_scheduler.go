@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
 	"github.com/golang/glog"
 )
@@ -157,6 +158,26 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 	g.lastNodeIndexLock.Unlock()
 
 	return priorityList[ix].Host, nil
+}
+
+// preempt finds nodes with pods that can be preempted to make room for "pod" to
+// schedule. It chooses one of the nodes and preempts the pods on the node and
+// returns the node name if such a node is found.
+// TODO(bsalamat): This function is under construction! DO NOT USE!
+func (g *genericScheduler) preempt(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
+	nodes, err := nodeLister.List()
+	if err != nil {
+		return "", err
+	}
+	if len(nodes) == 0 {
+		return "", ErrNoNodesAvailable
+	}
+	nodeToPods := selectNodesForPreemption(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.predicateMetaProducer)
+	if len(nodeToPods) == 0 {
+		return "", nil
+	}
+	// TODO: Add a node scoring mechanism and perform preemption
+	return "", nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
@@ -421,6 +442,125 @@ func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInf
 		Host:  node.Name,
 		Score: 1,
 	}, nil
+}
+
+// selectNodesForPreemption finds all the nodes with possible victims for
+// preemption in parallel.
+func selectNodesForPreemption(pod *v1.Pod,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodes []*v1.Node,
+	predicates map[string]algorithm.FitPredicate,
+	metadataProducer algorithm.MetadataProducer,
+) map[string][]*v1.Pod {
+
+	nodeNameToPods := map[string][]*v1.Pod{}
+	var resultLock sync.Mutex
+
+	// We can use the same metadata producer for all nodes.
+	meta := metadataProducer(pod, nodeNameToInfo)
+	checkNode := func(i int) {
+		nodeName := nodes[i].Name
+		pods, fits := selectVictimsOnNode(pod, meta.ShallowCopy(), nodeNameToInfo[nodeName], predicates)
+		if fits && len(pods) != 0 {
+			resultLock.Lock()
+			nodeNameToPods[nodeName] = pods
+			resultLock.Unlock()
+		}
+	}
+	workqueue.Parallelize(16, len(nodes), checkNode)
+	return nodeNameToPods
+}
+
+// selectVictimsOnNode finds minimum set of pods on the given node that should
+// be preempted in order to make enough room for "pod" to be scheduled. The
+// minimum set selected is subject to the constraint that a higher-priority pod
+// is never preempted when a lower-priority pod could be (higher/lower relative
+// to one another, not relative to the preemptor "pod").
+// The algorithm first checks if the pod can be scheduled on the node when all the
+// lower priority pods are gone. If so, it sorts all the lower priority pods by
+// their priority and starting from the highest priority one, tries to keep as
+// many of them as possible while checking that the "pod" can still fit on the node.
+// NOTE: This function assumes that it is never called if "pod" cannot be scheduled
+// due to pod affinity, node affinity, or node anti-affinity reasons. None of
+// these predicates can be satisfied by removing more pods from the node.
+func selectVictimsOnNode(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo, fitPredicates map[string]algorithm.FitPredicate) ([]*v1.Pod, bool) {
+	higherPriority := func(pod1, pod2 interface{}) bool {
+		return util.GetPodPriority(pod1.(*v1.Pod)) > util.GetPodPriority(pod2.(*v1.Pod))
+	}
+	potentialVictims := util.SortableList{CompFunc: higherPriority}
+	nodeInfoCopy := nodeInfo.Clone()
+
+	removePod := func(rp *v1.Pod) {
+		nodeInfoCopy.RemovePod(rp)
+		meta.RemovePod(rp)
+	}
+	addPod := func(ap *v1.Pod) {
+		nodeInfoCopy.AddPod(ap)
+		meta.AddPod(ap, nodeInfoCopy)
+	}
+	// As the first step, remove all the lower priority pods from the node and
+	// check if the given pod can be scheduled.
+	podPriority := util.GetPodPriority(pod)
+	for _, p := range nodeInfoCopy.Pods() {
+		if util.GetPodPriority(p) < podPriority {
+			potentialVictims.Items = append(potentialVictims.Items, p)
+			removePod(p)
+		}
+	}
+	potentialVictims.Sort()
+	// If the new pod does not fit after removing all the lower priority pods,
+	// we are almost done and this node is not suitable for preemption. The only condition
+	// that we should check is if the "pod" is failing to schedule due to pod affinity
+	// failure.
+	if fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil); !fits {
+		if err != nil {
+			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
+			return nil, false
+		}
+		// If the new pod still cannot be scheduled for any reason other than pod
+		// affinity, the new pod will not fit on this node and we are done here.
+		affinity := pod.Spec.Affinity
+		if affinity == nil || affinity.PodAffinity == nil {
+			return nil, false
+		}
+		for _, failedPred := range failedPredicates {
+			if failedPred != predicates.ErrPodAffinityNotMatch {
+				return nil, false
+			}
+		}
+		// If we reach here, it means that the pod cannot be scheduled due to pod
+		// affinity or anti-affinity. Since failure reason for both affinity and
+		// anti-affinity is the same, we cannot say which one caused it. So, we try
+		// adding pods one at a time and see if any of them satisfies the affinity rules.
+		for i, p := range potentialVictims.Items {
+			existingPod := p.(*v1.Pod)
+			addPod(existingPod)
+			if fits, _, _ = podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil); !fits {
+				removePod(existingPod)
+			} else {
+				// We found the pod needed to satisfy pod affinity. Let's remove it from
+				// potential victims list.
+				// NOTE: We assume that pod affinity can be satisfied by only one pod,
+				// not multiple pods. This is how scheduler works today.
+				potentialVictims.Items = append(potentialVictims.Items[:i], potentialVictims.Items[i+1:]...)
+				break
+			}
+		}
+		if !fits {
+			return nil, false
+		}
+	}
+	victims := []*v1.Pod{}
+	// Try to reprieve as may pods as possible starting from the highest priority one.
+	for _, p := range potentialVictims.Items {
+		lpp := p.(*v1.Pod)
+		addPod(lpp)
+		if fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil); !fits {
+			removePod(lpp)
+			victims = append(victims, lpp)
+		}
+	}
+	return victims, true
 }
 
 func NewGenericScheduler(
