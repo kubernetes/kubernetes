@@ -101,7 +101,6 @@ func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outpu
 		}
 
 		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
-
 	}
 
 	return printer, nil

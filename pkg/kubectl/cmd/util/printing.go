@@ -127,11 +127,15 @@ func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, m
 		return nil, err
 	}
 
-	// we try to convert to HumanReadablePrinter, if return ok, it must be no generic
-	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
-	// need to convert to delegatePrinter again then invoke AddHandlers()
-	if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
-		printersinternal.AddHandlers(humanReadablePrinter)
+	// We add handlers to the printer in case it implements printers.TabularPrintHandler.
+	// printers.AddHandlers expects a type that implements printers.TabularPrintHandler
+	// as its parameter. Ensure that the current printer is a printers.TabularPrintHandler
+	// and register tabular output handlers to it.
+	//
+	// We add printer handlers before a call to maybeWrapSortingPrinter so that we don't
+	// need to convert to delegatePrinter again before invoking AddHandlers()
+	if tabularPrinter, ok := printer.(printers.TabularPrintHandler); ok {
+		printersinternal.AddHandlers(tabularPrinter)
 	}
 
 	return maybeWrapSortingPrinter(cmd, printer), nil

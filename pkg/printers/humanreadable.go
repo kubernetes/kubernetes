@@ -37,7 +37,8 @@ type TablePrinter interface {
 	PrintTable(obj runtime.Object, options PrintOptions) (*metav1alpha1.Table, error)
 }
 
-type PrintHandler interface {
+// TabularPrintHandler is a print handler that works with human-readable / tabular output handlers
+type TabularPrintHandler interface {
 	Handler(columns, columnsWithWide []string, printFunc interface{}) error
 	TableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
 	DefaultTableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
@@ -66,7 +67,7 @@ type HumanReadablePrinter struct {
 	decoder        runtime.Decoder
 }
 
-var _ PrintHandler = &HumanReadablePrinter{}
+var _ TabularPrintHandler = &HumanReadablePrinter{}
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
 // If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
@@ -94,7 +95,7 @@ func (a *HumanReadablePrinter) AddTabWriter(t bool) *HumanReadablePrinter {
 	return a
 }
 
-func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
+func (a *HumanReadablePrinter) With(fns ...func(TabularPrintHandler)) *HumanReadablePrinter {
 	for _, fn := range fns {
 		fn(a)
 	}
