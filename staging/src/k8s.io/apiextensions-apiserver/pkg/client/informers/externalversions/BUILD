@@ -24,3 +24,20 @@ go_library(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
