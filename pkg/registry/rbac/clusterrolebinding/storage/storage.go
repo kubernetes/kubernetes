@@ -37,7 +37,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &rbac.ClusterRoleBinding{} },
 		NewListFunc:              func() runtime.Object { return &rbac.ClusterRoleBindingList{} },
-		PredicateFunc:            clusterrolebinding.Matcher,
 		DefaultQualifiedResource: rbac.Resource("clusterrolebindings"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("clusterrolebindings"),
 
@@ -45,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: clusterrolebinding.Strategy,
 		DeleteStrategy: clusterrolebinding.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: clusterrolebinding.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

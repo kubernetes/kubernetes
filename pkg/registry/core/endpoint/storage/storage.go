@@ -36,7 +36,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc:              func() runtime.Object { return &api.EndpointsList{} },
-		PredicateFunc:            endpoint.MatchEndpoints,
 		DefaultQualifiedResource: api.Resource("endpoints"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("endpoints"),
 
@@ -44,7 +43,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: endpoint.Strategy,
 		DeleteStrategy: endpoint.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: endpoint.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

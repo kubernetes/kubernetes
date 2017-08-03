@@ -40,7 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &extensions.DaemonSet{} },
 		NewListFunc:              func() runtime.Object { return &extensions.DaemonSetList{} },
-		PredicateFunc:            daemonset.MatchDaemonSet,
 		DefaultQualifiedResource: extensions.Resource("daemonsets"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("daemonsets"),
 
@@ -48,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: daemonset.Strategy,
 		DeleteStrategy: daemonset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: daemonset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

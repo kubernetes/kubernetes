@@ -38,7 +38,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &schedulingapi.PriorityClass{} },
 		NewListFunc:              func() runtime.Object { return &schedulingapi.PriorityClassList{} },
-		PredicateFunc:            priorityclass.Matcher,
 		DefaultQualifiedResource: schedulingapi.Resource("priorityclasses"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("priorityclasses"),
 
@@ -46,7 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: priorityclass.Strategy,
 		DeleteStrategy: priorityclass.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: priorityclass.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

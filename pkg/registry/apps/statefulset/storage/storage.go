@@ -40,7 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &appsapi.StatefulSet{} },
 		NewListFunc:              func() runtime.Object { return &appsapi.StatefulSetList{} },
-		PredicateFunc:            statefulset.MatchStatefulSet,
 		DefaultQualifiedResource: appsapi.Resource("statefulsets"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("statefulsets"),
 
@@ -48,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: statefulset.Strategy,
 		DeleteStrategy: statefulset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: statefulset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

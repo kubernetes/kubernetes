@@ -17,15 +17,10 @@ limitations under the License.
 package rolebinding
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -100,28 +95,5 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 func (s strategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
-	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	roleBinding, ok := obj.(*rbac.RoleBinding)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("not a RoleBinding")
-	}
-	return labels.Set(roleBinding.Labels), SelectableFields(roleBinding), roleBinding.Initializers != nil, nil
-}
-
-// Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// SelectableFields returns a field set that can be used for filter selection
-func SelectableFields(obj *rbac.RoleBinding) fields.Set {
 	return nil
 }
