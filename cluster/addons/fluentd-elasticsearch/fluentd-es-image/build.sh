@@ -42,7 +42,7 @@ rm -rf /opt/td-agent/embedded/share/doc \
   /opt/td-agent/embedded/share/postgresql
 
 apt-get remove -y make g++
-apt-get autoremove -y 
-apt-get clean -y 
+apt-get autoremove -y
+apt-get clean -y
 
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
