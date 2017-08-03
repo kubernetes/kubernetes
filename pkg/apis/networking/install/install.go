@@ -37,7 +37,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  networking.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/api/networking",
 			AddInternalObjectsToScheme: networking.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

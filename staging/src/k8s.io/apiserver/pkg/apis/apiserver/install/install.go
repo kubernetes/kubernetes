@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			GroupName:                  apiserver.GroupName,
 			RootScopedKinds:            sets.NewString("APIService"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/apiserver/pkg/apis/apiserver",
 			AddInternalObjectsToScheme: apiserver.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

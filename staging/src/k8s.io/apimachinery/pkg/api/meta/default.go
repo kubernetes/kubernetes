@@ -17,8 +17,6 @@ limitations under the License.
 package meta
 
 import (
-	"strings"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -26,18 +24,15 @@ import (
 
 // NewDefaultRESTMapperFromScheme instantiates a DefaultRESTMapper based on types registered in the given scheme.
 func NewDefaultRESTMapperFromScheme(defaultGroupVersions []schema.GroupVersion, interfacesFunc VersionInterfacesFunc,
-	importPathPrefix string, ignoredKinds, rootScoped sets.String, scheme *runtime.Scheme) *DefaultRESTMapper {
+	ignoredKinds, rootScoped sets.String, scheme *runtime.Scheme) *DefaultRESTMapper {
 
 	mapper := NewDefaultRESTMapper(defaultGroupVersions, interfacesFunc)
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address
 	// our resources.
 	for _, gv := range defaultGroupVersions {
-		for kind, oType := range scheme.KnownTypes(gv) {
+		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
-			// TODO: Remove import path check.
-			// We check the import path because we currently stuff both "api" and "extensions" objects
-			// into the same group within Scheme since Scheme has no notion of groups yet.
-			if !strings.Contains(oType.PkgPath(), importPathPrefix) || ignoredKinds.Has(kind) {
+			if ignoredKinds.Has(kind) {
 				continue
 			}
 			scope := RESTScopeNamespace

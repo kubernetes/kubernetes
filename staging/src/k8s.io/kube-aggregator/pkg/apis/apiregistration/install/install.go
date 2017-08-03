@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			GroupName:                  apiregistration.GroupName,
 			RootScopedKinds:            sets.NewString("APIService"),
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kube-aggregator/pkg/apis/apiregistration",
 			AddInternalObjectsToScheme: apiregistration.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
