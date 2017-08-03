@@ -620,14 +620,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 
-	_, err = dc.hasFailed(d, rsList, podMap)
-	if err != nil {
-		return err
-	}
-	// TODO: Automatically rollback here if we failed above. Locate the last complete
-	// revision and populate the rollback spec with it.
-	// See https://github.com/kubernetes/kubernetes/issues/23211.
-
 	if d.Spec.Paused {
 		return dc.sync(d, rsList, podMap)
 	}
