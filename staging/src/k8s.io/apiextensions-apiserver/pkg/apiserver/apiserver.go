@@ -178,6 +178,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 
+	// this only happens when KUBE_API_VERSIONS is set.  We must return without adding controllers or poststarthooks which would affect healthz
+	if crdClient == nil {
+		return s, nil
+	}
+
 	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, c.GenericConfig.RequestContextMapper)
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient)
 	finalizingController := finalizer.NewCRDFinalizer(
@@ -185,11 +190,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		crdClient,
 		crdHandler,
 	)
-
-	// this only happens when KUBE_API_VERSIONS is set.  We must return without adding poststarthooks which would affect healthz
-	if crdClient == nil {
-		return s, nil
-	}
 
 	s.GenericAPIServer.AddPostStartHook("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
