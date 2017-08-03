@@ -22,6 +22,15 @@ import (
 	"time"
 )
 
+const (
+	initErrType     string = "init"
+	downErrType     string = "down"
+	internalErrType string = "internal"
+	plegErrType     string = "PLEG"
+
+	networkErrType string = "network"
+)
+
 type runtimeState struct {
 	sync.RWMutex
 	lastBaseRuntimeSync      time.Time
@@ -30,7 +39,7 @@ type runtimeState struct {
 	internalError            error
 	cidr                     string
 	initError                error
-	healthChecks             []*healthCheck
+	healthChecks             map[string]*healthCheck
 }
 
 // A health check function should be efficient and not rely on external
@@ -45,7 +54,7 @@ type healthCheck struct {
 func (s *runtimeState) addHealthCheck(name string, f healthCheckFnType) {
 	s.Lock()
 	defer s.Unlock()
-	s.healthChecks = append(s.healthChecks, &healthCheck{name: name, fn: f})
+	s.healthChecks[name] = &healthCheck{name: name, fn: f}
 }
 
 func (s *runtimeState) setRuntimeSync(t time.Time) {
@@ -84,34 +93,34 @@ func (s *runtimeState) setInitError(err error) {
 	s.initError = err
 }
 
-func (s *runtimeState) runtimeErrors() []string {
+func (s *runtimeState) runtimeErrors() map[string]string {
 	s.RLock()
 	defer s.RUnlock()
-	var ret []string
+	ret := make(map[string]string)
 	if s.initError != nil {
-		ret = append(ret, s.initError.Error())
+		ret[initErrType] = s.initError.Error()
 	}
 	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
-		ret = append(ret, "container runtime is down")
+		ret[downErrType] = "container runtime is down"
 	}
 	if s.internalError != nil {
-		ret = append(ret, s.internalError.Error())
+		ret[internalErrType] = s.internalError.Error()
 	}
 	for _, hc := range s.healthChecks {
 		if ok, err := hc.fn(); !ok {
-			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
+			ret[hc.name] = fmt.Sprintf("%s is not healthy: %v", hc.name, err)
 		}
 	}
 
 	return ret
 }
 
-func (s *runtimeState) networkErrors() []string {
+func (s *runtimeState) networkErrors() map[string]string {
 	s.RLock()
 	defer s.RUnlock()
-	var ret []string
+	ret := make(map[string]string)
 	if s.networkError != nil {
-		ret = append(ret, s.networkError.Error())
+		ret[networkErrType] = s.networkError.Error()
 	}
 	return ret
 }
@@ -124,5 +133,6 @@ func newRuntimeState(
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
 		networkError:             fmt.Errorf("network state unknown"),
 		internalError:            nil,
+		healthChecks:             make(map[string]*healthCheck),
 	}
 }

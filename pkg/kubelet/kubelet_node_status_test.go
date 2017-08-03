@@ -226,9 +226,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet.updateRuntimeUp()
 	assert.NoError(t, kubelet.updateNodeStatus())
 	actions := kubeClient.Actions()
-	require.Len(t, actions, 2)
+	require.Len(t, actions, 3)
 	require.True(t, actions[1].Matches("patch", "nodes"))
-	require.Equal(t, actions[1].GetSubresource(), "status")
+	require.Equal(t, actions[1].GetSubresource(), "")
+	require.Equal(t, actions[2].GetSubresource(), "status")
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
@@ -395,7 +396,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	assert.NoError(t, kubelet.updateNodeStatus())
 
 	actions := kubeClient.Actions()
-	assert.Len(t, actions, 2)
+	assert.Len(t, actions, 3)
 
 	assert.IsType(t, core.PatchActionImpl{}, actions[1])
 	patchAction := actions[1].(core.PatchActionImpl)
@@ -521,9 +522,10 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		kubeClient.ClearActions()
 		assert.NoError(t, kubelet.updateNodeStatus())
 		actions := kubeClient.Actions()
-		require.Len(t, actions, 2)
+		require.Len(t, actions, 3)
 		require.True(t, actions[1].Matches("patch", "nodes"))
-		require.Equal(t, actions[1].GetSubresource(), "status")
+		require.Equal(t, actions[1].GetSubresource(), "")
+		require.Equal(t, actions[2].GetSubresource(), "status")
 
 		updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 		require.NoError(t, err, "can't apply node status patch")
@@ -921,9 +923,10 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	kubelet.updateRuntimeUp()
 	assert.NoError(t, kubelet.updateNodeStatus())
 	actions := kubeClient.Actions()
-	require.Len(t, actions, 2)
+	require.Len(t, actions, 3)
 	require.True(t, actions[1].Matches("patch", "nodes"))
-	require.Equal(t, actions[1].GetSubresource(), "status")
+	require.Equal(t, actions[1].GetSubresource(), "")
+	require.Equal(t, actions[2].GetSubresource(), "status")
 
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
