@@ -39,7 +39,7 @@ import (
 )
 
 type APIHandlerManager interface {
-	AddAPIService(apiService *apiregistration.APIService)
+	AddAPIService(apiService *apiregistration.APIService) error
 	RemoveAPIService(apiServiceName string)
 }
 
@@ -102,8 +102,7 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return nil
 	}
 
-	c.apiHandlerManager.AddAPIService(apiService)
-	return nil
+	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {

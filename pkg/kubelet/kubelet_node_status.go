@@ -852,6 +852,37 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *v1.Node) {
 	}
 }
 
+// Set OODCondition for the node.
+func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
+	currentTime := metav1.NewTime(kl.clock.Now())
+	var nodeOODCondition *v1.NodeCondition
+
+	// Check if NodeOutOfDisk condition already exists and if it does, just pick it up for update.
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == v1.NodeOutOfDisk {
+			nodeOODCondition = &node.Status.Conditions[i]
+		}
+	}
+
+	newOODCondition := nodeOODCondition == nil
+	if newOODCondition || nodeOODCondition.Status == v1.ConditionUnknown {
+		nodeOODCondition = &v1.NodeCondition{
+			Type:               v1.NodeOutOfDisk,
+			Status:             v1.ConditionFalse,
+			Reason:             "KubeletHasSufficientDisk",
+			Message:            "kubelet has sufficient disk space available",
+			LastTransitionTime: currentTime,
+		}
+	}
+
+	// Update the heartbeat time irrespective of all the conditions.
+	nodeOODCondition.LastHeartbeatTime = currentTime
+
+	if newOODCondition {
+		node.Status.Conditions = append(node.Status.Conditions, *nodeOODCondition)
+	}
+}
+
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 // TODO: why is this a package var?
 var oldNodeUnschedulable bool
@@ -902,6 +933,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	return []func(*v1.Node) error{
 		kl.setNodeAddress,
 		withoutError(kl.setNodeStatusInfo),
+		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeDiskPressureCondition),
 		withoutError(kl.setNodeReadyCondition),

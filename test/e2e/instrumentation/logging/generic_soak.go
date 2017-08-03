@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/instrumentation"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {

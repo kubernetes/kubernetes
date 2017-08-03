@@ -275,7 +275,7 @@ function dump_nodes_with_logexporter() {
   local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
-  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 10 ))"
+  local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 5 ))"
 
   # Fill in the parameters in the logexporter daemonset template.
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
@@ -286,7 +286,12 @@ function dump_nodes_with_logexporter() {
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${KUBECTL}" create -f "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  if ! "${KUBECTL}" create -f "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"; then
+    echo "Failed to create logexporter daemonset.. falling back to logdump through SSH"
+    "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+    dump_nodes "${NODE_NAMES[@]}"
+    return
+  fi
 
   # Give some time for the pods to finish uploading logs.
   sleep "${logexport_sleep_seconds}"
@@ -301,7 +306,7 @@ function dump_nodes_with_logexporter() {
       echo "Attempt ${retry} failed to list marker files for succeessful nodes"
       if [[ "${retry}" == 10 ]]; then
         echo "Final attempt to list marker files failed.. falling back to logdump through SSH"
-        "${KUBECTL}" delete namespace "${logexporter_namespace}"
+        "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
         return
       fi
@@ -321,7 +326,7 @@ function dump_nodes_with_logexporter() {
   done
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
-  "${KUBECTL}" delete namespace "${logexporter_namespace}"
+  "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"
     dump_nodes "${failed_nodes[@]}"

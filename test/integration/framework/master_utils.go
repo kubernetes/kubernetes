@@ -289,14 +289,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	return m, s, closeFn
 }
 
-func parseCIDROrDie(cidr string) *net.IPNet {
-	_, parsed, err := net.ParseCIDR(cidr)
-	if err != nil {
-		glog.Fatalf("error while parsing CIDR: %s", cidr)
-	}
-	return parsed
-}
-
 // Returns a basic master config.
 func NewMasterConfig() *master.Config {
 	// This causes the integration tests to exercise the etcd

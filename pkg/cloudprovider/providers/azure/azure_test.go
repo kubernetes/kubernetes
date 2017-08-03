@@ -879,7 +879,7 @@ func TestMetadataParsing(t *testing.T) {
 	}
 
 	networkJSON := NetworkMetadata{}
-	if err := metadata.QueryMetadataJSON("/some/path", &networkJSON); err != nil {
+	if err := metadata.Object("/some/path", &networkJSON); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

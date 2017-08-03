@@ -18,7 +18,7 @@ go_library(
     deps = [
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/instrumentation:go_default_library",
+        "//test/e2e/instrumentation/common:go_default_library",
         "//vendor/github.com/influxdata/influxdb/client/v2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",

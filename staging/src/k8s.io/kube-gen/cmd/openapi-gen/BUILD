@@ -21,6 +21,6 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/openapi-gen/generators:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/generators:go_default_library",
     ],
 )
