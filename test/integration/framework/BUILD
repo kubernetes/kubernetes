@@ -28,7 +28,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
-        "//pkg/generated/openapi:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master:go_default_library",
@@ -68,6 +67,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
