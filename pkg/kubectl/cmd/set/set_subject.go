@@ -235,7 +235,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

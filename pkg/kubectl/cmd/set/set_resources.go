@@ -81,6 +81,7 @@ type ResourcesOptions struct {
 	Requests             string
 	ResourceRequirements api.ResourceRequirements
 
+	PrintSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	Resources              []string
@@ -134,6 +135,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Local = cmdutil.GetFlagBool(cmd, "local")
 	o.ChangeCause = f.Command(cmd, false)
 	o.PrintObject = f.PrintObject
+	o.PrintSuccess = f.PrintSuccess
 	o.Cmd = cmd
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -243,7 +245,7 @@ func (o *ResourcesOptions) Run() error {
 			}
 		}
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
+		o.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

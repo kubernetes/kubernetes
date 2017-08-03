@@ -45,7 +45,8 @@ type ResumeConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	Out io.Writer
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Out          io.Writer
 }
 
 var (
@@ -104,6 +105,8 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 	o.Resumer = f.Resumer
 	o.Out = out
 
+	o.PrintSuccess = f.PrintSuccess
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -146,7 +149,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
 
@@ -157,7 +160,7 @@ func (o ResumeConfig) RunResume() error {
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
+		o.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

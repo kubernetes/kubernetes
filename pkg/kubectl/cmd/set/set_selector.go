@@ -49,6 +49,7 @@ type SelectorOptions struct {
 	selector  *metav1.LabelSelector
 
 	out              io.Writer
+	PrintSuccess     func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -133,6 +134,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 			Latest()
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.PrintObject = func(obj runtime.Object) error {
 		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
 	}
@@ -194,7 +196,7 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
+		o.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
 	})
 }

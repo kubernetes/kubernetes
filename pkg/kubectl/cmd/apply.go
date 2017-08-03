@@ -294,7 +294,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			if len(output) > 0 && !shortOutput {
 				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -340,7 +340,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		if len(output) > 0 && !shortOutput {
 			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -381,13 +381,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, shortOutput); err != nil {
+			if err := p.prune(f, n, m, shortOutput); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, shortOutput); err != nil {
+		if err := p.prune(f, metav1.NamespaceNone, m, shortOutput); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -460,7 +460,7 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput bool) error {
+func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, shortOutput bool) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
@@ -501,7 +501,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 				return err
 			}
 		}
-		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }

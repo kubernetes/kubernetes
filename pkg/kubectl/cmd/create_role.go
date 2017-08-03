@@ -112,6 +112,7 @@ type CreateRoleOptions struct {
 	Mapper       meta.RESTMapper
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
+	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 }
 
 // Role is a command to ease creating Roles.
@@ -161,6 +162,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		}
 	}
 	c.Verbs = verbs
+	c.PrintSuccess = f.PrintSuccess
 
 	// Support resource.group pattern. If no API Group specified, use "" as core API Group.
 	// e.g. --resource=pods,deployments.extensions
@@ -292,7 +294,7 @@ func (c *CreateRoleOptions) RunCreateRole() error {
 	}
 
 	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(c.Mapper, useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
+		c.PrintSuccess(c.Mapper, useShortOutput, c.Out, "roles", c.Name, c.DryRun, "created")
 		return nil
 	}
 

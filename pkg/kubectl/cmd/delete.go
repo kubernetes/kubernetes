@@ -241,7 +241,7 @@ func (o *DeleteOptions) RunDelete() error {
 	if o.Cascade {
 		return ReapResult(o.Result, o.f, o.Out, true, o.IgnoreNotFound, o.Timeout, o.GracePeriod, o.WaitForDeletion, shortOutput, o.Mapper, false)
 	}
-	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
+	return DeleteResult(o.Result, o.f, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
 }
 
 func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
@@ -259,7 +259,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				// No client side reaper found. Let the server do cascading deletion.
-				return cascadingDeleteResource(info, out, shortOutput, mapper)
+				return cascadingDeleteResource(info, f, out, shortOutput, mapper)
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -276,7 +276,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			}
 		}
 		if !quiet {
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 		}
 		return nil
 	})
@@ -289,7 +289,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, f cmdutil.Factory, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -302,7 +302,7 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 
 		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
 		orphan := true
-		return deleteResource(info, out, shortOutput, mapper, &metav1.DeleteOptions{OrphanDependents: &orphan})
+		return deleteResource(info, f, out, shortOutput, mapper, &metav1.DeleteOptions{OrphanDependents: &orphan})
 	})
 	if err != nil {
 		return err
@@ -313,17 +313,17 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	return nil
 }
 
-func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
+func cascadingDeleteResource(info *resource.Info, f cmdutil.Factory, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return deleteResource(info, out, shortOutput, mapper, deleteOptions)
+	return deleteResource(info, f, out, shortOutput, mapper, deleteOptions)
 }
 
-func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper, deleteOptions *metav1.DeleteOptions) error {
+func deleteResource(info *resource.Info, f cmdutil.Factory, out io.Writer, shortOutput bool, mapper meta.RESTMapper, deleteOptions *metav1.DeleteOptions) error {
 	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
-	cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
+	f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "deleted")
 	return nil
 }
 

@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -244,7 +245,7 @@ func (o *DrainOptions) RunDrain() error {
 
 	err := o.deleteOrEvictPodsSimple()
 	if err == nil {
-		cmdutil.PrintSuccess(o.mapper, false, o.Out, "node", o.nodeInfo.Name, false, "drained")
+		o.Factory.PrintSuccess(o.mapper, false, o.Out, "node", o.nodeInfo.Name, false, "drained")
 	}
 	return err
 }
@@ -568,7 +569,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				cmdutil.PrintSuccess(o.mapper, false, o.Out, "pod", pod.Name, false, verbStr)
+				o.Factory.PrintSuccess(o.mapper, false, o.Out, "pod", pod.Name, false, verbStr)
 				continue
 			} else if err != nil {
 				return false, err
@@ -640,7 +641,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		}
 		unsched := node.Spec.Unschedulable
 		if unsched == desired {
-			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
+			o.Factory.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			node.Spec.Unschedulable = desired
@@ -656,10 +657,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
+			o.Factory.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
-		cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, "skipped")
+		o.Factory.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, "skipped")
 	}
 
 	return nil

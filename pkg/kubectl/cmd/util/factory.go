@@ -149,6 +149,7 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
+	// TODO: how is this different than PrinterForMapping?
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
@@ -242,6 +243,8 @@ type BuilderFactory interface {
 	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	// PrintSuccess prints message after finishing mutating operations
+	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	// One stop shopping for a Builder
 	NewBuilder(allowRemoteCalls bool) *resource.Builder
 	// Resource builder for working with unstructured objects
