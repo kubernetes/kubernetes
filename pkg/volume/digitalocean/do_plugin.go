@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	doVolumePluginName = "kubernetes.io/do-volume"
+	doVolumePluginName = "kubernetes.io/digitalocean-volume"
 	secretNamespace    = "kube-system"
 	secretName         = "digitalocean"
 	secretToken        = "token"

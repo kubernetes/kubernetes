@@ -2380,10 +2380,10 @@ func TestValidateVolumes(t *testing.T) {
 		{
 			name: "valid DOVolume",
 			vol: api.Volume{
-				Name: "do-volume",
+				Name: "digitalocean-volume",
 				VolumeSource: api.VolumeSource{
 					DOVolume: &api.DOVolumeSource{
-						VolumeID: "do-volume-source-identifier",
+						VolumeID: "digitalocean-volume-source-identifier",
 						FSType:   "ext4",
 						ReadOnly: false,
 					},
@@ -2393,7 +2393,7 @@ func TestValidateVolumes(t *testing.T) {
 		{
 			name: "no ID DOVolume",
 			vol: api.Volume{
-				Name: "do-volume",
+				Name: "digitalocean-volume",
 				VolumeSource: api.VolumeSource{
 					DOVolume: &api.DOVolumeSource{
 						VolumeID: "",

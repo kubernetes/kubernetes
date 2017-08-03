@@ -185,7 +185,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	expectedPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~do-volume/vol1")
+	expectedPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~digitalocean-volume/vol1")
 	path := mounter.GetPath()
 	if path != expectedPath {
 		t.Errorf("Got unexpected path: %s", path)
