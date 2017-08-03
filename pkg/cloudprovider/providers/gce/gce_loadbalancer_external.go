@@ -789,7 +789,7 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(serviceName, ipAddress, regio
 	if fw.Description != desc ||
 		len(fw.Allowed) != 1 ||
 		fw.Allowed[0].IPProtocol != string(ports[0].Protocol) ||
-		!equalStringSets(fw.Allowed[0].Ports, []string{string(ports[0].Port)}) ||
+		!equalStringSets(fw.Allowed[0].Ports, []string{strconv.Itoa(int(ports[0].Port))}) ||
 		!equalStringSets(fw.SourceRanges, sourceRanges.StringSlice()) {
 		glog.Warningf("Firewall %v exists but parameters have drifted - updating...", fwName)
 		if err := gce.updateFirewall(fwName, region, desc, sourceRanges, ports, hosts); err != nil {
