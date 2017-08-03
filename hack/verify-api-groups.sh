@@ -31,7 +31,7 @@ while IFS= read -d $'\0' -r file ; do
 done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
 
 # every register file should contain a GroupName.  Gather the different representations.
-# 1. group directory name for go2idl client gen
+# 1. group directory name for client gen
 # 2. external group versions for init.sh all APIs list
 # 3. install packages for inclusion in import_known_versions files
 group_dirnames=()

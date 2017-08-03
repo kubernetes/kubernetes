@@ -87,6 +87,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kubeadm/app/cmd/features:all-srcs",
         "//cmd/kubeadm/app/cmd/phases:all-srcs",
     ],
     tags = ["automanaged"],

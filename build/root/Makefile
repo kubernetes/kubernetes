@@ -163,6 +163,7 @@ define CHECK_TEST_HELP_INFO
 #   WHAT: Directory names to test.  All *_test.go files under these
 #     directories will be run.  If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
+#   KUBE_COVER: Whether to run tests with code coverage. Set to 'y' to enable coverage collection.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.

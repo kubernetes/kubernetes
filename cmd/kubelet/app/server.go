@@ -40,7 +40,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -476,7 +475,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				if err != nil {
 					return err
 				}
-				if err := updateTransport(clientConfig, clientCertificateManager); err != nil {
+				if err := certificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager); err != nil {
 					return err
 				}
 			}
@@ -625,44 +624,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	<-done
-	return nil
-}
-
-func updateTransport(clientConfig *restclient.Config, clientCertificateManager certificate.Manager) error {
-	if clientConfig.Transport != nil {
-		return fmt.Errorf("there is already a transport configured")
-	}
-	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
-	if err != nil {
-		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
-	}
-	if tlsConfig == nil {
-		tlsConfig = &tls.Config{}
-	}
-	tlsConfig.Certificates = nil
-	tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-		cert := clientCertificateManager.Current()
-		if cert == nil {
-			return &tls.Certificate{Certificate: nil}, nil
-		}
-		return cert, nil
-	}
-	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
-		TLSHandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:     tlsConfig,
-		MaxIdleConnsPerHost: 25,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-	})
-	clientConfig.CertData = nil
-	clientConfig.KeyData = nil
-	clientConfig.CertFile = ""
-	clientConfig.KeyFile = ""
-	clientConfig.CAData = nil
-	clientConfig.CAFile = ""
 	return nil
 }
 

@@ -40,18 +40,12 @@ type Clientset struct {
 
 // ApiregistrationV1beta1 retrieves the ApiregistrationV1beta1Client
 func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiregistrationV1beta1Client
 }
 
 // Deprecated: Apiregistration retrieves the default version of ApiregistrationClient.
 // Please explicitly pick a version.
 func (c *Clientset) Apiregistration() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiregistrationV1beta1Client
 }
 

@@ -223,7 +223,7 @@ type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
 	// StatefulSet's generation, which is updated on mutation by the API Server.
 	// +optional
-	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
 	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32 `json:"replicas" protobuf:"varint,2,opt,name=replicas"`
@@ -313,7 +313,7 @@ type DeploymentSpec struct {
 
 	// The number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
-	// Defaults to 2.
+	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
 

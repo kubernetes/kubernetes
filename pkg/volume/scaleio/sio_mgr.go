@@ -27,7 +27,7 @@ import (
 
 type storageInterface interface {
 	CreateVolume(string, int64) (*siotypes.Volume, error)
-	AttachVolume(string) (string, error)
+	AttachVolume(string, bool) (string, error)
 	IsAttached(string) (bool, error)
 	DetachVolume(string) error
 	DeleteVolume(string) error
@@ -103,8 +103,9 @@ func (m *sioMgr) CreateVolume(volName string, sizeGB int64) (*siotypes.Volume, e
 	return vol, nil
 }
 
-// AttachVolume maps a ScaleIO volume to the running node
-func (m *sioMgr) AttachVolume(volName string) (string, error) {
+// AttachVolume maps a ScaleIO volume to the running node.  If flag multiMaps,
+// ScaleIO will allow other SDC to map to volume.
+func (m *sioMgr) AttachVolume(volName string, multipleMappings bool) (string, error) {
 	client, err := m.getClient()
 	if err != nil {
 		glog.Error(log("attach volume failed: %v", err))
@@ -139,7 +140,7 @@ func (m *sioMgr) AttachVolume(volName string) (string, error) {
 	}
 
 	// attach volume, get deviceName
-	if err := client.AttachVolume(sioVolumeID(vol.ID)); err != nil {
+	if err := client.AttachVolume(sioVolumeID(vol.ID), multipleMappings); err != nil {
 		glog.Error(log("attachment for volume %s failed :%v", volName, err))
 		return "", err
 	}

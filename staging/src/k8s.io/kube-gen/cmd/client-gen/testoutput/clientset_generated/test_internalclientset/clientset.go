@@ -38,9 +38,6 @@ type Clientset struct {
 
 // Testgroup retrieves the TestgroupClient
 func (c *Clientset) Testgroup() testgroupinternalversion.TestgroupInterface {
-	if c == nil {
-		return nil
-	}
 	return c.TestgroupClient
 }
 

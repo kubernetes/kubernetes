@@ -38,9 +38,6 @@ type Clientset struct {
 
 // Apiregistration retrieves the ApiregistrationClient
 func (c *Clientset) Apiregistration() apiregistrationinternalversion.ApiregistrationInterface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiregistrationClient
 }
 

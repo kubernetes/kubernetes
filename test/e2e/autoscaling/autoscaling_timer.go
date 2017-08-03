@@ -29,10 +29,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
+var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 
-	framework.KubeDescribe("Autoscaling a service", func() {
+	SIGDescribe("Autoscaling a service", func() {
 		BeforeEach(func() {
 			// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
 			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})

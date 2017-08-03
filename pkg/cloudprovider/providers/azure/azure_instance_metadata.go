@@ -54,7 +54,7 @@ type Subnet struct {
 	Prefix  string `json:"prefix"`
 }
 
-// InstanceMetadata represents access to the Azure instance metadata server.
+// InstanceMetadata knows how to query the Azure instance metadata server.
 type InstanceMetadata struct {
 	baseURL string
 }
@@ -71,8 +71,8 @@ func (i *InstanceMetadata) makeMetadataURL(path string) string {
 	return i.baseURL + path
 }
 
-// QueryMetadataJSON queries the metadata server and populates the passed in object
-func (i *InstanceMetadata) QueryMetadataJSON(path string, obj interface{}) error {
+// Object queries the metadata server and populates the passed in object
+func (i *InstanceMetadata) Object(path string, obj interface{}) error {
 	data, err := i.queryMetadataBytes(path, "json")
 	if err != nil {
 		return err
@@ -80,8 +80,8 @@ func (i *InstanceMetadata) QueryMetadataJSON(path string, obj interface{}) error
 	return json.Unmarshal(data, obj)
 }
 
-// QueryMetadataText queries the metadata server and returns the corresponding text
-func (i *InstanceMetadata) QueryMetadataText(path string) (string, error) {
+// Text queries the metadata server and returns the corresponding text
+func (i *InstanceMetadata) Text(path string) (string, error) {
 	data, err := i.queryMetadataBytes(path, "text")
 	if err != nil {
 		return "", err

@@ -263,7 +263,7 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # the subnet and is the range used for node instance IPs.
   NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
   # Add to the provider custom variables.
-  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
 fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
@@ -327,3 +327,10 @@ if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT}" == "true" ]]; then
 fi
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
+
+if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
+fi
+if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
+fi

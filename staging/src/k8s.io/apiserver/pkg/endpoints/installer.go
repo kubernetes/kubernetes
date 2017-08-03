@@ -85,8 +85,10 @@ var toDiscoveryKubeVerb = map[string]string{
 }
 
 // Install handlers for API resources.
-func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []metav1.APIResource, errors []error) {
-	errors = make([]error, 0)
+func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []error) {
+	var apiResources []metav1.APIResource
+	var errors []error
+	ws := a.newWebService()
 
 	proxyHandler := (&handlers.ProxyHandler{
 		Prefix:     a.prefix + "/proxy/",
@@ -112,11 +114,11 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []metav1.AP
 			apiResources = append(apiResources, *apiResource)
 		}
 	}
-	return apiResources, errors
+	return apiResources, ws, errors
 }
 
-// NewWebService creates a new restful webservice with the api installer's prefix and version.
-func (a *APIInstaller) NewWebService() *restful.WebService {
+// newWebService creates a new restful webservice with the api installer's prefix and version.
+func (a *APIInstaller) newWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path(a.prefix)
 	// a.prefix contains "prefix/group/version"

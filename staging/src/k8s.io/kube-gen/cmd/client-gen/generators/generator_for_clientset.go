@@ -124,9 +124,6 @@ type Clientset struct {
 var clientsetInterfaceImplTemplate = `
 // $.GroupVersion$ retrieves the $.GroupVersion$Client
 func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
-	if c == nil {
-		return nil
-	}
 	return c.$.GroupVersion$Client
 }
 `
@@ -135,9 +132,6 @@ var clientsetInterfaceDefaultVersionImpl = `
 // Deprecated: $.Group$ retrieves the default version of $.Group$Client.
 // Please explicitly pick a version.
 func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
-	if c == nil {
-		return nil
-	}
 	return c.$.GroupVersion$Client
 }
 `

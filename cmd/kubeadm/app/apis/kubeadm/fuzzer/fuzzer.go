@@ -41,6 +41,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"
 			obj.UnifiedControlPlaneImage = "foo"
+			obj.FeatureFlags = map[string]bool{}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

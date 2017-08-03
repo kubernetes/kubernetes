@@ -12,7 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "servicecontroller.go",
+        "service_controller.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -39,7 +39,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["servicecontroller_test.go"],
+    srcs = ["service_controller_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

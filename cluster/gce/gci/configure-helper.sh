@@ -163,12 +163,12 @@ function setup-logrotate() {
   # * keep only 5 old (rotated) logs, and will discard older logs.
   cat > /etc/logrotate.d/allvarlogs <<EOF
 /var/log/*.log {
-    rotate 5
+    rotate ${LOGROTATE_FILES_MAX_COUNT:-5}
     copytruncate
     missingok
     notifempty
     compress
-    maxsize 100M
+    maxsize ${LOGROTATE_MAX_SIZE:-100M}
     daily
     dateext
     dateformat -%Y%m%d-%s
@@ -239,10 +239,13 @@ function append_or_replace_prefixed_line {
   local -r file="${1:-}"
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
+  local -r dirname="$(dirname ${file})"
+  local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
 
   touch "${file}"
-  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${file}.filtered"  && mv "${file}.filtered" "${file}"
-  echo "${prefix}${suffix}" >> "${file}"
+  awk "substr(\$0,0,length(\"${prefix}\")) != \"${prefix}\" { print }" "${file}" > "${tmpfile}"
+  echo "${prefix}${suffix}" >> "${tmpfile}"
+  mv "${tmpfile}" "${file}"
 }
 
 function create-node-pki {
@@ -324,7 +327,6 @@ function create-master-pki {
   ln -sf "${APISERVER_SERVER_KEY_PATH}" /etc/srv/kubernetes/server.key
   ln -sf "${APISERVER_SERVER_CERT_PATH}" /etc/srv/kubernetes/server.cert
 
-
   if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
     AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
     echo "${AGGREGATOR_CA_KEY}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
@@ -359,7 +361,11 @@ function create-master-auth {
     fi
     append_or_replace_prefixed_line "${basic_auth_csv}" "${KUBE_PASSWORD},${KUBE_USER},"      "admin,system:masters"
   fi
+
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
+    rm "${known_tokens_csv}"
+  fi
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
@@ -818,43 +824,6 @@ EOF
     # kubelet will not do it.
     echo "Docker command line is updated. Restart docker to pick it up"
     systemctl restart docker
-  fi
-}
-
-# A helper function for loading a docker image. It keeps trying up to 5 times.
-#
-# $1: Full path of the docker image
-function try-load-docker-image {
-  local -r img=$1
-  echo "Try to load docker image file ${img}"
-  # Temporarily turn off errexit, because we don't want to exit on first failure.
-  set +e
-  local -r max_attempts=5
-  local -i attempt_num=1
-  until timeout 30 docker load -i "${img}"; do
-    if [[ "${attempt_num}" == "${max_attempts}" ]]; then
-      echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
-      exit 1
-    else
-      attempt_num=$((attempt_num+1))
-      sleep 5
-    fi
-  done
-  # Re-enable errexit.
-  set -e
-}
-
-# Loads kube-system docker images. It is better to do it before starting kubelet,
-# as kubelet will restart docker daemon, which may interfere with loading images.
-function load-docker-images {
-  echo "Start loading kube-system docker images"
-  local -r img_dir="${KUBE_HOME}/kube-docker-files"
-  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-    try-load-docker-image "${img_dir}/kube-apiserver.tar"
-    try-load-docker-image "${img_dir}/kube-controller-manager.tar"
-    try-load-docker-image "${img_dir}/kube-scheduler.tar"
-  else
-    try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
 }
 
@@ -1890,7 +1859,6 @@ fi
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
 assemble-docker-flags
-load-docker-images
 start-kubelet
 
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then

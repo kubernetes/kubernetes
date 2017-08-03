@@ -5122,124 +5122,6 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
-func TestValidatePodWithAffinity(t *testing.T) {
-	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
-		spec := api.PodSpec{
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-		}
-		if affinity != nil {
-			spec.Affinity = affinity
-		}
-		return spec
-	}
-
-	errorCases := []api.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							TopologyKey: "",
-							Namespaces:  []string{"ns"},
-						},
-					},
-				},
-			}),
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
-									},
-								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "",
-							},
-						},
-					},
-				},
-			}),
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							TopologyKey: "",
-							Namespaces:  []string{"ns"},
-						},
-					},
-				},
-			}),
-		},
-		{
-		/* TODO: Re-enable if/when topologykey is required.
-		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-		Spec: validPodSpec(&api.Affinity{
-			PodAntiAffinity: &api.PodAntiAffinity{
-				PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-					{
-						Weight: 10,
-						PodAffinityTerm: api.PodAffinityTerm{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							Namespaces:  []string{"ns"},
-							TopologyKey: "",
-						},
-					},
-				},
-			},
-		}),*/
-		},
-	}
-
-	for _, v := range errorCases {
-		if errs := ValidatePod(&v); len(errs) == 0 {
-			t.Errorf("expected failure for %v", errs)
-		}
-	}
-}
-
 func TestValidatePodUpdate(t *testing.T) {
 	var (
 		activeDeadlineSecondsZero     = int64(0)
@@ -6299,6 +6181,24 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = api.ServiceTypeNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid duplicate ports (with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(80)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate ports (with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
 			},
 			numErrs: 0,
 		},

@@ -2005,7 +2005,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doTaintingPass()
+	nodeController.doNoExecuteTaintingPass()
 
 	node0, err := fakeNodeHandler.Get("node0", metav1.GetOptions{})
 	if err != nil {
@@ -2043,7 +2043,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doTaintingPass()
+	nodeController.doNoExecuteTaintingPass()
 
 	node0, err = fakeNodeHandler.Get("node0", metav1.GetOptions{})
 	if err != nil {

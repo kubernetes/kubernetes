@@ -731,6 +731,9 @@ func appsFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Spec.RevisionHistoryLimit = new(int32)
 				*s.Spec.RevisionHistoryLimit = 10
 			}
+			if s.Status.ObservedGeneration == nil {
+				s.Status.ObservedGeneration = new(int64)
+			}
 		},
 	}
 }

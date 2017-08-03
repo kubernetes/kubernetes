@@ -229,7 +229,7 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # the subnet and is the range used for node instance IPs.
   NODE_IP_RANGE="$(get-node-ip-range)"
   # Add to the provider custom variables.
-  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
@@ -278,3 +278,10 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
+
+if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
+fi
+if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
+fi

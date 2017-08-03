@@ -462,10 +462,17 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
+
 	var healthzServer *healthcheck.HealthzServer
 	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 		healthzUpdater = healthzServer
 	}
 
@@ -570,13 +577,6 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Add iptables reload function, if not on Windows.
 	if goruntime.GOOS != "windows" {
 		iptInterface.AddReloadFunc(proxier.Sync)
-	}
-
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
 	}
 
 	return &ProxyServer{

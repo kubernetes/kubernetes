@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment
+  namespace: kube-system
+data:
+  elasticsearch-user: elastic

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/instrumentation"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	. "github.com/onsi/ginkgo"
 )

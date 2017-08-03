@@ -89,6 +89,14 @@ func findDisk(wwn, lun string, io ioHandler) (string, string) {
 	return "", ""
 }
 
+// Removes a scsi device based upon /dev/sdX name
+func removeFromScsiSubsystem(deviceName string, io ioHandler) {
+	fileName := "/sys/block/" + deviceName + "/device/delete"
+	glog.V(4).Infof("fc: remove device from scsi-subsystem: path: %s", fileName)
+	data := []byte("1")
+	io.WriteFile(fileName, data, 0666)
+}
+
 // rescan scsi bus
 func scsiHostRescan(io ioHandler) {
 	scsi_path := "/sys/class/scsi_host/"
@@ -177,9 +185,13 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	return devicePath, err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
-	if err := c.mounter.Unmount(mntPath); err != nil {
-		return fmt.Errorf("fc detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devName string) error {
+	// Remove scsi device from the node.
+	if !strings.HasPrefix(devName, "/dev/") {
+		return fmt.Errorf("fc detach disk: invalid device name: %s", devName)
 	}
+	arr := strings.Split(devName, "/")
+	dev := arr[len(arr)-1]
+	removeFromScsiSubsystem(dev, c.io)
 	return nil
 }
