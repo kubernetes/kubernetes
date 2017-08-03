@@ -47,6 +47,8 @@ from charmhelpers.contrib.charmsupport import nrpe
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
+kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
+kubeclientconfig_path = '/root/.kube/config'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
@@ -319,7 +321,8 @@ def watch_for_changes(kube_api, kube_control, cni):
       'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
       'tls_client.server.key.saved',
       'kube-control.dns.available', 'kube-control.auth.available',
-      'cni.available', 'kubernetes-worker.restart-needed')
+      'cni.available', 'kubernetes-worker.restart-needed',
+      'worker.auth.bootstrapped')
 def start_worker(kube_api, kube_control, auth_control, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -335,7 +338,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
         hookenv.log('Waiting for cluster cidr.')
         return
 
-    creds = kube_control.get_auth_credentials()
+    creds = db.get('credentials')
     data_changed('kube-control.creds', creds)
 
     # set --allow-privileged flag for kubelet
@@ -389,6 +392,8 @@ def render_and_launch_ingress():
                          '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
                          '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
+        kubectl_manifest('delete',
+                         '/root/cdk/addons/ingress-replication-controller-service.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
 
@@ -458,11 +463,13 @@ def create_config(server, creds):
     cmd = ['chown', '-R', 'ubuntu:ubuntu', '/home/ubuntu/.kube']
     check_call(cmd)
     # Create kubernetes configuration in the default location for root.
-    create_kubeconfig('/root/.kube/config', server, ca,
+    create_kubeconfig(kubeclientconfig_path, server, ca,
                       token=creds['client_token'], user='root')
     # Create kubernetes configuration for kubelet, and kube-proxy services.
     create_kubeconfig(kubeconfig_path, server, ca,
                       token=creds['kubelet_token'], user='kubelet')
+    create_kubeconfig(kubeproxyconfig_path, server, ca,
+                      token=creds['proxy_token'], user='kube-proxy')
 
 
 def configure_worker_services(api_servers, dns, cluster_cidr):
@@ -491,7 +498,7 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
 
     kube_proxy_opts = FlagManager('kube-proxy')
     kube_proxy_opts.add('cluster-cidr', cluster_cidr)
-    kube_proxy_opts.add('kubeconfig', kubeconfig_path)
+    kube_proxy_opts.add('kubeconfig', kubeproxyconfig_path)
     kube_proxy_opts.add('logtostderr', 'true')
     kube_proxy_opts.add('v', '0')
     kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
@@ -556,7 +563,7 @@ def launch_default_ingress_controller():
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
-    render('default-http-backend.yaml', manifest, context)
+    render('default-backend.yml', manifest, context)
     hookenv.log('Creating the default http backend.')
     try:
         kubectl('apply', '-f', manifest)
@@ -574,13 +581,24 @@ def launch_default_ingress_controller():
         context['ingress_image'] = \
             "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
     manifest = addon_path.format('ingress-replication-controller.yaml')
-    render('ingress-replication-controller.yaml', manifest, context)
+    render('nginx-ingress-controller.yml', manifest, context)
     hookenv.log('Creating the ingress replication controller.')
     try:
         kubectl('apply', '-f', manifest)
     except CalledProcessError as e:
         hookenv.log(e)
         hookenv.log('Failed to create ingress controller. Will attempt again next update.')  # noqa
+        hookenv.close_port(80)
+        hookenv.close_port(443)
+        return
+    manifest = addon_path.format('ingress-replication-controller-service.yaml')
+    render('nginx-ingress-controller-service.yml', manifest, context)
+    hookenv.log('Creating the ingress replication controller service.')
+    try:
+        kubectl('apply', '-f', manifest)
+    except CalledProcessError as e:
+        hookenv.log(e)
+        hookenv.log('Failed to create ingress controller service. Will attempt again next update.')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
         return
@@ -613,7 +631,7 @@ def get_kube_api_servers(kube_api):
 def kubectl(*args):
     ''' Run a kubectl cli command with a config file. Returns stdout and throws
     an error if the command fails. '''
-    command = ['kubectl', '--kubeconfig=' + kubeconfig_path] + list(args)
+    command = ['kubectl', '--kubeconfig=' + kubeclientconfig_path] + list(args)
     hookenv.log('Executing {}'.format(command))
     return check_output(command)
 
@@ -821,7 +839,10 @@ def request_kubelet_and_proxy_credentials(kube_control):
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
     creds = kube_control.get_auth_credentials()
-    if data_changed('kube-control.creds', creds):
+    nodeuser = 'system:node:{}'.format(gethostname())
+    if data_changed('kube-control.creds', creds) and creds['user'] == nodeuser:
+        db.set('credentials', creds)
+        set_state('worker.auth.bootstrapped')
         set_state('kubernetes-worker.restart-needed')
 
 
