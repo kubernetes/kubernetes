@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
+	jobcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/job"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	servicednscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
@@ -153,6 +154,14 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 		if controllerEnabled(s.Controllers, serverResources, federatedType.ControllerName, federatedType.RequiredResources, true) {
 			synccontroller.StartFederationSyncController(kind, federatedType.AdapterFactory, restClientCfg, stopChan, minimizeLatency)
 		}
+	}
+
+	if controllerEnabled(s.Controllers, serverResources, jobcontroller.ControllerName, jobcontroller.RequiredResources, true) {
+		glog.V(3).Infof("Loading client config for job controller %q", jobcontroller.UserAgentName)
+		jobClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, jobcontroller.UserAgentName))
+		jobController := jobcontroller.NewJobController(jobClientset)
+		glog.V(3).Infof("Running job controller")
+		go jobController.Run(s.ConcurrentJobSyncs, wait.NeverStop)
 	}
 
 	if controllerEnabled(s.Controllers, serverResources, ingresscontroller.ControllerName, ingresscontroller.RequiredResources, true) {
