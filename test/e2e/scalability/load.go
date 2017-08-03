@@ -78,7 +78,7 @@ var knownKinds = []schema.GroupKind{
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = framework.KubeDescribe("Load capacity", func() {
+var _ = SIGDescribe("Load capacity", func() {
 	var clientset clientset.Interface
 	var nodeCount int
 	var ns string
