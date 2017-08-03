@@ -221,8 +221,8 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(nodeColumnDefinitions, printNodeList)
 
 	eventColumnDefinitions := []metav1alpha1.TableColumnDefinition{
-		{Name: "Lastseen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
-		{Name: "Firtseen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
+		{Name: "Last Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
+		{Name: "First Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
 		{Name: "Count", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["count"]},
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Kind", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["kind"]},
@@ -263,8 +263,8 @@ func AddHandlers(h printers.PrintHandler) {
 	persistentVolumeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["capacity"]},
-		{Name: "AccessModes", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["accessModes"]},
-		{Name: "ReclaimPolicy", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["persistentVolumeReclaimPolicy"]},
+		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["accessModes"]},
+		{Name: "Reclaim Policy", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["persistentVolumeReclaimPolicy"]},
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["phase"]},
 		{Name: "Claim", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["claimRef"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pv"},
@@ -278,7 +278,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["phase"]},
 		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["capacity"]},
-		{Name: "AccessModes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
+		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
@@ -297,7 +297,7 @@ func AddHandlers(h printers.PrintHandler) {
 	thirdPartyResourceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Description", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["description"]},
-		{Name: "version(s)", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["versions"]},
+		{Name: "Version(s)", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["versions"]},
 	}
 
 	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResource)
@@ -319,7 +319,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	horizontalPodAutoscalerColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Refrence", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
+		{Name: "Reference", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
 		{Name: "Targets", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
 		{Name: "MinPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
 		{Name: "MaxPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
@@ -341,7 +341,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Data", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
 		{Name: "Caps", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
-		{Name: "Selinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
+		{Name: "SELinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
 		{Name: "RunAsUser", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
 		{Name: "FsGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
 		{Name: "SupGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
