@@ -97,7 +97,7 @@ func (r *Reset) Run(out io.Writer) error {
 
 	// Try to unmount mounted directories under /var/lib/kubelet in order to be able to remove the /var/lib/kubelet directory later
 	fmt.Printf("[reset] Unmounting mounted directories in %q\n", "/var/lib/kubelet")
-	umountDirsCmd := "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs -r umount"
+	umountDirsCmd := "awk '$2 ~ path {print $2}' path=/var/lib/kubelet /proc/mounts | xargs -r umount"
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
 		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
