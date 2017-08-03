@@ -81,7 +81,7 @@ fi
 
 ENABLE_GARBAGE_COLLECTOR=${ENABLE_GARBAGE_COLLECTOR:-true}
 
-CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PodPreset,DefaultTolerationSeconds,NodeRestriction,ResourceQuota}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PodPreset,DefaultTolerationSeconds,LimitPodHardAntiAffinityTopology,NodeRestriction,ResourceQuota}"
 
 # Master components' test arguments.
 APISERVER_TEST_ARGS="${KUBEMARK_APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${API_SERVER_TEST_LOG_LEVEL} ${TEST_CLUSTER_STORAGE_MEDIA_TYPE} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT} ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"

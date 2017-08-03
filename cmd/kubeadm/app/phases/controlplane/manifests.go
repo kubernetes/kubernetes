@@ -39,6 +39,7 @@ const (
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
+	defaultv18AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,LimitPodHardAntiAffinityTopology,NodeRestriction,ResourceQuota"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
@@ -157,6 +158,10 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		"requestheader-allowed-names":        "front-proxy-client",
 		"proxy-client-cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientCertName),
 		"proxy-client-key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
+	}
+
+	if k8sVersion.AtLeast(kubeadmconstants.MinimumLimitPodHardAntiAffinityTopologyVersion) {
+		defaultArguments["admission-control"] = defaultv18AdmissionControl
 	}
 
 	command := []string{"kube-apiserver"}

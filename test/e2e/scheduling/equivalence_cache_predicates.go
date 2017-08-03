@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -226,6 +227,64 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 
 		// these two replicas should all be rejected since podAntiAffinity says it they anit-affinity with pod {"service": "S1"}
 		verifyReplicasResult(cs, 0, replica, ns, labelRCName)
+	})
+
+	It("validates that toplogykey of hard pod antiaffinity is limited to kubernetes.io/hostname", func() {
+		By("Trying to launch a pod with hard anti affinity that topologykey is zone.")
+		podName := "separate-by-zone"
+		_, err := cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
+			Name: podName,
+			Affinity: &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "service",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1"},
+									},
+								},
+							},
+							TopologyKey: "zone",
+							Namespaces:  []string{ns},
+						},
+					},
+				},
+			},
+		}))
+
+		if err == nil || !errors.IsForbidden(err) {
+			framework.Failf("Expect error of forbidden, got : %v", err)
+		}
+
+		By("Trying to launch a pod with hard anti affinity that topologykey is kubernetes.io/hostname.")
+		podName = "separate-by-hostname"
+		conf := pausePodConfig{
+			Name: podName,
+			Affinity: &v1.Affinity{
+				PodAntiAffinity: &v1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "service",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"S1"},
+									},
+								},
+							},
+							TopologyKey: "kubernetes.io/hostname",
+							Namespaces:  []string{ns},
+						},
+					},
+				},
+			},
+		}
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, true)
+		verifyResult(cs, 1, 0, ns)
 	})
 })
 
