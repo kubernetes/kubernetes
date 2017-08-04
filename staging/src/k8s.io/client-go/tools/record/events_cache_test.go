@@ -102,7 +102,7 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	}
 	actualFirstTimestamp := recvEvent.FirstTimestamp
 	actualLastTimestamp := recvEvent.LastTimestamp
-	if actualFirstTimestamp.Equal(actualLastTimestamp) {
+	if actualFirstTimestamp.Equal(&actualLastTimestamp) {
 		if expectCompression {
 			t.Errorf("%v - FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", messagePrefix, actualFirstTimestamp, actualLastTimestamp, recvEvent)
 		}

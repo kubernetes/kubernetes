@@ -1044,7 +1044,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	}
 	objectMeta = t.getObjectMetaOrFail(object)
 	if objectMeta.GetDeletionTimestamp() == nil || objectMeta.GetDeletionGracePeriodSeconds() == nil ||
-		*objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace || !objectMeta.GetDeletionTimestamp().Before(deletionTimestamp) {
+		*objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace || !objectMeta.GetDeletionTimestamp().Before(&deletionTimestamp) {
 		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}
 }

@@ -2282,10 +2282,10 @@ func (o byFirstTimestamp) Len() int      { return len(o) }
 func (o byFirstTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byFirstTimestamp) Less(i, j int) bool {
-	if o[i].FirstTimestamp.Equal(o[j].FirstTimestamp) {
+	if o[i].FirstTimestamp.Equal(&o[j].FirstTimestamp) {
 		return o[i].InvolvedObject.Name < o[j].InvolvedObject.Name
 	}
-	return o[i].FirstTimestamp.Before(o[j].FirstTimestamp)
+	return o[i].FirstTimestamp.Before(&o[j].FirstTimestamp)
 }
 
 func dumpAllPodInfo(c clientset.Interface) {

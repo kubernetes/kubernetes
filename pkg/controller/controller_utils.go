@@ -711,8 +711,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
 	// 6. older pods < newer pods < empty timestamp pods
-	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
-		return afterOrZero(s[j].CreationTimestamp, s[i].CreationTimestamp)
+	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
+		return afterOrZero(&s[j].CreationTimestamp, &s[i].CreationTimestamp)
 	}
 	return false
 }
@@ -751,31 +751,31 @@ func (s ActivePods) Less(i, j int) bool {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
 	// 6. Empty creation time pods < newer pods < older pods
-	if !s[i].CreationTimestamp.Equal(s[j].CreationTimestamp) {
-		return afterOrZero(s[i].CreationTimestamp, s[j].CreationTimestamp)
+	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
+		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}
 	return false
 }
 
 // afterOrZero checks if time t1 is after time t2; if one of them
 // is zero, the zero time is seen as after non-zero time.
-func afterOrZero(t1, t2 metav1.Time) bool {
+func afterOrZero(t1, t2 *metav1.Time) bool {
 	if t1.Time.IsZero() || t2.Time.IsZero() {
 		return t1.Time.IsZero()
 	}
 	return t1.After(t2.Time)
 }
 
-func podReadyTime(pod *v1.Pod) metav1.Time {
+func podReadyTime(pod *v1.Pod) *metav1.Time {
 	if podutil.IsPodReady(pod) {
 		for _, c := range pod.Status.Conditions {
 			// we only care about pod ready conditions
 			if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
-				return c.LastTransitionTime
+				return &c.LastTransitionTime
 			}
 		}
 	}
-	return metav1.Time{}
+	return &metav1.Time{}
 }
 
 func maxContainerRestarts(pod *v1.Pod) int {
@@ -841,10 +841,10 @@ type ControllersByCreationTimestamp []*v1.ReplicationController
 func (o ControllersByCreationTimestamp) Len() int      { return len(o) }
 func (o ControllersByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o ControllersByCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 // ReplicaSetsByCreationTimestamp sorts a list of ReplicaSet by creation timestamp, using their names as a tie breaker.
@@ -853,10 +853,10 @@ type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
 func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
 func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 // ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
