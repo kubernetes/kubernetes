@@ -144,8 +144,9 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 
 // addFlags adds flags for a specific componentconfig.KubeletConfiguration to the specified FlagSet
 func (c *kubeletConfiguration) addFlags(fs *pflag.FlagSet) {
-	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-	fs.BoolVar(&c.ExperimentalFailSwapOn, "experimental-fail-swap-on", c.ExperimentalFailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. This is a temporary opton to maintain legacy behavior, failing due to swap enabled will happen by default in v1.6.")
+	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", true, "Makes the Kubelet fail to start if swap is enabled on the node. ")
+	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", true, "DEPRECATED: please use --fail-swap-on instead.")
+	fs.MarkDeprecated("experimental-fail-swap-on", "This flag is deprecated and will be removed in future releases. please use --fail-swap-on instead.")
 
 	fs.StringVar(&c.PodManifestPath, "pod-manifest-path", c.PodManifestPath, "Path to to the directory containing pod manifest files to run, or the path to a single pod manifest file. Files starting with dots will be ignored.")
 	fs.DurationVar(&c.SyncFrequency.Duration, "sync-frequency", c.SyncFrequency.Duration, "Max period between synchronizing running containers and config")
