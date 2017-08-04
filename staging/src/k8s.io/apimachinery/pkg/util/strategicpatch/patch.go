@@ -468,13 +468,13 @@ func index(l []interface{}, valToLookUp interface{}, mergeKeys []string, kind re
 		getValFn = func(item interface{}) interface{} {
 			typedItem, ok := item.(map[string]interface{})
 			if !ok {
-				return nil
+				return -1
 			}
 			mergeKeyValues := make([]interface{}, 0, len(mergeKeys))
 			for _, mergeKey := range mergeKeys {
 				val, ok := typedItem[mergeKey]
 				if !ok {
-					return nil
+					return -1
 				}
 				mergeKeyValues = append(mergeKeyValues, val)
 			}
@@ -672,11 +672,11 @@ func diffListsOfScalars(original, modified []interface{}, diffOptions DiffOption
 		var originalValue, modifiedValue interface{}
 		if originalInBounds {
 			originalValue = originalScalars[originalIndex]
-			originalString = fmt.Sprintf("%v", originalValue)
+			originalString = fmt.Sprint(originalValue)
 		}
 		if modifiedInBounds {
 			modifiedValue = modifiedScalars[modifiedIndex]
-			modifiedString = fmt.Sprintf("%v", modifiedValue)
+			modifiedString = fmt.Sprint(modifiedValue)
 		}
 
 		originalV, modifiedV := compareListValuesAtIndex(originalInBounds, modifiedInBounds, originalString, modifiedString)
@@ -775,7 +775,7 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKeys
 			}
 		}
 		switch {
-		case bothInBounds && ItemMatchesOriginalAndModifiedSlice(compareResult):
+		case bothInBounds && itemMatchesOriginalAndModifiedSlice(compareResult):
 			// Merge key values are equal, so recurse
 			patchValue, err := diffMaps(originalElement, modifiedElement, t, diffOptions)
 			if err != nil {
@@ -794,7 +794,7 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKeys
 		case !originalInBounds:
 			fallthrough
 		// modified has additional map
-		case bothInBounds && ItemAddedToModifiedSlice(compareResult):
+		case bothInBounds && itemAddedToModifiedSlice(compareResult):
 			if !diffOptions.IgnoreChangesAndAdditions {
 				patch = append(patch, modifiedElement)
 			}
@@ -803,7 +803,7 @@ func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKeys
 		case !modifiedInBounds:
 			fallthrough
 		// original has additional map
-		case bothInBounds && ItemRemovedFromModifiedSlice(compareResult):
+		case bothInBounds && itemRemovedFromModifiedSlice(compareResult):
 			if !diffOptions.IgnoreDeletions {
 				// Item was deleted, so add delete directive
 				toDeleteItem, err := CreateDeleteDirective(mergeKeys, originalElementMergeKeysMap)
@@ -997,10 +997,8 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 			case mergeKeysEqual:
 				patchIndex++
 			}
-		} else {
-			if reflect.DeepEqual(nonDeleteList[patchIndex], typedSetOrderList[setOrderIndex]) {
-				patchIndex++
-			}
+		} else if reflect.DeepEqual(nonDeleteList[patchIndex], typedSetOrderList[setOrderIndex]) {
+			patchIndex++
 		}
 		setOrderIndex++
 	}
@@ -1763,8 +1761,8 @@ func (ss SortableSliceOfScalars) Len() int {
 }
 
 func (ss SortableSliceOfScalars) Less(i, j int) bool {
-	iStr := fmt.Sprintf("%v", ss.s[i])
-	jStr := fmt.Sprintf("%v", ss.s[j])
+	iStr := fmt.Sprint(ss.s[i])
+	jStr := fmt.Sprint(ss.s[j])
 	return sort.StringsAreSorted([]string{iStr, jStr})
 }
 
@@ -1954,7 +1952,7 @@ func mergeKeysValueToString(mergeKeys []string, m map[string]interface{}) (strin
 		if !found {
 			return "", mergepatch.ErrNoMergeKey(m, nil, mergeKey)
 		}
-		mergeKeyValueStrings = append(mergeKeyValueStrings, fmt.Sprintf("%s", mergeKeyValue))
+		mergeKeyValueStrings = append(mergeKeyValueStrings, fmt.Sprint(mergeKeyValue))
 	}
 	return strings.Join(mergeKeyValueStrings, ", "), nil
 }
@@ -2082,15 +2080,15 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	return json.Marshal(patchMap)
 }
 
-func ItemAddedToModifiedSlice(compareResult mergeKeysCompareResultType) bool {
+func itemAddedToModifiedSlice(compareResult mergeKeysCompareResultType) bool {
 	return compareResult == mergeKeysGreater
 }
 
-func ItemRemovedFromModifiedSlice(compareResult mergeKeysCompareResultType) bool {
+func itemRemovedFromModifiedSlice(compareResult mergeKeysCompareResultType) bool {
 	return compareResult == mergeKeysLess
 }
 
-func ItemMatchesOriginalAndModifiedSlice(compareResult mergeKeysCompareResultType) bool {
+func itemMatchesOriginalAndModifiedSlice(compareResult mergeKeysCompareResultType) bool {
 	return compareResult == mergeKeysEqual
 }
 
@@ -2109,12 +2107,12 @@ func compareByMergeKeys(left, right map[string]interface{}, mergeKeys []string) 
 	var foundLeft, foundRight bool
 	for _, mergeKey := range mergeKeys {
 		if leftValue, foundLeft = left[mergeKey]; foundLeft {
-			leftString = fmt.Sprintf("%v", leftValue)
+			leftString = fmt.Sprint(leftValue)
 		} else {
 			return mergeKeysNotFound
 		}
 		if rightValue, foundRight = right[mergeKey]; foundRight {
-			rightString = fmt.Sprintf("%v", rightValue)
+			rightString = fmt.Sprint(rightValue)
 		} else {
 			return mergeKeysNotFound
 		}

@@ -34,9 +34,8 @@ var (
 func ErrNoMergeKey(m1, m2 map[string]interface{}, k ...string) error {
 	if m2 == nil {
 		return fmt.Errorf("map: %v does not contain declared merge keys: %v", m1, k)
-	} else {
-		return fmt.Errorf("at least one of maps: %v and %v does not contain declared merge keys: %v", m1, m2, k)
 	}
+	return fmt.Errorf("at least one of maps: %v and %v does not contain declared merge keys: %v", m1, m2, k)
 }
 
 func ErrBadArgType(expected, actual interface{}) error {
