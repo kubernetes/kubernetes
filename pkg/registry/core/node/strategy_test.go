@@ -23,6 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestMatchNode(t *testing.T) {

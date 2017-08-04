@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/imagepolicy/fuzzer:all-srcs",
         "//pkg/apis/imagepolicy/install:all-srcs",
         "//pkg/apis/imagepolicy/v1alpha1:all-srcs",
     ],

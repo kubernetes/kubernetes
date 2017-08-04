@@ -32,6 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestMatchPod(t *testing.T) {

@@ -47,6 +47,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/extensions/fuzzer:all-srcs",
         "//pkg/apis/extensions/install:all-srcs",
         "//pkg/apis/extensions/v1beta1:all-srcs",
         "//pkg/apis/extensions/validation:all-srcs",
