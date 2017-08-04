@@ -134,7 +134,7 @@ func main() {
 	}
 
 	if config.Morph == "proxy" {
-		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
+		client, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
 		}
@@ -147,7 +147,7 @@ func main() {
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
 			internalClientset,
-			eventClient,
+			client.Core(),
 			iptInterface,
 			sysctl,
 			execer,
