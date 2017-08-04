@@ -24,7 +24,7 @@ go_test(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/controller/node/testutil:go_default_library",
+        "//pkg/controller/testutil:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/taints:go_default_library",
@@ -115,9 +115,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/controller/node/testutil:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

@@ -182,7 +182,6 @@ pkg/controller/job
 pkg/controller/namespace
 pkg/controller/namespace/deletion
 pkg/controller/node
-pkg/controller/node/testutil
 pkg/controller/podautoscaler
 pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
