@@ -17,7 +17,6 @@ limitations under the License.
 package httplog
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -35,28 +34,6 @@ func TestDefaultStacktracePred(t *testing.T) {
 		if !DefaultStacktracePred(x) {
 			t.Fatalf("should log on %v by default", x)
 		}
-	}
-}
-
-func TestHandler(t *testing.T) {
-	want := &httptest.ResponseRecorder{
-		HeaderMap: make(http.Header),
-		Body:      new(bytes.Buffer),
-	}
-	want.WriteHeader(http.StatusOK)
-	mux := http.NewServeMux()
-	handler := Handler(mux, DefaultStacktracePred)
-	mux.HandleFunc("/kube", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	req, err := http.NewRequest("GET", "http://example.com/kube", nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-	if !reflect.DeepEqual(want, w) {
-		t.Errorf("Expected %v, got %v", want, w)
 	}
 }
 

@@ -323,3 +323,27 @@ func TestValidateMixedArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateFeatureFlags(t *testing.T) {
+	type featureFlag map[string]bool
+	var tests = []struct {
+		featureFlags featureFlag
+		expected     bool
+	}{
+		{featureFlag{"SelfHosting": true}, true},
+		{featureFlag{"SelfHosting": false}, true},
+		{featureFlag{"StoreCertsInSecrets": true}, true},
+		{featureFlag{"StoreCertsInSecrets": false}, true},
+		{featureFlag{"Foo": true}, false},
+	}
+	for _, rt := range tests {
+		actual := ValidateFeatureFlags(rt.featureFlags, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed featureFlags:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}

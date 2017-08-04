@@ -1,5 +1,3 @@
-#!/bin/sh
-
 # Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-"http://localhost:9200"}
-echo ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+FROM BASEIMAGE
 
-export KIBANA_BASE_URL=${KIBANA_BASE_URL:-"''"}
-echo "server.basePath: ${KIBANA_BASE_URL}"
-echo "server.basePath: ${KIBANA_BASE_URL}" >> /kibana/config/kibana.yml
-echo "server.host: ${KIBANA_HOST}"
-echo "server.host: ${KIBANA_HOST}" >> /kibana/config/kibana.yml
+# The samba-common, cifs-utils, and nfs-common packages depend on
+# ucf, which itself depends on /bin/bash existing.
+# It doesn't seem to actually need bash, however.
+RUN ln -s /bin/sh /bin/bash
 
-/kibana/bin/kibana -e ${ELASTICSEARCH_URL}
+RUN echo CACHEBUST>/dev/null && clean-install \
+    iptables \
+    ebtables \
+    ethtool \
+    ca-certificates \
+    conntrack \
+    util-linux \
+    socat \
+    git \
+    jq \
+    nfs-common \
+    glusterfs-client \
+    cifs-utils \
+    ceph-common
+
+COPY cni-bin/bin /opt/cni/bin

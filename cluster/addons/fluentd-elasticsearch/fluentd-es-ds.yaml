@@ -32,6 +32,16 @@ spec:
         env:
         - name: FLUENTD_ARGS
           value: -q
+        - name: FLUENT_ELASTICSEARCH_USER
+          valueFrom:
+            configMapKeyRef:
+              name: environment
+              key: elasticsearch-user
+        - name: FLUENT_ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: environment
+              key: elasticsearch-password
         resources:
           limits:
             memory: 200Mi

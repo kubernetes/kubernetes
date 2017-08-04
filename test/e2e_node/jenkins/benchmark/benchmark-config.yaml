@@ -70,21 +70,21 @@ images:
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   cosbeta-resource1:
-    image: cos-beta-60-9592-52-0
+    image: cos-beta-60-9592-70-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   cosbeta-resource2:
-    image: cos-beta-60-9592-52-0
+    image: cos-beta-60-9592-70-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   cosbeta-resource3:
-    image: cos-beta-60-9592-52-0
+    image: cos-beta-60-9592-70-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
@@ -111,24 +111,63 @@ images:
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
-  coreos-resource1:
-    image: coreos-alpha-1122-0-0-v20160727
+  coreosalpha-resource1:
+    image: coreos-alpha-1478-0-0-v20170719
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
     machine: n1-standard-1
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
-  coreos-resource2:
-    image: coreos-alpha-1122-0-0-v20160727
+  coreosalpha-resource2:
+    image: coreos-alpha-1478-0-0-v20170719
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
     machine: n1-standard-1
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
-  coreos-resource3:
-    image: coreos-alpha-1122-0-0-v20160727
+  coreosalpha-resource3:
+    image: coreos-alpha-1478-0-0-v20170719
     project: coreos-cloud
     metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 105 pods per node \[Benchmark\]'
+  coreosstable-resource1:
+    image: coreos-stable-1409-7-0-v20170719
+    project: coreos-cloud
+    metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 0 pods per node \[Benchmark\]'
+  coreosstable-resource2:
+    image: coreos-stable-1409-7-0-v20170719
+    project: coreos-cloud
+    metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 35 pods per node \[Benchmark\]'
+  coreosstable-resource3:
+    image: coreos-stable-1409-7-0-v20170719
+    project: coreos-cloud
+    metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 105 pods per node \[Benchmark\]'
+  ubuntustable-resource1:
+    image: ubuntu-gke-1604-xenial-v20170420-1
+    project: ubuntu-os-gke-cloud
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 0 pods per node \[Benchmark\]'
+  ubuntustable-resource2:
+    image: ubuntu-gke-1604-xenial-v20170420-1
+    project: ubuntu-os-gke-cloud
+    machine: n1-standard-1
+    tests:
+      - 'resource tracking for 35 pods per node \[Benchmark\]'
+  ubuntustable-resource3:
+    image: ubuntu-gke-1604-xenial-v20170420-1
+    project: ubuntu-os-gke-cloud
     machine: n1-standard-1
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'

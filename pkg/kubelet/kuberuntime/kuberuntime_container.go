@@ -574,8 +574,8 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 
 	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
 
-	// Run the pre-stop lifecycle hooks if applicable.
-	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
+	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
+	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs

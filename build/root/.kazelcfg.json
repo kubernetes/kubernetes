@@ -1,18 +1,7 @@
 {
 	"GoPrefix": "k8s.io/kubernetes",
-	"SrcDirs": [
-		"./pkg",
-		"./cmd",
-		"./third_party",
-		"./plugin",
-		"./test",
-		"./federation",
-		"./examples"
-	],
 	"SkippedPaths": [
-		"^_.*",
-		"^staging.*",
-		"_vendor"
+		"^_.*"
 	],
 	"AddSourcesRules": true,
 	"VendorMultipleBuildFiles": true,

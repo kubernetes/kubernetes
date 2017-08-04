@@ -102,7 +102,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 // in extensions. These addons are:
 // - MaxUnavailable during rolling update set to 25% (1 in extensions)
 // - MaxSurge value during rolling update set to 25% (1 in extensions)
-// - RevisionHistoryLimit set to 2 (not set in extensions)
+// - RevisionHistoryLimit set to 10 (not set in extensions)
 // - ProgressDeadlineSeconds set to 600s (not set in extensions)
 func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
 	// Default labels and selector to labels from pod template spec.
@@ -144,7 +144,7 @@ func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
-		*obj.Spec.RevisionHistoryLimit = 2
+		*obj.Spec.RevisionHistoryLimit = 10
 	}
 	if obj.Spec.ProgressDeadlineSeconds == nil {
 		obj.Spec.ProgressDeadlineSeconds = new(int32)

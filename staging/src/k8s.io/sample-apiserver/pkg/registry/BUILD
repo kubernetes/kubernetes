@@ -16,3 +16,20 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer:all-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

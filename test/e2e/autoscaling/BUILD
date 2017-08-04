@@ -13,6 +13,7 @@ go_library(
         "autoscaling_timer.go",
         "cluster_size_autoscaling.go",
         "dns_autoscaling.go",
+        "framework.go",
         "horizontal_pod_autoscaling.go",
     ],
     tags = ["automanaged"],

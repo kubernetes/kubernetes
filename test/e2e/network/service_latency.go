@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package network
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ func (d durations) Len() int           { return len(d) }
 func (d durations) Less(i, j int) bool { return d[i] < d[j] }
 func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
-var _ = framework.KubeDescribe("Service endpoints latency", func() {
+var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
 	It("should not be very high [Conformance]", func() {

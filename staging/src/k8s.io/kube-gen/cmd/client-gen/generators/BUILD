@@ -32,3 +32,21 @@ go_library(
         "//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/kube-gen/cmd/client-gen/generators/fake:all-srcs",
+        "//staging/src/k8s.io/kube-gen/cmd/client-gen/generators/scheme:all-srcs",
+        "//staging/src/k8s.io/kube-gen/cmd/client-gen/generators/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

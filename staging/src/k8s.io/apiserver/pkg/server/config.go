@@ -74,7 +74,7 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
-// It's members are sorted roughly in order of importance for composers.
+// Its members are sorted roughly in order of importance for composers.
 type Config struct {
 	// SecureServingInfo is required to serve https
 	SecureServingInfo *SecureServingInfo
@@ -104,7 +104,7 @@ type Config struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
-	// LegacyAuditWriter is the destination for audit logs.  If nil, they will not be written.
+	// LegacyAuditWriter is the destination for audit logs. If nil, they will not be written.
 	LegacyAuditWriter io.Writer
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
@@ -126,13 +126,13 @@ type Config struct {
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
-	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
 	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
 	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
 	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
 	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
@@ -293,7 +293,7 @@ type completedConfig struct {
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
-// from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
+// from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
@@ -374,7 +374,7 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
-// name is used to differentiate for logging.  The handler chain in particular can be difficult as it starts delgating.
+// name is used to differentiate for logging. The handler chain in particular can be difficult as it starts delgating.
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	// The delegationTarget and the config must agree on the RequestContextMapper
 

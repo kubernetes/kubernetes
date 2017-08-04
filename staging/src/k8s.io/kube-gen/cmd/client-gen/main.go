@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// client-gen makes the individual typed clients using go2idl.
+// client-gen makes the individual typed clients using gengo.
 package main
 
 import (

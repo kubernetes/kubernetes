@@ -163,6 +163,10 @@ message SubjectAccessReviewSpec {
   // it needs a reflection here.
   // +optional
   map<string, ExtraValue> extra = 5;
+
+  // UID information about the requesting user.
+  // +optional
+  optional string uid = 6;
 }
 
 // SubjectAccessReviewStatus

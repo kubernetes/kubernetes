@@ -38,9 +38,6 @@ type Clientset struct {
 
 // Apiextensions retrieves the ApiextensionsClient
 func (c *Clientset) Apiextensions() apiextensionsinternalversion.ApiextensionsInterface {
-	if c == nil {
-		return nil
-	}
 	return c.ApiextensionsClient
 }
 

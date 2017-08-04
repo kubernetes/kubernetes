@@ -56,3 +56,19 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets/types:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

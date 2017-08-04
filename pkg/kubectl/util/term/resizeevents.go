@@ -21,8 +21,8 @@ package term
 import (
 	"os"
 	"os/signal"
-	"syscall"
 
+	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
 )
@@ -35,7 +35,7 @@ func monitorResizeEvents(fd uintptr, resizeEvents chan<- remotecommand.TerminalS
 		defer runtime.HandleCrash()
 
 		winch := make(chan os.Signal, 1)
-		signal.Notify(winch, syscall.SIGWINCH)
+		signal.Notify(winch, unix.SIGWINCH)
 		defer signal.Stop(winch)
 
 		for {

@@ -85,3 +85,19 @@ filegroup(
     name = "testdata",
     srcs = glob(["testdata/*"]),
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/options/encryptionconfig:all-srcs",
+    ],
+    tags = ["automanaged"],
+)
