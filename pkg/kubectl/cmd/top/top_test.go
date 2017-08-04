@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package top
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ const (
 )
 
 func TestTopSubcommandsExist(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	f, _, _, _ := cmdtesting.NewAPIFactory()
 	buf := bytes.NewBuffer([]byte{})
