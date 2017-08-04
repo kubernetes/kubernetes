@@ -233,7 +233,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
 		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
-		SelectorParam(options.LabelSelector).
+		LabelSelectorParam(options.LabelSelector).
 		ExportParam(options.Export).
 		RequestChunksOf(options.ChunkSize).
 		IncludeUninitialized(cmdutil.ShouldIncludeUninitialized(cmd, false)). // TODO: this needs to be better factored
@@ -450,7 +450,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
 		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
-		SelectorParam(options.LabelSelector).
+		LabelSelectorParam(options.LabelSelector).
 		ExportParam(options.Export).
 		RequestChunksOf(options.ChunkSize).
 		IncludeUninitialized(includeUninitialized).

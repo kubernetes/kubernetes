@@ -219,7 +219,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		LabelSelectorParam(options.Selector).
 		IncludeUninitialized(includeUninitialized).
 		Flatten().
 		Do()

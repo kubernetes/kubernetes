@@ -691,7 +691,7 @@ func (v FilteredVisitor) Visit(fn VisitorFunc) error {
 	})
 }
 
-func FilterBySelector(s labels.Selector) FilterFunc {
+func FilterByLabelSelector(s labels.Selector) FilterFunc {
 	return func(info *Info, err error) (bool, error) {
 		if err != nil {
 			return false, err
