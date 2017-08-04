@@ -838,9 +838,11 @@ def request_kubelet_and_proxy_credentials(kube_control):
 @when('kube-control.auth.available')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    creds = kube_control.get_auth_credentials()
     nodeuser = 'system:node:{}'.format(gethostname())
-    if data_changed('kube-control.creds', creds) and creds['user'] == nodeuser:
+    creds = kube_control.get_auth_credentials(nodeuser)
+    if creds \
+            and data_changed('kube-control.creds', creds) \
+            and creds['user'] == nodeuser:
         db.set('credentials', creds)
         set_state('worker.auth.bootstrapped')
         set_state('kubernetes-worker.restart-needed')
