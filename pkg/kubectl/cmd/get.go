@@ -232,7 +232,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, allNamespaces)
+		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+		printOpts.WithNamespace = allNamespaces
+
+		printer, err := f.DecoratedPrinterWithOptions(printOpts, false, mapping)
 		if err != nil {
 			return err
 		}
@@ -311,7 +314,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	printer, err := f.PrinterWithOptions(printers.PrintOptions{}, false)
 	if err != nil {
 		return err
 	}
@@ -448,19 +451,20 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			mapping = infos[ix].Mapping
 			original = infos[ix].Object
 		}
-		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
+		if shouldGetNewDecoratedPrinter(printer, lastMapping, mapping) {
 			if printer != nil {
 				w.Flush()
 			}
 
-			var outputOpts *printers.OutputOptions
+			printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+			printOpts.WithNamespace = allNamespaces
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping)
+				outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping, &printOpts)
 			}
 
-			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
+			printer, err = f.DecoratedPrinterWithOptions(printOpts, false, mapping)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -546,7 +550,7 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "its an experimental feature.")
 }
 
-func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
+func shouldGetNewDecoratedPrinter(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
 }
 
@@ -555,44 +559,44 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 }
 
 // outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
-// openapi schema and returns the output options for the mapping if found.
-func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
-
+// openapi schema and updates the given *printers.PrintOptions object.
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
 	// user has not specified any output format, check if OpenAPI has
 	// default specification to print this resource type
 	api, err := f.OpenAPISchema(openAPIcacheDir)
 	if err != nil {
 		// Error getting schema
-		return nil, false
+		return false
 	}
 	// Found openapi metadata for this resource
 	schema := api.LookupResource(mapping.GroupVersionKind)
 	if schema == nil {
 		// Schema not found, return empty columns
-		return nil, false
+		return false
 	}
 
 	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
 	if !found {
 		// Extension not found, return empty columns
-		return nil, false
+		return false
 	}
 
-	return outputOptsFromStr(columns)
+	return outputOptsFromStr(columns, printOpts)
 }
 
 // outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
-func outputOptsFromStr(columnStr string) (*printers.OutputOptions, bool) {
+func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool {
 	if columnStr == "" {
-		return nil, false
+		return false
 	}
 	parts := strings.SplitN(columnStr, "=", 2)
 	if len(parts) < 2 {
-		return nil, false
+		return false
 	}
-	return &printers.OutputOptions{
-		FmtType:          parts[0],
-		FmtArg:           parts[1],
-		AllowMissingKeys: true,
-	}, true
+
+	printOpts.OutputFmt = parts[0]
+	printOpts.OutputFmtArg = parts[1]
+	printOpts.AllowMissingKeys = true
+
+	return true
 }

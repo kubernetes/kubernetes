@@ -66,6 +66,16 @@ type PrintOptions struct {
 	AbsoluteTimestamps bool
 	Kind               string
 	ColumnLabels       []string
+
+	SortBy string
+
+	// output format options used to generate a resource printer.
+	// supported format types can be found in pkg/printers/printers.go
+	OutputFmt        string
+	OutputFmtArg     string
+
+	// indicates if it is OK to ignore missing keys for rendering an output template.
+	AllowMissingKeys bool
 }
 
 // Describer generates output for the named resource or an error
@@ -99,14 +109,4 @@ type ErrNoDescriber struct {
 // Error implements the error interface.
 func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
-}
-
-// OutputOptions represents resource output options which is used to generate a resource printer.
-type OutputOptions struct {
-	// supported Format types can be found in pkg/printers/printers.go
-	FmtType string
-	FmtArg  string
-
-	// indicates if it is OK to ignore missing keys for rendering an output template.
-	AllowMissingKeys bool
 }

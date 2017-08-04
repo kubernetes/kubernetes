@@ -149,7 +149,6 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
-	// TODO: how is this different than PrinterForMapping?
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
@@ -235,12 +234,14 @@ type BuilderFactory interface {
 	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
 	// could not be found.
 	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error)
-	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	// Returns a printer, true if the printer is generic (is not internal), or
-	// an error if a printer could not be found.
-	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
+	PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error)
+	// PrinterWithOptions returns the standard printer for the given set of options
+	PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error)
+	// DecoratedPrinterWithOptions returns a printer suitable for displaying versioned resources.
+	// Returns a versioned printer if the resulting standard printer is generic, or attaches internal
+	// resource handlers if the printer is not generic and implements printers.TabularPrintHandler.
+	// Returns an error if the given RESTMapping is nil or has an empty groupversion.
+	DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations

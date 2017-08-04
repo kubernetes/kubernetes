@@ -79,7 +79,7 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
-			printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+			printer, err := f.PrinterForCommand(cmd, false)
 			cmdutil.CheckErr(err)
 			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 

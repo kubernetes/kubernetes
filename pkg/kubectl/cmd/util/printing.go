@@ -80,45 +80,25 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
-// printerForCommand returns the printer for the outputOptions (if given) or
-// returns the default printer for the command. Requires that printer flags have
-// been added to cmd (see AddPrinterFlags).
-// TODO: remove the dependency on cmd object
-func printerForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-
-	if outputOpts == nil {
-		outputOpts = extractOutputOptions(cmd)
-	}
-
-	// this function may be invoked by a command that did not call AddPrinterFlags first, so we need
-	// to be safe about how we access the no-headers flag
-	noHeaders := false
-	if cmd.Flags().Lookup("no-headers") != nil {
-		noHeaders = GetFlagBool(cmd, "no-headers")
-	}
-	printer, err := printers.GetStandardPrinter(outputOpts, noHeaders, mapper, typer, encoder, decoders, options)
-	if err != nil {
-		return nil, err
-	}
-
-	// We add handlers to the printer in case it implements printers.TabularPrintHandler.
-	// printers.AddHandlers expects a type that implements printers.TabularPrintHandler
-	// as its parameter. Ensure that the current printer is a printers.TabularPrintHandler
-	// and register tabular output handlers to it.
-	//
-	// We add printer handlers before a call to maybeWrapSortingPrinter so that we don't
-	// need to convert to delegatePrinter again before invoking AddHandlers()
-	if tabularPrinter, ok := printer.(printers.TabularPrintHandler); ok {
-		printersinternal.AddHandlers(tabularPrinter)
-	}
-
-	return maybeWrapSortingPrinter(cmd, printer), nil
-}
-
-// extractOutputOptions parses printer specific commandline args and returns
-// printers.OutputsOptions object.
-func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
+// ExtractCmdPrintOptions parses printer specific commandline args and
+// returns a PrintOptions object.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags)
+func ExtractCmdPrintOptions(cmd *cobra.Command) printers.PrintOptions {
 	flags := cmd.Flags()
+
+	columnLabel, err := flags.GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+
+	options := printers.PrintOptions{
+		NoHeaders:          GetFlagBool(cmd, "no-headers"),
+		Wide:               GetWideFlag(cmd),
+		ShowAll:            GetFlagBool(cmd, "show-all"),
+		ShowLabels:         GetFlagBool(cmd, "show-labels"),
+		AbsoluteTimestamps: isWatch(cmd),
+		ColumnLabels:       columnLabel,
+	}
 
 	var outputFormat string
 	if flags.Lookup("output") != nil {
@@ -149,29 +129,42 @@ func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
 
 	// this function may be invoked by a command that did not call AddPrinterFlags first, so we need
 	// to be safe about how we access the allow-missing-template-keys flag
-	allowMissingTemplateKeys := false
 	if flags.Lookup("allow-missing-template-keys") != nil {
-		allowMissingTemplateKeys = GetFlagBool(cmd, "allow-missing-template-keys")
+		options.AllowMissingKeys = GetFlagBool(cmd, "allow-missing-template-keys")
 	}
 
-	return &printers.OutputOptions{
-		FmtType:          outputFormat,
-		FmtArg:           templateFile,
-		AllowMissingKeys: allowMissingTemplateKeys,
-	}
+	options.OutputFmt = outputFormat
+	options.OutputFmtArg = templateFile
+
+	return options
 }
 
-func maybeWrapSortingPrinter(cmd *cobra.Command, printer printers.ResourcePrinter) printers.ResourcePrinter {
-	sorting, err := cmd.Flags().GetString("sort-by")
+// printerWithOptions returns the printer for the given options.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+func printerWithOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+	printer, err := printers.GetStandardPrinter(options.NoHeaders, mapper, typer, encoder, decoders, options)
 	if err != nil {
-		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
-		return printer
+		return nil, err
 	}
 
-	if len(sorting) != 0 {
+	// We add handlers to the printer in case it implements printers.TabularPrintHandler.
+	// printers.AddHandlers expects a type that implements printers.TabularPrintHandler
+	// as its parameter. Ensure that the current printer is a printers.TabularPrintHandler
+	// and register tabular output handlers to it.
+	// We add printer handlers before a call to maybeWrapSortingPrinter so that we don't
+	// need to convert to delegatePrinter again before invoking AddHandlers()
+	if tabularPrinter, ok := printer.(printers.TabularPrintHandler); ok {
+		printersinternal.AddHandlers(tabularPrinter)
+	}
+
+	return maybeWrapSortingPrinter(printer, options), nil
+}
+
+func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printers.PrintOptions) printers.ResourcePrinter {
+	if len(printOpts.SortBy) != 0 {
 		return &kubectl.SortingPrinter{
 			Delegate:  printer,
-			SortField: fmt.Sprintf("{%s}", sorting),
+			SortField: fmt.Sprintf("{%s}", printOpts.SortBy),
 		}
 	}
 	return printer

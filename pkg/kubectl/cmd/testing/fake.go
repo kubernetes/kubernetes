@@ -350,8 +350,54 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
+}
+
+func (f *FakeFactory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
+func (f *FakeFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
+func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
+	printer, err := f.PrinterForCommand(cmd, false)
+	if err != nil {
+		return err
+	}
+	if !printer.IsGeneric() {
+		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+		printer, err = f.DecoratedPrinterWithOptions(printOpts, false, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
+}
+
+func (f *FakeFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
+	resource, _ = mapper.ResourceSingularizer(resource)
+	dryRunMsg := ""
+	if dryRun {
+		dryRunMsg = " (dry run)"
+	}
+	if shortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
+		} else {
+			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
+		}
+	}
 }
 
 func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
@@ -472,10 +518,6 @@ func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
 
 func (f *FakeFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	return nil
-}
-
-func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
 }
 
 func (f *FakeFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
@@ -644,8 +686,54 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+	return f.tf.Printer, f.tf.Err
+}
+
+func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
+	printer, err := f.PrinterForCommand(cmd, false)
+	if err != nil {
+		return err
+	}
+	if !printer.IsGeneric() {
+		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+		printer, err = f.DecoratedPrinterWithOptions(printOpts, false, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return printer.PrintObj(info.Object, out)
+}
+
+func (f *fakeAPIFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
+	resource, _ = mapper.ResourceSingularizer(resource)
+	dryRunMsg := ""
+	if dryRun {
+		dryRunMsg = " (dry run)"
+	}
+	if shortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
+		} else {
+			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
+		}
+	}
 }
 
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
@@ -718,15 +806,12 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper me
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, isLocal, nil, mapping, false)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	printer, err := f.DecoratedPrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err
 	}
 	return printer.PrintObj(obj, out)
-}
-
-func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
 }
 
 func (f *fakeAPIFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
