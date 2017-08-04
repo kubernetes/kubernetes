@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -102,6 +103,8 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 			return c.admitPod(nodeName, a)
 		case "status":
 			return c.admitPodStatus(nodeName, a)
+		case "eviction":
+			return c.admitPodEviction(nodeName, a)
 		default:
 			return admission.NewForbidden(a, fmt.Errorf("unexpected pod subresource %s", a.GetSubresource()))
 		}
@@ -161,6 +164,9 @@ func (c *nodePlugin) admitPod(nodeName string, a admission.Attributes) error {
 		if errors.IsNotFound(err) {
 			// wasn't found in the server cache, do a live lookup before forbidding
 			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return err
+			}
 		}
 		if err != nil {
 			return admission.NewForbidden(a, err)
@@ -187,6 +193,45 @@ func (c *nodePlugin) admitPodStatus(nodeName string, a admission.Attributes) err
 		// only allow a node to update status of a pod bound to itself
 		if pod.Spec.NodeName != nodeName {
 			return admission.NewForbidden(a, fmt.Errorf("node %s can only update pod status for pods with spec.nodeName set to itself", nodeName))
+		}
+		return nil
+
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %s", a.GetOperation()))
+	}
+}
+
+func (c *nodePlugin) admitPodEviction(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Create:
+		// require eviction to an existing pod object
+		eviction, ok := a.GetObject().(*policy.Eviction)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		// use pod name from the admission attributes, if set, rather than from the submitted Eviction object
+		podName := a.GetName()
+		if len(podName) == 0 {
+			if len(eviction.Name) == 0 {
+				return admission.NewForbidden(a, fmt.Errorf("could not determine pod from request data"))
+			}
+			podName = eviction.Name
+		}
+		// get the existing pod from the server cache
+		existingPod, err := c.podsGetter.Pods(a.GetNamespace()).Get(podName, v1.GetOptions{ResourceVersion: "0"})
+		if errors.IsNotFound(err) {
+			// wasn't found in the server cache, do a live lookup before forbidding
+			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(podName, v1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+		// only allow a node to evict a pod bound to itself
+		if existingPod.Spec.NodeName != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("node %s can only evict pods with spec.nodeName set to itself", nodeName))
 		}
 		return nil
 

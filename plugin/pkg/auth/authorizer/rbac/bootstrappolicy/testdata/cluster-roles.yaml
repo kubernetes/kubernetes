@@ -681,6 +681,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/eviction
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - configmaps
     - secrets
     verbs:
