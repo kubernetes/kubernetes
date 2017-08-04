@@ -199,7 +199,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
 		if selector != "" {
-			builder.ResourceTypes("pods").SelectorParam(selector)
+			builder.ResourceTypes("pods").LabelSelectorParam(selector)
 		}
 		infos, err := builder.Do().Infos()
 		if err != nil {

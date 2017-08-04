@@ -153,7 +153,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	if !o.Local {
 		builder = builder.
-			SelectorParam(o.Selector).
+			LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
 			Latest()
 	} else {
