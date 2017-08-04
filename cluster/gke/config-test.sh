@@ -18,10 +18,24 @@
 CLUSTER_NAME="${CLUSTER_NAME:-${USER}-gke-e2e}"
 NETWORK=${KUBE_GKE_NETWORK:-e2e}
 NODE_TAG="k8s-${CLUSTER_NAME}-node"
-IMAGE_TYPE="${KUBE_GKE_IMAGE_TYPE:-container_vm}"
+IMAGE_TYPE="${KUBE_GKE_IMAGE_TYPE:-cos}"
 ENABLE_KUBERNETES_ALPHA="${KUBE_GKE_ENABLE_KUBERNETES_ALPHA:-}"
 
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
+
+# Set e2e test context through NODE_OS_DISTRIBUTION.
+case $(kubectl get node -o=jsonpath='{.items[0].status.nodeInfo.osImage}') in
+*"Debian"*)
+	NODE_OS_DISTRIBUTION="debian"
+	;;
+"ubuntu")
+	NODE_OS_DISTRIBUTION="ubuntu"
+	;;
+*)
+	NODE_OS_DISTRIBUTION="gci"
+	;;
+esac
+echo "Setting NODE_OS_DISTRIBUTION=${NODE_OS_DISTRIBUTION-}"
 
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.
