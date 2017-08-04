@@ -251,7 +251,7 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 		// If equivalenceCache is available
 		if eCacheAvailable {
 			// PredicateWithECache will returns it's cached predicate results
-			fit, reasons, invalid = ecache.PredicateWithECache(pod, info.Node().GetName(), predicateKey, equivalenceHash)
+			fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
 		}
 
 		if !eCacheAvailable || invalid {
@@ -264,7 +264,7 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 			if eCacheAvailable {
 				// update equivalence cache with newly computed fit & reasons
 				// TODO(resouer) should we do this in another thread? any race?
-				ecache.UpdateCachedPredicateItem(pod, info.Node().GetName(), predicateKey, fit, reasons, equivalenceHash)
+				ecache.UpdateCachedPredicateItem(pod.GetName(), info.Node().GetName(), predicateKey, fit, reasons, equivalenceHash)
 			}
 		}
 
