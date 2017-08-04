@@ -96,8 +96,10 @@ type VolumeTestConfig struct {
 	// Wait for the pod to terminate successfully
 	// False indicates that the pod is long running
 	WaitForCompletion bool
-	// NodeName to run pod on.  Default is any node.
-	NodeName string
+	// ServerNodeName is the spec.nodeName to run server pod on.  Default is any node.
+	ServerNodeName string
+	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
+	ClientNodeName string
 }
 
 // VolumeTest contains a volume to mount into a client pod and its
@@ -283,7 +285,7 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			},
 			Volumes:       volumes,
 			RestartPolicy: restartPolicy,
-			NodeName:      config.NodeName,
+			NodeName:      config.ServerNodeName,
 		},
 	}
 
@@ -388,7 +390,8 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 					Level: "s0:c0,c1",
 				},
 			},
-			Volumes: []v1.Volume{},
+			Volumes:  []v1.Volume{},
+			NodeName: config.ClientNodeName,
 		},
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
