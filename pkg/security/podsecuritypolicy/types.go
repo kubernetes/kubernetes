@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
@@ -64,7 +63,7 @@ type StrategyFactory interface {
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
-	AppArmorStrategy          apparmor.Strategy
+	AppArmorStrategy          interfaces.ContainerValidatorDefaulter
 	FSGroupStrategy           group.GroupStrategy
 	SupplementalGroupStrategy group.GroupStrategy
 	CapabilitiesStrategy      capabilities.Strategy

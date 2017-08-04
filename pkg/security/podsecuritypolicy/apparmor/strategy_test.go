@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
 	"k8s.io/kubernetes/pkg/util/maps"
 )
 
@@ -33,6 +34,7 @@ const (
 )
 
 var (
+	// pod annotations
 	withoutAppArmor = map[string]string{"foo": "bar"}
 	withDefault     = map[string]string{
 		"foo": "bar",
@@ -47,6 +49,7 @@ var (
 		apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "bad",
 	}
 
+	// psp annotations
 	noAppArmor               = map[string]string{"foo": "bar"}
 	unconstrainedWithDefault = map[string]string{
 		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
@@ -105,9 +108,15 @@ func TestGenerate(t *testing.T) {
 	for i, test := range tests {
 		s := NewStrategy(test.pspAnnotations)
 		msgAndArgs := []interface{}{"testcase[%d]: %s", i, spew.Sdump(test)}
-		actual, err := s.Generate(test.podAnnotations, &container)
+		pod := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: maps.CopySS(test.podAnnotations)},
+			Spec: api.PodSpec{
+				Containers: []api.Container{*container.DeepCopy()},
+			},
+		}
+		err := s.DefaultContainer(pod, &pod.Spec.Containers[0])
 		assert.NoError(t, err, msgAndArgs...)
-		assert.Equal(t, test.expected, actual, msgAndArgs...)
+		assert.Equal(t, test.expected, pod.Annotations, msgAndArgs...)
 	}
 }
 
@@ -115,48 +124,37 @@ func TestValidate(t *testing.T) {
 	type testcase struct {
 		pspAnnotations map[string]string
 		podAnnotations map[string]string
-		expectErr      bool
+		expectResult   interfaces.Result
 	}
-	tests := []testcase{}
-	// Valid combinations
-	for _, podAnnotations := range []map[string]string{withDefault, withLocal} {
-		for _, pspAnnotations := range []map[string]string{noAppArmor, unconstrainedWithDefault, constrained, constrainedWithDefault} {
-			tests = append(tests, testcase{
-				pspAnnotations: pspAnnotations,
-				podAnnotations: podAnnotations,
-				expectErr:      false,
-			})
-		}
-	}
-	for _, podAnnotations := range []map[string]string{withoutAppArmor, withDisallowed} {
-		for _, pspAnnotations := range []map[string]string{noAppArmor, unconstrainedWithDefault} {
-			tests = append(tests, testcase{
-				pspAnnotations: pspAnnotations,
-				podAnnotations: podAnnotations,
-				expectErr:      false,
-			})
-		}
-	}
-	// Invalid combinations
-	for _, podAnnotations := range []map[string]string{withoutAppArmor, withDisallowed} {
-		for _, pspAnnotations := range []map[string]string{constrained, constrainedWithDefault} {
-			tests = append(tests, testcase{
-				pspAnnotations: pspAnnotations,
-				podAnnotations: podAnnotations,
-				expectErr:      true,
-			})
-		}
+	tests := []testcase{
+		{pspAnnotations: noAppArmor, podAnnotations: withoutAppArmor, expectResult: interfaces.Allowed},
+		{pspAnnotations: noAppArmor, podAnnotations: withDefault, expectResult: interfaces.Allowed},
+		{pspAnnotations: noAppArmor, podAnnotations: withLocal, expectResult: interfaces.Allowed},
+		{pspAnnotations: noAppArmor, podAnnotations: withDisallowed, expectResult: interfaces.Allowed},
+
+		{pspAnnotations: unconstrainedWithDefault, podAnnotations: withoutAppArmor, expectResult: interfaces.RequiresDefaulting},
+		{pspAnnotations: unconstrainedWithDefault, podAnnotations: withDefault, expectResult: interfaces.Allowed},
+		{pspAnnotations: unconstrainedWithDefault, podAnnotations: withLocal, expectResult: interfaces.Allowed},
+		{pspAnnotations: unconstrainedWithDefault, podAnnotations: withDisallowed, expectResult: interfaces.Allowed},
+
+		{pspAnnotations: constrained, podAnnotations: withoutAppArmor, expectResult: interfaces.Forbidden},
+		{pspAnnotations: constrained, podAnnotations: withDefault, expectResult: interfaces.Allowed},
+		{pspAnnotations: constrained, podAnnotations: withLocal, expectResult: interfaces.Allowed},
+		{pspAnnotations: constrained, podAnnotations: withDisallowed, expectResult: interfaces.Forbidden},
+
+		{pspAnnotations: constrainedWithDefault, podAnnotations: withoutAppArmor, expectResult: interfaces.RequiresDefaulting},
+		{pspAnnotations: constrainedWithDefault, podAnnotations: withDefault, expectResult: interfaces.Allowed},
+		{pspAnnotations: constrainedWithDefault, podAnnotations: withLocal, expectResult: interfaces.Allowed},
+		{pspAnnotations: constrainedWithDefault, podAnnotations: withDisallowed, expectResult: interfaces.Forbidden},
 	}
 
 	for i, test := range tests {
 		s := NewStrategy(test.pspAnnotations)
 		pod, container := makeTestPod(test.podAnnotations)
-		msgAndArgs := []interface{}{"testcase[%d]: %s", i, spew.Sdump(test)}
-		errs := s.Validate(pod, container)
-		if test.expectErr {
-			assert.Len(t, errs, 1, msgAndArgs...)
-		} else {
-			assert.Len(t, errs, 0, msgAndArgs...)
+		result, _ := s.ValidateContainer(pod, container, container.SecurityContext)
+		if result.Result != test.expectResult {
+			t.Logf("%d: %s\n%v\n%v", i, spew.Sdump(test), pod.Annotations, result.Result)
+			t.Errorf("%d: expected %v, got %v", i, test.expectResult, result.Result)
 		}
 	}
 }

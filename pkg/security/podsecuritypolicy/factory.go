@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
@@ -132,7 +133,7 @@ func createSELinuxStrategy(opts *extensions.SELinuxStrategyOptions) (selinux.SEL
 }
 
 // createAppArmorStrategy creates a new AppArmor strategy.
-func createAppArmorStrategy(psp *extensions.PodSecurityPolicy) (apparmor.Strategy, error) {
+func createAppArmorStrategy(psp *extensions.PodSecurityPolicy) (interfaces.ContainerValidatorDefaulter, error) {
 	return apparmor.NewStrategy(psp.Annotations), nil
 }
 
