@@ -2656,7 +2656,7 @@ func TestValidateVolumes(t *testing.T) {
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 
 	testCases := []api.VolumeSource{
-		{EmptyDir: &api.EmptyDirVolumeSource{SizeLimit: *resource.NewQuantity(int64(5), resource.BinarySI)}},
+		{EmptyDir: &api.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
 	}
 	// Enable alpha feature LocalStorageCapacityIsolation
 	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
