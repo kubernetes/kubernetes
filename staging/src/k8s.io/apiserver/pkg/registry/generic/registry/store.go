@@ -1267,8 +1267,23 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if options.RESTOptions == nil {
 		return fmt.Errorf("options for %s must have RESTOptions set", e.QualifiedResource.String())
 	}
-	if options.AttrFunc == nil {
-		return fmt.Errorf("options for %s must have AttrFunc set", e.QualifiedResource.String())
+
+	attrFunc := options.AttrFunc
+	if attrFunc == nil {
+		if isNamespaced {
+			attrFunc = storage.DefaultNamespaceScopedAttr
+		} else {
+			attrFunc = storage.DefaultClusterScopedAttr
+		}
+	}
+	if e.PredicateFunc == nil {
+		e.PredicateFunc = func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+			return storage.SelectionPredicate{
+				Label:    label,
+				Field:    field,
+				GetAttrs: attrFunc,
+			}
+		}
 	}
 
 	opts, err := options.RESTOptions.GetRESTOptions(e.QualifiedResource)
@@ -1349,7 +1364,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			prefix,
 			keyFunc,
 			e.NewListFunc,
-			options.AttrFunc,
+			attrFunc,
 			triggerFunc,
 		)
 	}

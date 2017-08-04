@@ -40,7 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:            api.Scheme,
 		NewFunc:           func() runtime.Object { return &batch.CronJob{} },
 		NewListFunc:       func() runtime.Object { return &batch.CronJobList{} },
-		PredicateFunc:     cronjob.MatchCronJob,
 		QualifiedResource: batch.Resource("cronjobs"),
 		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("cronjobs"),
 
@@ -48,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: cronjob.Strategy,
 		DeleteStrategy: cronjob.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: cronjob.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
