@@ -28,6 +28,15 @@ const (
 	ValidatedPSPAnnotation = "kubernetes.io/psp"
 )
 
+func VisitContainers(pod *api.Pod, visitor func(*api.Container)) {
+	for i := range pod.Spec.InitContainers {
+		visitor(&pod.Spec.InitContainers[i])
+	}
+	for i := range pod.Spec.Containers {
+		visitor(&pod.Spec.Containers[i])
+	}
+}
+
 func GetAllFSTypesExcept(exceptions ...string) sets.String {
 	fstypes := GetAllFSTypesAsSet()
 	for _, e := range exceptions {

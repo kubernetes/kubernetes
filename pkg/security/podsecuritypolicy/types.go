@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
@@ -32,6 +33,8 @@ import (
 // Provider provides the implementation to generate a new security
 // context based on constraints or validate an existing security context against constraints.
 type Provider interface {
+	interfaces.PodValidatorDefaulter
+
 	// Create a PodSecurityContext based on the given constraints. Also returns an updated set
 	// of Pod annotations for alpha feature support.
 	CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error)

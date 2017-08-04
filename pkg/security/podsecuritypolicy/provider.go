@@ -23,7 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util/maps"
 )
 
@@ -38,6 +40,9 @@ const (
 type simpleProvider struct {
 	psp        *extensions.PodSecurityPolicy
 	strategies *ProviderStrategies
+
+	podValidators       []interfaces.PodValidatorDefaulter
+	containerValidators []interfaces.ContainerValidatorDefaulter
 }
 
 // ensure we implement the interface correctly.
@@ -57,10 +62,63 @@ func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, stra
 		return nil, err
 	}
 
+	podValidators := []interfaces.PodValidatorDefaulter{}
+	containerValidators := []interfaces.ContainerValidatorDefaulter{}
+
 	return &simpleProvider{
-		psp:        psp,
-		strategies: strategies,
+		psp:                 psp,
+		strategies:          strategies,
+		podValidators:       podValidators,
+		containerValidators: containerValidators,
 	}, nil
+}
+
+func (s *simpleProvider) ValidatePod(pod *api.Pod) (*interfaces.ValidationResult, error) {
+	result := &interfaces.ValidationResult{
+		Result: interfaces.Allowed,
+	}
+
+	for _, podValidator := range s.podValidators {
+		r, err := podValidator.ValidatePod(pod)
+		if err != nil {
+			return nil, err
+		}
+		result.Add(r.Result, r.Errors...)
+	}
+
+	var err error
+	psputil.VisitContainers(pod, func(container *api.Container) {
+		effectiveSecurityContext := securitycontext.InternalDetermineEffectiveSecurityContext(pod, container)
+		for _, containerValidator := range s.containerValidators {
+			r, containerErr := containerValidator.ValidateContainer(pod, container, effectiveSecurityContext)
+			if containerErr != nil {
+				err = containerErr
+				return
+			}
+			result.Add(r.Result, r.Errors...)
+		}
+	})
+
+	return result, err
+}
+
+func (s *simpleProvider) DefaultPod(pod *api.Pod) error {
+	for _, child := range s.podValidators {
+		if err := child.DefaultPod(pod); err != nil {
+			return err
+		}
+	}
+
+	var err error
+	psputil.VisitContainers(pod, func(container *api.Container) {
+		container.SecurityContext = securitycontext.InternalDetermineEffectiveSecurityContext(pod, container)
+		for _, containerValidator := range s.containerValidators {
+			if containerErr := containerValidator.DefaultContainer(pod, container); containerErr != nil {
+				err = containerErr
+			}
+		}
+	})
+	return err
 }
 
 // Create a PodSecurityContext based on the given constraints.  If a setting is already set
