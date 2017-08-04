@@ -187,6 +187,7 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 				}
 			}
 			// remove a lock: rbd lock remove
+			glog.V(4).Infof("rbd: remove lock %s from client %s for image %s/%s", lock_id, locker, b.Pool, b.Image)
 			cmd, err = b.plugin.execCommand("rbd",
 				append([]string{"lock", "remove", b.Image, lock_id, locker, "--pool", b.Pool, "--id", b.Id, "-m", mon}, secret_opt...))
 		}
@@ -239,13 +240,13 @@ func (util *RBDUtil) fencing(b rbdMounter) error {
 	return util.rbdLock(b, true)
 }
 
-func (util *RBDUtil) defencing(c rbdUnmounter) error {
+func (util *RBDUtil) defencing(b rbdMounter) error {
 	// no need to fence readOnly
-	if c.ReadOnly {
+	if (&b).GetAttributes().ReadOnly {
 		return nil
 	}
 
-	return util.rbdLock(*c.rbdMounter, false)
+	return util.rbdLock(b, false)
 }
 
 func (util *RBDUtil) AttachDisk(b rbdMounter) error {
@@ -317,6 +318,34 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	// mount it
 	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
+		// Currently, RBD plugin does `rbd lock/map` and `format/mount` in one
+		// `Mounter.Setup` call. If `format/mount` fails, the `Mounter.Setup`
+		// fails, no `Unmouter.TearDown` will be executed, `rbd lock/map`
+		// cannot be undone.
+		// The lock can be cleaned up when the image is to be locked next time
+		// because it's an orphaned lock (no watcher on the image). But `rbd
+		// map` will be impossible to be undone. The image will be mapped on
+		// the node forever, which will cause the PV cannot be deleted (still
+		// be used by a node). We fix it here to undo `rbd lock/map`
+		// immediately if `format/mount` fails.
+		// NOTE: This is not a perfect solution, but it's the best we can do
+		// for now. It's better if we can split the `Mounter.Setup` process into
+		// `Attacher.Attach` and `Mounter.Setup`. But RBD plugin cannot
+		// implement `Attacher` interface currently, due to it cannot get
+		// secret string in `attacher.Attacher` call if user specified
+		// `secretName` under their namespace instead of keyring file on the
+		// node.
+		if inuse, err := b.mounter.DeviceOpened(devicePath); err == nil && !inuse {
+			glog.V(1).Infof("rbd: %s is not used, remove it", devicePath)
+			// rbd unmap
+			if _, err := b.plugin.execCommand("rbd", []string{"unmap", devicePath}); err != nil {
+				glog.Errorf("rbd: failed to unmap device %s: %v", devicePath, err)
+			}
+			if err := util.loadRBD(&b, globalPDPath); err == nil {
+				// remove rbd lock
+				util.defencing(b)
+			}
+		}
 	}
 	return err
 }
@@ -340,7 +369,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 		// load ceph and image/pool info to remove fencing
 		if err := util.loadRBD(c.rbdMounter, mntPath); err == nil {
 			// remove rbd lock
-			util.defencing(c)
+			util.defencing(*c.rbdMounter)
 		}
 
 		glog.Infof("rbd: successfully unmap device %s", device)
