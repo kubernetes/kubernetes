@@ -74,7 +74,7 @@ func CreateServiceAccounts(clientset clientset.Interface) error {
 }
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
-func CreateRBACRules(clientset *clientset.Clientset, k8sVersion *version.Version) error {
+func CreateRBACRules(clientset clientset.Interface, k8sVersion *version.Version) error {
 	if err := createRoles(clientset); err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func CreateRBACRules(clientset *clientset.Clientset, k8sVersion *version.Version
 	return nil
 }
 
-func createRoles(clientset *clientset.Clientset) error {
+func createRoles(clientset clientset.Interface) error {
 	roles := []rbac.Role{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -121,7 +121,7 @@ func createRoles(clientset *clientset.Clientset) error {
 	return nil
 }
 
-func createRoleBindings(clientset *clientset.Clientset) error {
+func createRoleBindings(clientset clientset.Interface) error {
 	roleBindings := []rbac.RoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -156,7 +156,7 @@ func createRoleBindings(clientset *clientset.Clientset) error {
 	return nil
 }
 
-func createClusterRoles(clientset *clientset.Clientset) error {
+func createClusterRoles(clientset clientset.Interface) error {
 	clusterRoles := []rbac.ClusterRole{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -182,7 +182,7 @@ func createClusterRoles(clientset *clientset.Clientset) error {
 	return nil
 }
 
-func createClusterRoleBindings(clientset *clientset.Clientset) error {
+func createClusterRoleBindings(clientset clientset.Interface) error {
 	clusterRoleBindings := []rbac.ClusterRoleBinding{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -249,7 +249,7 @@ func createClusterRoleBindings(clientset *clientset.Clientset) error {
 	return nil
 }
 
-func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset *clientset.Clientset, k8sVersion *version.Version) error {
+func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset clientset.Interface, k8sVersion *version.Version) error {
 
 	nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
 	if err != nil {

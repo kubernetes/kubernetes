@@ -220,7 +220,7 @@ func controllerManagerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Vo
 	}
 }
 
-func createTLSSecrets(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+func createTLSSecrets(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	for _, tlsKeyPair := range getTLSKeyPairs() {
 		secret, err := createTLSSecretFromFiles(
 			tlsKeyPair.name,
@@ -240,7 +240,7 @@ func createTLSSecrets(cfg *kubeadmapi.MasterConfiguration, client *clientset.Cli
 	return nil
 }
 
-func createOpaqueSecrets(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+func createOpaqueSecrets(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	files := []string{
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
