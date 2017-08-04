@@ -17,16 +17,13 @@ limitations under the License.
 package service
 
 import (
+	"strings"
 	"testing"
 
-	"fmt"
-	"strings"
+	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
@@ -218,37 +215,6 @@ func TestNeedsHealthCheck(t *testing.T) {
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
-
-	checkNeedsHealthCheck(false, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				v1.BetaAnnotationExternalTraffic: "invalid",
-			},
-		},
-	})
-	checkNeedsHealthCheck(false, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficGlobal,
-			},
-		},
-	})
-	checkNeedsHealthCheck(true, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal,
-			},
-		},
-	})
 }
 
 func TestGetServiceHealthCheckNodePort(t *testing.T) {
@@ -284,17 +250,6 @@ func TestGetServiceHealthCheckNodePort(t *testing.T) {
 			HealthCheckNodePort:   int32(34567),
 		},
 	})
-	checkGetServiceHealthCheckNodePort(34567, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{
-				v1.BetaAnnotationExternalTraffic:     v1.AnnotationValueExternalTrafficLocal,
-				v1.BetaAnnotationHealthCheckNodePort: "34567",
-			},
-		},
-	})
 }
 
 func TestClearExternalTrafficPolicy(t *testing.T) {
@@ -310,25 +265,11 @@ func TestClearExternalTrafficPolicy(t *testing.T) {
 				},
 			},
 		},
-		// Beta annotations cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal,
-					},
-				},
-			},
-		},
 	}
 
 	for i, tc := range testCases {
 		ClearExternalTrafficPolicy(tc.inputService)
-		if _, ok := tc.inputService.Annotations[v1.BetaAnnotationExternalTraffic]; ok ||
-			tc.inputService.Spec.ExternalTrafficPolicy != "" {
+		if tc.inputService.Spec.ExternalTrafficPolicy != "" {
 			t.Errorf("%v: failed to clear ExternalTrafficPolicy", i)
 			spew.Dump(tc)
 		}
@@ -339,7 +280,6 @@ func TestSetServiceHealthCheckNodePort(t *testing.T) {
 	testCases := []struct {
 		inputService *v1.Service
 		hcNodePort   int32
-		beta         bool
 	}{
 		// First class fields cases.
 		{
@@ -350,7 +290,6 @@ func TestSetServiceHealthCheckNodePort(t *testing.T) {
 				},
 			},
 			30012,
-			false,
 		},
 		{
 			&v1.Service{
@@ -360,58 +299,13 @@ func TestSetServiceHealthCheckNodePort(t *testing.T) {
 				},
 			},
 			0,
-			false,
-		},
-		// Beta annotations cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-			30012,
-			true,
-		},
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficGlobal,
-					},
-				},
-			},
-			0,
-			true,
 		},
 	}
 
 	for i, tc := range testCases {
 		SetServiceHealthCheckNodePort(tc.inputService, tc.hcNodePort)
-		if !tc.beta {
-			if tc.inputService.Spec.HealthCheckNodePort != tc.hcNodePort {
-				t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, tc.inputService.Spec.HealthCheckNodePort, tc.hcNodePort)
-			}
-		} else {
-			l, ok := tc.inputService.Annotations[v1.BetaAnnotationHealthCheckNodePort]
-			if tc.hcNodePort == 0 {
-				if ok {
-					t.Errorf("%v: HealthCheckNodePort set, want it to be cleared", i)
-				}
-			} else {
-				if !ok {
-					t.Errorf("%v: HealthCheckNodePort unset, want %v", i, tc.hcNodePort)
-				} else if l != fmt.Sprintf("%v", tc.hcNodePort) {
-					t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, l, tc.hcNodePort)
-				}
-			}
+		if tc.inputService.Spec.HealthCheckNodePort != tc.hcNodePort {
+			t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, tc.inputService.Spec.HealthCheckNodePort, tc.hcNodePort)
 		}
 	}
 }
