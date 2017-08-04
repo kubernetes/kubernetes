@@ -700,7 +700,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	SizeLimit resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

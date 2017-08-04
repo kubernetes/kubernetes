@@ -522,8 +522,7 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 	// Account for storage requested by emptydir volumes
 	// If the storage medium is memory, should exclude the size
 	for _, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
-
+		if vol.EmptyDir != nil && vol.EmptyDir.SizeLimit != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
 			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
 		}
 	}
