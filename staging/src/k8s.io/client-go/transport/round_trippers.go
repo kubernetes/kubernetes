@@ -23,6 +23,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/gregjones/httpcache"
+	"github.com/gregjones/httpcache/diskcache"
+	"github.com/peterbourgon/diskv"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
@@ -56,6 +59,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 		len(config.Impersonate.Extra) > 0 {
 		rt = NewImpersonatingRoundTripper(config.Impersonate, rt)
 	}
+	if len(config.CacheDir) > 0 {
+		rt = NewCacheRoundTripper(config.CacheDir, rt)
+	}
 	return rt, nil
 }
 
@@ -85,6 +91,17 @@ type authProxyRoundTripper struct {
 	extra    map[string][]string
 
 	rt http.RoundTripper
+}
+
+// NewCacheRoundTripper creates a roundtripper that reads the ETag on
+// response headers and send the If-None-Match header on subsequent
+// corresponding requests.
+func NewCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
+	d := diskv.New(diskv.Options{BasePath: cacheDir})
+	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
+	t.Transport = rt
+
+	return t
 }
 
 // NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for

@@ -17,11 +17,13 @@ limitations under the License.
 package clientcmd
 
 import (
+	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/pflag"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/homedir"
 )
 
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
@@ -34,6 +36,7 @@ type ConfigOverrides struct {
 	Context         clientcmdapi.Context
 	CurrentContext  string
 	Timeout         string
+	CacheDir        string
 }
 
 // ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
@@ -44,6 +47,7 @@ type ConfigOverrideFlags struct {
 	ContextOverrideFlags ContextOverrideFlags
 	CurrentContext       FlagInfo
 	Timeout              FlagInfo
+	CacheDir             FlagInfo
 }
 
 // AuthOverrideFlags holds the flag names to be used for binding command line flags for AuthInfo objects
@@ -146,10 +150,12 @@ const (
 	FlagUsername         = "username"
 	FlagPassword         = "password"
 	FlagTimeout          = "request-timeout"
+	FlagCacheDir         = "cachedir"
 )
 
 // RecommendedConfigOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
+	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 	return ConfigOverrideFlags{
 		AuthOverrideFlags:    RecommendedAuthOverrideFlags(prefix),
 		ClusterOverrideFlags: RecommendedClusterOverrideFlags(prefix),
@@ -157,6 +163,7 @@ func RecommendedConfigOverrideFlags(prefix string) ConfigOverrideFlags {
 
 		CurrentContext: FlagInfo{prefix + FlagContext, "", "", "The name of the kubeconfig context to use"},
 		Timeout:        FlagInfo{prefix + FlagTimeout, "", "0", "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests."},
+		CacheDir:       FlagInfo{prefix + FlagCacheDir, "", defaultCacheDir, "Path to http-cache directory"},
 	}
 }
 
@@ -198,6 +205,7 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
 	flagNames.CurrentContext.BindStringFlag(flags, &overrides.CurrentContext)
 	flagNames.Timeout.BindStringFlag(flags, &overrides.Timeout)
+	flagNames.CacheDir.BindStringFlag(flags, &overrides.CacheDir)
 }
 
 // BindAuthInfoFlags is a convenience method to bind the specified flags to their associated variables

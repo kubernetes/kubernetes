@@ -138,7 +138,6 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmdutil.AddOpenAPIFlags(cmd)
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
@@ -457,7 +456,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping)
+				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
 			}
 
 			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
@@ -556,11 +555,11 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 
 // outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
 // openapi schema and returns the output options for the mapping if found.
-func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
 
 	// user has not specified any output format, check if OpenAPI has
 	// default specification to print this resource type
-	api, err := f.OpenAPISchema(openAPIcacheDir)
+	api, err := f.OpenAPISchema()
 	if err != nil {
 		// Error getting schema
 		return nil, false
