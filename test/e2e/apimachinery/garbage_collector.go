@@ -646,6 +646,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for the rc to be deleted")
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
+		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
 		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err == nil {
@@ -732,7 +733,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Expect(err).NotTo(HaveOccurred())
 		var pods *v1.PodList
 		var err2 error
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
+		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
+		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			pods, err2 = podClient.List(metav1.ListOptions{})
 			if err2 != nil {
 				return false, fmt.Errorf("Failed to list pods: %v", err)

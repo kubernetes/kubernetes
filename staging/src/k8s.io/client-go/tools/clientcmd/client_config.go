@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -31,16 +32,19 @@ import (
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/util/homedir"
 )
 
 var (
 	// ClusterDefaults has the same behavior as the old EnvVar and DefaultCluster fields
 	// DEPRECATED will be replaced
 	ClusterDefaults = clientcmdapi.Cluster{Server: getDefaultServer()}
+	cacheDirDefault = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
 	// DefaultClientConfig represents the legacy behavior of this package for defaulting
 	// DEPRECATED will be replace
 	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
 		ClusterDefaults: ClusterDefaults,
+		CacheDir:        cacheDirDefault,
 	}, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
 )
 
@@ -131,6 +135,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
+	clientConfig.CacheDir = config.overrides.CacheDir
 
 	if len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)

@@ -464,7 +464,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return false, nil
 	}
-	privateKey, err := serviceaccount.ReadPrivateKey(ctx.Options.ServiceAccountKeyFile)
+	privateKey, err := certutil.PrivateKeyFromFile(ctx.Options.ServiceAccountKeyFile)
 	if err != nil {
 		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}

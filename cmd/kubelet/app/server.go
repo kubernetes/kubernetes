@@ -583,7 +583,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				},
 				ExperimentalQOSReserved: *experimentalQOSReserved,
 			},
-			s.ExperimentalFailSwapOn,
+			s.FailSwapOn,
 			kubeDeps.Recorder)
 
 		if err != nil {

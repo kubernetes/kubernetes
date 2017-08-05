@@ -33,7 +33,6 @@ import (
 )
 
 var (
-	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
 	inputVersions = flag.StringSlice("input", []string{
 		"api/",
 		"admissionregistration/",
@@ -170,47 +169,30 @@ func main() {
 		"k8s.io/apimachinery/pkg/apimachinery/registered",
 	}
 
-	if *test {
-		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
-		}...)
-		arguments.CustomArgs = clientgenargs.Args{
-			Groups: []types.GroupVersions{{Group: "testgroup", Versions: []types.Version{""}}},
-			GroupVersionToInputPath: map[types.GroupVersion]string{
-				{Group: "testgroup", Version: ""}: "k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup",
-			},
-			ClientsetName:       "test_internalclientset",
-			ClientsetOutputPath: "k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/",
-			ClientsetOnly:       false,
-			FakeClient:          true,
-			CmdArgs:             cmdArgs,
-		}
-	} else {
-		inputPath, groups, gvToPath, err := parseInputVersions()
-		if err != nil {
-			glog.Fatalf("Error: %v", err)
-		}
-		includedTypesOverrides, err := parseIncludedTypesOverrides()
-		if err != nil {
-			glog.Fatalf("Unexpected error: %v", err)
-		}
-		glog.V(3).Infof("going to generate clientset from these input paths: %v", inputPath)
-		arguments.InputDirs = append(inputPath, dependencies...)
-
-		arguments.CustomArgs = clientgenargs.Args{
-			Groups:                  groups,
-			GroupVersionToInputPath: gvToPath,
-			ClientsetName:           *clientsetName,
-			ClientsetAPIPath:        *clientsetAPIPath,
-			ClientsetOutputPath:     *clientsetPath,
-			ClientsetOnly:           *clientsetOnly,
-			FakeClient:              *fakeClient,
-			CmdArgs:                 cmdArgs,
-			IncludedTypesOverrides:  includedTypesOverrides,
-		}
-
-		glog.V(3).Infof("==arguments: %v\n", arguments)
+	inputPath, groups, gvToPath, err := parseInputVersions()
+	if err != nil {
+		glog.Fatalf("Error: %v", err)
 	}
+	includedTypesOverrides, err := parseIncludedTypesOverrides()
+	if err != nil {
+		glog.Fatalf("Unexpected error: %v", err)
+	}
+	glog.V(3).Infof("going to generate clientset from these input paths: %v", inputPath)
+	arguments.InputDirs = append(inputPath, dependencies...)
+
+	arguments.CustomArgs = clientgenargs.Args{
+		Groups:                  groups,
+		GroupVersionToInputPath: gvToPath,
+		ClientsetName:           *clientsetName,
+		ClientsetAPIPath:        *clientsetAPIPath,
+		ClientsetOutputPath:     *clientsetPath,
+		ClientsetOnly:           *clientsetOnly,
+		FakeClient:              *fakeClient,
+		CmdArgs:                 cmdArgs,
+		IncludedTypesOverrides:  includedTypesOverrides,
+	}
+
+	glog.V(3).Infof("==arguments: %v\n", arguments)
 
 	if err := arguments.Execute(
 		generators.NameSystems(),

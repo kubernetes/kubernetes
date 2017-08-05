@@ -53,7 +53,7 @@ func addNamespaceRole(namespace string, role rbac.Role) {
 
 func addNamespaceRoleBinding(namespace string, roleBinding rbac.RoleBinding) {
 	if !strings.HasPrefix(namespace, "kube-") {
-		glog.Fatalf(`roles can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
+		glog.Fatalf(`rolebindings can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
 	}
 
 	existingRoleBindings := namespaceRoleBindings[namespace]

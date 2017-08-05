@@ -42,8 +42,6 @@ filegroup(
         "//staging/src/k8s.io/kube-gen/cmd/client-gen/args:all-srcs",
         "//staging/src/k8s.io/kube-gen/cmd/client-gen/generators:all-srcs",
         "//staging/src/k8s.io/kube-gen/cmd/client-gen/path:all-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/client-gen/test_apis/testgroup:all-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/client-gen/testoutput/clientset_generated/test_internalclientset:all-srcs",
         "//staging/src/k8s.io/kube-gen/cmd/client-gen/types:all-srcs",
     ],
     tags = ["automanaged"],

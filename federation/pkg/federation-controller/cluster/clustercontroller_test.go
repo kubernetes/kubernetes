@@ -150,3 +150,49 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	// Reset KubeconfigGetterForSecret
 	controllerutil.KubeconfigGetterForSecret = originalGetter
 }
+
+// Test races between informer's updates and routine updates of cluster status
+// Issue https://github.com/kubernetes/kubernetes/issues/49958
+func TestUpdateClusterRace(t *testing.T) {
+	clusterName := "foobarCluster"
+	// create dummy httpserver
+	testClusterServer := httptest.NewServer(createHttptestFakeHandlerForCluster(true))
+	defer testClusterServer.Close()
+	federationCluster := newCluster(clusterName, testClusterServer.URL)
+	federationClusterList := newClusterList(federationCluster)
+
+	testFederationServer := httptest.NewServer(createHttptestFakeHandlerForFederation(federationClusterList, true))
+	defer testFederationServer.Close()
+
+	restClientCfg, err := clientcmd.BuildConfigFromFlags(testFederationServer.URL, "")
+	if err != nil {
+		t.Errorf("Failed to build client config")
+	}
+	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
+
+	// Override KubeconfigGetterForSecret to avoid having to setup service accounts and mount files with secret tokens.
+	originalGetter := controllerutil.KubeconfigGetterForSecret
+	controllerutil.KubeconfigGetterForSecret = func(s *api.Secret) clientcmd.KubeconfigGetter {
+		return func() (*clientcmdapi.Config, error) {
+			return &clientcmdapi.Config{}, nil
+		}
+	}
+
+	manager := newClusterController(federationClientSet, 5)
+
+	go func() {
+		for {
+			manager.UpdateClusterStatus()
+		}
+	}()
+
+	// try to trigger the race in UpdateClusterStatus
+	for i := 0; i < 10; i++ {
+		manager.GetClusterClient(federationCluster)
+		manager.addToClusterSet(federationCluster)
+		manager.delFromClusterSet(federationCluster)
+	}
+
+	// Reset KubeconfigGetterForSecret
+	controllerutil.KubeconfigGetterForSecret = originalGetter
+}

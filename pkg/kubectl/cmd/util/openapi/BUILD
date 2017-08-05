@@ -15,15 +15,11 @@ go_library(
         "document.go",
         "extensions.go",
         "openapi.go",
-        "openapi_cache.go",
         "openapi_getter.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/version:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -35,7 +31,6 @@ go_test(
     name = "go_default_xtest",
     size = "small",
     srcs = [
-        "openapi_cache_test.go",
         "openapi_getter_test.go",
         "openapi_suite_test.go",
         "openapi_test.go",
