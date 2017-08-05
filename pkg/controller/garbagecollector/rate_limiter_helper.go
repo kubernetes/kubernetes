@@ -32,7 +32,7 @@ type RegisteredRateLimiter struct {
 	rateLimiters map[schema.GroupVersion]*sync.Once
 }
 
-// NewRegisteredRateLimiter returns a new RegisteredRateLimiater.
+// NewRegisteredRateLimiter returns a new RegisteredRateLimiter.
 // TODO: NewRegisteredRateLimiter is not dynamic. We need to find a better way
 // when GC dynamically change the resources it monitors.
 func NewRegisteredRateLimiter(resources map[schema.GroupVersionResource]struct{}) *RegisteredRateLimiter {

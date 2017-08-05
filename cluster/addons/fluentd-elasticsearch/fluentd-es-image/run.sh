@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM docker.elastic.co/elasticsearch/elasticsearch:5.5.1
+# These steps must be executed once the host /var and /lib volumes have
+# been mounted, and therefore cannot be done in the docker build stage.
 
-VOLUME ["/data"]
-EXPOSE 9200 9300
+# For systems without journald
+mkdir -p /var/log/journal
 
-COPY elasticsearch_logging_discovery run.sh bin/
-COPY config/elasticsearch.yml config/log4j2.properties config/
+# Copy host libsystemd into image to avoid compatibility issues.
+if [ ! -z "$(ls /host/lib/libsystemd* 2>/dev/null)" ]; then
+  rm /lib/x86_64-linux-gnu/libsystemd*
+  cp -a /host/lib/libsystemd* /lib/x86_64-linux-gnu/
+fi
 
-USER root
-RUN chown -R elasticsearch:elasticsearch ./
-CMD ["bin/run.sh"]
+/usr/local/bin/fluentd $@

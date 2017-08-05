@@ -43,7 +43,7 @@ func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
 }
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
-func WaitForAPI(client *clientset.Clientset) {
+func WaitForAPI(client clientset.Interface) {
 	start := time.Now()
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {
 		healthStatus := 0
@@ -59,7 +59,7 @@ func WaitForAPI(client *clientset.Clientset) {
 
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
-func WaitForPodsWithLabel(client *clientset.Clientset, labelKeyValPair string) {
+func WaitForPodsWithLabel(client clientset.Interface, labelKeyValPair string) {
 	// TODO: Implement a timeout
 	// TODO: Implement a verbosity switch
 	wait.PollInfinite(kubeadmconstants.APICallRetryInterval, func() (bool, error) {

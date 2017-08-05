@@ -371,7 +371,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		now := T2.Add(10 * 24 * time.Hour)
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err == nil {
-			t.Errorf("unexpected lack of error")
+			t.Errorf("expected an error")
 		}
 	}
 	{

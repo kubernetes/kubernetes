@@ -35,7 +35,7 @@ import (
 )
 
 // CreateEssentialAddons creates the kube-proxy and kube-dns addons
-func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
 		// Fetch this value from the kubeconfig file
 		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort),
@@ -94,7 +94,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	return nil
 }
 
-func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clientset.Clientset) error {
+func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
 	kubeproxyConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
@@ -127,7 +127,7 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client *clients
 	return nil
 }
 
-func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.Clientset) error {
+func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
 	kubednsDeployment := &extensions.Deployment{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
@@ -164,7 +164,7 @@ func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client *clientset.
 }
 
 // getDNSIP fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
-func getDNSIP(client *clientset.Clientset) (net.IP, error) {
+func getDNSIP(client clientset.Interface) (net.IP, error) {
 	k8ssvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch information about the kubernetes service: %v", err)

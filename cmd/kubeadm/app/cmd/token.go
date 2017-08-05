@@ -193,7 +193,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client *clientset.Clientset, token string, tokenDuration time.Duration, usages []string, description string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, token string, tokenDuration time.Duration, usages []string, description string) error {
 
 	if len(token) == 0 {
 		var err error
@@ -230,7 +230,7 @@ func RunGenerateToken(out io.Writer) error {
 }
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
-func RunListTokens(out io.Writer, errW io.Writer, client *clientset.Clientset) error {
+func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) error {
 	// First, build our selector for bootstrap tokens only
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
@@ -312,7 +312,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client *clientset.Clientset) e
 }
 
 // RunDeleteToken removes a bootstrap token from the server.
-func RunDeleteToken(out io.Writer, client *clientset.Clientset, tokenIdOrToken string) error {
+func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIdOrToken string) error {
 	// Assume the given first argument is a token id and try to parse it
 	tokenId := tokenIdOrToken
 	if err := tokenutil.ParseTokenID(tokenIdOrToken); err != nil {

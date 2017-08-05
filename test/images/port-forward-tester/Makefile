@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SRSC=portforwardtester
+SRCS=portforwardtester
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest

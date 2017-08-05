@@ -54,7 +54,7 @@ const (
 // 7. The self-hosted containers should now step up and take over.
 // 8. In order to avoid race conditions, we're still making sure the API /healthz endpoint is healthy
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 
 	if err := createTLSSecrets(cfg, client); err != nil {
 		return err

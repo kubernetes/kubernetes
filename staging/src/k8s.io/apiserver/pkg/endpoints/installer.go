@@ -511,7 +511,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
 	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
 	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
-	// 422 (StatusUnprocessableEntity), http.StatusInternalServerError,
+	// http.StatusUnprocessableEntity, http.StatusInternalServerError,
 	// http.StatusServiceUnavailable
 	// and api error codes
 	// Note that if we specify a versioned Status object here, we may need to
