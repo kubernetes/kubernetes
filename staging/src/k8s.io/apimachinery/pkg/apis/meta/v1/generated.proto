@@ -678,7 +678,9 @@ message StatusDetails {
   // +optional
   repeated StatusCause causes = 4;
 
-  // If specified, the time in seconds before the operation should be retried.
+  // If specified, the time in seconds before the operation should be retried. Some errors may indicate
+  // the client must take an alternate action - for those errors this field may indicate how long to wait
+  // before taking the alternate action.
   // +optional
   optional int32 retryAfterSeconds = 5;
 }

@@ -39,7 +39,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -1065,7 +1064,7 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 		t.Errorf("Got error GETing: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != apierrs.StatusUnprocessableEntity {
+	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Errorf("Unexpected non-error reading container logs: %#v", resp)
 	}
 }
