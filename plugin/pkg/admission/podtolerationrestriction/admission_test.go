@@ -21,8 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -30,6 +32,7 @@ import (
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 // TestPodAdmission verifies various scenarios involving pod/namespace tolerations
@@ -50,11 +53,56 @@ func TestPodAdmission(t *testing.T) {
 	defer close(stopCh)
 	informerFactory.Start(stopCh)
 
-	pod := &api.Pod{
+	CPU1000m := resource.MustParse("1000m")
+	CPU500m := resource.MustParse("500m")
+
+	burstablePod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "test",
+					Resources: api.ResourceRequirements{
+						Limits:   api.ResourceList{api.ResourceCPU: CPU1000m},
+						Requests: api.ResourceList{api.ResourceCPU: CPU500m},
+					},
+				},
+			},
+		},
+	}
+
+	guaranteedPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "test",
+					Resources: api.ResourceRequirements{
+						Limits:   api.ResourceList{api.ResourceCPU: CPU1000m},
+						Requests: api.ResourceList{api.ResourceCPU: CPU1000m},
+					},
+				},
+			},
+		},
+	}
+
+	bestEffortPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "test",
+				},
+			},
+		},
+	}
+
+	if err := utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=true"); err != nil {
+		t.Errorf("Failed to enable TaintByCondition feature: %v.", err)
 	}
 
 	tests := []struct {
+		pod                       *api.Pod
 		defaultClusterTolerations []api.Toleration
 		namespaceTolerations      []api.Toleration
 		whitelist                 []api.Toleration
@@ -65,6 +113,7 @@ func TestPodAdmission(t *testing.T) {
 		testName                  string
 	}{
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{},
@@ -73,6 +122,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "default cluster tolerations with empty pod tolerations",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -81,6 +131,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "default cluster tolerations with pod tolerations specified",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -89,6 +140,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "namespace tolerations",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{},
@@ -97,6 +149,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "no pod tolerations",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -104,6 +157,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "conflicting pod and namespace tolerations",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue2", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -111,6 +165,7 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "conflicting pod and default cluster tolerations",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
@@ -120,12 +175,39 @@ func TestPodAdmission(t *testing.T) {
 			testName:                  "merged pod tolerations satisfy whitelist",
 		},
 		{
+			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			whitelist:                 []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
 			podTolerations:            []api.Toleration{},
 			admit:                     false,
 			testName:                  "merged pod tolerations conflict with the whitelist",
+		},
+		{
+			pod: burstablePod,
+			defaultClusterTolerations: []api.Toleration{},
+			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			whitelist:                 []api.Toleration{},
+			podTolerations:            []api.Toleration{},
+			mergedTolerations: []api.Toleration{
+				{Key: algorithm.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
+				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
+			},
+			admit:    true,
+			testName: "added memoryPressure/DiskPressure for Burstable pod",
+		},
+		{
+			pod: guaranteedPod,
+			defaultClusterTolerations: []api.Toleration{},
+			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			whitelist:                 []api.Toleration{},
+			podTolerations:            []api.Toleration{},
+			mergedTolerations: []api.Toleration{
+				{Key: algorithm.TaintNodeMemoryPressure, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
+				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
+			},
+			admit:    true,
+			testName: "added memoryPressure/DiskPressure for Guaranteed pod",
 		},
 	}
 	for _, test := range tests {
@@ -148,6 +230,7 @@ func TestPodAdmission(t *testing.T) {
 		informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
 
 		handler.pluginConfig = &pluginapi.Configuration{Default: test.defaultClusterTolerations, Whitelist: test.clusterWhitelist}
+		pod := test.pod
 		pod.Spec.Tolerations = test.podTolerations
 
 		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
