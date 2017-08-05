@@ -1042,6 +1042,30 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 		Effect:   v1.TaintEffectNoExecute,
 	})
 
+	// According to TaintNodesByCondition, all DaemonSet pods should tolerate
+	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
+	// OutOfDisk taint additional.
+	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      algorithm.TaintNodeDiskPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+		Key:      algorithm.TaintNodeMemoryPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubelettypes.IsCriticalPod(newPod) {
+		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+			Key:      algorithm.TaintNodeOutOfDisk,
+			Operator: v1.TolerationOpExists,
+			Effect:   v1.TaintEffectNoSchedule,
+		})
+	}
+
 	pods := []*v1.Pod{}
 
 	podList, err := dsc.podLister.List(labels.Everything())
@@ -1213,6 +1237,11 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 
 func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
 	reasons := []algorithm.PredicateFailureReason{}
+
+	// If TaintNodesByCondition feature was enabled, account PodToleratesNodeTaints predicates.
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		return true, nil
+	}
 
 	for _, c := range nodeInfo.Node().Status.Conditions {
 		// TODO: There are other node status that the DaemonSet should ideally respect too,

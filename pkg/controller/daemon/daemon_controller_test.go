@@ -1251,6 +1251,68 @@ func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	}
 }
 
+// DaemonSet should launch a critical pod even when the node with OutOfDisk taints.
+func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("critical")
+		ds.Spec.UpdateStrategy = *strategy
+		setDaemonSetCritical(ds)
+		manager, podControl, _ := newTestController(ds)
+
+		node := newNode("not-enough-disk", nil)
+		node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
+		node.Spec.Taints = []v1.Taint{{Key: algorithm.TaintNodeOutOfDisk, Effect: v1.TaintEffectNoSchedule}}
+		manager.nodeStore.Add(node)
+
+		// NOTE: Whether or not TaintNodesByCondition is enabled, it'll add toleration to DaemonSet pods.
+
+		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+
+		// With enabling critical pod annotation feature gate, we will create critical pod
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+		// Rollback feature gate to false.
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+	}
+}
+
+// DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure taints.
+func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("critical")
+		ds.Spec.UpdateStrategy = *strategy
+		setDaemonSetCritical(ds)
+		manager, podControl, _ := newTestController(ds)
+
+		node := newNode("resources-pressure", nil)
+		node.Status.Conditions = []v1.NodeCondition{
+			{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue},
+			{Type: v1.NodeMemoryPressure, Status: v1.ConditionTrue},
+		}
+		node.Spec.Taints = []v1.Taint{
+			{Key: algorithm.TaintNodeDiskPressure, Effect: v1.TaintEffectNoSchedule},
+			{Key: algorithm.TaintNodeMemoryPressure, Effect: v1.TaintEffectNoSchedule},
+		}
+		manager.nodeStore.Add(node)
+
+		// Enabling critical pod and taint nodes by condition feature gate should create critical pod
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+		// Rollback feature gate to false.
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+	}
+}
+
 // DaemonSet should launch a critical pod even when the node has insufficient free resource.
 func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
