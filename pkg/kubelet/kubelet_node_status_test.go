@@ -211,7 +211,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -385,7 +384,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -520,7 +518,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),

@@ -829,6 +829,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - nodes/status
+    verbs:
+    - patch
+  - apiGroups:
+    - ""
+    resources:
     - events
     verbs:
     - create

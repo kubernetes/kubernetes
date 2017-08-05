@@ -19,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	gojson "encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -38,11 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/client/retry"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -361,7 +365,7 @@ with the apiserver API to configure the proxy.`,
 // fields are required.
 type ProxyServer struct {
 	Client                 clientset.Interface
-	EventClient            v1core.EventsGetter
+	CoreClient             v1core.CoreV1Interface
 	IptInterface           utiliptables.Interface
 	Proxier                proxy.ProxyProvider
 	Broadcaster            record.EventBroadcaster
@@ -383,7 +387,7 @@ type ProxyServer struct {
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.CoreV1Interface, error) {
 	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
@@ -408,12 +412,12 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		return nil, nil, err
 	}
 
-	eventClient, err := clientgoclientset.NewForConfig(kubeConfig)
+	cs, err := clientgoclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return client, eventClient.CoreV1(), nil
+	return client, cs.CoreV1(), nil
 }
 
 // NewProxyServer returns a new ProxyServer.
@@ -452,7 +456,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		return &ProxyServer{IptInterface: iptInterface, CleanupAndExit: cleanupAndExit}, nil
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, coreClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
@@ -581,7 +585,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	return &ProxyServer{
 		Client:                 client,
-		EventClient:            eventClient,
+		CoreClient:             coreClient,
 		IptInterface:           iptInterface,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
@@ -631,8 +635,8 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	if s.Broadcaster != nil && s.EventClient != nil {
-		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	if s.Broadcaster != nil && s.CoreClient != nil {
+		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.CoreClient.Events("")})
 	}
 
 	// Start up a healthz server if requested
@@ -720,6 +724,8 @@ func (s *ProxyServer) Run() error {
 	// functions must configure their shared informer event handlers first.
 	go informerFactory.Start(wait.NeverStop)
 
+	go s.reportVersion()
+
 	// Birth Cry after the birth is successful
 	s.birthCry()
 
@@ -778,6 +784,44 @@ func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.Kernel
 
 func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
+}
+
+func (s *ProxyServer) reportVersion() error {
+	v := version.Get().String()
+	nodeClient := s.CoreClient.Nodes()
+	nodeName := s.NodeRef.Name
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := nodeClient.Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			glog.Warningf("Failed to retrieve node info: %v", err)
+			return err
+		}
+		oldData, err := gojson.Marshal(node)
+		if err != nil {
+			glog.Errorf("failed to marshal node %#v for node %q: %v", node, nodeName, err)
+			return err
+		}
+		node.Status.NodeInfo.KubeProxyVersion = v
+		newData, err := gojson.Marshal(node)
+		if err != nil {
+			glog.Errorf("failed to marshal new node %#v for node %q: %v", node, nodeName, err)
+			return err
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+		if err != nil {
+			glog.Errorf("failed to create patch for node %q: %v", nodeName, err)
+			return err
+		}
+		_, err = nodeClient.PatchStatus(nodeName, patchBytes)
+		if err != nil {
+			glog.Warningf("Failed to set kube proxy version on node: %v", err)
+		}
+		return err
+	})
+	if err == nil {
+		glog.Infof("kube-proxy reported version: %s", v)
+	}
+	return err
 }
 
 func getNodeIP(client clientset.Interface, hostname string) net.IP {
