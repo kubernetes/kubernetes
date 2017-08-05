@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,4 +105,8 @@ type NodeConfiguration struct {
 	NodeName                 string
 	TLSBootstrapToken        string
 	Token                    string
+}
+
+func (cfg *MasterConfiguration) GetMasterEndpoint() string {
+	return fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort)
 }

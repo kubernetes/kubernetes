@@ -231,9 +231,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-
-	masterEndpoint := fmt.Sprintf("https://%s:%d", i.cfg.API.AdvertiseAddress, i.cfg.API.BindPort)
-	err = kubeconfigphase.CreateInitKubeConfigFiles(masterEndpoint, i.cfg.CertificatesDir, kubeadmconstants.KubernetesDir, i.cfg.NodeName)
+	err = kubeconfigphase.CreateInitKubeConfigFiles(kubeadmconstants.KubernetesDir, i.cfg)
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     tags = ["automanaged"],
+    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
 go_test(
