@@ -62,7 +62,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			// digital signatures used during TLS negotiation.
 			certificates.UsageDigitalSignature,
 			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
+			// keys, including the symmetric keys negotiated during TLS setup
 			// and used for data transfer.
 			certificates.UsageKeyEncipherment,
 			// ServerAuth allows the cert to be used by a TLS server to
@@ -106,7 +106,7 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 			// negotiation.
 			certificates.UsageDigitalSignature,
 			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
+			// keys, including the symmetric keys negotiated during TLS setup
 			// and used for data transfer..
 			certificates.UsageKeyEncipherment,
 			// ClientAuth allows the cert to be used by a TLS client to
