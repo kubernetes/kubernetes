@@ -309,8 +309,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.lastObservations = observations
 	m.Unlock()
 
-	// evict pods if there is a resource uage violation from local volume temporary storage
-	// If eviction happenes in localVolumeEviction function, skip the rest of eviction action
+	// evict pods if there is a resource usage violation from local volume temporary storage
+	// If eviction happens in localVolumeEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		if evictedPods := m.localStorageEviction(activePods); len(evictedPods) > 0 {
 			return evictedPods
