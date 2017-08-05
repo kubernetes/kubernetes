@@ -38,7 +38,21 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName: storage.GroupName,
-			// TODO:  change the order when GKE supports v1
+			/*
+				DO NOT set the preferred storage version to v1 until Kubernetes 1.7. This will BREAK rolling
+				cluster upgrades if you do:
+
+				1. Start with 3 apiservers running 1.5
+				2. Upgrade 1 apiserver to 1.6
+				3. Someone sends a request to the 1.6 apiserver to create or update a storage class
+				4. The 1.6 apiserver persists it as v1
+				5. Anyone talking to the 1.5 apiservers that haven't been upgraded yet will break trying to
+				   retrieve the storage class stored as v1.
+
+				Once a cluster is 100% upgraded to 1.7, cluster administrators must run
+				`cluster/update-storage-objects.sh` prior to upgrading to 1.8. This will update all
+				storageclasses so they're stored in v1 format in etcd.
+			*/
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/storage",
 			RootScopedKinds:            sets.NewString("StorageClass"),

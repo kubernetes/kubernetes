@@ -34,13 +34,13 @@ type RESTStorageProvider struct {
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(storageapi.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1beta1.SchemeGroupVersion
-	}
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1.SchemeGroupVersion
+	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(storageapiv1beta1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[storageapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = storageapiv1beta1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
