@@ -42,6 +42,7 @@ go_library(
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/network:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
