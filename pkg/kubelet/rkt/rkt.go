@@ -847,7 +847,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 		return err
 	}
 
-	// Create additional mount for termintation message path.
+	// Create additional mount for termination message path.
 	mount, err := r.makeContainerLogMount(opts, &c)
 	if err != nil {
 		return err
