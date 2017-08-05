@@ -337,17 +337,25 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 		// node.
 		if inuse, err := b.mounter.DeviceOpened(devicePath); err == nil && !inuse {
 			glog.V(1).Infof("rbd: %s is not used, remove it", devicePath)
-			// rbd unmap
-			if _, err := b.plugin.execCommand("rbd", []string{"unmap", devicePath}); err != nil {
-				glog.Errorf("rbd: failed to unmap device %s: %v", devicePath, err)
-			}
-			if err := util.loadRBD(&b, globalPDPath); err == nil {
-				// remove rbd lock
-				util.defencing(b)
+			if err := util.detachDevice(b, devicePath, globalPDPath); err != nil {
+				glog.Errorf("rbd: failed to detach device %s: %v", devicePath, err)
 			}
 		}
 	}
 	return err
+}
+
+// detachDevice detaches the device from node and remove the lock if needed
+func (util *RBDUtil) detachDevice(b rbdMounter, device string, mntPath string) error {
+	// rbd unmap
+	if _, err := b.plugin.execCommand("rbd", []string{"unmap", device}); err != nil {
+		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s: %v", device, err))
+	}
+	if err := util.loadRBD(&b, mntPath); err == nil {
+		// remove rbd lock
+		util.defencing(b)
+	}
+	return nil
 }
 
 func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
@@ -360,16 +368,9 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	}
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
-		// rbd unmap
-		_, err = c.plugin.execCommand("rbd", []string{"unmap", device})
+		err = util.detachDevice(*c.rbdMounter, device, mntPath)
 		if err != nil {
-			return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err))
-		}
-
-		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(c.rbdMounter, mntPath); err == nil {
-			// remove rbd lock
-			util.defencing(*c.rbdMounter)
+			return fmt.Errorf("rbd detach disk: failed to detach device: %s\nError: %v", device, err)
 		}
 
 		glog.Infof("rbd: successfully unmap device %s", device)
