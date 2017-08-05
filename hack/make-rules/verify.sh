@@ -38,6 +38,7 @@ QUICK_PATTERNS+=(
   "verify-boilerplate.sh"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
+  "verify-multiarch-test-images.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-staging-client-go.sh"

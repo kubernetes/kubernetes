@@ -1,0 +1,7 @@
+test/images/pets/redis
+test/images/pets/zookeeper
+test/images/volumes-tester/ceph
+test/images/volumes-tester/gluster
+test/images/volumes-tester/iscsi
+test/images/volumes-tester/nfs
+test/images/volumes-tester/rbd
