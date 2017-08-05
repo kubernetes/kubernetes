@@ -40,15 +40,22 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["certs_test.go"],
+    srcs = [
+        "certs_test.go",
+        "kubeconfig_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
-        "//vendor/github.com/renstrom/dedent:go_default_library",
-        "//vendor/github.com/spf13/cobra:go_default_library",
+        "//cmd/kubeadm/test:go_default_library",
+        "//cmd/kubeadm/test/cmd:go_default_library",
+        "//cmd/kubeadm/test/kubeconfig:go_default_library",
+        "//pkg/util/node:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
     ],
 )
 
