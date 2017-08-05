@@ -1,4 +1,4 @@
 approvers:
-- sig-scheduling-maintainers
+  - sig-scheduling-maintainers
 reviewers:
-- sig-scheduling
+  - sig-scheduling
