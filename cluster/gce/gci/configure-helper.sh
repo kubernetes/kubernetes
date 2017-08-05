@@ -1596,6 +1596,26 @@ function setup-addon-manifests {
   chmod 644 "${dst_dir}"/*
 }
 
+# Fluentd manifest is modified using kubectl, which may not be available at
+# this point. Run this as a background process.
+function wait-for-apiserver-and-update-fluentd {
+  until kubectl get nodes
+  do
+    sleep 10
+  done
+  kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} \
+    --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT} \
+    --requests=cpu=${FLUENTD_GCP_CPU_REQUEST},memory=${FLUENTD_GCP_MEMORY_REQUEST} \
+    -o yaml > ${fluentd_gcp_yaml}.tmp
+  mv ${fluentd_gcp_yaml}.tmp ${fluentd_gcp_yaml}
+}
+
+# Trigger background process that will ultimately update fluentd resource
+# requirements.
+function start-fluentd-resource-update {
+  wait-for-apiserver-and-update-fluentd &
+}
+
 # Prepares the manifests of k8s addons, and starts the addon manager.
 # Vars assumed:
 #   CLUSTER_NAME
@@ -1679,6 +1699,8 @@ function start-kube-addons {
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     setup-addon-manifests "addons" "fluentd-gcp"
+    local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
+    start-fluentd-resource-update
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
