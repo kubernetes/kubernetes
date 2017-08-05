@@ -480,6 +480,47 @@ func TestGeneratePod(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"env-from":          []string{"ConfigMapRef=Foo", "SecretRef=Bar"},
+			},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							ImagePullPolicy: v1.PullAlways,
+							EnvFrom: []v1.EnvFromSource{
+								{
+									ConfigMapRef: &v1.ConfigMapEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "Foo",
+										},
+									},
+								},
+								{
+									SecretRef: &v1.SecretEnvSource{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "Bar",
+										},
+									},
+								},
+							},
+						},
+					},
+					DNSPolicy:     v1.DNSClusterFirst,
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			},
+		},
+		{
+			params: map[string]interface{}{
 				"name":  "foo",
 				"image": "someimage",
 				"port":  "80",
@@ -665,6 +706,7 @@ func TestGenerateDeployment(t *testing.T) {
 				"command":           "true",
 				"args":              []string{"bar", "baz", "blah"},
 				"env":               []string{"a=b", "c=d"},
+				"env-from":          []string{"ConfigMapRef=Foo", "SecretRef=Bar"},
 				"requests":          "cpu=100m,memory=100Mi",
 				"limits":            "cpu=400m,memory=200Mi",
 			},
@@ -702,6 +744,22 @@ func TestGenerateDeployment(t *testing.T) {
 										{
 											Name:  "c",
 											Value: "d",
+										},
+									},
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Foo",
+												},
+											},
+										},
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Bar",
+												},
+											},
 										},
 									},
 									Resources: v1.ResourceRequirements{
@@ -758,6 +816,7 @@ func TestGenerateAppsDeployment(t *testing.T) {
 				"command":           "true",
 				"args":              []string{"bar", "baz", "blah"},
 				"env":               []string{"a=b", "c=d"},
+				"env-from":          []string{"ConfigMapRef=Foo", "SecretRef=Bar"},
 				"requests":          "cpu=100m,memory=100Mi",
 				"limits":            "cpu=400m,memory=200Mi",
 			},
@@ -795,6 +854,22 @@ func TestGenerateAppsDeployment(t *testing.T) {
 										{
 											Name:  "c",
 											Value: "d",
+										},
+									},
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Foo",
+												},
+											},
+										},
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Bar",
+												},
+											},
 										},
 									},
 									Resources: v1.ResourceRequirements{
@@ -849,6 +924,7 @@ func TestGenerateJob(t *testing.T) {
 				"command":          "true",
 				"args":             []string{"bar", "baz", "blah"},
 				"env":              []string{"a=b", "c=d"},
+				"env-from":         []string{"ConfigMapRef=Foo", "SecretRef=Bar"},
 				"requests":         "cpu=100m,memory=100Mi",
 				"limits":           "cpu=400m,memory=200Mi",
 				"restart":          "OnFailure",
@@ -886,6 +962,22 @@ func TestGenerateJob(t *testing.T) {
 										{
 											Name:  "c",
 											Value: "d",
+										},
+									},
+									EnvFrom: []v1.EnvFromSource{
+										{
+											ConfigMapRef: &v1.ConfigMapEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Foo",
+												},
+											},
+										},
+										{
+											SecretRef: &v1.SecretEnvSource{
+												LocalObjectReference: v1.LocalObjectReference{
+													Name: "Bar",
+												},
+											},
 										},
 									},
 									Resources: v1.ResourceRequirements{
@@ -940,6 +1032,7 @@ func TestGenerateCronJob(t *testing.T) {
 				"command":          "true",
 				"args":             []string{"bar", "baz", "blah"},
 				"env":              []string{"a=b", "c=d"},
+				"env-from":         []string{"ConfigMapRef=Foo", "SecretRef=Bar"},
 				"requests":         "cpu=100m,memory=100Mi",
 				"limits":           "cpu=400m,memory=200Mi",
 				"restart":          "OnFailure",
@@ -982,6 +1075,22 @@ func TestGenerateCronJob(t *testing.T) {
 												{
 													Name:  "c",
 													Value: "d",
+												},
+											},
+											EnvFrom: []v1.EnvFromSource{
+												{
+													ConfigMapRef: &v1.ConfigMapEnvSource{
+														LocalObjectReference: v1.LocalObjectReference{
+															Name: "Foo",
+														},
+													},
+												},
+												{
+													SecretRef: &v1.SecretEnvSource{
+														LocalObjectReference: v1.LocalObjectReference{
+															Name: "Bar",
+														},
+													},
 												},
 											},
 											Resources: v1.ResourceRequirements{
@@ -1091,6 +1200,117 @@ func TestParseEnv(t *testing.T) {
 		}
 		if !reflect.DeepEqual(envs, test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", test.expected, envs, test.test)
+		}
+	}
+}
+
+func TestParseEnvFrom(t *testing.T) {
+	tests := []struct {
+		envFromArray []string
+		expected     []v1.EnvFromSource
+		expectErr    bool
+		test         string
+	}{
+		{
+			envFromArray: []string{
+				"WrongType=foo",
+			},
+			expected:  []v1.EnvFromSource{},
+			expectErr: true,
+			test:      "test invalid type",
+		},
+		{
+			envFromArray: []string{
+				"ConfigMap",
+			},
+			expected:  []v1.EnvFromSource{},
+			expectErr: true,
+			test:      "test without equals",
+		},
+		{
+			envFromArray: []string{
+				"ConfigMapRef=",
+			},
+			expected:  []v1.EnvFromSource{},
+			expectErr: true,
+			test:      "test without value",
+		},
+		{
+			envFromArray: []string{
+				"=FOO",
+			},
+			expected:  []v1.EnvFromSource{},
+			expectErr: true,
+			test:      "test without type",
+		},
+		{
+			envFromArray: []string{
+				"ConfigMapRef=FOO",
+			},
+			expected: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "FOO",
+						},
+					},
+				},
+			},
+			expectErr: false,
+			test:      "test ConfigMapRef",
+		},
+		{
+			envFromArray: []string{
+				"SecretRef=FOO",
+			},
+			expected: []v1.EnvFromSource{
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "FOO",
+						},
+					},
+				},
+			},
+			expectErr: false,
+			test:      "test SecretRef",
+		},
+		{
+			envFromArray: []string{
+				"ConfigMapRef=FOO",
+				"SecretRef=BAR",
+			},
+			expected: []v1.EnvFromSource{
+				{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "FOO",
+						},
+					},
+				},
+				{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "BAR",
+						},
+					},
+				},
+			},
+			expectErr: false,
+			test:      "test multiple options",
+		},
+	}
+
+	for _, test := range tests {
+		envFroms, err := parseEnvFroms(test.envFromArray)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v (%s)", err, test.test)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(envFroms, test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v (%s)", test.expected, envFroms, test.test)
 		}
 	}
 }
