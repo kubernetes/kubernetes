@@ -749,7 +749,9 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, r
 	// we've finished re-adopting existing pods to the rc.
 	selector = labels.SelectorFromSet(selectorCopy)
 	options = metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err = podClient.Pods(namespace).List(options)
+	if podList, err = podClient.Pods(namespace).List(options); err != nil {
+		return nil, err
+	}
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != deploymentValue {
