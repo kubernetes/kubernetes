@@ -33,12 +33,12 @@ import (
 const tokenCreateRetries = 5
 
 // CreateNewToken tries to create a token and fails if one with the same ID already exists
-func CreateNewToken(client *clientset.Clientset, token string, tokenDuration time.Duration, usages []string, description string) error {
+func CreateNewToken(client clientset.Interface, token string, tokenDuration time.Duration, usages []string, description string) error {
 	return UpdateOrCreateToken(client, token, true, tokenDuration, usages, description)
 }
 
 // UpdateOrCreateToken attempts to update a token with the given ID, or create if it does not already exist.
-func UpdateOrCreateToken(client *clientset.Clientset, token string, failIfExists bool, tokenDuration time.Duration, usages []string, description string) error {
+func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists bool, tokenDuration time.Duration, usages []string, description string) error {
 	tokenID, tokenSecret, err := tokenutil.ParseToken(token)
 	if err != nil {
 		return err
@@ -46,14 +46,14 @@ func UpdateOrCreateToken(client *clientset.Clientset, token string, failIfExists
 	secretName := fmt.Sprintf("%s%s", bootstrapapi.BootstrapTokenSecretPrefix, tokenID)
 	var lastErr error
 	for i := 0; i < tokenCreateRetries; i++ {
-		secret, err := client.Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
+		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if err == nil {
 			if failIfExists {
 				return fmt.Errorf("a token with id %q already exists", tokenID)
 			}
 			// Secret with this ID already exists, update it:
 			secret.Data = encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, description)
-			if _, err := client.Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
+			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err
@@ -70,7 +70,7 @@ func UpdateOrCreateToken(client *clientset.Clientset, token string, failIfExists
 				Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
 				Data: encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, description),
 			}
-			if _, err := client.Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
+			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
 			} else {
 				lastErr = err
