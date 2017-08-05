@@ -1409,6 +1409,28 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			},
 			isNamespaced: false,
 		},
+		{
+			obj: &extensions.PodSecurityPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: extensions.PodSecurityPolicySpec{
+					SELinux: extensions.SELinuxStrategyOptions{
+						Rule: extensions.SELinuxStrategyRunAsAny,
+					},
+					RunAsUser: extensions.RunAsUserStrategyOptions{
+						Rule: extensions.RunAsUserStrategyRunAsAny,
+					},
+					FSGroup: extensions.FSGroupStrategyOptions{
+						Rule: extensions.FSGroupStrategyRunAsAny,
+					},
+					SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+						Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+					},
+				},
+			},
+			isNamespaced: false,
+		},
 	}
 
 	for i, test := range table {
