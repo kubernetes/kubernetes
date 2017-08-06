@@ -1,4 +1,4 @@
-// +build linux
+// +build freebsd linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
