@@ -17,17 +17,22 @@ limitations under the License.
 package openapi_test
 
 import (
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
+
+var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
 
 var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 	var resources openapi.Resources
 	BeforeEach(func() {
-		s, err := data.OpenAPISchema()
+		s, err := fakeSchema.OpenAPISchema()
 		Expect(err).To(BeNil())
 		resources, err = openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
@@ -136,7 +141,7 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openAPIData", func() {
 	var resources openapi.Resources
 	BeforeEach(func() {
-		s, err := data.OpenAPISchema()
+		s, err := fakeSchema.OpenAPISchema()
 		Expect(err).To(BeNil())
 		resources, err = openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
