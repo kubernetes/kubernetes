@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.1
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.6.3
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:
