@@ -34,7 +34,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	cmdphases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	addonsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons"
+	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
@@ -289,16 +290,15 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	// Create the necessary ServiceAccounts
-	if err := apiconfigphase.CreateServiceAccounts(client); err != nil {
-		return err
-	}
-
 	if err := apiconfigphase.CreateRBACRules(client, k8sVersion); err != nil {
 		return err
 	}
 
-	if err := addonsphase.CreateEssentialAddons(i.cfg, client); err != nil {
+	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
+		return err
+	}
+
+	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
 		return err
 	}
 

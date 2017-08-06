@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package addons
+package dns
 
 import (
 	"fmt"
@@ -30,32 +30,13 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-// CreateEssentialAddons creates the kube-proxy and kube-dns addons
-func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
-	proxyConfigMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap, struct{ MasterEndpoint string }{
-		// Fetch this value from the kubeconfig file
-		MasterEndpoint: fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort),
-	})
-	if err != nil {
-		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
-	}
-
-	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-		ImageRepository: cfg.ImageRepository,
-		Arch:            runtime.GOARCH,
-		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-		ImageOverride:   cfg.UnifiedControlPlaneImage,
-		ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-		CloudTaintKey:   algorithm.TaintExternalCloudProvider,
-	})
-	if err != nil {
-		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
+// EnsureDNSAddon creates the kube-dns addon
+func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	if err := CreateServiceAccount(client); err != nil {
+		return err
 	}
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
@@ -81,48 +62,30 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client clientset
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 
-	err = CreateKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client)
-	if err != nil {
-		return err
-	}
-	fmt.Println("[addons] Applied essential addon: kube-proxy")
-
-	err = CreateKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client)
-	if err != nil {
+	if err = createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
 		return err
 	}
 	fmt.Println("[addons] Applied essential addon: kube-dns")
 	return nil
 }
 
-func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
-	kubeproxyConfigMap := &v1.ConfigMap{}
-	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
-		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
+// CreateServiceAccount creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
+func CreateServiceAccount(client clientset.Interface) error {
+	sa := v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeDNSServiceAccountName,
+			Namespace: metav1.NamespaceSystem,
+		},
 	}
-
-	if err := apiclientutil.CreateConfigMapIfNotExists(client, kubeproxyConfigMap); err != nil {
-		return err
-	}
-
-	kubeproxyDaemonSet := &extensions.DaemonSet{}
-	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
-		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
-	}
-
-	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
+	if _, err := client.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
-		}
-
-		if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Update(kubeproxyDaemonSet); err != nil {
-			return fmt.Errorf("unable to update the kube-proxy daemonset: %v", err)
+			return err
 		}
 	}
 	return nil
 }
 
-func CreateKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
+func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
 	kubednsDeployment := &extensions.Deployment{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
@@ -175,11 +138,4 @@ func getDNSIP(client clientset.Interface) (net.IP, error) {
 		return nil, fmt.Errorf("could not parse dns ip %q: %v", dnsIP, err)
 	}
 	return dnsIP, nil
-}
-
-func getClusterCIDR(podsubnet string) string {
-	if len(podsubnet) == 0 {
-		return ""
-	}
-	return "- --cluster-cidr=" + podsubnet
 }

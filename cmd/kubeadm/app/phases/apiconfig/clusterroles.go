@@ -19,81 +19,22 @@ package apiconfig
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-const (
-	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
-	KubeProxyClusterRoleName = "system:node-proxier"
-)
-
-// CreateServiceAccounts creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
-func CreateServiceAccounts(client clientset.Interface) error {
-	// TODO: Each ServiceAccount should be created per-addon (decentralized) vs here
-	serviceAccounts := []v1.ServiceAccount{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kubeadmconstants.KubeDNSServiceAccountName,
-				Namespace: metav1.NamespaceSystem,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kubeadmconstants.KubeProxyServiceAccountName,
-				Namespace: metav1.NamespaceSystem,
-			},
-		},
-	}
-
-	for _, sa := range serviceAccounts {
-		if _, err := client.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
 func CreateRBACRules(client clientset.Interface, k8sVersion *version.Version) error {
-	if err := createClusterRoleBindings(client); err != nil {
-		return err
-	}
 	if err := deletePermissiveNodesBindingWhenUsingNodeAuthorization(client, k8sVersion); err != nil {
 		return fmt.Errorf("failed to remove the permissive 'system:nodes' Group Subject in the 'system:node' ClusterRoleBinding: %v", err)
 	}
 
 	fmt.Println("[apiconfig] Created RBAC rules")
 	return nil
-}
-
-func createClusterRoleBindings(client clientset.Interface) error {
-	// TODO: This ClusterRoleBinding should be created by the kube-proxy phase, not here
-	return apiclientutil.CreateClusterRoleBindingIfNotExists(client, &rbac.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kubeadm:node-proxier",
-		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
-			Kind:     "ClusterRole",
-			Name:     KubeProxyClusterRoleName,
-		},
-		Subjects: []rbac.Subject{
-			{
-				Kind:      rbac.ServiceAccountKind,
-				Name:      kubeadmconstants.KubeProxyServiceAccountName,
-				Namespace: metav1.NamespaceSystem,
-			},
-		},
-	})
 }
 
 func deletePermissiveNodesBindingWhenUsingNodeAuthorization(client clientset.Interface, k8sVersion *version.Version) error {
