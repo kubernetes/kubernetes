@@ -35,18 +35,18 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*testgroupv1.TestgroupV1Client
+	testgroupV1 *testgroupv1.TestgroupV1Client
 }
 
 // TestgroupV1 retrieves the TestgroupV1Client
 func (c *Clientset) TestgroupV1() testgroupv1.TestgroupV1Interface {
-	return c.TestgroupV1Client
+	return c.testgroupV1
 }
 
 // Deprecated: Testgroup retrieves the default version of TestgroupClient.
 // Please explicitly pick a version.
 func (c *Clientset) Testgroup() testgroupv1.TestgroupV1Interface {
-	return c.TestgroupV1Client
+	return c.testgroupV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -65,7 +65,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.TestgroupV1Client, err = testgroupv1.NewForConfig(&configShallowCopy)
+	cs.testgroupV1, err = testgroupv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.TestgroupV1Client = testgroupv1.NewForConfigOrDie(c)
+	cs.testgroupV1 = testgroupv1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -91,7 +91,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.TestgroupV1Client = testgroupv1.New(c)
+	cs.testgroupV1 = testgroupv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

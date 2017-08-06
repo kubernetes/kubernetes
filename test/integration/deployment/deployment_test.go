@@ -58,7 +58,7 @@ func TestNewDeployment(t *testing.T) {
 	tester.waitForDeploymentStatusValidAndMarkPodsReady()
 
 	// Check new RS annotations
-	newRS, err := deploymentutil.GetNewReplicaSet(deploy, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deploy, c.ExtensionsV1beta1())
 	if err != nil {
 		t.Fatalf("failed to get new ReplicaSet of Deployment %s: %v", deploy.Name, err)
 	}

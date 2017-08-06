@@ -288,7 +288,7 @@ func TestGetNewRS(t *testing.T) {
 			fakeClient = addListRSReactor(fakeClient, test.objs[1])
 			fakeClient = addUpdatePodsReactor(fakeClient)
 			fakeClient = addUpdateRSReactor(fakeClient)
-			rs, err := GetNewReplicaSet(&newDeployment, fakeClient)
+			rs, err := GetNewReplicaSet(&newDeployment, fakeClient.ExtensionsV1beta1())
 			if err != nil {
 				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
 			}
@@ -361,7 +361,7 @@ func TestGetOldRSs(t *testing.T) {
 			fakeClient = addListRSReactor(fakeClient, test.objs[0])
 			fakeClient = addGetRSReactor(fakeClient, test.objs[0])
 			fakeClient = addUpdateRSReactor(fakeClient)
-			_, rss, err := GetOldReplicaSets(&newDeployment, fakeClient)
+			_, rss, err := GetOldReplicaSets(&newDeployment, fakeClient.ExtensionsV1beta1())
 			if err != nil {
 				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
 			}

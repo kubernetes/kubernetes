@@ -163,7 +163,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			// Locate a running pod.
 			var pod v1.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(metav1.ListOptions{})
+				podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -191,7 +191,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// this gives the controller enough time to have truly set the status.
 				time.Sleep(timeout)
 
-				err = cs.Pods(ns).Evict(e)
+				err = cs.CoreV1().Pods(ns).Evict(e)
 				Expect(err).Should(MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
 				// Only wait for running pods in the "allow" case
@@ -202,7 +202,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-					err = cs.Pods(ns).Evict(e)
+					err = cs.CoreV1().Pods(ns).Evict(e)
 					if err != nil {
 						return false, nil
 					} else {
@@ -264,7 +264,7 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 			},
 		}
 
-		_, err := cs.Pods(ns).Create(pod)
+		_, err := cs.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
 	}
 }

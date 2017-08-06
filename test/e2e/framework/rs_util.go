@@ -63,7 +63,7 @@ func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, exp
 	if err != nil {
 		return err
 	}
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	if err != nil {
 		return err
 	}

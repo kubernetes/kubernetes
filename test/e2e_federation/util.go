@@ -88,7 +88,7 @@ func createClusterObjectOrFail(f *fedframework.Framework, context *fedframework.
 func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterService, err := clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
+		clusterService, err := clientset.CoreV1().Services(namespace).Get(service.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated service %q in namespace %q in cluster is absent", service.Name, namespace))
 			return true, nil // Success
@@ -141,7 +141,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	}
 
 	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
-	return clientset.Services(namespace).Create(service)
+	return clientset.CoreV1().Services(namespace).Create(service)
 }
 
 func createLBService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
@@ -178,7 +178,7 @@ func createLBService(clientset *fedclientset.Clientset, namespace, name string) 
 	}
 
 	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
-	return clientset.Services(namespace).Create(service)
+	return clientset.CoreV1().Services(namespace).Create(service)
 }
 
 func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
@@ -200,7 +200,7 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
 	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
-	err := clientset.Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.CoreV1().Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 	// Wait for the service to be deleted.
 	err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
@@ -224,7 +224,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 
 		err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
 			var err error
-			cSvc, err = c.Clientset.Services(namespace).Get(service.Name, metav1.GetOptions{})
+			cSvc, err = c.Clientset.CoreV1().Services(namespace).Get(service.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				// Get failed with an error, try again.
 				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", service.Name, namespace, name, err, framework.Poll)
@@ -260,7 +260,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 
 func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		err := clientset.Services(namespace).Delete(service.Name, &metav1.DeleteOptions{})
+		err := clientset.CoreV1().Services(namespace).Delete(service.Name, &metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			// Deletion failed with an error, try again.
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service.Name, namespace, clusterName)
