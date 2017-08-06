@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,6 +58,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
+		// lying around so we don't have to race any caches
+		framework.BindClusterRole(f.ClientSet.Rbac(), "podsecuritypolicy:privileged", f.Namespace.Name,
+			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 	})
 
 	framework.KubeDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {

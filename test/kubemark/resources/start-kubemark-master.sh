@@ -413,6 +413,8 @@ function start-kubemaster-component() {
 		sed -i -e "s@{{etcd_image}}@${ETCD_IMAGE}@g" "${src_file}"
 	elif [ "${component}" == "kube-addon-manager" ]; then
 		setup-addon-manifests "addons" "kubemark-rbac-bindings"
+                setup-addon-manifests "addons" "podsecuritypolicies"
+                setup-addon-manifests "addons" "podsecuritypolicies-rbac"
 	else
 		local -r component_docker_tag=$(cat ${KUBE_BINDIR}/${component}.docker_tag)
 		sed -i -e "s@{{${component}_docker_tag}}@${component_docker_tag}@g" "${src_file}"

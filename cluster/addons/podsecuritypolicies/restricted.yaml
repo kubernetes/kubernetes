@@ -1,0 +1,28 @@
+apiVersion: extensions/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: restricted
+  annotations:
+    kubernetes.io/description: 'restricted allows minimal access for create pods to work.'
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+spec:
+  privileged: false
+  hostIPC: false
+  hostPID: false
+  hostNetwork: false
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: MustRunAsNonRoot
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - 'emptyDir'
+  - 'secret'
+  - 'downwardAPI'
+  - 'configMap'
+  - 'persistentVolumeClaim'
+  - 'projected'

@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: podsecuritypolicy:restricted
+rules:
+- apiGroups:
+  - extensions
+  resourceNames:
+  - restricted
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
