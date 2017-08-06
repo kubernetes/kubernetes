@@ -45,6 +45,15 @@ type localTestConfig struct {
 	scName string
 }
 
+type LocalVolumeType string
+
+const (
+	// default local volume type, aka a directory
+	DirectoryLocalVolumeType LocalVolumeType = "dir"
+	// creates a tmpfs and mounts it
+	TmpfsLocalVolumeType LocalVolumeType = "tmpfs"
+)
+
 type localTestVolume struct {
 	// Node that the volume is on
 	node *v1.Node
@@ -54,6 +63,8 @@ type localTestVolume struct {
 	pvc *v1.PersistentVolumeClaim
 	// PV for this volume
 	pv *v1.PersistentVolume
+	// Type of local volume
+	localVolumeType LocalVolumeType
 }
 
 const (
@@ -97,7 +108,6 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 	var (
 		config *localTestConfig
-		node0  *v1.Node
 		scName string
 	)
 
@@ -107,7 +117,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
 		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 		// Choose the first node
-		node0 = &nodes.Items[0]
+		node0 := &nodes.Items[0]
 
 		config = &localTestConfig{
 			ns:     f.Namespace.Name,
@@ -123,7 +133,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		var testVol *localTestVolume
 
 		BeforeEach(func() {
-			testVol = setupLocalVolumePVCPV(config, node0)
+			testVol = setupLocalVolumePVCPV(config, DirectoryLocalVolumeType)
 		})
 
 		AfterEach(func() {
@@ -132,9 +142,9 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 		It("should be able to mount and read from the volume using one-command containers", func() {
 			By("Creating a pod to read from the PV")
-			//testFileContent was written during setupLocalVolume
-			_, readCmd := createWriteAndReadCmds(volumeDir, testFile, "" /*writeTestFileContent*/)
+			readCmd := createReadCmd(volumeDir, testFile)
 			podSpec := makeLocalPod(config, testVol, readCmd)
+			//testFileContent was written during setupLocalVolume
 			f.TestContainerOutput("pod reads PV", podSpec, 0, []string{testFileContent})
 		})
 
@@ -154,13 +164,11 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
 			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
 			framework.Logf("pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(node0.Name))
+			Expect(pod1NodeName).To(Equal(config.node0.Name))
 
 			By("Reading in pod1")
 			// testFileContent was written during setupLocalVolume
-			_, readCmd := createWriteAndReadCmds(volumeDir, testFile, "" /*writeTestFileContent*/)
-			readOut := podRWCmdExec(pod1, readCmd)
-			Expect(readOut).To(ContainSubstring(testFileContent)) /*aka writeTestFileContents*/
+			testReadFileContent(volumeDir, testFile, testFileContent, pod1)
 
 			By("Deleting pod1")
 			framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
@@ -174,7 +182,10 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
 			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
 			framework.Logf("pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(node0.Name))
+			Expect(pod1NodeName).To(Equal(config.node0.Name))
+
+			// testFileContent was written during setupLocalVolume
+			testReadFileContent(volumeDir, testFile, testFileContent, pod1)
 
 			By("Writing in pod1")
 			writeCmd, _ := createWriteAndReadCmds(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
@@ -190,7 +201,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		var testVol *localTestVolume
 
 		BeforeEach(func() {
-			testVol = setupLocalVolumePVCPV(config, node0)
+			testVol = setupLocalVolumePVCPV(config, DirectoryLocalVolumeType)
 		})
 
 		AfterEach(func() {
@@ -208,91 +219,31 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			podSpec2 := makeLocalPod(config, testVol, readCmd)
 			f.TestContainerOutput("pod reads PV", podSpec2, 0, []string{testVol.hostDir})
 		})
+	})
 
-		It("should be able to mount volume in two pods one after other, write from pod1, and read from pod2", func() {
-			By("Creating pod1")
-			pod1, pod1Err := createLocalPod(config, testVol)
-			Expect(pod1Err).NotTo(HaveOccurred())
+	LocalVolumeTypes := []LocalVolumeType{DirectoryLocalVolumeType, TmpfsLocalVolumeType}
 
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
-			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(node0.Name))
-
-			writeCmd, readCmd := createWriteAndReadCmds(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
-
-			By("Writing in pod1")
-			podRWCmdExec(pod1, writeCmd)
-
-			By("Deleting pod1")
-			framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
-
-			By("Creating pod2")
-			pod2, pod2Err := createLocalPod(config, testVol)
-			Expect(pod2Err).NotTo(HaveOccurred())
-
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
-			pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
-			Expect(pod2NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
-			Expect(pod2NodeName).To(Equal(node0.Name))
-
-			By("Reading in pod2")
-			readOut := podRWCmdExec(pod2, readCmd)
-			Expect(readOut).To(ContainSubstring(testVol.hostDir)) /*aka writeTestFileContents*/
-
-			By("Deleting pod2")
-			framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+	Context("when two pods mount a local volume at the same time", func() {
+		It("should be able to write from pod1 and read from pod2", func() {
+			for _, testVolType := range LocalVolumeTypes {
+				var testVol *localTestVolume
+				By(fmt.Sprintf("local-volume-type: %s", testVolType))
+				testVol = setupLocalVolumePVCPV(config, testVolType)
+				twoPodsReadWriteTest(config, testVol)
+				cleanupLocalVolume(config, testVol)
+			}
 		})
 	})
 
-	Context("when two pods request one prebound PVC at the same time", func() {
-
-		var testVol *localTestVolume
-
-		BeforeEach(func() {
-			testVol = setupLocalVolumePVCPV(config, node0)
-		})
-
-		AfterEach(func() {
-			cleanupLocalVolume(config, testVol)
-		})
-
-		It("should be able to mount volume in two pods at the same time, write from pod1, and read from pod2", func() {
-			By("Creating pod1 to write to the PV")
-			pod1, pod1Err := createLocalPod(config, testVol)
-			Expect(pod1Err).NotTo(HaveOccurred())
-
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
-			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(node0.Name))
-
-			By("Creating pod2 to read from the PV")
-			pod2, pod2Err := createLocalPod(config, testVol)
-			Expect(pod2Err).NotTo(HaveOccurred())
-
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
-			pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
-			Expect(pod2NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
-			Expect(pod2NodeName).To(Equal(node0.Name))
-
-			writeCmd, readCmd := createWriteAndReadCmds(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
-
-			By("Writing in pod1")
-			podRWCmdExec(pod1, writeCmd)
-			By("Reading in pod2")
-			readOut := podRWCmdExec(pod2, readCmd)
-
-			Expect(readOut).To(ContainSubstring(testVol.hostDir)) /*aka writeTestFileContents*/
-
-			By("Deleting pod1")
-			framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
-			By("Deleting pod2")
-			framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+	Context("when two pods mount a local volume one after the other", func() {
+		It("should be able to write from pod1 and read from pod2", func() {
+			for _, testVolType := range LocalVolumeTypes {
+				var testVol *localTestVolume
+				By(fmt.Sprintf("local-volume-type: %s", testVolType))
+				testVol = setupLocalVolumePVCPV(config, testVolType)
+				twoPodsReadWriteSerialTest(config, testVol)
+				cleanupLocalVolume(config, testVol)
+			}
 		})
 	})
 
@@ -320,7 +271,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			By("Creating a directory under discovery path")
 			framework.Logf("creating local volume under path %q", volumePath)
 			mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
-			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, node0)
+			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for a PersitentVolume to be created")
@@ -342,7 +293,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			// Delete the persistent volume claim: file will be cleaned up and volume be re-created.
 			By("Deleting the persistent volume claim to clean up persistent volume and re-create one")
 			writeCmd, _ := createWriteAndReadCmds(volumePath, testFile, testFileContent)
-			err = framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, node0)
+			err = framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 			err = config.client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
@@ -352,11 +303,95 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			Expect(err).NotTo(HaveOccurred())
 			Expect(newPV.UID).NotTo(Equal(oldPV.UID))
 			fileDoesntExistCmd := createFileDoesntExistCmd(volumePath, testFile)
-			err = framework.IssueSSHCommand(fileDoesntExistCmd, framework.TestContext.Provider, node0)
+			err = framework.IssueSSHCommand(fileDoesntExistCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
+
+// The tests below are run against multiple mount point types
+
+// Test two pods at the same time, write from pod1, and read from pod2
+func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
+	By("Creating pod1 to write to the PV")
+	pod1, pod1Err := createLocalPod(config, testVol)
+	Expect(pod1Err).NotTo(HaveOccurred())
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
+	pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
+	Expect(pod1NodeNameErr).NotTo(HaveOccurred())
+	framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
+	Expect(pod1NodeName).To(Equal(config.node0.Name))
+
+	// testFileContent was written during setupLocalVolume
+	testReadFileContent(volumeDir, testFile, testFileContent, pod1)
+
+	By("Creating pod2 to read from the PV")
+	pod2, pod2Err := createLocalPod(config, testVol)
+	Expect(pod2Err).NotTo(HaveOccurred())
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
+	pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
+	Expect(pod2NodeNameErr).NotTo(HaveOccurred())
+	framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
+	Expect(pod2NodeName).To(Equal(config.node0.Name))
+
+	// testFileContent was written during setupLocalVolume
+	testReadFileContent(volumeDir, testFile, testFileContent, pod2)
+
+	writeCmd := createWriteCmd(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
+
+	By("Writing in pod1")
+	podRWCmdExec(pod1, writeCmd)
+
+	By("Reading in pod2")
+	testReadFileContent(volumeDir, testFile, testVol.hostDir, pod2)
+
+	By("Deleting pod1")
+	framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+	By("Deleting pod2")
+	framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+}
+
+// Test two pods one after other, write from pod1, and read from pod2
+func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolume) {
+	By("Creating pod1")
+	pod1, pod1Err := createLocalPod(config, testVol)
+	Expect(pod1Err).NotTo(HaveOccurred())
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
+	pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
+	Expect(pod1NodeNameErr).NotTo(HaveOccurred())
+	framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
+	Expect(pod1NodeName).To(Equal(config.node0.Name))
+
+	// testFileContent was written during setupLocalVolume
+	testReadFileContent(volumeDir, testFile, testFileContent, pod1)
+
+	writeCmd := createWriteCmd(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
+
+	By("Writing in pod1")
+	podRWCmdExec(pod1, writeCmd)
+
+	By("Deleting pod1")
+	framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+
+	By("Creating pod2")
+	pod2, pod2Err := createLocalPod(config, testVol)
+	Expect(pod2Err).NotTo(HaveOccurred())
+
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
+	pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
+	Expect(pod2NodeNameErr).NotTo(HaveOccurred())
+	framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
+	Expect(pod2NodeName).To(Equal(config.node0.Name))
+
+	By("Reading in pod2")
+	testReadFileContent(volumeDir, testFile, testVol.hostDir, pod2)
+
+	By("Deleting pod2")
+	framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+}
 
 // podNode wraps RunKubectl to get node where pod is running
 func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
@@ -365,18 +400,23 @@ func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
 }
 
 // setupLocalVolume setups a directory to user for local PV
-func setupLocalVolume(config *localTestConfig) *localTestVolume {
+func setupLocalVolume(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
+
+	if localVolumeType == TmpfsLocalVolumeType {
+		createAndMountTmpfsLocalVolume(config, hostDir)
+	}
+
 	// populate volume with testFile containing testFileContent
 	writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent)
 	By(fmt.Sprintf("Creating local volume on node %q at path %q", config.node0.Name, hostDir))
-
 	err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 	return &localTestVolume{
-		node:    config.node0,
-		hostDir: hostDir,
+		node:            config.node0,
+		hostDir:         hostDir,
+		localVolumeType: localVolumeType,
 	}
 }
 
@@ -390,6 +430,10 @@ func cleanupLocalVolume(config *localTestConfig, volume *localTestVolume) {
 	errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
 	if len(errs) > 0 {
 		framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
+	}
+
+	if volume.localVolumeType == TmpfsLocalVolumeType {
+		unmountTmpfsLocalVolume(config, volume.hostDir)
 	}
 
 	By("Removing the test directory")
@@ -461,13 +505,40 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume) (*v1.Pod, 
 	return framework.CreatePod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "")
 }
 
+func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string) {
+	By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", config.node0.Name, dir))
+	err := framework.IssueSSHCommand(fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=1m tmpfs-%q %q", dir, dir, dir), framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func unmountTmpfsLocalVolume(config *localTestConfig, dir string) {
+	By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", config.node0.Name, dir))
+	err := framework.IssueSSHCommand(fmt.Sprintf("sudo umount %q", dir), framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+}
+
 // Create corresponding write and read commands
 // to be executed via SSH on the node with the local PV
 func createWriteAndReadCmds(testFileDir string, testFile string, writeTestFileContent string) (writeCmd string, readCmd string) {
-	testFilePath := filepath.Join(testFileDir, testFile)
-	writeCmd = fmt.Sprintf("mkdir -p %s; echo %s > %s", testFileDir, writeTestFileContent, testFilePath)
-	readCmd = fmt.Sprintf("cat %s", testFilePath)
+	writeCmd = createWriteCmd(testFileDir, testFile, writeTestFileContent)
+	readCmd = createReadCmd(testFileDir, testFile)
 	return writeCmd, readCmd
+}
+
+func createWriteCmd(testFileDir string, testFile string, writeTestFileContent string) string {
+	testFilePath := filepath.Join(testFileDir, testFile)
+	return fmt.Sprintf("mkdir -p %s; echo %s > %s", testFileDir, writeTestFileContent, testFilePath)
+}
+func createReadCmd(testFileDir string, testFile string) string {
+	testFilePath := filepath.Join(testFileDir, testFile)
+	return fmt.Sprintf("cat %s", testFilePath)
+}
+
+// Read testFile and evaluate whether it contains the testFileContent
+func testReadFileContent(testFileDir string, testFile string, testFileContent string, pod *v1.Pod) {
+	readCmd := createReadCmd(volumeDir, testFile)
+	readOut := podRWCmdExec(pod, readCmd)
+	Expect(readOut).To(ContainSubstring(testFileContent))
 }
 
 // Create command to verify that the file doesn't exist
@@ -487,9 +558,9 @@ func podRWCmdExec(pod *v1.Pod, cmd string) string {
 
 // Initialize test volume on node
 // and create local PVC and PV
-func setupLocalVolumePVCPV(config *localTestConfig, node *v1.Node) *localTestVolume {
+func setupLocalVolumePVCPV(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
 	By("Initializing test volume")
-	testVol := setupLocalVolume(config)
+	testVol := setupLocalVolume(config, localVolumeType)
 
 	By("Creating local PVC and PV")
 	createLocalPVCPV(config, testVol)
