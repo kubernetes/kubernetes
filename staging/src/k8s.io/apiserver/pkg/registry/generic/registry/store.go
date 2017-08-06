@@ -362,8 +362,9 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 		select {
 		case event, ok := <-ch:
 			if !ok {
-				// TODO: should we just expose the partially initialized object?
-				return nil, kubeerr.NewServerTimeout(e.QualifiedResource, "create", 0)
+				msg := fmt.Sprintf("server has timed out waiting for the initialization of %s %s",
+					e.QualifiedResource.String(), accessor.GetName())
+				return nil, kubeerr.NewTimeoutError(msg, 0)
 			}
 			switch event.Type {
 			case watch.Deleted:

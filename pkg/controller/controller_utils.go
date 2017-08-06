@@ -580,7 +580,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
-		return fmt.Errorf("unable to create pods: %v", err)
+		return err
 	} else {
 		accessor, err := meta.Accessor(object)
 		if err != nil {

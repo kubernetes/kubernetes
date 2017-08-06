@@ -466,6 +466,16 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 					Controller:         boolPtr(true),
 				}
 				err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
+				if err != nil && errors.IsTimeout(err) {
+					// Pod is created but its initialization has timed out.
+					// If the initialization is successful eventually, the
+					// controller will observe the creation via the informer.
+					// If the initialization fails, or if the pod keeps
+					// uninitialized for a long time, the informer will not
+					// receive any update, and the controller will create a new
+					// pod when the expectation expires.
+					return
+				}
 				if err != nil {
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
