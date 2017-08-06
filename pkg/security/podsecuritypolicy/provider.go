@@ -239,7 +239,8 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 
 	// TODO(tallclair): ValidatePodSecurityContext should be renamed to ValidatePod since its scope
 	// is not limited to the PodSecurityContext.
-	if len(pod.Spec.Volumes) > 0 && !psputil.PSPAllowsAllVolumes(s.psp) {
+	if len(pod.Spec.Volumes) > 0 {
+		allowsAllVolumeTypes := psputil.PSPAllowsAllVolumes(s.psp)
 		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
 		for i, v := range pod.Spec.Volumes {
 			fsType, err := psputil.GetVolumeFSType(v)
@@ -248,10 +249,19 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 				continue
 			}
 
-			if !allowedVolumes.Has(string(fsType)) {
+			if !allowsAllVolumeTypes && !allowedVolumes.Has(string(fsType)) {
 				allErrs = append(allErrs, field.Invalid(
 					field.NewPath("spec", "volumes").Index(i), string(fsType),
 					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
+				continue
+			}
+
+			if fsType == extensions.HostPath {
+				if !psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path) {
+					allErrs = append(allErrs, field.Invalid(
+						field.NewPath("spec", "volumes").Index(i).Child("hostPath", "pathPrefix"), v.HostPath.Path,
+						fmt.Sprintf("is not allowed to be used")))
+				}
 			}
 		}
 	}

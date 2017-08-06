@@ -9470,6 +9470,13 @@
      "allowPrivilegeEscalation": {
       "type": "boolean",
       "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation."
+     },
+     "allowedHostPaths": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AllowedHostPath"
+      },
+      "description": "AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used."
      }
     }
    },
@@ -9585,6 +9592,16 @@
        "$ref": "v1beta1.IDRange"
       },
       "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
+     }
+    }
+   },
+   "v1beta1.AllowedHostPath": {
+    "id": "v1beta1.AllowedHostPath",
+    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "PathPrefix is the path prefix that the host volume must match. PathPrefix does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
      }
     }
    },
