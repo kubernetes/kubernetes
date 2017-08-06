@@ -292,6 +292,17 @@ message LabelSelectorRequirement {
   repeated string values = 3;
 }
 
+// List holds a list of objects, which may not be known by the server.
+message List {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional ListMeta metadata = 1;
+
+  // List of objects
+  repeated k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
+}
+
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 message ListMeta {

@@ -165,6 +165,16 @@ func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_LabelSelectorRequirement
 }
 
+var map_List = map[string]string{
+	"":         "List holds a list of objects, which may not be known by the server.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "List of objects",
+}
+
+func (List) SwaggerDoc() map[string]string {
+	return map_List
+}
+
 var map_ListMeta = map[string]string{
 	"":                "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
 	"selfLink":        "SelfLink is a URL representing this object. Populated by the system. Read-only.",
