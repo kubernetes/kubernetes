@@ -150,9 +150,6 @@ func getFullIngestionPred(podsMap map[string]FiniteLoggingPod) NumberedIngestion
 	return func(name string, occ map[int]bool) (bool, error) {
 		p := podsMap[name]
 		ok := len(occ) == p.ExpectedLineCount()
-		if !ok {
-			framework.Logf("Pod %s is still missing %d lines", name, p.ExpectedLineCount()-len(occ))
-		}
 		return ok, nil
 	}
 }
@@ -160,24 +157,27 @@ func getFullIngestionPred(podsMap map[string]FiniteLoggingPod) NumberedIngestion
 func getFullIngestionTimeout(podsMap map[string]FiniteLoggingPod, slack float64) NumberedTimeoutFun {
 	return func(names []string, occs map[string]map[int]bool) error {
 		totalGot, totalWant := 0, 0
-		podsWithLosses := []string{}
+		lossMsgs := []string{}
 		for _, name := range names {
 			got := len(occs[name])
 			want := podsMap[name].ExpectedLineCount()
 			if got != want {
-				podsWithLosses = append(podsWithLosses, name)
+				lossMsg := fmt.Sprintf("%s: %d lines", name, want-got)
+				lossMsgs = append(lossMsgs, lossMsg)
 			}
 			totalGot += got
 			totalWant += want
 		}
-		if len(podsWithLosses) > 0 {
-			framework.Logf("Still missing logs from: %s", strings.Join(podsWithLosses, ", "))
+		if len(lossMsgs) > 0 {
+			framework.Logf("Still missing logs from:\n%s", strings.Join(lossMsgs, "\n"))
 		}
 		lostFrac := 1 - float64(totalGot)/float64(totalWant)
 		if lostFrac > slack {
 			return fmt.Errorf("still missing %.2f%% of logs, only %.2f%% is tolerable",
 				lostFrac*100, slack*100)
 		}
+		framework.Logf("Missing %.2f%% of logs, which is lower than the threshold %.2f%%",
+			lostFrac*100, slack*100)
 		return nil
 	}
 }
