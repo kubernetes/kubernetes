@@ -184,7 +184,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 		if !found {
 			continue
 		}
-		cgroups, err := cm.GetCgroupSubsystems()
+		cgroups, err := cm.GetCgroupSubsystems(nil)
 		if err != nil {
 			return err
 		}

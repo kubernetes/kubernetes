@@ -69,14 +69,15 @@ type ContainerManager interface {
 }
 
 type NodeConfig struct {
-	RuntimeCgroupsName    string
-	SystemCgroupsName     string
-	KubeletCgroupsName    string
-	ContainerRuntime      string
-	CgroupsPerQOS         bool
-	CgroupRoot            string
-	CgroupDriver          string
-	ProtectKernelDefaults bool
+	RuntimeCgroupsName      string
+	SystemCgroupsName       string
+	KubeletCgroupsName      string
+	ExcludeCgroupSubsystems []string
+	ContainerRuntime        string
+	CgroupsPerQOS           bool
+	CgroupRoot              string
+	CgroupDriver            string
+	ProtectKernelDefaults   bool
 	NodeAllocatableConfig
 	ExperimentalQOSReserved map[v1.ResourceName]int64
 }

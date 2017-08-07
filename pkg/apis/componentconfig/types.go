@@ -322,6 +322,9 @@ type KubeletConfiguration struct {
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	// +optional
 	KubeletCgroups string
+	// Kubelet won't create cgroups in hierarchies with these subsystems attached.
+	// +optional
+	ExcludeCgroupSubsystems []string
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.

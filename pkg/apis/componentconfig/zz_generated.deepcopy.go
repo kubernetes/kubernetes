@@ -428,6 +428,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	if in.ExcludeCgroupSubsystems != nil {
+		in, out := &in.ExcludeCgroupSubsystems, &out.ExcludeCgroupSubsystems
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.RegisterWithTaints != nil {
 		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
