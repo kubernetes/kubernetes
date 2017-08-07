@@ -327,7 +327,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name)
+			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, conditions.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -425,72 +425,60 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		}
 		return err
 	})
+
+	// Fix generic not found error.
+	if err != nil && errors.IsNotFound(err) {
+		err = errors.NewNotFound(api.Resource("pods"), name)
+	}
+
 	return result, err
 }
 
-func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
-
-	// fix generic not found error with empty name in PodRunningAndReady
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
-func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
-
-	// fix generic not found error with empty name in PodCompleted
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
 func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
-	pod, err := waitForPodRunning(podClient, ns, name)
+	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
+
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		return logOpts(f, pod, opts)
+	}
+
+	opts.PodClient = podClient
+	opts.PodName = name
+	opts.Namespace = ns
+
+	// opts.Run sets opts.Err to nil
+	save := opts.Err
+	err = opts.Run()
+	opts.Err = save
+	if err != nil {
+		return logOpts(f, pod, opts)
+	}
+
+	return nil
+}
+
+// logOpts logs output from opts to the pods log.
+func logOpts(f cmdutil.Factory, pod *api.Pod, opts *AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
 	}
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
+
+	req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	if err != nil {
 		return err
 	}
 
-	opts.PodClient = podClient
+	readCloser, err := req.Stream()
+	if err != nil {
+		return err
+	}
+	defer readCloser.Close()
 
-	opts.PodName = name
-	opts.Namespace = ns
-	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
-	stderr := opts.Err
-	if err := opts.Run(); err != nil {
-		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
+	_, err = io.Copy(opts.Out, readCloser)
+	if err != nil {
 		return err
 	}
 	return nil
