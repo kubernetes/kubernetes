@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package monitoring
 
 import (
 	"strings"
@@ -22,17 +22,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	gin "github.com/onsi/ginkgo"
+	gom "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("MetricsGrabber", func() {
+var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
 	var c clientset.Interface
 	var grabber *metrics.MetricsGrabber
-	BeforeEach(func() {
+	gin.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
 		framework.ExpectNoError(err)
@@ -40,24 +41,24 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 		framework.ExpectNoError(err)
 	})
 
-	It("should grab all metrics from API server.", func() {
-		By("Connecting to /metrics endpoint")
+	gin.It("should grab all metrics from API server.", func() {
+		gin.By("Connecting to /metrics endpoint")
 		response, err := grabber.GrabFromApiServer()
 		framework.ExpectNoError(err)
-		Expect(response).NotTo(BeEmpty())
+		gom.Expect(response).NotTo(gom.BeEmpty())
 	})
 
-	It("should grab all metrics from a Kubelet.", func() {
-		By("Proxying to Node through the API server")
+	gin.It("should grab all metrics from a Kubelet.", func() {
+		gin.By("Proxying to Node through the API server")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(nodes.Items).NotTo(BeEmpty())
+		gom.Expect(nodes.Items).NotTo(gom.BeEmpty())
 		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
 		framework.ExpectNoError(err)
-		Expect(response).NotTo(BeEmpty())
+		gom.Expect(response).NotTo(gom.BeEmpty())
 	})
 
-	It("should grab all metrics from a Scheduler.", func() {
-		By("Proxying to Pod through the API server")
+	gin.It("should grab all metrics from a Scheduler.", func() {
+		gin.By("Proxying to Pod through the API server")
 		// Check if master Node is registered
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -74,11 +75,11 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 		}
 		response, err := grabber.GrabFromScheduler()
 		framework.ExpectNoError(err)
-		Expect(response).NotTo(BeEmpty())
+		gom.Expect(response).NotTo(gom.BeEmpty())
 	})
 
-	It("should grab all metrics from a ControllerManager.", func() {
-		By("Proxying to Pod through the API server")
+	gin.It("should grab all metrics from a ControllerManager.", func() {
+		gin.By("Proxying to Pod through the API server")
 		// Check if master Node is registered
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -95,6 +96,6 @@ var _ = framework.KubeDescribe("MetricsGrabber", func() {
 		}
 		response, err := grabber.GrabFromControllerManager()
 		framework.ExpectNoError(err)
-		Expect(response).NotTo(BeEmpty())
+		gom.Expect(response).NotTo(gom.BeEmpty())
 	})
 })
