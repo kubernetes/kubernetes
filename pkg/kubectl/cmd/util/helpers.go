@@ -606,7 +606,7 @@ func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
 func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
 	foundPair := false
 	for _, s := range args {
-		nonResource := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		nonResource := (strings.Contains(s, "=") && s[0] != '=') || (strings.HasSuffix(s, "-") && s != "-")
 		switch {
 		case !foundPair && nonResource:
 			foundPair = true
@@ -632,7 +632,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	var invalidBuf bytes.Buffer
 	var invalidBufNonEmpty bool
 	for _, pairArg := range pairArgs {
-		if strings.Contains(pairArg, "=") {
+		if strings.Contains(pairArg, "=") && pairArg[0] != '=' {
 			parts := strings.SplitN(pairArg, "=", 2)
 			if len(parts) != 2 {
 				if invalidBufNonEmpty {
@@ -643,7 +643,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 			} else {
 				newPairs[parts[0]] = parts[1]
 			}
-		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
+		} else if supportRemove && strings.HasSuffix(pairArg, "-") && pairArg != "-" {
 			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
 		} else {
 			if invalidBufNonEmpty {
