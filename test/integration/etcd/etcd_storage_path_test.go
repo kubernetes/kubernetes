@@ -133,7 +133,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta1
 	gvr("apps", "v1beta1", "statefulsets"): {
-		stub:             `{"metadata": {"name": "ss1"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		stub:             `{"metadata": {"name": "ss1"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss1",
 	},
 	gvr("apps", "v1beta1", "deployments"): {
@@ -149,7 +149,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
 	gvr("apps", "v1beta2", "statefulsets"): {
-		stub:             `{"metadata": {"name": "ss2"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		stub:             `{"metadata": {"name": "ss2"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss2",
 		expectedGVK:      gvkP("apps", "v1beta1", "StatefulSet"),
 	},
