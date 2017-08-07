@@ -141,7 +141,7 @@ type NodeTestContextType struct {
 
 type CloudConfig struct {
 	ProjectID         string
-	Zone              string
+	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
 	MultiZone         bool
 	Cluster           string

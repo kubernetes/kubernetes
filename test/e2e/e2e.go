@@ -84,11 +84,23 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
+
+		gceCloud, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
+		}
+
+		cloudConfig.Provider = gceCloud
+
+		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZones()
+			if err != nil {
+				return err
+			}
+
+			cloudConfig.Zone, _ = zones.PopAny()
 		}
 
 	case "aws":
