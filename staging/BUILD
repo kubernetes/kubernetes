@@ -119,6 +119,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/union:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:all-srcs",
