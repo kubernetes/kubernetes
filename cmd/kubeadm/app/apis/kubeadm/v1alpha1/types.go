@@ -38,11 +38,6 @@ type MasterConfiguration struct {
 	Token    string        `json:"token"`
 	TokenTTL time.Duration `json:"tokenTTL"`
 
-	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
-	// controller manager are managed by Kubernetes itself. This option is likely to
-	// become the default in the future.
-	SelfHosted bool `json:"selfHosted"`
-
 	APIServerExtraArgs         map[string]string `json:"apiServerExtraArgs"`
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs"`
 	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs"`
