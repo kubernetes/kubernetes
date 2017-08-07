@@ -100,6 +100,8 @@ type VolumeTestConfig struct {
 	ServerNodeName string
 	// ClientNodeName is the spec.nodeName to run client pod on.  Default is any node.
 	ClientNodeName string
+	// NodeSelector to use in pod spec (server, client and injector pods).
+	NodeSelector map[string]string
 }
 
 // VolumeTest contains a volume to mount into a client pod and its
@@ -286,6 +288,7 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 			Volumes:       volumes,
 			RestartPolicy: restartPolicy,
 			NodeName:      config.ServerNodeName,
+			NodeSelector:  config.NodeSelector,
 		},
 	}
 
@@ -390,8 +393,9 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 					Level: "s0:c0,c1",
 				},
 			},
-			Volumes:  []v1.Volume{},
-			NodeName: config.ClientNodeName,
+			Volumes:      []v1.Volume{},
+			NodeName:     config.ClientNodeName,
+			NodeSelector: config.NodeSelector,
 		},
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
@@ -476,6 +480,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 					VolumeSource: volume,
 				},
 			},
+			NodeSelector: config.NodeSelector,
 		},
 	}
 
