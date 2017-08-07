@@ -448,12 +448,14 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	opts.PodName = name
 	opts.Namespace = ns
 
-	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
-	stderr := opts.Err
-	if err := opts.Run(); err != nil {
-		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
+	// opts.Run sets opts.Err to nil
+	save := opts.Err
+	err = opts.Run()
+	opts.Err = save
+	if err != nil {
 		return logOpts(f, pod, opts)
 	}
+
 	return nil
 }
 
