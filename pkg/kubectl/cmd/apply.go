@@ -526,16 +526,16 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 	if err != nil {
 		return err
 	}
+	var options *metav1.DeleteOptions
+	if gracePeriod >= 0 {
+		options = metav1.NewDeleteOptions(int64(gracePeriod))
+	}
 	r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs)
 	if err != nil {
 		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
 			return err
 		}
-		return resource.NewHelper(c, mapping).Delete(namespace, name)
-	}
-	var options *metav1.DeleteOptions
-	if gracePeriod >= 0 {
-		options = metav1.NewDeleteOptions(int64(gracePeriod))
+		return resource.NewHelper(c, mapping).DeleteWithOptions(namespace, name, options)
 	}
 	if err := r.Stop(namespace, name, 2*time.Minute, options); err != nil {
 		return err

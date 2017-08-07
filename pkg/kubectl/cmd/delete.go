@@ -259,7 +259,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				// No client side reaper found. Let the server do cascading deletion.
-				return cascadingDeleteResource(info, out, shortOutput, mapper)
+				return cascadingDeleteResource(info, out, gracePeriod, shortOutput, mapper)
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -313,9 +313,13 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 	return nil
 }
 
-func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool, mapper meta.RESTMapper) error {
+func cascadingDeleteResource(info *resource.Info, out io.Writer, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	if gracePeriod >= 0 {
+		period := int64(gracePeriod)
+		deleteOptions.GracePeriodSeconds = &period
+	}
 	return deleteResource(info, out, shortOutput, mapper, deleteOptions)
 }
 
