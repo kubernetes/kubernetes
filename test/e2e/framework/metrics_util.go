@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/system"
-	"k8s.io/kubernetes/test/e2e/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"

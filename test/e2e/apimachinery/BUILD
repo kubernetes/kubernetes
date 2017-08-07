@@ -28,7 +28,7 @@ go_library(
         "//pkg/util/version:go_default_library",
         "//test/e2e/apps:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/metrics:go_default_library",
+        "//test/e2e/framework/metrics:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

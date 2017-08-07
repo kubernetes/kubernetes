@@ -813,13 +813,13 @@ test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/framework
+test/e2e/framework/metrics
 test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
 test/e2e/kubectl
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
-test/e2e/metrics
 test/e2e/network
 test/e2e/node
 test/e2e/scalability
