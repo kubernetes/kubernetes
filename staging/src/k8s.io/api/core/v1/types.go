@@ -2114,9 +2114,7 @@ type NodeSelectorTerm struct {
 // that relates the key and values.
 type NodeSelectorRequirement struct {
 	// The label key that the selector applies to.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
 	Operator NodeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=NodeSelectorOperator"`
@@ -2302,9 +2300,7 @@ type PreferredSchedulingTerm struct {
 // any pod that does not tolerate the Taint.
 type Taint struct {
 	// Required. The taint key to be applied to a node.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Required. The taint value corresponding to the taint key.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
@@ -2346,9 +2342,7 @@ type Toleration struct {
 	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
