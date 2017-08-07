@@ -10,7 +10,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["group_adder_test.go"],
+    srcs = [
+        "group_adder_test.go",
+        "token_group_adder_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -24,6 +27,7 @@ go_library(
     srcs = [
         "authenticated_group_adder.go",
         "group_adder.go",
+        "token_group_adder.go",
     ],
     tags = ["automanaged"],
     deps = [
