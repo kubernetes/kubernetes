@@ -42,6 +42,7 @@ var (
 
 		   * deployments
 		   * daemonsets
+		   * statefulsets
 		`)
 )
 
