@@ -34,12 +34,12 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with ControllerRevision objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &apps.ControllerRevision{} },
-		NewListFunc:       func() runtime.Object { return &apps.ControllerRevisionList{} },
-		PredicateFunc:     controllerrevision.MatchControllerRevision,
-		QualifiedResource: apps.Resource("controllerrevisions"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("controllerrevisions"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &apps.ControllerRevision{} },
+		NewListFunc:              func() runtime.Object { return &apps.ControllerRevisionList{} },
+		PredicateFunc:            controllerrevision.MatchControllerRevision,
+		DefaultQualifiedResource: apps.Resource("controllerrevisions"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("controllerrevisions"),
 
 		CreateStrategy: controllerrevision.Strategy,
 		UpdateStrategy: controllerrevision.Strategy,

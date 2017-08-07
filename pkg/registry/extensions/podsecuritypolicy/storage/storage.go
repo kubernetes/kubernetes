@@ -34,12 +34,12 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against PodSecurityPolicy objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.PodSecurityPolicy{} },
-		NewListFunc:       func() runtime.Object { return &extensions.PodSecurityPolicyList{} },
-		PredicateFunc:     podsecuritypolicy.MatchPodSecurityPolicy,
-		QualifiedResource: extensions.Resource("podsecuritypolicies"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("podsecuritypolicies"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &extensions.PodSecurityPolicy{} },
+		NewListFunc:              func() runtime.Object { return &extensions.PodSecurityPolicyList{} },
+		PredicateFunc:            podsecuritypolicy.MatchPodSecurityPolicy,
+		DefaultQualifiedResource: extensions.Resource("podsecuritypolicies"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("podsecuritypolicies"),
 
 		CreateStrategy:      podsecuritypolicy.Strategy,
 		UpdateStrategy:      podsecuritypolicy.Strategy,

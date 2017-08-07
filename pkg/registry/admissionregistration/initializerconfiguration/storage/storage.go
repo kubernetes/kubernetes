@@ -40,9 +40,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.InitializerConfiguration).Name, nil
 		},
-		PredicateFunc:     initializerconfiguration.MatchInitializerConfiguration,
-		QualifiedResource: admissionregistration.Resource("initializerconfigurations"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("initializerconfigurations"),
+		PredicateFunc:            initializerconfiguration.MatchInitializerConfiguration,
+		DefaultQualifiedResource: admissionregistration.Resource("initializerconfigurations"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("initializerconfigurations"),
 
 		CreateStrategy: initializerconfiguration.Strategy,
 		UpdateStrategy: initializerconfiguration.Strategy,

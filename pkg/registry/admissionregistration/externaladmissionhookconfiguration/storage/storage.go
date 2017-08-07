@@ -40,9 +40,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ExternalAdmissionHookConfiguration).Name, nil
 		},
-		PredicateFunc:     externaladmissionhookconfiguration.MatchExternalAdmissionHookConfiguration,
-		QualifiedResource: admissionregistration.Resource("externaladmissionhookconfigurations"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("externaladmissionhookconfigurations"),
+		PredicateFunc:            externaladmissionhookconfiguration.MatchExternalAdmissionHookConfiguration,
+		DefaultQualifiedResource: admissionregistration.Resource("externaladmissionhookconfigurations"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("externaladmissionhookconfigurations"),
 
 		CreateStrategy: externaladmissionhookconfiguration.Strategy,
 		UpdateStrategy: externaladmissionhookconfiguration.Strategy,
