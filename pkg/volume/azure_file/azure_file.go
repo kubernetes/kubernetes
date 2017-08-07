@@ -210,38 +210,6 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	/*
-		if runtime.GOOS == "windows" {
-			source := fmt.Sprintf("\\\\%s.file.%s\\%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
-			mountCmd := "net"
-			mountArgs := []string{"use", "*", source, fmt.Sprintf("/u:AZURE\\%s", accountName), accountKey, "/p:yes"}
-			fmt.Printf("Mounting cmd (%s) with arguments (%s)\n", mountCmd, mountArgs)
-			output, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
-			if err != nil {
-				fmt.Printf("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
-			} else {
-				fmt.Printf("Mount succeeded, output: %s", output)
-
-				parent := "c:\\mnt"
-				dir := "c:\\mnt\\test"
-				err := os.MkdirAll(parent, 0700)
-				if err != nil {
-					fmt.Printf("mkdir failed: %v\nmkdir command: %s\n", err, mountCmd)
-				} else {
-					fmt.Printf("mkdir succeeded\n")
-				}
-
-				output, err := exec.Command("cmd", "/c", "mklink", "/D", dir, source).CombinedOutput()
-				if err != nil {
-					fmt.Printf("mklink failed: %v\n", err)
-				} else {
-					fmt.Printf("mklink succeeded, output: %s", output)
-				}
-			}
-			return nil
-		}
-	*/
-
 	mountOptions := []string{}
 	source := ""
 

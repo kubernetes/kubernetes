@@ -1,7 +1,7 @@
 // +build windows
 
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,9 +31,8 @@ type Mounter struct {
 }
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	glog.Infof("Empty mount source (%s), target (%s), fstype (%s), options (%s)\n", source, target, fstype, options)
 	if source == "tmpfs" || len(target) < 3 {
-		glog.Infof("Skip mounting source (%s), target (%s)\n, with arguments (%s)", source, target, options)
+		glog.Infof("Skip mounting source (%s), target (%s)\n, with arguments (%s) in windows", source, target, options)
 		return nil
 	}
 
@@ -46,29 +45,35 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		glog.Infof("mkdir(%s) failed: %v\n", parentDir, err)
 		return err
 	}
-	glog.Infof("mkdir(%s) succeeded.\n", parentDir)
 
-	mountCmd := "net"
-	glog.Infof("Mounting cmd (%s) with arguments (%s), source (%s), target (%s)\n", mountCmd, options, source, target)
-	output, err := exec.Command(mountCmd, options...).CombinedOutput()
-	if err != nil {
-		glog.Infof("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
-		return err
-	}
-	glog.Infof("Mount succeeded, output: %s", output)
+	/*
+		Comment below code since in Windows Server 2016 RS3, there will be new cmdlet(New-SmbGlobalMapping) to replace "net use"
+		mountCmd := "net"
+		glog.Infof("Mounting cmd (%s) with arguments (%s), source (%s), target (%s)\n", mountCmd, options, source, target)
+		output, err := exec.Command(mountCmd, options...).CombinedOutput()
+		if err != nil {
+			glog.Infof("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
+			return err
+		}
+		glog.Infof("Mount succeeded, output: %s", output)
+	*/
 
-	output, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
+	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
 	if err != nil {
 		glog.Infof("mklink failed: %v\n", err)
-	} else {
-		glog.Infof("mklink succeeded, output: %s", output)
 	}
 
 	return nil
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	glog.Infof("Empty Unmount target (%s)\n", target)
+	glog.Infof("Unmount target (%s)\n", target)
+	output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput()
+	if err != nil {
+		glog.Infof("Unmount failed: %v\n", err)
+	} else {
+		glog.Infof("Unmount succeeded, output: %s", output)
+	}
 	return nil
 }
 
@@ -89,7 +94,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", nil
+	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
 }
 
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
