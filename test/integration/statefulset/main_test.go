@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta2
+package statefulset
 
-type DaemonSetExpansion interface{}
+import (
+	"testing"
 
-type DeploymentExpansion interface{}
+	"k8s.io/kubernetes/test/integration/framework"
+)
 
-type ReplicaSetExpansion interface{}
-
-type StatefulSetExpansion interface{}
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
+}
