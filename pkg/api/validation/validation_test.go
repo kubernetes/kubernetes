@@ -3631,6 +3631,21 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy:          "IfNotPresent",
 			},
 		},
+		"Resource GPU invalid setting only request": {
+			{
+				Name:  "gpu-resource-request-limit",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
 		"Request limit simple invalid": {
 			{
 				Name:  "abc-123",
