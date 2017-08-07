@@ -70,6 +70,8 @@ type StrategicMergePatchTestCaseData struct {
 	// TwoWayResult is the expected object after applying the two-way patch on current object.
 	// If nil, Modified is used.
 	TwoWayResult map[string]interface{}
+	// ExpectedError is the string that the error message should contain
+	ExpectedError string
 }
 
 // The meaning of each field is the same as StrategicMergePatchTestCaseData's.
@@ -90,6 +92,7 @@ type MergeItem struct {
 	Value                 string
 	Other                 string
 	MergingList           []MergeItem `patchStrategy:"merge" patchMergeKey:"name"`
+	MergingListTwoMK      []MergeItem `patchStrategy:"merge" patchMergeKey:"name,value"`
 	NonMergingList        []MergeItem
 	MergingIntList        []int `patchStrategy:"merge"`
 	NonMergingIntList     []int
@@ -127,6 +130,27 @@ testCases:
         - name: 1
         - name: 2
         - name: 3
+  - description: sort one multiMK list of maps
+    original:
+      MergingListTwoMK:
+        - name: 2
+          value: 1
+        - name: 1
+          value: 2
+        - name: 1
+          value: 1
+        - name: 2
+          value: 2
+    sorted:
+      MergingListTwoMK:
+        - name: 1
+          value: 1
+        - name: 1
+          value: 2
+        - name: 2
+          value: 1
+        - name: 2
+          value: 2
   - description: sort lists of maps but not nested lists of maps
     original:
       mergingList:
@@ -537,6 +561,16 @@ testCases:
         - 2
         - 3
         - 1
+  - description: not all merge keys presents
+    original:
+      mergingListTwoMK:
+        - name: 1
+          value: a
+    twoWay:
+      mergingListTwoMK:
+        - name: 1
+          other: x
+    expectedError: does not contain declared merge key
 `)
 
 var customStrategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
@@ -613,7 +647,7 @@ mergingList:
 		},
 	},
 	{
-		Description: "$setElementOrder contains item that is not present in the int list to be merged",
+		Description: "order in patch and $setElementOrder doesn't match",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
 mergingIntList:
@@ -645,7 +679,7 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 
 	for _, c := range tc.TestCases {
 		original, expectedTwoWayPatch, _, expectedResult := twoWayTestCaseToJSONOrFail(t, c)
-		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, "")
+		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, c.ExpectedError)
 	}
 
 	for _, c := range customStrategicMergePatchRawTestCases {
@@ -1109,6 +1143,7 @@ testCases:
       other: c
       retainKeysMap:
         name: foo
+
 `)
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
@@ -5969,6 +6004,577 @@ retainKeysMergingList:
 `),
 		},
 	},
+	{
+		Description: "add field to map in merging list with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: {}
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: {}
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list with 2 merge keys with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: {}
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "delete field to map in merging list with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: null
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: null
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "delete field to map in merging list with 2 merge keys with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    simpleMap: null
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: null
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "change field to map in merging list with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+    simpleMap: {}
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "change field to map in merging list with 2 merge keys with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    nonMergingIntList:
+      - 1
+  - name: 1
+    value: b
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+    nonMergingIntList:
+      - 2
+  - name: 1
+    value: b
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+    nonMergingIntList:
+      - 1
+  - name: 1
+    value: b
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+    nonMergingIntList:
+      - 1
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: y
+    nonMergingIntList:
+      - 1
+  - name: 1
+    value: b
+`),
+		},
+	},
+	{
+		Description: "add an item in merging list with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: c
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: c
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+    other: y
+  - name: 1
+    value: c
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+  - name: 1
+    value: c
+mergingListTwoMK:
+  - name: 1
+    value: b
+    other: y
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+  - name: 1
+    value: c
+mergingListTwoMK:
+  - name: 1
+    value: b
+    other: y
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+    other: y
+  - name: 1
+    value: c
+`),
+		},
+	},
+	{
+		Description: "delete an item in merging list with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: b
+    other: y
+  - name: 1
+    value: c
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+    other: y
+  - name: 1
+    value: c
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: c
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: c
+mergingListTwoMK:
+  - name: 1
+    value: b
+    $patch: delete
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 1
+    value: a
+  - name: 1
+    value: c
+mergingListTwoMK:
+  - name: 1
+    value: b
+    $patch: delete
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: c
+`),
+		},
+	},
+	{
+		Description: "setElementOrder with 2 merge keys",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+    other: y
+  - name: 2
+    value: a
+`),
+			Current: []byte(`
+mergingListTwoMK:
+  - name: 1
+    value: a
+    other: x
+  - name: 1
+    value: b
+    other: y
+    simpleMap: {}
+  - name: 2
+    value: a
+`),
+			Modified: []byte(`
+mergingListTwoMK:
+  - name: 2
+    value: a
+  - name: 1
+    value: b
+    other: y
+  - name: 1
+    value: a
+    other: x
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 2
+    value: a
+  - name: 1
+    value: b
+  - name: 1
+    value: a
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingListTwoMK:
+  - name: 2
+    value: a
+  - name: 1
+    value: b
+  - name: 1
+    value: a
+`),
+			Result: []byte(`
+mergingListTwoMK:
+  - name: 2
+    value: a
+  - name: 1
+    value: b
+    other: y
+    simpleMap: {}
+  - name: 1
+    value: a
+    other: x
+`),
+		},
+	},
 }
 
 func TestStrategicMergePatch(t *testing.T) {
@@ -6025,7 +6631,7 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expectedPatch, actualPatch, c.Description)
-	testPatchApplication(t, original, actualPatch, expectedResult, c.Description, "")
+	testPatchApplication(t, original, actualPatch, expectedResult, c.Description, c.ExpectedError)
 }
 
 func testTwoWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
@@ -6089,7 +6695,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 			}
 
 			testPatchCreation(t, expected, actual, c.Description)
-			testPatchApplication(t, current, actual, result, c.Description, "")
+			testPatchApplication(t, current, actual, result, c.Description, c.ExpectedError)
 		}
 
 		return
@@ -6102,7 +6708,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, current, actual, result, c.Description, "")
+	testPatchApplication(t, current, actual, result, c.Description, c.ExpectedError)
 }
 
 func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
