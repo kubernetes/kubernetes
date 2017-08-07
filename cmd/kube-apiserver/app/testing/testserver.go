@@ -106,7 +106,7 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 		default:
 		}
 
-		result := client.CoreV1Client.RESTClient().Get().AbsPath("/healthz").Do()
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {

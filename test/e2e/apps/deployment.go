@@ -132,7 +132,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		d := deployments.Items[i]
 
 		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c)
+		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.ExtensionsV1beta1())
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
 			return
@@ -186,7 +186,7 @@ func checkDeploymentRevision(c clientset.Interface, ns, deploymentName, revision
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	// Check revision of the new replica set of this deployment
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nilRs))
 	Expect(newRS.Annotations).NotTo(Equal(nil))
@@ -268,7 +268,7 @@ func testDeleteDeployment(f *framework.Framework) {
 
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nilRs))
 	stopDeployment(c, internalClient, ns, deploymentName)
@@ -318,7 +318,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	framework.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c)
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(allOldRSs)).Should(Equal(1))
 	// The old RS should contain pod-template-hash in its selector, label, and template label
@@ -542,7 +542,7 @@ func testPausedDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that there is no latest state realized for the new deployment.
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(rs).To(Equal(nilRs))
 
@@ -594,11 +594,11 @@ func testPausedDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Looking for new replicaset for paused deployment %q (there should be none)", deploymentName)
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).To(Equal(nilRs))
 
-	_, allOldRs, err := deploymentutil.GetOldReplicaSets(deployment, c)
+	_, allOldRs, err := deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	if len(allOldRs) != 1 {
 		err = fmt.Errorf("expected an old replica set")
@@ -887,7 +887,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	// There should be no old RSs (overlapping RS)
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(oldRSs)).Should(Equal(0))
 	Expect(len(allOldRSs)).Should(Equal(0))
@@ -951,7 +951,7 @@ func testScalePausedDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(*(rs.Spec.Replicas)).Should(Equal(newReplicas))
 }
@@ -985,7 +985,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment %q to complete", deployment.Name)
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
-	first, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	first, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
@@ -1007,7 +1007,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	framework.Logf("Checking that the replica sets for %q are synced", deploymentName)
-	second, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	second, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	first, err = c.Extensions().ReplicaSets(first.Namespace).Get(first.Name, metav1.GetOptions{})
@@ -1035,7 +1035,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
-	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, rs := range append(oldRSs, rs) {
@@ -1070,7 +1070,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	oldRs, err := c.Extensions().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	oldCond := replicaSetHasDesiredReplicas(c.Extensions(), oldRs)
@@ -1095,7 +1095,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))
 	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
-	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c)
+	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, rs := range append(oldRSs, rs) {
@@ -1433,7 +1433,7 @@ func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
 	// once it has no owner reference, then recreate the Deployment if we ever proceed with
 	// https://github.com/kubernetes/kubernetes/issues/44237
 	framework.Logf("Mock a hash collision")
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
+	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	var nilRs *extensions.ReplicaSet
 	Expect(newRS).NotTo(Equal(nilRs))

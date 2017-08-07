@@ -426,7 +426,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 	var err error
 
 	if len(actual) != len(expected) {
-		t.Fatalf("expected %d, got %d", len(expected), len(actual))
+		t.Fatalf("expected %d, but actual %d", len(expected), len(actual))
 	}
 	for i, obj := range actual {
 		switch obj.(type) {
@@ -443,7 +443,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 			t.Fatal(err)
 		}
 		if !apiequality.Semantic.DeepEqual(expected[i], actualObj) {
-			t.Errorf("unexpected object: %d \n%#v\n%#v", i, expected[i], actualObj)
+			t.Errorf("expected object: %#v, but actualObj:%#v\n", expected[i], actualObj)
 		}
 	}
 }
@@ -590,7 +590,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -629,7 +629,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -675,7 +675,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(actualBytes) != string(expectedBytes) {
-		t.Errorf("unexpected object:\n%s\n%s", expectedBytes, actualBytes)
+		t.Errorf("expectedBytes: %s,but actualBytes: %s", expectedBytes, actualBytes)
 	}
 }
 
@@ -689,7 +689,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -697,7 +697,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -746,7 +746,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 			case "/namespaces/test/services/bar":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -879,7 +879,7 @@ func TestWatchSelector(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -889,7 +889,7 @@ func TestWatchSelector(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -929,10 +929,10 @@ func TestWatchResource(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -971,10 +971,10 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -1014,10 +1014,10 @@ func TestWatchOnlyResource(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -1063,7 +1063,7 @@ func TestWatchOnlyList(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),

@@ -816,7 +816,18 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
-			if err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, newControllerRef(ds)); err != nil {
+			err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, newControllerRef(ds))
+			if err != nil && errors.IsTimeout(err) {
+				// Pod is created but its initialization has timed out.
+				// If the initialization is successful eventually, the
+				// controller will observe the creation via the informer.
+				// If the initialization fails, or if the pod keeps
+				// uninitialized for a long time, the informer will not
+				// receive any update, and the controller will create a new
+				// pod when the expectation expires.
+				return
+			}
+			if err != nil {
 				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 				dsc.expectations.CreationObserved(dsKey)
 				errCh <- err

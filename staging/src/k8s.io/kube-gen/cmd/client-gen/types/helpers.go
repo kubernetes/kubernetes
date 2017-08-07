@@ -91,11 +91,12 @@ func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
 		defaultVersion := defaultVersion(group.Versions)
 		for _, version := range group.Versions {
 			groupVersionPackages = append(groupVersionPackages, GroupVersionPackage{
-				Group:            Group(namer.IC(group.Group.NonEmpty())),
-				Version:          Version(namer.IC(version.String())),
-				GroupVersion:     namer.IC(group.Group.NonEmpty()) + namer.IC(version.String()),
-				PackageName:      strings.ToLower(group.Group.NonEmpty() + version.NonEmpty()),
-				IsDefaultVersion: version == defaultVersion && version != "",
+				Group:                 Group(namer.IC(group.Group.NonEmpty())),
+				Version:               Version(namer.IC(version.String())),
+				GroupVersion:          namer.IC(group.Group.NonEmpty()) + namer.IC(version.String()),
+				LowerCaseGroupVersion: namer.IL(group.Group.NonEmpty()) + namer.IC(version.String()),
+				PackageName:           strings.ToLower(group.Group.NonEmpty() + version.NonEmpty()),
+				IsDefaultVersion:      version == defaultVersion && version != "",
 			})
 		}
 	}

@@ -147,7 +147,7 @@ func main() {
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
 			internalClientset,
-			client.Core(),
+			client.CoreV1(),
 			iptInterface,
 			sysctl,
 			execer,

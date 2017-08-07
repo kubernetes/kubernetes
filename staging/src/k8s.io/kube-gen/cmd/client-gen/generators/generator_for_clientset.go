@@ -70,7 +70,6 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	allGroups := clientgentypes.ToGroupVersionPackages(g.groups)
-
 	m := map[string]interface{}{
 		"allGroups":                            allGroups,
 		"Config":                               c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
@@ -116,7 +115,7 @@ var clientsetTemplate = `
 // version included in a Clientset.
 type Clientset struct {
 	*$.DiscoveryClient|raw$
-    $range .allGroups$*$.PackageName$.$.GroupVersion$Client
+    $range .allGroups$$.LowerCaseGroupVersion$ *$.PackageName$.$.GroupVersion$Client
     $end$
 }
 `
@@ -124,7 +123,7 @@ type Clientset struct {
 var clientsetInterfaceImplTemplate = `
 // $.GroupVersion$ retrieves the $.GroupVersion$Client
 func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
-	return c.$.GroupVersion$Client
+	return c.$.LowerCaseGroupVersion$
 }
 `
 
@@ -132,7 +131,7 @@ var clientsetInterfaceDefaultVersionImpl = `
 // Deprecated: $.Group$ retrieves the default version of $.Group$Client.
 // Please explicitly pick a version.
 func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
-	return c.$.GroupVersion$Client
+	return c.$.LowerCaseGroupVersion$
 }
 `
 
@@ -155,7 +154,7 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-$range .allGroups$    cs.$.GroupVersion$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
+$range .allGroups$    cs.$.LowerCaseGroupVersion$, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
 		return nil, err
 	}
@@ -174,7 +173,7 @@ var newClientsetForConfigOrDieTemplate = `
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
 	var cs Clientset
-$range .allGroups$    cs.$.GroupVersion$Client =$.PackageName$.NewForConfigOrDie(c)
+$range .allGroups$    cs.$.LowerCaseGroupVersion$ =$.PackageName$.NewForConfigOrDie(c)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
 	return &cs
@@ -185,7 +184,7 @@ var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
 func New(c $.RESTClientInterface|raw$) *Clientset {
 	var cs Clientset
-$range .allGroups$    cs.$.GroupVersion$Client =$.PackageName$.New(c)
+$range .allGroups$    cs.$.LowerCaseGroupVersion$ =$.PackageName$.New(c)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs
