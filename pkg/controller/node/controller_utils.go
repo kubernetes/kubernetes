@@ -303,7 +303,7 @@ func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintTo
 	}
 	glog.V(4).Infof("Added %v Taint to Node %v", taintToAdd, node.Name)
 
-	err = controller.RemoveTaintOffNode(kubeClient, node.Name, taintToRemove, node)
+	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintToRemove)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
