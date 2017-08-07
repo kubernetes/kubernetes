@@ -215,11 +215,7 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if volume.Status != VolumeAvailableStatus {
-		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
-		glog.Errorf(errmsg)
-		return "", errors.New(errmsg)
-	}
+
 	cClient, err := os.NewComputeV2()
 	if err != nil {
 		return "", err
@@ -258,6 +254,12 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	if err != nil {
 		return err
 	}
+	if volume.Status == VolumeAvailableStatus {
+		// "available" is fine since that means the volume is detached from instance already.
+		glog.V(2).Infof("volume: %s has been detached from compute: %s ", volume.ID, instanceID)
+		return nil
+	}
+
 	if volume.Status != VolumeInUseStatus {
 		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
 		glog.Errorf(errmsg)
