@@ -119,7 +119,7 @@ func autoConvert_batch_CronJobList_To_v1beta1_CronJobList(in *batch.CronJobList,
 			}
 		}
 	} else {
-		out.Items = make([]v1beta1.CronJob, 0)
+		out.Items = nil
 	}
 	return nil
 }

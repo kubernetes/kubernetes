@@ -120,11 +120,7 @@ func Convert_v1alpha1_EventList_To_audit_EventList(in *EventList, out *audit.Eve
 
 func autoConvert_audit_EventList_To_v1alpha1_EventList(in *audit.EventList, out *EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]Event, 0)
-	} else {
-		out.Items = *(*[]Event)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]Event)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -200,11 +196,7 @@ func Convert_v1alpha1_Policy_To_audit_Policy(in *Policy, out *audit.Policy, s co
 
 func autoConvert_audit_Policy_To_v1alpha1_Policy(in *audit.Policy, out *Policy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if in.Rules == nil {
-		out.Rules = make([]PolicyRule, 0)
-	} else {
-		out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
-	}
+	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
@@ -226,11 +218,7 @@ func Convert_v1alpha1_PolicyList_To_audit_PolicyList(in *PolicyList, out *audit.
 
 func autoConvert_audit_PolicyList_To_v1alpha1_PolicyList(in *audit.PolicyList, out *PolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]Policy, 0)
-	} else {
-		out.Items = *(*[]Policy)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]Policy)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

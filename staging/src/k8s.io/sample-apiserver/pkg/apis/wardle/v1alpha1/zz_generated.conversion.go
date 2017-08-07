@@ -85,11 +85,7 @@ func Convert_v1alpha1_FischerList_To_wardle_FischerList(in *FischerList, out *wa
 
 func autoConvert_wardle_FischerList_To_v1alpha1_FischerList(in *wardle.FischerList, out *FischerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]Fischer, 0)
-	} else {
-		out.Items = *(*[]Fischer)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]Fischer)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -143,11 +139,7 @@ func Convert_v1alpha1_FlunderList_To_wardle_FlunderList(in *FlunderList, out *wa
 
 func autoConvert_wardle_FlunderList_To_v1alpha1_FlunderList(in *wardle.FlunderList, out *FlunderList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]Flunder, 0)
-	} else {
-		out.Items = *(*[]Flunder)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]Flunder)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

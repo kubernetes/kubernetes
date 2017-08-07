@@ -144,7 +144,7 @@ func autoConvert_apps_ControllerRevisionList_To_v1beta1_ControllerRevisionList(i
 			}
 		}
 	} else {
-		out.Items = make([]v1beta1.ControllerRevision, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -248,7 +248,7 @@ func autoConvert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensi
 			}
 		}
 	} else {
-		out.Items = make([]v1beta1.Deployment, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -571,7 +571,7 @@ func autoConvert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.Statef
 			}
 		}
 	} else {
-		out.Items = make([]v1beta1.StatefulSet, 0)
+		out.Items = nil
 	}
 	return nil
 }
