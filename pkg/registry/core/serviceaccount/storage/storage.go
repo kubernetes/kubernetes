@@ -36,7 +36,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceAccountList{} },
-		PredicateFunc:            serviceaccount.Matcher,
 		DefaultQualifiedResource: api.Resource("serviceaccounts"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("serviceaccounts"),
 
@@ -45,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		DeleteStrategy:      serviceaccount.Strategy,
 		ReturnDeletedObject: true,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: serviceaccount.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

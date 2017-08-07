@@ -40,7 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
 		NewListFunc:              func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
-		PredicateFunc:            poddisruptionbudget.MatchPodDisruptionBudget,
 		DefaultQualifiedResource: policyapi.Resource("poddisruptionbudgets"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("poddisruptionbudgets"),
 
@@ -48,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: poddisruptionbudget.Strategy,
 		DeleteStrategy: poddisruptionbudget.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: poddisruptionbudget.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
