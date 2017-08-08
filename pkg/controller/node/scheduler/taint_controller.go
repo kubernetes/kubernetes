@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package scheduler
 
 import (
 	"fmt"
@@ -122,7 +122,7 @@ func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, er
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
-		return []v1.Pod{}, fmt.Errorf("Failed to get Pods assigned to node %v. Skipping update.", nodeName)
+		return []v1.Pod{}, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
 	}
 	return pods.Items, nil
 }

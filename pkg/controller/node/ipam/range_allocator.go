@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package ipam
 
 import (
 	"fmt"
 	"net"
 	"sync"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +33,8 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
+	"k8s.io/kubernetes/pkg/controller/node/util"
 )
 
 // TODO: figure out the good setting for those constants.
@@ -45,7 +48,7 @@ const (
 
 type rangeAllocator struct {
 	client      clientset.Interface
-	cidrs       *cidrSet
+	cidrs       *cidrset.CidrSet
 	clusterCIDR *net.IPNet
 	maxCIDRs    int
 	// Channel that is used to pass updating Nodes with assigned CIDRs to the background
@@ -74,7 +77,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, s
 
 	ra := &rangeAllocator{
 		client:                client,
-		cidrs:                 newCIDRSet(clusterCIDR, subNetMaskSize),
+		cidrs:                 cidrset.NewCIDRSet(clusterCIDR, subNetMaskSize),
 		clusterCIDR:           clusterCIDR,
 		nodeCIDRUpdateChannel: make(chan nodeAndCIDR, cidrUpdateQueueSize),
 		recorder:              recorder,
@@ -150,7 +153,7 @@ func (r *rangeAllocator) occupyCIDR(node *v1.Node) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 	}
-	if err := r.cidrs.occupy(podCIDR); err != nil {
+	if err := r.cidrs.Occupy(podCIDR); err != nil {
 		return fmt.Errorf("failed to mark cidr as occupied: %v", err)
 	}
 	return nil
@@ -169,10 +172,10 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	if node.Spec.PodCIDR != "" {
 		return r.occupyCIDR(node)
 	}
-	podCIDR, err := r.cidrs.allocateNext()
+	podCIDR, err := r.cidrs.AllocateNext()
 	if err != nil {
 		r.removeNodeFromProcessing(node.Name)
-		recordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
+		util.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
 
@@ -194,7 +197,7 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 	}
 
 	glog.V(4).Infof("release CIDR %s", node.Spec.PodCIDR)
-	if err = r.cidrs.release(podCIDR); err != nil {
+	if err = r.cidrs.Release(podCIDR); err != nil {
 		return fmt.Errorf("Error when releasing CIDR %v: %v", node.Spec.PodCIDR, err)
 	}
 	return err
@@ -212,7 +215,7 @@ func (r *rangeAllocator) filterOutServiceRange(serviceCIDR *net.IPNet) {
 		return
 	}
 
-	if err := r.cidrs.occupy(serviceCIDR); err != nil {
+	if err := r.cidrs.Occupy(serviceCIDR); err != nil {
 		glog.Errorf("Error filtering out service cidr %v: %v", serviceCIDR, err)
 	}
 }
@@ -232,7 +235,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		if node.Spec.PodCIDR != "" {
 			glog.Errorf("Node %v already has allocated CIDR %v. Releasing assigned one if different.", node.Name, node.Spec.PodCIDR)
 			if node.Spec.PodCIDR != data.cidr.String() {
-				if err := r.cidrs.release(data.cidr); err != nil {
+				if err := r.cidrs.Release(data.cidr); err != nil {
 					glog.Errorf("Error when releasing CIDR %v", data.cidr.String())
 				}
 			}
@@ -246,13 +249,13 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		}
 	}
 	if err != nil {
-		recordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
+		util.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
 		// We accept the fact that we may leek CIDRs here. This is safer than releasing
 		// them in case when we don't know if request went through.
 		// NodeController restart will return all falsely allocated CIDRs to the pool.
 		if !apierrors.IsServerTimeout(err) {
 			glog.Errorf("CIDR assignment for node %v failed: %v. Releasing allocated CIDR", data.nodeName, err)
-			if releaseErr := r.cidrs.release(data.cidr); releaseErr != nil {
+			if releaseErr := r.cidrs.Release(data.cidr); releaseErr != nil {
 				glog.Errorf("Error releasing allocated CIDR for node %v: %v", data.nodeName, releaseErr)
 			}
 		}

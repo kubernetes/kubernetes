@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package cidrset
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"sync"
 )
 
-type cidrSet struct {
+type CidrSet struct {
 	sync.Mutex
 	clusterCIDR     *net.IPNet
 	clusterIP       net.IP
@@ -44,7 +45,12 @@ const (
 	maxPrefixLength = 64
 )
 
-func newCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *cidrSet {
+var (
+	ErrCIDRRangeNoCIDRsRemaining = errors.New(
+		"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
+)
+
+func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *CidrSet {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, _ := clusterMask.Size()
 
@@ -54,7 +60,7 @@ func newCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *cidrSet {
 	} else {
 		maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
 	}
-	return &cidrSet{
+	return &CidrSet{
 		clusterCIDR:     clusterCIDR,
 		clusterIP:       clusterCIDR.IP,
 		clusterMaskSize: clusterMaskSize,
@@ -63,7 +69,7 @@ func newCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *cidrSet {
 	}
 }
 
-func (s *cidrSet) indexToCIDRBlock(index int) *net.IPNet {
+func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
 	var ip []byte
 	var mask int
 	switch /*v4 or v6*/ {
@@ -91,7 +97,7 @@ func (s *cidrSet) indexToCIDRBlock(index int) *net.IPNet {
 	}
 }
 
-func (s *cidrSet) allocateNext() (*net.IPNet, error) {
+func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -104,7 +110,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 		}
 	}
 	if nextUnused == -1 {
-		return nil, errCIDRRangeNoCIDRsRemaining
+		return nil, ErrCIDRRangeNoCIDRsRemaining
 	}
 	s.nextCandidate = (nextUnused + 1) % s.maxCIDRs
 
@@ -113,7 +119,7 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 	return s.indexToCIDRBlock(nextUnused), nil
 }
 
-func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
 	begin, end = 0, s.maxCIDRs-1
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
@@ -160,7 +166,7 @@ func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 	return begin, end, nil
 }
 
-func (s *cidrSet) release(cidr *net.IPNet) error {
+func (s *CidrSet) Release(cidr *net.IPNet) error {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {
 		return err
@@ -173,7 +179,7 @@ func (s *cidrSet) release(cidr *net.IPNet) error {
 	return nil
 }
 
-func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
+func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {
 		return err
@@ -188,7 +194,7 @@ func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
 	return nil
 }
 
-func (s *cidrSet) getIndexForCIDR(cidr *net.IPNet) (int, error) {
+func (s *CidrSet) getIndexForCIDR(cidr *net.IPNet) (int, error) {
 	var cidrIndex uint32
 	if cidr.IP.To4() != nil {
 		cidrIndex = (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(cidr.IP.To4())) >> uint32(32-s.subNetMaskSize)

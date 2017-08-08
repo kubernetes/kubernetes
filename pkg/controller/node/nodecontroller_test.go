@@ -39,6 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	"k8s.io/kubernetes/pkg/controller/node/scheduler"
+	"k8s.io/kubernetes/pkg/controller/node/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -103,7 +106,7 @@ func NewNodeControllerFromClient(
 		serviceCIDR,
 		nodeCIDRMaskSize,
 		allocateNodeCIDRs,
-		RangeAllocatorType,
+		ipam.RangeAllocatorType,
 		useTaints,
 		useTaints,
 	)
@@ -637,9 +640,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
-				nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUid, _ := value.UID.(string)
-					deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
+					util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -782,9 +785,9 @@ func TestPodStatusChange(t *testing.T) {
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUid, _ := value.UID.(string)
-				deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+				util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -1337,9 +1340,9 @@ func (nc *nodeController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) 
 	var podEvicted bool
 	zones := testutil.GetZones(fakeNodeHandler)
 	for _, zone := range zones {
-		nc.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
-			deletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			util.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
 			return true, 0
 		})
 	}
@@ -2310,7 +2313,7 @@ func TestCheckNodeKubeletVersionParsing(t *testing.T) {
 				},
 			},
 		}
-		isOutdated := nodeRunningOutdatedKubelet(n)
+		isOutdated := util.NodeRunningOutdatedKubelet(n)
 		if ov.outdated != isOutdated {
 			t.Errorf("Version %v doesn't match test expectation. Expected outdated %v got %v", n.Status.NodeInfo.KubeletVersion, ov.outdated, isOutdated)
 		} else {

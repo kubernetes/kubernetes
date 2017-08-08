@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package scheduler
 
 import (
 	"container/heap"
@@ -25,6 +25,15 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/golang/glog"
+)
+
+const (
+	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
+	NodeStatusUpdateRetry = 5
+	// controls how often NodeController will try to evict Pods from non-responsive Nodes.
+	NodeEvictionPeriod = 100 * time.Millisecond
+	// Burst value for all eviction rate limiters
+	EvictionRateLimiterBurst = 1
 )
 
 // TimedValue is a value that should be processed at a designated time.
@@ -260,7 +269,7 @@ func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 	if newQPS <= 0 {
 		newLimiter = flowcontrol.NewFakeNeverRateLimiter()
 	} else {
-		newLimiter = flowcontrol.NewTokenBucketRateLimiter(newQPS, evictionRateLimiterBurst)
+		newLimiter = flowcontrol.NewTokenBucketRateLimiter(newQPS, EvictionRateLimiterBurst)
 	}
 	// If we're currently waiting on limiter, we drain the new one - this is a good approach when Burst value is 1
 	// TODO: figure out if we need to support higher Burst values and decide on the drain logic, should we keep:

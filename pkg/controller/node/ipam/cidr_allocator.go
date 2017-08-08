@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package ipam
 
 import (
-	"errors"
 	"net"
 
 	v1 "k8s.io/api/core/v1"
 )
-
-var errCIDRRangeNoCIDRsRemaining = errors.New(
-	"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
 
 type nodeAndCIDR struct {
 	cidr     *net.IPNet

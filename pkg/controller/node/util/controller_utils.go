@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package util
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,9 +45,17 @@ import (
 	"github.com/golang/glog"
 )
 
-// deletePods will delete all pods from master running on given node, and return true
+var (
+	ErrCloudInstance = errors.New("cloud provider doesn't support instances")
+
+	// The minimum kubelet version for which the nodecontroller
+	// can safely flip pod.Status to NotReady.
+	podStatusReconciliationVersion = utilversion.MustParseSemantic("v1.2.0")
+)
+
+// DeletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted, or were found pending deletion.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
+func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
@@ -58,7 +67,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	}
 
 	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		RecordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for _, pod := range pods.Items {
@@ -68,8 +77,8 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		}
 
 		// Set reason and message in the pod object.
-		if _, err = setPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
-			if errors.IsConflict(err) {
+		if _, err = SetPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
+			if apierrors.IsConflict(err) {
 				updateErrList = append(updateErrList,
 					fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err))
 				continue
@@ -100,9 +109,9 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	return remaining, nil
 }
 
-// setPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
+// SetPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
 // and returns an error if it encounters one.
-func setPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
+func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
 	if pod.Status.Reason == nodepkg.NodeUnreachablePodReason {
 		return pod, nil
 	}
@@ -118,7 +127,7 @@ func setPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 	return updatedPod, nil
 }
 
-func forcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
+func ForcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	var zero int64
 	glog.Infof("NodeController is force deleting Pod: %v:%v", pod.Namespace, pod.Name)
 	err := c.Core().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
@@ -128,75 +137,23 @@ func forcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	return err
 }
 
-// forcefullyDeleteNode immediately the node. The pods on the node are cleaned
+// ForcefullyDeleteNode immediately the node. The pods on the node are cleaned
 // up by the podGC.
-func forcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error {
+func ForcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error {
 	if err := kubeClient.Core().Nodes().Delete(nodeName, nil); err != nil {
 		return fmt.Errorf("unable to delete node %q: %v", nodeName, err)
 	}
 	return nil
 }
 
-// maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
-// that should not be gracefully terminated.
-func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			glog.Errorf("Tombstone contained object that is not a Pod %#v", obj)
-			return
-		}
-	}
-
-	// consider only terminating pods
-	if pod.DeletionTimestamp == nil {
-		return
-	}
-
-	node, err := nc.nodeLister.Get(pod.Spec.NodeName)
-	// if there is no such node, do nothing and let the podGC clean it up.
-	if errors.IsNotFound(err) {
-		return
-	}
-	if err != nil {
-		// this can only happen if the Store.KeyFunc has a problem creating
-		// a key for the pod. If it happens once, it will happen again so
-		// don't bother requeuing the pod.
-		utilruntime.HandleError(err)
-		return
-	}
-
-	// delete terminating pods that have been scheduled on
-	// nodes that do not support graceful termination
-	// TODO(mikedanese): this can be removed when we no longer
-	// guarantee backwards compatibility of master API to kubelets with
-	// versions less than 1.1.0
-	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
-	if err != nil {
-		glog.V(0).Infof("Couldn't parse version %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-	if v.LessThan(gracefulDeletionVersion) {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-}
-
 // update ready status of all pods running on given node from master
 // return true if success
-func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
+func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	// Don't set pods to NotReady if the kubelet is running a version that
 	// doesn't understand how to correct readiness.
 	// TODO: Remove this check when we no longer guarantee backward compatibility
 	// with node versions < 1.2.0.
-	if nodeRunningOutdatedKubelet(node) {
+	if NodeRunningOutdatedKubelet(node) {
 		return nil
 	}
 	nodeName := node.Name
@@ -233,11 +190,11 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
-// nodeRunningOutdatedKubelet returns true if the kubeletVersion reported
+// NodeRunningOutdatedKubelet returns true if the kubeletVersion reported
 // in the nodeInfo of the given node is "outdated", meaning < 1.2.0.
 // Older versions were inflexible and modifying pod.Status directly through
 // the apiserver would result in unexpected outcomes.
-func nodeRunningOutdatedKubelet(node *v1.Node) bool {
+func NodeRunningOutdatedKubelet(node *v1.Node) bool {
 	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.Errorf("couldn't parse version %q of node %v", node.Status.NodeInfo.KubeletVersion, err)
@@ -250,7 +207,7 @@ func nodeRunningOutdatedKubelet(node *v1.Node) bool {
 	return false
 }
 
-func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+func NodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
@@ -264,7 +221,7 @@ func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.Nod
 	return true, nil
 }
 
-func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
+func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
@@ -275,7 +232,7 @@ func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
-func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
+func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
@@ -289,7 +246,7 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_st
 }
 
 // Returns true in case of success and false otherwise
-func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
+func SwapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
 	taintToAdd.TimeAdded = metav1.Now()
 	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintToAdd)
 	if err != nil {
@@ -317,7 +274,7 @@ func swapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintTo
 	return true
 }
 
-func createAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		obj, err := scheme.Scheme.DeepCopy(originalObj)
 		if err != nil {
@@ -332,7 +289,7 @@ func createAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	}
 }
 
-func createUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
+func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
 		oldObj, err := scheme.Scheme.DeepCopy(origOldObj)
 		if err != nil {
@@ -353,7 +310,7 @@ func createUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 	}
 }
 
-func createDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		obj, err := scheme.Scheme.DeepCopy(originalObj)
 		if err != nil {
