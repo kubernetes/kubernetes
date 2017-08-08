@@ -46,6 +46,12 @@ type Options struct {
 	CacheSizeMax uint64 // bytes
 	PathPerm     os.FileMode
 	FilePerm     os.FileMode
+	// If TempDir is set, it will enable filesystem atomic writes by
+	// writing temporary files to that location before being moved
+	// to BasePath.
+	// Note that TempDir MUST be on the same device/partition as
+	// BasePath.
+	TempDir string
 
 	Index     Index
 	IndexLess LessFunction
@@ -115,47 +121,84 @@ func (d *Diskv) WriteStream(key string, r io.Reader, sync bool) error {
 	return d.writeStreamWithLock(key, r, sync)
 }
 
-// writeStream does no input validation checking.
-// TODO: use atomic FS ops.
-func (d *Diskv) writeStreamWithLock(key string, r io.Reader, sync bool) error {
-	if err := d.ensurePathWithLock(key); err != nil {
-		return fmt.Errorf("ensure path: %s", err)
+// createKeyFileWithLock either creates the key file directly, or
+// creates a temporary file in TempDir if it is set.
+func (d *Diskv) createKeyFileWithLock(key string) (*os.File, error) {
+	if d.TempDir != "" {
+		if err := os.MkdirAll(d.TempDir, d.PathPerm); err != nil {
+			return nil, fmt.Errorf("temp mkdir: %s", err)
+		}
+		f, err := ioutil.TempFile(d.TempDir, "")
+		if err != nil {
+			return nil, fmt.Errorf("temp file: %s", err)
+		}
+
+		if err := f.Chmod(d.FilePerm); err != nil {
+			f.Close()           // error deliberately ignored
+			os.Remove(f.Name()) // error deliberately ignored
+			return nil, fmt.Errorf("chmod: %s", err)
+		}
+		return f, nil
 	}
 
 	mode := os.O_WRONLY | os.O_CREATE | os.O_TRUNC // overwrite if exists
 	f, err := os.OpenFile(d.completeFilename(key), mode, d.FilePerm)
 	if err != nil {
-		return fmt.Errorf("open file: %s", err)
+		return nil, fmt.Errorf("open file: %s", err)
+	}
+	return f, nil
+}
+
+// writeStream does no input validation checking.
+func (d *Diskv) writeStreamWithLock(key string, r io.Reader, sync bool) error {
+	if err := d.ensurePathWithLock(key); err != nil {
+		return fmt.Errorf("ensure path: %s", err)
+	}
+
+	f, err := d.createKeyFileWithLock(key)
+	if err != nil {
+		return fmt.Errorf("create key file: %s", err)
 	}
 
 	wc := io.WriteCloser(&nopWriteCloser{f})
 	if d.Compression != nil {
 		wc, err = d.Compression.Writer(f)
 		if err != nil {
-			f.Close() // error deliberately ignored
+			f.Close()           // error deliberately ignored
+			os.Remove(f.Name()) // error deliberately ignored
 			return fmt.Errorf("compression writer: %s", err)
 		}
 	}
 
 	if _, err := io.Copy(wc, r); err != nil {
-		f.Close() // error deliberately ignored
+		f.Close()           // error deliberately ignored
+		os.Remove(f.Name()) // error deliberately ignored
 		return fmt.Errorf("i/o copy: %s", err)
 	}
 
 	if err := wc.Close(); err != nil {
-		f.Close() // error deliberately ignored
+		f.Close()           // error deliberately ignored
+		os.Remove(f.Name()) // error deliberately ignored
 		return fmt.Errorf("compression close: %s", err)
 	}
 
 	if sync {
 		if err := f.Sync(); err != nil {
-			f.Close() // error deliberately ignored
+			f.Close()           // error deliberately ignored
+			os.Remove(f.Name()) // error deliberately ignored
 			return fmt.Errorf("file sync: %s", err)
 		}
 	}
 
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("file close: %s", err)
+	}
+
+	if f.Name() != d.completeFilename(key) {
+		if err := os.Rename(f.Name(), d.completeFilename(key)); err != nil {
+			os.Remove(f.Name()) // error deliberately ignored
+			return fmt.Errorf("rename: %s", err)
+		}
 	}
 
 	if d.Index != nil {
@@ -390,6 +433,9 @@ func (d *Diskv) EraseAll() error {
 	defer d.mu.Unlock()
 	d.cache = make(map[string][]byte)
 	d.cacheSize = 0
+	if d.TempDir != "" {
+		os.RemoveAll(d.TempDir) // errors ignored
+	}
 	return os.RemoveAll(d.BasePath)
 }
 
