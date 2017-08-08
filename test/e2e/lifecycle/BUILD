@@ -12,11 +12,11 @@ go_library(
     srcs = [
         "addon_update.go",
         "cluster_upgrade.go",
+        "framework.go",
         "ha_master.go",
         "reboot.go",
         "resize_nodes.go",
         "restart.go",
-        "sig.go",
     ],
     tags = ["automanaged"],
     deps = [

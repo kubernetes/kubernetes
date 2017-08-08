@@ -82,6 +82,20 @@ func TestMatchPod(t *testing.T) {
 			fieldSelector: fields.ParseSelectorOrDie("status.phase=Pending"),
 			expectMatch:   false,
 		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{PodIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=1.2.3.4"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{PodIP: "1.2.3.4"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
+			expectMatch:   false,
+		},
 	}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)

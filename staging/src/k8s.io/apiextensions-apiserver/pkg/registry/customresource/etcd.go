@@ -40,8 +40,8 @@ func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, co
 			ret.SetGroupVersionKind(listKind)
 			return ret
 		},
-		PredicateFunc:     strategy.MatchCustomResourceDefinitionStorage,
-		QualifiedResource: resource,
+		PredicateFunc:            strategy.MatchCustomResourceDefinitionStorage,
+		DefaultQualifiedResource: resource,
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,

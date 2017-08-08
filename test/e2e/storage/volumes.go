@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -429,6 +430,11 @@ var _ = SIGDescribe("Volumes", func() {
 			config = framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "pd",
+				// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+				// so pods should be also scheduled there.
+				NodeSelector: map[string]string{
+					kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+				},
 			}
 		})
 

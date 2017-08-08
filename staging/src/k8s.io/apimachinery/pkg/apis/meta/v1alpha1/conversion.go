@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podtemplate
+package v1alpha1
 
-import (
-	"testing"
+import "k8s.io/apimachinery/pkg/conversion"
 
-	"k8s.io/kubernetes/pkg/api"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-)
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
-		"PodTemplate",
-		PodTemplateToSelectableFields(&api.PodTemplate{}),
-		nil,
-	)
+// Convert_Slice_string_To_v1alpha1_IncludeObjectPolicy allows converting a URL query parameter value
+func Convert_Slice_string_To_v1alpha1_IncludeObjectPolicy(input *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
+	if len(*input) > 0 {
+		*out = IncludeObjectPolicy((*input)[0])
+	}
+	return nil
 }

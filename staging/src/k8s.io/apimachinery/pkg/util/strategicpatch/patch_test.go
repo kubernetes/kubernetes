@@ -5969,6 +5969,75 @@ retainKeysMergingList:
 `),
 		},
 	},
+	{
+		Description: "delete and reorder in one list, reorder in another",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: a
+  value: a
+- name: b
+  value: b
+mergeItemPtr:
+- name: c
+  value: c
+- name: d
+  value: d
+`),
+			Current: []byte(`
+mergingList:
+- name: a
+  value: a
+- name: b
+  value: b
+mergeItemPtr:
+- name: c
+  value: c
+- name: d
+  value: d
+`),
+			Modified: []byte(`
+mergingList:
+- name: b
+  value: b
+mergeItemPtr:
+- name: d
+  value: d
+- name: c
+  value: c
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: b
+$setElementOrder/mergeItemPtr:
+- name: d
+- name: c
+mergingList:
+- $patch: delete
+  name: a
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: b
+$setElementOrder/mergeItemPtr:
+- name: d
+- name: c
+mergingList:
+- $patch: delete
+  name: a
+`),
+			Result: []byte(`
+mergingList:
+- name: b
+  value: b
+mergeItemPtr:
+- name: d
+  value: d
+- name: c
+  value: c
+`),
+		},
+	},
 }
 
 func TestStrategicMergePatch(t *testing.T) {
@@ -5993,9 +6062,12 @@ func TestStrategicMergePatch(t *testing.T) {
 		testThreeWayPatch(t, c)
 	}
 
-	for _, c := range strategicMergePatchRawTestCases {
-		testTwoWayPatchForRawTestCase(t, c)
-		testThreeWayPatchForRawTestCase(t, c)
+	// run multiple times to exercise different map traversal orders
+	for i := 0; i < 10; i++ {
+		for _, c := range strategicMergePatchRawTestCases {
+			testTwoWayPatchForRawTestCase(t, c)
+			testThreeWayPatchForRawTestCase(t, c)
+		}
 	}
 }
 

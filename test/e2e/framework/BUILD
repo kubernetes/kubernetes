@@ -79,8 +79,8 @@ go_library(
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/manifest:go_default_library",
-        "//test/e2e/metrics:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
@@ -101,6 +101,7 @@ go_library(
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -152,6 +153,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/e2e/framework/ginkgowrapper:all-srcs",
+        "//test/e2e/framework/metrics:all-srcs",
     ],
     tags = ["automanaged"],
 )

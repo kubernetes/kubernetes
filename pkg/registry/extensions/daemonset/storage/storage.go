@@ -37,18 +37,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.DaemonSet{} },
-		NewListFunc:       func() runtime.Object { return &extensions.DaemonSetList{} },
-		PredicateFunc:     daemonset.MatchDaemonSet,
-		QualifiedResource: extensions.Resource("daemonsets"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("daemonsets"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &extensions.DaemonSet{} },
+		NewListFunc:              func() runtime.Object { return &extensions.DaemonSetList{} },
+		DefaultQualifiedResource: extensions.Resource("daemonsets"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("daemonsets"),
 
 		CreateStrategy: daemonset.Strategy,
 		UpdateStrategy: daemonset.Strategy,
 		DeleteStrategy: daemonset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: daemonset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
