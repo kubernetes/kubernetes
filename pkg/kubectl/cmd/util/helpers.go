@@ -408,16 +408,6 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 
 func AddOpenAPIFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("openapi-validation", false, "If true, use openapi rather than swagger for validation")
-	cmd.Flags().String("schema-cache-dir",
-		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
-		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
-			clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
-	)
-	cmd.MarkFlagFilename("schema-cache-dir")
-}
-
-func GetOpenAPICacheDir(cmd *cobra.Command) string {
-	return GetFlagString(cmd, "schema-cache-dir")
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {

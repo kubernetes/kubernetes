@@ -249,6 +249,7 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.BearerToken = ""
 		expected.Username = ""
 		expected.Password = ""
+		expected.CacheDir = ""
 		expected.AuthProvider = nil
 		expected.AuthConfigPersister = nil
 		expected.TLSClientConfig.CertData = nil
