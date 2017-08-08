@@ -1514,7 +1514,6 @@ func TestUpdateNode(t *testing.T) {
 					{Type: v1.NodeMemoryPressure, Status: v1.ConditionFalse},
 					{Type: v1.NodeDiskPressure, Status: v1.ConditionFalse},
 					{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionFalse},
-					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
 				}
 				return node
 			}(),
@@ -1522,7 +1521,6 @@ func TestUpdateNode(t *testing.T) {
 				node := newNode("node1", nil)
 				node.Status.Conditions = []v1.NodeCondition{
 					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
 				}
 				return node
 			}(),
