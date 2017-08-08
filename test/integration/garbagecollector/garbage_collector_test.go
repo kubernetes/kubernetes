@@ -265,7 +265,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
 		go gc.Run(workers, stopCh)
-		go gc.Sync(restMapper, discoveryClient, syncPeriod, stopCh)
+		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
 	}
 
 	if workerCount > 0 {

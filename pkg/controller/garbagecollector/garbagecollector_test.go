@@ -46,11 +46,17 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (_ *testRESTMapper) Reset() {}
+
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	tweakableRM := meta.NewDefaultRESTMapper(nil, nil)
-	rm := meta.MultiRESTMapper{tweakableRM, api.Registry.RESTMapper()}
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, api.Registry.RESTMapper()}}
 	metaOnlyClientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
@@ -168,7 +174,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	podResource := map[schema.GroupVersionResource]struct{}{{Version: "v1", Resource: "pods"}: {}}
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource, ignoredResources, sharedInformers)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, &testRESTMapper{api.Registry.RESTMapper()}, podResource, ignoredResources, sharedInformers)
 	if err != nil {
 		t.Fatal(err)
 	}
