@@ -392,8 +392,6 @@ def render_and_launch_ingress():
                          '/root/cdk/addons/default-http-backend.yaml')
         kubectl_manifest('delete',
                          '/root/cdk/addons/ingress-replication-controller.yaml')  # noqa
-        kubectl_manifest('delete',
-                         '/root/cdk/addons/ingress-replication-controller-service.yaml')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
 
@@ -563,7 +561,7 @@ def launch_default_ingress_controller():
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
-    render('default-backend.yml', manifest, context)
+    render('default-http-backend.yaml', manifest, context)
     hookenv.log('Creating the default http backend.')
     try:
         kubectl('apply', '-f', manifest)
@@ -581,24 +579,13 @@ def launch_default_ingress_controller():
         context['ingress_image'] = \
             "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
     manifest = addon_path.format('ingress-replication-controller.yaml')
-    render('nginx-ingress-controller.yml', manifest, context)
+    render('ingress-replication-controller.yaml', manifest, context)
     hookenv.log('Creating the ingress replication controller.')
     try:
         kubectl('apply', '-f', manifest)
     except CalledProcessError as e:
         hookenv.log(e)
         hookenv.log('Failed to create ingress controller. Will attempt again next update.')  # noqa
-        hookenv.close_port(80)
-        hookenv.close_port(443)
-        return
-    manifest = addon_path.format('ingress-replication-controller-service.yaml')
-    render('nginx-ingress-controller-service.yml', manifest, context)
-    hookenv.log('Creating the ingress replication controller service.')
-    try:
-        kubectl('apply', '-f', manifest)
-    except CalledProcessError as e:
-        hookenv.log(e)
-        hookenv.log('Failed to create ingress controller service. Will attempt again next update.')  # noqa
         hookenv.close_port(80)
         hookenv.close_port(443)
         return
