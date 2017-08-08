@@ -100,34 +100,6 @@ func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, erro
 	return seen, err
 }
 
-func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutronports.Port, error) {
-	var targetPort neutronports.Port
-	var portFound = false
-
-	err := neutronports.List(client, neutronports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		portList, err := neutronports.ExtractPorts(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, port := range portList {
-			for _, ip := range port.FixedIPs {
-				if ip.IPAddress == ipAddress {
-					targetPort = port
-					portFound = true
-					return false, nil
-				}
-			}
-		}
-
-		return true, nil
-	})
-	if err == nil && !portFound {
-		err = ErrNotFound
-	}
-	return targetPort, err
-}
-
 func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*floatingips.FloatingIP, error) {
 	opts := floatingips.ListOpts{
 		PortID: portID,
