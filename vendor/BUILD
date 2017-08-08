@@ -260,6 +260,7 @@ filegroup(
         "//vendor/github.com/libopenstorage/openstorage/pkg/units:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/volume:all-srcs",
         "//vendor/github.com/lpabon/godbc:all-srcs",
+        "//vendor/github.com/lxn/win:all-srcs",
         "//vendor/github.com/magiconair/properties:all-srcs",
         "//vendor/github.com/mailru/easyjson/buffer:all-srcs",
         "//vendor/github.com/mailru/easyjson/jlexer:all-srcs",
