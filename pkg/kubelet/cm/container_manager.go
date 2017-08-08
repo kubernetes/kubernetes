@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 
@@ -66,6 +67,8 @@ type ContainerManager interface {
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
 	UpdateQOSCgroups() error
+
+	InternalContainerLifecycle() InternalContainerLifecycle
 }
 
 type NodeConfig struct {

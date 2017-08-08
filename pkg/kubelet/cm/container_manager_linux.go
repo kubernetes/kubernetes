@@ -117,6 +117,8 @@ type containerManagerImpl struct {
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
+	// Interface for device plugin management.
+	devicePluginHdler DevicePluginHandler
 }
 
 type features struct {
@@ -819,4 +821,14 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.capacity
+}
+
+// GetDevicePluginHandler returns the DevicePluginHandler
+func (m *containerManagerImpl) GetDevicePluginHandler() DevicePluginHandler {
+	return m.devicePluginHdler
+}
+
+// SetDevicePluginHandler sets the DevicePluginHandler
+func (m *containerManagerImpl) SetDevicePluginHandler(d DevicePluginHandler) {
+	m.devicePluginHdler = d
 }

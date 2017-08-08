@@ -7,6 +7,7 @@ go_library(
         "container_manager.go",
         "container_manager_stub.go",
         "container_manager_unsupported.go",
+        "device_plugin_handler.go",
         "helpers_unsupported.go",
         "pod_container_manager_stub.go",
         "pod_container_manager_unsupported.go",
@@ -27,8 +28,10 @@ go_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
+        "//pkg/kubelet/deviceplugin:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
