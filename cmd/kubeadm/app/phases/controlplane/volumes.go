@@ -49,36 +49,36 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	// HostPath volumes for the API Server
 	// Read-only mount for the certificates directory
 	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeAPIServer, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
 
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if len(cfg.Etcd.Endpoints) != 0 {
 		etcdVols, etcdVolMounts := getEtcdCertVolumes(cfg.Etcd)
-		mounts.AddHostPathMounts(kubeAPIServer, etcdVols, etcdVolMounts)
+		mounts.AddHostPathMounts(kubeadmconstants.KubeAPIServer, etcdVols, etcdVolMounts)
 	}
 
 	// HostPath volumes for the controller manager
 	// Read-only mount for the certificates directory
 	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeControllerManager, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeControllerManager, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
-	mounts.NewHostPathMount(kubeControllerManager, kubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true)
 
 	// HostPath volumes for the scheduler
 	// Read-only mount for the scheduler kubeconfig file
 	schedulerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
-	mounts.NewHostPathMount(kubeScheduler, kubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeScheduler, kubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true)
 
 	// On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
 	// due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
 	if isPkiVolumeMountNeeded() {
-		mounts.NewHostPathMount(kubeAPIServer, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
-		mounts.NewHostPathMount(kubeControllerManager, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
+		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
+		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
 	}
 
 	return mounts

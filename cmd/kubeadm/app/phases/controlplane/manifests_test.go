@@ -55,21 +55,25 @@ func TestWriteStaticPodManifests(t *testing.T) {
 		expectedAPIProbePort int32
 	}{
 		{
-			cfg:       &kubeadmapi.MasterConfiguration{},
-			expectErr: true,
+			cfg: &kubeadmapi.MasterConfiguration{
+				KubernetesVersion: "v1.7.0",
+			},
+			expectErr: false,
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
 				API: kubeadmapi.API{
 					BindPort: 443,
 				},
+				KubernetesVersion: "v1.7.0",
 			},
-			expectErr:            true,
+			expectErr:            false,
 			expectedAPIProbePort: 443,
 		},
 	}
 	for _, rt := range tests {
-		actual := WriteStaticPodManifests(rt.cfg)
+
+		actual := WriteStaticPodManifests(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion), fmt.Sprintf("%s/etc/kubernetes/manifests", tmpdir))
 		if (actual == nil) && rt.expectErr {
 			t.Error("expected an error from WriteStaticPodManifests but got none")
 			continue
