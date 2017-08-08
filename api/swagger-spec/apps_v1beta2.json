@@ -7046,7 +7046,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete."
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate."
      },
      "rollingUpdate": {
       "$ref": "v1beta2.RollingUpdateDaemonSet",
@@ -7836,7 +7836,7 @@
     "properties": {
      "type": {
       "type": "string",
-      "description": "Type indicates the type of the StatefulSetUpdateStrategy."
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate."
      },
      "rollingUpdate": {
       "$ref": "v1beta2.RollingUpdateStatefulSetStrategy",
@@ -7851,7 +7851,7 @@
      "partition": {
       "type": "integer",
       "format": "int32",
-      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned."
+      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0."
      }
     }
    },

@@ -51838,7 +51838,7 @@
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollingUpdateDaemonSet"
      },
      "type": {
-      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
       "type": "string"
      }
     }
@@ -52287,7 +52287,7 @@
     "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
-      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
       "type": "integer",
       "format": "int32"
      }
@@ -52517,7 +52517,7 @@
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollingUpdateStatefulSetStrategy"
      },
      "type": {
-      "description": "Type indicates the type of the StatefulSetUpdateStrategy.",
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
       "type": "string"
      }
     }

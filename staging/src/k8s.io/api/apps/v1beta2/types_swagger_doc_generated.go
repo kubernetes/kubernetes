@@ -81,7 +81,7 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 
 var map_DaemonSetUpdateStrategy = map[string]string{
 	"":              "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
 }
 
@@ -268,7 +268,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 
 var map_RollingUpdateStatefulSetStrategy = map[string]string{
 	"":          "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
-	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
 }
 
 func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {
@@ -357,7 +357,7 @@ func (StatefulSetStatus) SwaggerDoc() map[string]string {
 
 var map_StatefulSetUpdateStrategy = map[string]string{
 	"":              "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
-	"type":          "Type indicates the type of the StatefulSetUpdateStrategy.",
+	"type":          "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
 	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
 }
 
