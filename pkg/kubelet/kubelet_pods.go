@@ -1402,7 +1402,9 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	if err != nil {
 		return nil, err
 	}
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
 }
@@ -1468,7 +1470,9 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port int32,
 	if err != nil {
 		return err
 	}
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	if pod.IsEmpty() {
 		return fmt.Errorf("pod not found (%q)", podFullName)
@@ -1541,7 +1545,9 @@ func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID
 		if err != nil {
 			return nil, err
 		}
-		podUID = kl.podManager.TranslatePodUID(podUID)
+		// Resolve and type convert back again.
+		// We need the static pod UID but the kubecontainer API works with types.UID.
+		podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 		podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
 		pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 		if pod.IsEmpty() {
