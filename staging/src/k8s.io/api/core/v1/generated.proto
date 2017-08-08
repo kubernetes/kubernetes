@@ -2714,7 +2714,7 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes
   // +optional
   // +patchMergeKey=name
-  // +patchStrategy=merge
+  // +patchStrategy=merge,retainKeys
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.

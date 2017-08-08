@@ -60953,7 +60953,7 @@
        "$ref": "#/definitions/io.k8s.api.core.v1.Volume"
       },
       "x-kubernetes-patch-merge-key": "name",
-      "x-kubernetes-patch-strategy": "merge"
+      "x-kubernetes-patch-strategy": "merge,retainKeys"
      }
     }
    },
@@ -62772,6 +62772,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStrategy"
      },
      "template": {
