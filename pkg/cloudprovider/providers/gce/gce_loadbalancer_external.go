@@ -127,14 +127,14 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		// a different IP, it will be harmlessly abandoned because it was only an
 		// ephemeral IP (or it was a different static IP owned by the user, in which
 		// case we shouldn't delete it anyway).
-		if isStatic, err := gce.projectOwnsStaticIP(loadBalancerName, gce.region, loadBalancerIP); err != nil {
+		if existingAddress, err := gce.GetRegionAddressByIP(gce.region, loadBalancerIP); err != nil && !isNotFound(err) {
 			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", loadBalancerIP, err)
-		} else if isStatic {
+		} else if err == nil {
 			// The requested IP is a static IP, owned and managed by the user.
 			isUserOwnedIP = true
 			isSafeToReleaseIP = false
 			ipAddress = loadBalancerIP
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided static IP %s", loadBalancerName, serviceName, ipAddress)
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided static IP %s (name: %s)", loadBalancerName, serviceName, ipAddress, existingAddress.Name)
 		} else if loadBalancerIP == fwdRuleIP {
 			// The requested IP is not a static IP, but is currently assigned
 			// to this forwarding rule, so we can keep it.
@@ -878,32 +878,6 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 		},
 	}
 	return firewall, nil
-}
-
-func (gce *GCECloud) projectOwnsStaticIP(name, region string, ipAddress string) (bool, error) {
-	pageToken := ""
-	page := 0
-	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-		listCall := gce.service.Addresses.List(gce.projectID, region)
-		if pageToken != "" {
-			listCall = listCall.PageToken(pageToken)
-		}
-		addresses, err := listCall.Do()
-		if err != nil {
-			return false, fmt.Errorf("failed to list gce IP addresses: %v", err)
-		}
-		pageToken = addresses.NextPageToken
-		for _, addr := range addresses.Items {
-			if addr.Address == ipAddress {
-				// This project does own the address, so return success.
-				return true, nil
-			}
-		}
-	}
-	if page >= maxPages {
-		glog.Errorf("projectOwnsStaticIP exceeded maxPages=%d for Addresses.List; truncating.", maxPages)
-	}
-	return false, nil
 }
 
 func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string) (ipAddress string, existing bool, err error) {
