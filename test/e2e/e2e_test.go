@@ -19,15 +19,19 @@ package e2e
 import (
 	"testing"
 
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
-	"k8s.io/kubernetes/test/e2e/framework"
+	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	_ "k8s.io/kubernetes/test/e2e/network"
+	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
