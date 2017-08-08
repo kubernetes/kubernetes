@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
@@ -140,7 +139,7 @@ func (o *VersionOptions) Complete(cmd *cobra.Command) error {
 
 func (o *VersionOptions) Validate() error {
 	if o.output != "" && o.output != "yaml" && o.output != "json" {
-		return errors.New(`--output must be 'yaml' or 'json'`)
+		return fmt.Errorf(`--output must be 'yaml' or 'json'`)
 	}
 
 	return nil
