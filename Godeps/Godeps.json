@@ -2254,8 +2254,8 @@
 		},
 		{
 			"ImportPath": "github.com/peterbourgon/diskv",
-			"Comment": "v2.0.0-2-g5dfcb07",
-			"Rev": "5dfcb07a075adbaaa4094cddfd160b1e1c77a043"
+			"Comment": "v2.0.1",
+			"Rev": "5f041e8faa004a95c88a202771f4cc3e991971e6"
 		},
 		{
 			"ImportPath": "github.com/pkg/errors",
