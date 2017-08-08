@@ -210,7 +210,8 @@ func (f *Framework) BeforeEach() {
 			TestContext.CloudConfig.KubemarkController, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 			Expect(err).NotTo(HaveOccurred())
 			externalInformerFactory.Start(f.kubemarkControllerCloseChannel)
-			TestContext.CloudConfig.KubemarkController.Init(f.kubemarkControllerCloseChannel)
+			Expect(TestContext.CloudConfig.KubemarkController.WaitForCacheSync(f.kubemarkControllerCloseChannel)).To(BeTrue())
+			go TestContext.CloudConfig.KubemarkController.Run(f.kubemarkControllerCloseChannel)
 		}
 	}
 

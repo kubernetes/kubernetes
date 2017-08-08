@@ -75,7 +75,7 @@ func GetGroupNodes(group string) ([]string, error) {
 		}
 		return lines, nil
 	} else if TestContext.Provider == "kubemark" {
-		return TestContext.CloudConfig.KubemarkController.GetNodeNamesForNodegroup(group)
+		return TestContext.CloudConfig.KubemarkController.GetNodeNamesForNodeGroup(group)
 	} else {
 		return nil, fmt.Errorf("provider does not support InstanceGroups")
 	}
