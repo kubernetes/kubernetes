@@ -134,7 +134,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		api.Kind("PriorityClass"):         &PriorityClassDescriber{c},
 
 		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
-		extensions.Kind("NetworkPolicy"):               &ExtensionsNetworkPolicyDescriber{c},
+		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
 		extensions.Kind("PodSecurityPolicy"):           &PodSecurityPolicyDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
@@ -3015,34 +3015,6 @@ func describeCluster(cluster *federation.Cluster) (string, error) {
 					c.Message)
 			}
 		}
-		return nil
-	})
-}
-
-// ExtensionsNetworkPolicyDescriber generates information about an extensions.NetworkPolicy
-type ExtensionsNetworkPolicyDescriber struct {
-	clientset.Interface
-}
-
-func (d *ExtensionsNetworkPolicyDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	c := d.Extensions().NetworkPolicies(namespace)
-
-	networkPolicy, err := c.Get(name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return describeExtensionsNetworkPolicy(networkPolicy)
-}
-
-func describeExtensionsNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
-		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
-		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
-
 		return nil
 	})
 }

@@ -28,9 +28,9 @@ import (
 	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
-	networkpolicystore "k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/storage"
 	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
 	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
+	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 )
 
 type RESTStorageProvider struct {

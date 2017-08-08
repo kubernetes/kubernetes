@@ -364,8 +364,6 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Pod-Selector", Type: "string", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicy)
-	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicyList)
 	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicy)
 	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicyList)
 
@@ -1653,26 +1651,6 @@ func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, options 
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSecurityPolicy(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printExtensionsNetworkPolicy(obj *extensions.NetworkPolicy, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	row := metav1alpha1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	row.Cells = append(row.Cells, obj.Name, metav1.FormatLabelSelector(&obj.Spec.PodSelector), translateTimestamp(obj.CreationTimestamp))
-	return []metav1alpha1.TableRow{row}, nil
-}
-
-func printExtensionsNetworkPolicyList(list *extensions.NetworkPolicyList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printExtensionsNetworkPolicy(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
