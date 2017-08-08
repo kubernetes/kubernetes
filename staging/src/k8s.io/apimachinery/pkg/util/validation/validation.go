@@ -126,7 +126,7 @@ func IsDNS1123Subdomain(value string) []string {
 }
 
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
