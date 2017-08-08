@@ -246,7 +246,7 @@ func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.Metadata
 	}
 }
 
-// isDangling check if a reference is pointing to an object that doesn't exist.
+// isDangling checks if a reference is pointing to an object that doesn't exist.
 // If isDangling looks up the referenced object at the API server, it also
 // returns its latest state.
 func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
