@@ -35,7 +35,8 @@ import (
 
 //NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	gName := names.SimpleNameGenerator.GenerateName("foo")
+	// ensure the singular doesn't end in an s for now
+	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
