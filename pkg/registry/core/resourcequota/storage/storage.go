@@ -38,7 +38,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.ResourceQuota{} },
 		NewListFunc:              func() runtime.Object { return &api.ResourceQuotaList{} },
-		PredicateFunc:            resourcequota.MatchResourceQuota,
 		DefaultQualifiedResource: api.Resource("resourcequotas"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("resourcequotas"),
 
@@ -47,7 +46,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		DeleteStrategy:      resourcequota.Strategy,
 		ReturnDeletedObject: true,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: resourcequota.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

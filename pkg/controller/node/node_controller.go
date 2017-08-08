@@ -1072,12 +1072,12 @@ func (nc *NodeController) markNodeForTainting(node *v1.Node) bool {
 func (nc *NodeController) markNodeAsHealthy(node *v1.Node) (bool, error) {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, UnreachableTaintTemplate, node)
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	if err != nil {
 		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
-	err = controller.RemoveTaintOffNode(nc.kubeClient, node.Name, NotReadyTaintTemplate, node)
+	err = controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
 	if err != nil {
 		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err

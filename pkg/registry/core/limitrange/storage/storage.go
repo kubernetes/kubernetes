@@ -36,7 +36,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
 		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
-		PredicateFunc:            limitrange.MatchLimitRange,
 		DefaultQualifiedResource: api.Resource("limitranges"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("limitranges"),
 
@@ -45,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		DeleteStrategy: limitrange.Strategy,
 		ExportStrategy: limitrange.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: limitrange.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// OWNER = sig/cli
+// OWNER = sig/network
 
-package kubectl
+package network
 
 import (
 	"fmt"
@@ -51,7 +51,7 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
-var _ = SIGDescribe("Kubectl Proxy", func() {
+var _ = SIGDescribe("Proxy", func() {
 	version := testapi.Groups[v1.GroupName].GroupVersion().Version
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{

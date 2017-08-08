@@ -40,7 +40,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &extensions.Ingress{} },
 		NewListFunc:              func() runtime.Object { return &extensions.IngressList{} },
-		PredicateFunc:            ingress.MatchIngress,
 		DefaultQualifiedResource: extensions.Resource("ingresses"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("ingresses"),
 
@@ -48,7 +47,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy: ingress.Strategy,
 		DeleteStrategy: ingress.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: ingress.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

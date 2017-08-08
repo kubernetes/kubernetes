@@ -17,15 +17,10 @@ limitations under the License.
 package limitrange
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -76,30 +71,9 @@ func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
-	return nil
-}
-
 func (limitrangeStrategy) Export(genericapirequest.Context, runtime.Object, bool) error {
 	// Copied from OpenShift exporter
 	// TODO: this needs to be fixed
 	//  limitrange.Strategy.PrepareForCreate(ctx, obj)
 	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	lr, ok := obj.(*api.LimitRange)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a limit range.")
-	}
-	return labels.Set(lr.ObjectMeta.Labels), LimitRangeToSelectableFields(lr), lr.Initializers != nil, nil
-}
-
-func MatchLimitRange(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }

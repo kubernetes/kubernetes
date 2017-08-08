@@ -37,7 +37,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &settingsapi.PodPreset{} },
 		NewListFunc:              func() runtime.Object { return &settingsapi.PodPresetList{} },
-		PredicateFunc:            podpreset.Matcher,
 		DefaultQualifiedResource: settingsapi.Resource("podpresets"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("podpresets"),
 
@@ -45,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: podpreset.Strategy,
 		DeleteStrategy: podpreset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: podpreset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

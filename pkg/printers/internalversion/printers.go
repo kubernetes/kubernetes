@@ -836,15 +836,16 @@ func printCronJobList(list *batch.CronJobList, options printers.PrintOptions) ([
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func loadBalancerStatusStringer(s api.LoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
-	result := []string{}
+	result := sets.NewString()
 	for i := range ingress {
 		if ingress[i].IP != "" {
-			result = append(result, ingress[i].IP)
+			result.Insert(ingress[i].IP)
 		} else if ingress[i].Hostname != "" {
-			result = append(result, ingress[i].Hostname)
+			result.Insert(ingress[i].Hostname)
 		}
 	}
-	r := strings.Join(result, ",")
+
+	r := strings.Join(result.List(), ",")
 	if !wide && len(r) > loadBalancerWidth {
 		r = r[0:(loadBalancerWidth-3)] + "..."
 	}

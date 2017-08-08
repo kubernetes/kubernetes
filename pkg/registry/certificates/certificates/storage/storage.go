@@ -39,7 +39,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
 		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
-		PredicateFunc:            csrregistry.Matcher,
 		DefaultQualifiedResource: certificates.Resource("certificatesigningrequests"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("certificatesigningrequests"),
 
@@ -47,7 +46,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 		UpdateStrategy: csrregistry.Strategy,
 		DeleteStrategy: csrregistry.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: csrregistry.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

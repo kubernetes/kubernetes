@@ -15,6 +15,7 @@ go_library(
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/azure:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp:go_default_library",
         "//vendor/k8s.io/client-go/plugin/pkg/client/auth/oidc:go_default_library",
+        "//vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack:go_default_library",
     ],
 )
 
@@ -32,6 +33,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/azure:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/gcp:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc:all-srcs",
+        "//staging/src/k8s.io/client-go/plugin/pkg/client/auth/openstack:all-srcs",
     ],
     tags = ["automanaged"],
 )

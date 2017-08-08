@@ -26,6 +26,7 @@ filegroup(
         ":package-srcs",
         "//federation/pkg/federation-controller/cluster:all-srcs",
         "//federation/pkg/federation-controller/ingress:all-srcs",
+        "//federation/pkg/federation-controller/job:all-srcs",
         "//federation/pkg/federation-controller/service:all-srcs",
         "//federation/pkg/federation-controller/sync:all-srcs",
         "//federation/pkg/federation-controller/util:all-srcs",

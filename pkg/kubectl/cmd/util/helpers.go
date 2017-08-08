@@ -404,6 +404,19 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
+func AddOpenAPIFlags(cmd *cobra.Command) {
+	cmd.Flags().String("schema-cache-dir",
+		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
+			clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
+	)
+	cmd.MarkFlagFilename("schema-cache-dir")
+}
+
+func GetOpenAPICacheDir(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "schema-cache-dir")
+}
+
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, "Filename, directory, or URL to files "+usage)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
@@ -606,7 +619,7 @@ func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
 func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
 	foundPair := false
 	for _, s := range args {
-		nonResource := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		nonResource := (strings.Contains(s, "=") && s[0] != '=') || (strings.HasSuffix(s, "-") && s != "-")
 		switch {
 		case !foundPair && nonResource:
 			foundPair = true
@@ -632,7 +645,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	var invalidBuf bytes.Buffer
 	var invalidBufNonEmpty bool
 	for _, pairArg := range pairArgs {
-		if strings.Contains(pairArg, "=") {
+		if strings.Contains(pairArg, "=") && pairArg[0] != '=' {
 			parts := strings.SplitN(pairArg, "=", 2)
 			if len(parts) != 2 {
 				if invalidBufNonEmpty {
@@ -643,7 +656,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 			} else {
 				newPairs[parts[0]] = parts[1]
 			}
-		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
+		} else if supportRemove && strings.HasSuffix(pairArg, "-") && pairArg != "-" {
 			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
 		} else {
 			if invalidBufNonEmpty {

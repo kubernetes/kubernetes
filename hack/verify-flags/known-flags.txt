@@ -119,6 +119,7 @@ cni-conf-dir
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-gc-syncs
+concurrent-job-syncs
 concurrent-namespace-syncs
 concurrent-replicaset-syncs
 concurrent-resource-quota-syncs
@@ -425,6 +426,7 @@ kube-reserved
 kube-reserved-cgroup
 kube-master-url
 kube-reserved
+kubemark-external-kubeconfig
 kubernetes-anywhere-cluster
 kubernetes-anywhere-path
 kubernetes-anywhere-phase2-provider

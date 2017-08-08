@@ -66,7 +66,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &extensions.Deployment{} },
 		NewListFunc:              func() runtime.Object { return &extensions.DeploymentList{} },
-		PredicateFunc:            deployment.MatchDeployment,
 		DefaultQualifiedResource: extensions.Resource("deployments"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("deployments"),
 
@@ -74,7 +73,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 		UpdateStrategy: deployment.Strategy,
 		DeleteStrategy: deployment.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: deployment.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

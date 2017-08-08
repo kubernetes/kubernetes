@@ -37,7 +37,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &extensionsapi.NetworkPolicy{} },
 		NewListFunc:              func() runtime.Object { return &extensionsapi.NetworkPolicyList{} },
-		PredicateFunc:            networkpolicy.MatchNetworkPolicy,
 		DefaultQualifiedResource: extensionsapi.Resource("networkpolicies"),
 		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("networkpolicies"),
 
@@ -45,7 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: networkpolicy.Strategy,
 		DeleteStrategy: networkpolicy.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: networkpolicy.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
