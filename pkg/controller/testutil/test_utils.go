@@ -68,30 +68,31 @@ type FakeNodeHandler struct {
 	DeleteWaitChan chan struct{}
 }
 
+// FakeLegacyHandler is a fake implemtation of CoreV1Interface.
 type FakeLegacyHandler struct {
 	v1core.CoreV1Interface
 	n *FakeNodeHandler
 }
 
 // GetUpdatedNodesCopy returns a slice of Nodes with updates applied.
-func (c *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	updatedNodesCopy := make([]*v1.Node, len(c.UpdatedNodes), len(c.UpdatedNodes))
-	for i, ptr := range c.UpdatedNodes {
+func (m *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	updatedNodesCopy := make([]*v1.Node, len(m.UpdatedNodes), len(m.UpdatedNodes))
+	for i, ptr := range m.UpdatedNodes {
 		updatedNodesCopy[i] = ptr
 	}
 	return updatedNodesCopy
 }
 
 // Core returns fake CoreInterface.
-func (c *FakeNodeHandler) Core() v1core.CoreV1Interface {
-	return &FakeLegacyHandler{c.Clientset.Core(), c}
+func (m *FakeNodeHandler) Core() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{m.Clientset.Core(), m}
 }
 
 // CoreV1 returns fake CoreV1Interface
-func (c *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
-	return &FakeLegacyHandler{c.Clientset.CoreV1(), c}
+func (m *FakeNodeHandler) CoreV1() v1core.CoreV1Interface {
+	return &FakeLegacyHandler{m.Clientset.CoreV1(), m}
 }
 
 // Nodes return fake NodeInterfaces.
@@ -115,9 +116,8 @@ func (m *FakeNodeHandler) Create(node *v1.Node) (*v1.Node, error) {
 		nodeCopy := *node
 		m.CreatedNodes = append(m.CreatedNodes, &nodeCopy)
 		return node, nil
-	} else {
-		return nil, errors.New("Create error.")
 	}
+	return nil, errors.New("create error")
 }
 
 // Get returns a Node from the fake store.
