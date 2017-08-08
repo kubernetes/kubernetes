@@ -429,7 +429,7 @@ func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.Endpoint
 //     therefore, to understand this, you need only understand the
 //     requirements and the body of this function.
 // * getMasterServiceUpdateIfNeeded ensures that the correct ports are
-//     are set.
+//     set.
 //
 // Requirements:
 // * All apiservers MUST use getMasterServiceUpdateIfNeeded and only
