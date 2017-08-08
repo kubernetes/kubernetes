@@ -37,6 +37,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -149,6 +150,16 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
+	// TODO(juanvallejo): have this method return an error to propagate to any downstream consumers
+	// AddDefaultHandlers receives a printers.TabularPrintHandler
+	// and registers default printer handlers
+	AddDefaultHandlers(handler printers.TabularPrintHandler)
+	// AddTableHandler receives a printers.TabularPrintHandler, a list of metav1alpha1.TableColumnDefinitions
+	// and a resource print handler function and registers the print handler fn with the given printer.
+	AddTableHandler(p printers.TabularPrintHandler, podColumnDefinitions []metav1alpha1.TableColumnDefinition, handler interface{}) error
+	// AddHandler receives a printers.TabularPrintHandler, a list of columns, and a print function and
+	// registers the print function with the given printer.
+	AddHandler(p printers.TabularPrintHandler, columns, columsnWithWide []string, printFunc interface{}) error
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
