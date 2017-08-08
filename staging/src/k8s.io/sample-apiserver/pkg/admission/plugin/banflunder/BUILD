@@ -11,6 +11,7 @@ go_library(
     srcs = ["admission.go"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
