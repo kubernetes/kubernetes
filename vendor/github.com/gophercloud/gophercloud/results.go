@@ -78,6 +78,53 @@ func (r Result) extractIntoPtr(to interface{}, label string) error {
 		return err
 	}
 
+	toValue := reflect.ValueOf(to)
+	if toValue.Kind() == reflect.Ptr {
+		toValue = toValue.Elem()
+	}
+
+	switch toValue.Kind() {
+	case reflect.Slice:
+		typeOfV := toValue.Type().Elem()
+		if typeOfV.Kind() == reflect.Struct {
+			if typeOfV.NumField() > 0 && typeOfV.Field(0).Anonymous {
+				newSlice := reflect.MakeSlice(reflect.SliceOf(typeOfV), 0, 0)
+				newType := reflect.New(typeOfV).Elem()
+
+				for _, v := range m[label].([]interface{}) {
+					b, err := json.Marshal(v)
+					if err != nil {
+						return err
+					}
+
+					for i := 0; i < newType.NumField(); i++ {
+						s := newType.Field(i).Addr().Interface()
+						err = json.NewDecoder(bytes.NewReader(b)).Decode(s)
+						if err != nil {
+							return err
+						}
+					}
+					newSlice = reflect.Append(newSlice, newType)
+				}
+				toValue.Set(newSlice)
+			}
+		}
+	case reflect.Struct:
+		typeOfV := toValue.Type()
+		if typeOfV.NumField() > 0 && typeOfV.Field(0).Anonymous {
+			for i := 0; i < toValue.NumField(); i++ {
+				toField := toValue.Field(i)
+				if toField.Kind() == reflect.Struct {
+					s := toField.Addr().Interface()
+					err = json.NewDecoder(bytes.NewReader(b)).Decode(s)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
 	err = json.Unmarshal(b, &to)
 	return err
 }

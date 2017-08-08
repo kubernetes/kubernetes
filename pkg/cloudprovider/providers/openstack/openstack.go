@@ -31,6 +31,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	apiversions_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
@@ -442,6 +443,26 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	}
 
 	return addrs[0].Address, nil
+}
+
+// getAttachedInterfacesByID returns the node interfaces of the specified instance.
+func getAttachedInterfacesByID(client *gophercloud.ServiceClient, serviceID string) ([]attachinterfaces.Interface, error) {
+	var interfaces []attachinterfaces.Interface
+
+	pager := attachinterfaces.List(client, serviceID)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := attachinterfaces.ExtractInterfaces(page)
+		if err != nil {
+			return false, err
+		}
+		interfaces = append(interfaces, s...)
+		return true, nil
+	})
+	if err != nil {
+		return interfaces, err
+	}
+
+	return interfaces, nil
 }
 
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
