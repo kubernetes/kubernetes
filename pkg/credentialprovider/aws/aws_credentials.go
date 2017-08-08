@@ -30,9 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-const chinaRegionPrefix = "cn-"
-const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
-const chinaRegistryURLTemplate = "*.dkr.ecr.%s.amazonaws.com.cn"
+const awsChinaRegionPrefix = "cn-"
+const awsStandardDNSSuffix = "amazon.com"
+const awsChinaDNSSuffix = "amazonaws.com.cn"
+const registryURLTemplate = "*.dkr.ecr.%s.%s"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
@@ -84,10 +85,12 @@ var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
 // registryURL has different suffix in AWS China region
 func registryURL(region string) string {
-	if strings.HasPrefix(region, chinaRegionPrefix) {
-		return fmt.Sprintf(registryURLTemplate, region)
+	dnsSuffix := awsStandardDNSSuffix
+	// deal with aws none standard regions
+	if strings.HasPrefix(region, awsChinaRegionPrefix) {
+		dnsSuffix = awsChinaDNSSuffix
 	}
-	return fmt.Sprintf(chinaRegistryURLTemplate, region)
+	return fmt.Sprintf(registryURLTemplate, region, dnsSuffix)
 }
 
 // RegisterCredentialsProvider registers a credential provider for the specified region.
