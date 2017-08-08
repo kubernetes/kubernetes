@@ -868,7 +868,7 @@ func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 		if len(name) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		if len(validation.IsCIdentifier(name)) != 0 {
+		if len(validation.IsEnvVarName(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}
