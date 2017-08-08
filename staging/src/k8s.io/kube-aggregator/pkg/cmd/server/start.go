@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
@@ -47,7 +48,7 @@ type AggregatorOptions struct {
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
 
-	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server wtih
+	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server with
 	// If it is not set, the in cluster config is used
 	CoreAPIKubeconfig string
 
@@ -102,7 +103,9 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 }
 
 func (o AggregatorOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *AggregatorOptions) Complete() error {
