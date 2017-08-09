@@ -1479,6 +1479,50 @@ func TestValidateDeploymentRollback(t *testing.T) {
 	}
 }
 
+func TestValidateDeploymentUpdate(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	validPodTemplate := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			},
+		},
+	}
+
+	type deploymentUpdateTest struct {
+		old    extensions.Deployment
+		update extensions.Deployment
+	}
+	errorCases := map[string]deploymentUpdateTest{
+		"different new and old selectors prior update": {
+			old: extensions.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DeploymentSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: extensions.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.DeploymentSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
+					Template: validPodTemplate.Template,
+				},
+			},
+		},
+	}
+	for testName, errorCase := range errorCases {
+		if errs := ValidateDeploymentUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+			t.Errorf("expected failure: %s", testName)
+		}
+	}
+}
+
 type ingressRules map[string]string
 
 func TestValidateIngress(t *testing.T) {
@@ -2164,6 +2208,22 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 				Spec: extensions.ReplicaSetSpec{
 					Replicas: -1,
 					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+		},
+		"different new and old selectors prior update": {
+			old: extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: validPodTemplate.Template,
+				},
+			},
+			update: extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
 					Template: validPodTemplate.Template,
 				},
 			},

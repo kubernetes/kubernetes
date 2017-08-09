@@ -332,14 +332,27 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	return allErrs
 }
 
+func ValidateSelector(update *metav1.LabelSelector, old *metav1.LabelSelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if update == nil || old == nil {
+		return allErrs
+	}
+	if !reflect.DeepEqual(update, old) {
+		allErrs = append(allErrs, field.Required(fldPath, "Spec.Selector must not be changed prior to any update operation"))
+	}
+	return allErrs
+}
+
 func ValidateDeploymentUpdate(update, old *extensions.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateSelector(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateSelector(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
 	if isDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
@@ -549,6 +562,7 @@ func ValidateReplicaSet(rs *extensions.ReplicaSet) field.ErrorList {
 func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateSelector(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -557,6 +571,7 @@ func ValidateReplicaSetUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList 
 func ValidateReplicaSetStatusUpdate(rs, oldRs *extensions.ReplicaSet) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateSelector(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	allErrs = append(allErrs, ValidateReplicaSetStatus(rs.Status, field.NewPath("status"))...)
 	return allErrs
 }

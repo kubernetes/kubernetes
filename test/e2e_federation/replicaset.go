@@ -369,6 +369,11 @@ func createReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 	}
 	By(fmt.Sprintf("Creating federation replicaset %q in namespace %q", replicaset.Name, namespace))
 
+	// a hack to pass validation check for controller selector immutability prior create (technically an update to nil object)
+	consistentLabelMap := map[string]string{"name": "myrs-consistent"}
+	replicaset.Spec.Selector.MatchLabels = consistentLabelMap
+	replicaset.Spec.Template.ObjectMeta.Labels = consistentLabelMap
+
 	newRS, err := clientset.Extensions().ReplicaSets(namespace).Create(replicaset)
 	framework.ExpectNoError(err, "Creating replicaset %q in namespace %q", replicaset.Name, namespace)
 	By(fmt.Sprintf("Successfully created federation replicaset %q in namespace %q", newRS.Name, namespace))
@@ -391,6 +396,11 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to updateReplicaSetOrFail: clientset: %v, namespace: %v", clientset, namespace))
 	}
 	By(fmt.Sprintf("Updating federation replicaset %q in namespace %q", replicaset.Name, namespace))
+
+	// a hack to pass validation check for controller selector immutability prior update
+	consistentLabelMap := map[string]string{"name": "myrs-consistent"}
+	replicaset.Spec.Selector.MatchLabels = consistentLabelMap
+	replicaset.Spec.Template.ObjectMeta.Labels = consistentLabelMap
 
 	newRS, err := clientset.ExtensionsV1beta1().ReplicaSets(namespace).Update(replicaset)
 	framework.ExpectNoError(err, "Updating replicaset %q in namespace %q", replicaset.Name, namespace)
