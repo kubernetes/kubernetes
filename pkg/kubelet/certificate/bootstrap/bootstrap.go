@@ -17,13 +17,16 @@ limitations under the License.
 package bootstrap
 
 import (
+	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	certificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -43,7 +46,6 @@ const (
 // The certificate and key file are stored in certDir.
 func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file already exists.
-	// TODO: inspect the kubeconfig, ensure a rest client can be built from it, verify client cert expiration, etc.
 	_, err := os.Stat(kubeconfigPath)
 	if err == nil {
 		glog.V(2).Infof("Kubeconfig %s exists, skipping bootstrap", kubeconfigPath)
@@ -59,6 +61,14 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
+	}
+	client, err := kubernetes.NewForConfig(bootstrapClientConfig)
+	if err != nil {
+		return err
+	}
+	_, err = client.ServerVersion()
+	if err != nil {
+		return fmt.Errorf("unable to create kubernetes rest client: %v", err)
 	}
 	bootstrapClient, err := certificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
@@ -86,8 +96,15 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	if err != nil {
 		return err
 	}
-	if err := certutil.WriteCert(certPath, certData); err != nil {
+	if err = certutil.WriteCert(certPath, certData); err != nil {
 		return err
+	}
+	cert, err := x509.ParseCertificate(certData)
+	if err != nil {
+		return err
+	}
+	if cert.NotAfter.Sub(time.Now()) <= time.Duration(0) {
+		return fmt.Errorf("the cert has expired")
 	}
 	defer func() {
 		if !success {
