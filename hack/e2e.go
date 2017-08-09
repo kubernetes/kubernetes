@@ -303,7 +303,7 @@ func DumpClusterLogs(location string) {
 		return
 	}
 	log.Printf("Dumping cluster logs to: %v", location)
-	finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
+	finishRunning("dump cluster logs", exec.Command("./cluster/log-dump/log-dump.sh", location))
 }
 
 func KubemarkTest() bool {

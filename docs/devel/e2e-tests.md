@@ -332,14 +332,14 @@ $ go run hack/e2e.go -v --down
 ### Debugging clusters
 
 If a cluster fails to initialize, or you'd like to better understand cluster
-state to debug a failed e2e test, you can use the `cluster/log-dump.sh` script
+state to debug a failed e2e test, you can use the `cluster/log-dump/log-dump.sh` script
 to gather logs.
 
 This script requires that the cluster provider supports ssh. Assuming it does,
 running:
 
 ```
-cluster/log-dump.sh <directory>
+cluster/log-dump/log-dump.sh <directory>
 ````
 
 will ssh to the master and all nodes and download a variety of useful logs to
