@@ -163,6 +163,12 @@ const (
 	//
 	// Enable pods to consume pre-allocated huge pages of varying page sizes
 	HugePages utilfeature.Feature = "HugePages"
+
+	// owner: @screeley44
+	// alpha: v1.9
+	//
+	// Enable Block volume support in containers.
+	BlockVolumeSupport utilfeature.Feature = "BlockVolumeSupport"
 )
 
 func init() {
@@ -194,6 +200,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
 	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	BlockVolumeSupport:                          {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

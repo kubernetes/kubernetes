@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -81,6 +80,7 @@ func testVolumeWithNodeAffinity(t *testing.T, name string, namespace string, aff
 }
 
 func TestValidatePersistentVolumes(t *testing.T) {
+	validMode := api.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		volume            *api.PersistentVolume
@@ -266,6 +266,25 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					},
 				},
 				StorageClassName: "-invalid-",
+			}),
+		},
+		// VolumeMode alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid volume mode": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "valid",
+				VolumeMode:       &validMode,
 			}),
 		},
 		// LocalVolume alpha feature disabled
@@ -575,6 +594,7 @@ func testVolumeClaimAnnotation(name string, namespace string, ann string, annval
 func TestValidatePersistentVolumeClaim(t *testing.T) {
 	invalidClassName := "-invalid-"
 	validClassName := "valid"
+	validMode := api.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		claim             *api.PersistentVolumeClaim
@@ -724,6 +744,32 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 					},
 				},
 				StorageClassName: &invalidClassName,
+			}),
+		},
+		// VolumeMode alpha feature disabled
+		// TODO: remove when no longer alpha
+		"disabled alpha valid volume mode": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				StorageClassName: &validClassName,
+				VolumeMode:       &validMode,
 			}),
 		},
 	}
@@ -2740,7 +2786,7 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
 			}
 		} else {
-			if len(names) != 1 || !names.Has(tc.vol.Name) {
+			if len(names) != 1 || !IsMatchedVolume(tc.vol.Name, names) {
 				t.Errorf("[%d: %q] wrong names result: %v", i, tc.name, names)
 			}
 		}
@@ -2880,6 +2926,128 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
 	}
+}
+
+func TestAlphaPVCVolumeMode(t *testing.T) {
+	// Enable alpha feature BlockVolumeSupport for PVC
+	err := utilfeature.DefaultFeatureGate.Set("BlockVolumeSupport=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolumeSupport: %v", err)
+		return
+	}
+
+	block := api.PersistentVolumeBlock
+	file := api.PersistentVolumeFilesystem
+	fake := api.PersistentVolumeMode("fake")
+	empty := api.PersistentVolumeMode("")
+
+	// Success Cases
+	successCasesPVC := map[string]*api.PersistentVolumeClaim{
+		"valid block value":      createTestVolModePVC(&block),
+		"valid filesystem value": createTestVolModePVC(&file),
+		"valid nil value":        createTestVolModePVC(nil),
+	}
+	for k, v := range successCasesPVC {
+		if errs := ValidatePersistentVolumeClaim(v); len(errs) != 0 {
+			t.Errorf("expected success for %s", k)
+		}
+	}
+
+	// Error Cases
+	errorCasesPVC := map[string]*api.PersistentVolumeClaim{
+		"invalid value": createTestVolModePVC(&fake),
+		"empty value":   createTestVolModePVC(&empty),
+	}
+	for k, v := range errorCasesPVC {
+		if errs := ValidatePersistentVolumeClaim(v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestAlphaPVVolumeMode(t *testing.T) {
+	// Enable alpha feature BlockVolumeSupport for PV
+	err := utilfeature.DefaultFeatureGate.Set("BlockVolumeSupport=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolumeSupport: %v", err)
+		return
+	}
+
+	block := api.PersistentVolumeBlock
+	file := api.PersistentVolumeFilesystem
+	fake := api.PersistentVolumeMode("fake")
+	empty := api.PersistentVolumeMode("")
+
+	// Success Cases
+	successCasesPV := map[string]*api.PersistentVolume{
+		"valid block value":      createTestVolModePV(&block),
+		"valid filesystem value": createTestVolModePV(&file),
+		"valid nil value":        createTestVolModePV(nil),
+	}
+	for k, v := range successCasesPV {
+		if errs := ValidatePersistentVolume(v); len(errs) != 0 {
+			t.Errorf("expected success for %s", k)
+		}
+	}
+
+	// Error Cases
+	errorCasesPV := map[string]*api.PersistentVolume{
+		"invalid value": createTestVolModePV(&fake),
+		"empty value":   createTestVolModePV(&empty),
+	}
+	for k, v := range errorCasesPV {
+		if errs := ValidatePersistentVolume(v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func createTestVolModePVC(vmode *api.PersistentVolumeMode) *api.PersistentVolumeClaim {
+	validName := "valid-storage-class"
+
+	pvc := api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			StorageClassName: &validName,
+			VolumeMode:       vmode,
+		},
+	}
+	return &pvc
+}
+
+func createTestVolModePV(vmode *api.PersistentVolumeMode) *api.PersistentVolume {
+
+	// PersistentVolume with VolumeMode set (valid and invalid)
+	pv := api.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "",
+		},
+		Spec: api.PersistentVolumeSpec{
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo",
+					Type: newHostPathType(string(api.HostPathDirectory)),
+				},
+			},
+			StorageClassName: "test-storage-class",
+			VolumeMode:       vmode,
+		},
+	}
+	return &pv
 }
 
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
@@ -3633,7 +3801,16 @@ func TestValidateEnvFrom(t *testing.T) {
 }
 
 func TestValidateVolumeMounts(t *testing.T) {
-	volumes := sets.NewString("abc", "123", "abc-123")
+	volumes := []api.Volume{
+		{Name: "abc", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(api.HostPathUnset))}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
 	container := api.Container{
 		SecurityContext: nil,
 	}
@@ -3648,7 +3825,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 	}
-	if errs := ValidateVolumeMounts(successCase, volumes, &container, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, vols, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -3657,7 +3834,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"name not found":                         {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
 		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
-		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"mountpath collision":                    {{Name: "abc", MountPath: "/path/a"}, {Name: "123", MountPath: "/path/a"}},
 		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
 		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
@@ -3665,7 +3842,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, volumes, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, vols, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -3783,9 +3960,16 @@ func TestValidateMountPropagation(t *testing.T) {
 		return
 	}
 
+	volumes := []api.Volume{
+		{Name: "foo", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(api.HostPathUnset))}}},
+	}
+	vols2, v2err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v2err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v2err)
+		return
+	}
 	for i, test := range tests {
-		volumes := sets.NewString("foo")
-		errs := ValidateVolumeMounts([]api.VolumeMount{test.mount}, volumes, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]api.VolumeMount{test.mount}, vols2, test.container, field.NewPath("field"))
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
@@ -3793,7 +3977,70 @@ func TestValidateMountPropagation(t *testing.T) {
 			t.Errorf("test %d expected success, got error: %v", i, errs)
 		}
 	}
+}
 
+func TestAlphaValidateVolumeDevices(t *testing.T) {
+	volumes := []api.Volume{
+		{Name: "abc", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "def", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(api.HostPathUnset))}}},
+	}
+
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volumes - expected success %v", v1err)
+		return
+	}
+
+	disabledAlphaVolDevice := []api.VolumeDevice{
+		{Name: "abc", DevicePath: "/foo"},
+	}
+
+	successCase := []api.VolumeDevice{
+		{Name: "abc", DevicePath: "/foo"},
+		{Name: "abc-123", DevicePath: "/usr/share/test"},
+	}
+
+	errorCases := map[string][]api.VolumeDevice{
+		"empty name":                    {{Name: "", DevicePath: "/foo"}},
+		"duplicate name":                {{Name: "abc", DevicePath: "/foo"}, {Name: "abc", DevicePath: "/foo/bar"}},
+		"name not found":                {{Name: "not-found", DevicePath: "/usr/share/test"}},
+		"name found but invalid source": {{Name: "def", DevicePath: "/usr/share/test"}},
+		"empty devicepath":              {{Name: "abc", DevicePath: ""}},
+		"relative devicepath":           {{Name: "abc-123", DevicePath: "baz"}},
+		"duplicate devicepath":          {{Name: "abc", DevicePath: "/foo"}, {Name: "abc-123", DevicePath: "/foo"}},
+		"no backsteps":                  {{Name: "def", DevicePath: "/baz/../"}},
+	}
+
+	// enable Alpha BlockVolumeSupport
+	err1 := utilfeature.DefaultFeatureGate.Set("BlockVolumeSupport=true")
+	if err1 != nil {
+		t.Errorf("Failed to enable feature gate for BlockVolumeSupport: %v", err1)
+		return
+	}
+	// Success Cases:
+	// Validate normal success cases - only PVC volumeSource
+	if errs := ValidateVolumeDevices(successCase, vols, field.NewPath("field")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	// Error Cases:
+	// Validate normal error cases - only PVC volumeSource
+	for k, v := range errorCases {
+		if errs := ValidateVolumeDevices(v, vols, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+
+	// disable Alpha BlockVolumeSupport
+	err2 := utilfeature.DefaultFeatureGate.Set("BlockVolumeSupport=false")
+	if err2 != nil {
+		t.Errorf("Failed to disable feature gate for BlockVolumeSupport: %v", err2)
+		return
+	}
+	if errs := ValidateVolumeDevices(disabledAlphaVolDevice, vols, field.NewPath("field")); len(errs) == 0 {
+		t.Errorf("expected failure: %v", errs)
+	}
 }
 
 func TestValidateProbe(t *testing.T) {
@@ -3908,7 +4155,7 @@ func getResourceLimits(cpu, memory string) api.ResourceList {
 }
 
 func TestValidateContainers(t *testing.T) {
-	volumes := sets.String{}
+	volumeDevices := make(map[string]api.VolumeSource)
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -4078,7 +4325,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -4340,7 +4587,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, volumeDevices, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
