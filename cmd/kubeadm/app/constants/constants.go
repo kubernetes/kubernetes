@@ -17,6 +17,7 @@ limitations under the License.
 package constants
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -97,6 +98,18 @@ const (
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
+
+	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
+	DefaultEtcdVersion = "3.0.17"
+
+	Etcd                  = "etcd"
+	KubeAPIServer         = "kube-apiserver"
+	KubeControllerManager = "kube-controller-manager"
+	KubeScheduler         = "kube-scheduler"
+	KubeProxy             = "kube-proxy"
+
+	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
+	SelfHostingPrefix = "self-hosted-"
 )
 
 var (
@@ -119,11 +132,29 @@ var (
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = []string{"signing", "authentication"}
 
+	// MasterComponents defines the master component names
+	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
 )
 
-// BuildStaticManifestFilepath returns the location on the disk where the Static Pod should be present
-func BuildStaticManifestFilepath(componentName string) string {
-	return filepath.Join(KubernetesDir, ManifestsSubDirName, componentName+".yaml")
+// GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
+func GetStaticPodDirectory() string {
+	return filepath.Join(KubernetesDir, ManifestsSubDirName)
+}
+
+// GetStaticPodFilepath returns the location on the disk where the Static Pod should be present
+func GetStaticPodFilepath(componentName, manifestsDir string) string {
+	return filepath.Join(manifestsDir, componentName+".yaml")
+}
+
+// GetAdminKubeConfigPath returns the location on the disk where admin kubeconfig is located by default
+func GetAdminKubeConfigPath() string {
+	return filepath.Join(KubernetesDir, AdminKubeConfigFileName)
+}
+
+// AddSelfHostedPrefix adds the self-hosted- prefix to the component name
+func AddSelfHostedPrefix(componentName string) string {
+	return fmt.Sprintf("%s%s", SelfHostingPrefix, componentName)
 }
