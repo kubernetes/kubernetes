@@ -534,7 +534,6 @@ def addons_ready():
 
     """
     try:
-        apply_rbac()
         check_call(['cdk-addons.apply'])
         return True
     except CalledProcessError:
@@ -663,44 +662,6 @@ def enable_rbac_config():
     config = hookenv.config()
     if data_changed('rbac-flag', str(config.get('enable-rbac'))):
         remove_state('kubernetes-master.components.started')
-
-
-def apply_rbac():
-    # TODO(kjackal): we should be checking if rbac is already applied
-    config = hookenv.config()
-    if is_state('leadership.is_leader'):
-        if config.get('enable-rbac'):
-            try:
-                cmd = ['kubectl', 'apply', '-f', 'templates/heapster-rbac.yaml']
-                check_output(cmd).decode('utf-8')
-            except CalledProcessError:
-                hookenv.log('Failed to apply heapster rbac rules')
-            try:
-                cmd = ['kubectl', 'apply', '-f', 'templates/nginx-ingress-controller-rbac.yml']
-                check_output(cmd).decode('utf-8')
-            except CalledProcessError:
-                hookenv.log('Failed to apply heapster rbac rules')
-
-            # TODO(kjackal): The follwoing is wrong and imposes security risk. What we should be doing is
-            # update the add-ons to include an rbac enabled dashboard
-            try:
-                cmd = "kubectl create clusterrolebinding add-on-cluster-admin  --clusterrole=cluster-admin" \
-                      " --serviceaccount=kube-system:default".split(' ')
-                check_output(cmd).decode('utf-8')
-            except CalledProcessError:
-                hookenv.log('Failed to elevate credentials')
-
-        else:
-            try:
-                cmd = ['kubectl', 'delete', '-f', 'templates/heapster-rbac.yaml']
-                check_output(cmd).decode('utf-8')
-            except CalledProcessError:
-                hookenv.log('Failed to delete heapster rbac rules')
-            try:
-                cmd = ['kubectl', 'delete', '-f', 'templates/nginx-ingress-controller-rbac.yml']
-                check_output(cmd).decode('utf-8')
-            except CalledProcessError:
-                hookenv.log('Failed to apply heapster rbac rules')
 
 
 @when('kubernetes-master.components.started')
