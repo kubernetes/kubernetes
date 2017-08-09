@@ -1606,7 +1606,7 @@ function wait-for-apiserver-and-update-fluentd {
   kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} \
     --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT} \
     --requests=cpu=${FLUENTD_GCP_CPU_REQUEST},memory=${FLUENTD_GCP_MEMORY_REQUEST} \
-    -o yaml > ${fluentd_gcp_yaml}.tmp
+    --containers=fluentd-gcp -o yaml > ${fluentd_gcp_yaml}.tmp
   mv ${fluentd_gcp_yaml}.tmp ${fluentd_gcp_yaml}
 }
 
