@@ -31,13 +31,14 @@ import (
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
-	var c clientset.Interface
+	var c, ec clientset.Interface
 	var grabber *metrics.MetricsGrabber
 	gin.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
+		ec = f.KubemarkExternalClusterClientSet
 		framework.ExpectNoError(err)
-		grabber, err = metrics.NewMetricsGrabber(c, true, true, true, true)
+		grabber, err = metrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
 		framework.ExpectNoError(err)
 	})
 

@@ -68,7 +68,7 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.
 	if c == nil {
 		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
 	}
-	grabber, err := metrics.NewMetricsGrabber(c, true, false, false, false)
+	grabber, err := metrics.NewMetricsGrabber(c, nil, true, false, false, false, false)
 	if err != nil {
 		return metrics.KubeletMetrics{}, err
 	}

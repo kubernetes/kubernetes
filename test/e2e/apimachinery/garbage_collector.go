@@ -251,7 +251,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 func gatherMetrics(f *framework.Framework) {
 	By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, false, false, true, false)
+	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {

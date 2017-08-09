@@ -51,7 +51,7 @@ func (m *Metrics) Equal(o Metrics) bool {
 
 func PrintSample(sample *model.Sample) string {
 	buf := make([]string, 0)
-	// Id is a VERY special label. For 'normal' container it's usless, but it's necessary
+	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
 	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
 	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
 	// but it works...
@@ -96,18 +96,4 @@ func parseMetrics(data string, output *Metrics) error {
 			(*output)[name] = append((*output)[name], metric)
 		}
 	}
-}
-
-func (g *MetricsGrabber) getMetricsFromPod(podName string, namespace string, port int) (string, error) {
-	rawOutput, err := g.client.Core().RESTClient().Get().
-		Namespace(namespace).
-		Resource("pods").
-		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", podName, port)).
-		Suffix("metrics").
-		Do().Raw()
-	if err != nil {
-		return "", err
-	}
-	return string(rawOutput), nil
 }

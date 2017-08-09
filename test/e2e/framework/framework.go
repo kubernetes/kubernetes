@@ -66,7 +66,8 @@ type Framework struct {
 	BaseName string
 
 	// ClientSet uses internal objects, you should use ClientSet where possible.
-	ClientSet clientset.Interface
+	ClientSet                        clientset.Interface
+	KubemarkExternalClusterClientSet clientset.Interface
 
 	InternalClientset *internalclientset.Clientset
 	StagingClient     *staging.Clientset
@@ -100,6 +101,9 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 
 	kubemarkControllerCloseChannel chan struct{}
+
+	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
+	clusterAutoscalerMetricsBeforeTest metrics.MetricsCollection
 }
 
 type TestDataSummary interface {
@@ -202,12 +206,13 @@ func (f *Framework) BeforeEach() {
 			Expect(err).NotTo(HaveOccurred())
 			externalClient, err := clientset.NewForConfig(externalConfig)
 			Expect(err).NotTo(HaveOccurred())
+			f.KubemarkExternalClusterClientSet = externalClient
 			f.kubemarkControllerCloseChannel = make(chan struct{})
 			externalInformerFactory := informers.NewSharedInformerFactory(externalClient, 0)
 			kubemarkInformerFactory := informers.NewSharedInformerFactory(f.ClientSet, 0)
 			kubemarkNodeInformer := kubemarkInformerFactory.Core().V1().Nodes()
 			go kubemarkNodeInformer.Informer().Run(f.kubemarkControllerCloseChannel)
-			TestContext.CloudConfig.KubemarkController, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
+			TestContext.CloudConfig.KubemarkController, err = kubemark.NewKubemarkController(f.KubemarkExternalClusterClientSet, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 			Expect(err).NotTo(HaveOccurred())
 			externalInformerFactory.Start(f.kubemarkControllerCloseChannel)
 			TestContext.CloudConfig.KubemarkController.Init(f.kubemarkControllerCloseChannel)
@@ -254,6 +259,22 @@ func (f *Framework) BeforeEach() {
 			f.logsSizeVerifier.Run()
 			f.logsSizeWaitGroup.Done()
 		}()
+	}
+
+	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
+	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics)
+		if err != nil {
+			Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
+		} else {
+			f.clusterAutoscalerMetricsBeforeTest, err = grabber.Grab()
+			if err != nil {
+				Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
+			} else {
+				Logf("Gathered ClusterAutoscaler metrics before test")
+			}
+		}
+
 	}
 }
 
@@ -351,16 +372,16 @@ func (f *Framework) AfterEach() {
 		By("Gathering metrics")
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
 		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
-		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, grabMetricsFromKubelets, true, true, true)
+		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
 			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				Logf("MetricsGrabber failed to grab metrics (skipping metrics gathering): %v", err)
-			} else {
-				f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
+				Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
 			}
+			(*MetricsForE2E)(&received).computeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
+			f.TestSummaries = append(f.TestSummaries, (*MetricsForE2E)(&received))
 		}
 	}
 
