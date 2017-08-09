@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -176,8 +177,9 @@ func (g *genericScheduler) preempt(pod *v1.Pod, nodeLister algorithm.NodeLister)
 	if len(nodeToPods) == 0 {
 		return "", nil
 	}
-	// TODO: Add a node scoring mechanism and perform preemption
-	return "", nil
+	node := pickOneNodeForPreemption(nodeToPods)
+	// TODO: Add actual preemption of pods
+	return node, nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
@@ -444,6 +446,89 @@ func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInf
 	}, nil
 }
 
+// pickOneNodeForPreemption chooses one node among the given nodes. It assumes
+// pods in each map entry are ordered by decreasing priority.
+// It picks a node based on the following criteria:
+// 1. A node with minimum highest priority victim is picked.
+// 2. Ties are broken by sum of priorities of all victims.
+// 3. If there are still ties, node with the minimum number of victims is picked.
+// 4. If there are still ties, the first such node in the map is picked (sort of randomly).
+func pickOneNodeForPreemption(nodesToPods map[string][]*v1.Pod) string {
+	type nodeScore struct {
+		nodeName        string
+		highestPriority int32
+		sumPriorities   int64
+		numPods         int
+	}
+	if len(nodesToPods) == 0 {
+		return ""
+	}
+	minHighestPriority := int32(math.MaxInt32)
+	nodeScores := []*nodeScore{}
+	for nodeName, pods := range nodesToPods {
+		if len(pods) == 0 {
+			// We found a node that doesn't need any preemption. Return it!
+			// This should happen rarely when one or more pods are terminated between
+			// the time that scheduler tries to schedule the pod and the time that
+			// preemption logic tries to find nodes for preemption.
+			return nodeName
+		}
+		// highestPodPriority is the highest priority among the victims on this node.
+		highestPodPriority := util.GetPodPriority(pods[0])
+		if highestPodPriority < minHighestPriority {
+			minHighestPriority = highestPodPriority
+		}
+		nodeScores = append(nodeScores, &nodeScore{nodeName: nodeName, highestPriority: highestPodPriority, numPods: len(pods)})
+	}
+	// Find the nodes with minimum highest priority victim.
+	minSumPriorities := int64(math.MaxInt64)
+	lowestHighPriorityNodes := []*nodeScore{}
+	for _, nodeScore := range nodeScores {
+		if nodeScore.highestPriority == minHighestPriority {
+			lowestHighPriorityNodes = append(lowestHighPriorityNodes, nodeScore)
+			var sumPriorities int64
+			for _, pod := range nodesToPods[nodeScore.nodeName] {
+				// We add MaxInt32+1 to all priorities to make all of them >= 0. This is
+				// needed so that a node with a few pods with negative priority is not
+				// picked over a node with a smaller number of pods with the same negative
+				// priority (and similar scenarios).
+				sumPriorities += int64(util.GetPodPriority(pod)) + int64(math.MaxInt32+1)
+			}
+			if sumPriorities < minSumPriorities {
+				minSumPriorities = sumPriorities
+			}
+			nodeScore.sumPriorities = sumPriorities
+		}
+	}
+	if len(lowestHighPriorityNodes) == 1 {
+		return lowestHighPriorityNodes[0].nodeName
+	}
+	// There are multiple nodes with the same minimum highest priority victim.
+	// Choose the one(s) with lowest sum of priorities.
+	minNumPods := math.MaxInt32
+	lowestSumPriorityNodes := []*nodeScore{}
+	for _, nodeScore := range lowestHighPriorityNodes {
+		if nodeScore.sumPriorities == minSumPriorities {
+			lowestSumPriorityNodes = append(lowestSumPriorityNodes, nodeScore)
+			if nodeScore.numPods < minNumPods {
+				minNumPods = nodeScore.numPods
+			}
+		}
+	}
+	if len(lowestSumPriorityNodes) == 1 {
+		return lowestSumPriorityNodes[0].nodeName
+	}
+	// There are still more than one node with minimum highest priority victim and
+	// lowest sum of victim priorities. Find the anyone with minimum number of victims.
+	for _, nodeScore := range lowestSumPriorityNodes {
+		if nodeScore.numPods == minNumPods {
+			return nodeScore.nodeName
+		}
+	}
+	glog.Errorf("We should never reach here!")
+	return ""
+}
+
 // selectNodesForPreemption finds all the nodes with possible victims for
 // preemption in parallel.
 func selectNodesForPreemption(pod *v1.Pod,
@@ -461,7 +546,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	checkNode := func(i int) {
 		nodeName := nodes[i].Name
 		pods, fits := selectVictimsOnNode(pod, meta.ShallowCopy(), nodeNameToInfo[nodeName], predicates)
-		if fits && len(pods) != 0 {
+		if fits {
 			resultLock.Lock()
 			nodeNameToPods[nodeName] = pods
 			resultLock.Unlock()
