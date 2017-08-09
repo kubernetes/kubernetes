@@ -4,23 +4,7 @@ licenses(["notice"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "cgo_genrule",
     "go_library",
-)
-
-cgo_genrule(
-    name = "cgo_codegen",
-    srcs = [
-        "seccomp.go",
-        "seccomp_internal.go",
-    ],
-    clinkopts = [
-        "-lz",
-        "-lm",
-        "-lpthread",
-        "-ldl",
-    ],
-    tags = ["automanaged"],
 )
 
 go_library(
