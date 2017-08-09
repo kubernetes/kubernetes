@@ -3519,9 +3519,12 @@ type EventSource struct {
 	// Component from which the event is generated.
 	// +optional
 	Component string
-	// Node name on which the event is generated.
+	// DEPRECATED: Node name on which the event is generated.
 	// +optional
 	Host string
+	// Identifies the component emitting the Event
+	// +optional
+	ID string
 }
 
 // Valid values for event types (new types could be added in future)
@@ -3577,7 +3580,77 @@ type Event struct {
 	// Type of this event (Normal, Warning), new types could be added in the future.
 	// +optional
 	Type string
+
+	// Time when this Event was first observed.
+	// +optional
+	EventTime metav1.MicroTime
+
+	// Data about the Event series this event represents or nil if it's a singleton Event.
+	// +optional
+	Series *EventSeries
+
+	// Component that generated the Event.
+	// +optional
+	Origin EventSource
+
+	// What Origin did/failed to do.
+	// +optional
+	Action EventAction
+
+	// On what Origin acted upon.
+	// +optional
+	Object *ObjectReference
+
+	// Optional secondary Object for more complex actions.
+	// +optional
+	SecondaryObject *ObjectReference
+
+	// +optional
+	Severity EventSeverity
 }
+
+type EventSeries struct {
+	// UID for this event series
+	UID string
+	// Number of occurrences in this series up to the last heartbeat time
+	Count int32
+	// Time when last update for this series was sent
+	HeartbeatTime metav1.MicroTime
+	// Time of the last occurence observed
+	LastObservedTime metav1.MicroTime
+	// State of this Series: Ongoing or Finished
+	State EventSeriesState
+}
+
+type EventAction struct {
+	Action string
+	Reason string
+}
+
+type EventSeverity string
+
+const (
+	// e.g. Pod scheduled
+	EventSeverityInProd EventSeverity = "InProd"
+
+	// e.g. Pod unable to schedule
+	EventSeverityTakeALookTomorrow EventSeverity = "TakeALookTomorrow"
+
+	// e.g. Node unreachable - something is wrong, but there's a
+	// possibility it will recover by itself
+	EventSeverityInvestigateInstantly EventSeverity = "InvestigateInstantly"
+
+	// e.g. ClusterAutoscaler out of quota - something needs user
+	// action
+	EventSeverityWakeMeUpInTheMiddleOfTheNight EventSeverity = "WakeMeUpInTheMiddleOfTheNight"
+)
+
+type EventSeriesState string
+
+const (
+	EventSeriesStateOngoing  = "Ongoing"
+	EventSeriesStateFinished = "Finished"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
