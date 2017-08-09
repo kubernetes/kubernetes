@@ -157,8 +157,7 @@ message DaemonSetStatus {
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 message DaemonSetUpdateStrategy {
-  // Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
-  // Default is OnDelete.
+  // Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
   // +optional
   optional string type = 1;
 
@@ -496,6 +495,8 @@ message RollingUpdateDeployment {
 message RollingUpdateStatefulSetStrategy {
   // Partition indicates the ordinal at which the StatefulSet should be
   // partitioned.
+  // Default value is 0.
+  // +optional
   optional int32 partition = 1;
 }
 
@@ -673,9 +674,12 @@ message StatefulSetStatus {
 // necessary to perform the update for the indicated strategy.
 message StatefulSetUpdateStrategy {
   // Type indicates the type of the StatefulSetUpdateStrategy.
+  // Default is RollingUpdate.
+  // +optional
   optional string type = 1;
 
   // RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+  // +optional
   optional RollingUpdateStatefulSetStrategy rollingUpdate = 2;
 }
 
