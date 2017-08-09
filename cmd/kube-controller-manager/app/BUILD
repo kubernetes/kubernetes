@@ -91,6 +91,7 @@ go_library(
         "//pkg/volume/gce_pd:go_default_library",
         "//pkg/volume/glusterfs:go_default_library",
         "//pkg/volume/host_path:go_default_library",
+        "//pkg/volume/iscsi:go_default_library",
         "//pkg/volume/local:go_default_library",
         "//pkg/volume/nfs:go_default_library",
         "//pkg/volume/photon_pd:go_default_library",
