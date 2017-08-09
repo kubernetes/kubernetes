@@ -209,6 +209,9 @@ type Controller struct {
 	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	taintNodeByCondition bool
+
+	// nodeEvictor handles node eviction, taint based or otherwise.
+	nodeEvictor nodeEvictor
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -299,9 +302,19 @@ func NewNodeController(
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 	}
+
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
 	}
+
+	if useTaintBasedEvictions && runTaintManager {
+		nc.nodeEvictor = newTaintBasedNodeEvictor(nc)
+		glog.Infof("NodeController is using taint based evictions.")
+	} else {
+		nc.nodeEvictor = newDefaultNodeEvictor(nc)
+
+	}
+
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
