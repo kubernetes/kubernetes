@@ -13,7 +13,6 @@ go_library(
         "parse.go",
         "xfs.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

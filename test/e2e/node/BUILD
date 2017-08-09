@@ -17,7 +17,6 @@ go_library(
         "nodeoutofdisk.go",
         "security_context.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",

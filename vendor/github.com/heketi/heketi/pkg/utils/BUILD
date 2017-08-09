@@ -19,7 +19,6 @@ go_library(
         "stringstack.go",
         "uuid.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/lpabon/godbc:go_default_library"],
 )
 

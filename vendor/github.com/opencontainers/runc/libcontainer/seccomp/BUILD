@@ -13,7 +13,6 @@ go_library(
         "config.go",
         "seccomp_unsupported.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library"],
 )
 

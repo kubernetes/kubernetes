@@ -13,7 +13,6 @@ go_library(
         "api.go",
         "conf.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/invoke:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",

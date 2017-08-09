@@ -14,7 +14,6 @@ go_library(
         "bootstrap_token_cleaner.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/bootstrap/api:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["nettest.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -36,5 +35,4 @@ filegroup(
 go_binary(
     name = "nettest",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )

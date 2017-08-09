@@ -16,7 +16,6 @@ go_library(
         "reporter.go",
         "teamcity_reporter.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer:go_default_library",

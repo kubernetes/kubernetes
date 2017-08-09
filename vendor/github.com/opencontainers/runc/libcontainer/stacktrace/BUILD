@@ -14,7 +14,6 @@ go_library(
         "frame.go",
         "stacktrace.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

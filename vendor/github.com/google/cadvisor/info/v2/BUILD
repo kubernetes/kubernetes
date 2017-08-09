@@ -14,7 +14,6 @@ go_library(
         "conversion.go",
         "machine.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

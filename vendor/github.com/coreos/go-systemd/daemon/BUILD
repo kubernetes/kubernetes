@@ -13,7 +13,6 @@ go_library(
         "sdnotify.go",
         "watchdog.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

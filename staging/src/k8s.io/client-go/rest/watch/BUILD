@@ -14,7 +14,6 @@ go_library(
         "decoder.go",
         "encoder.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -29,7 +28,6 @@ go_test(
         "decoder_test.go",
         "encoder_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

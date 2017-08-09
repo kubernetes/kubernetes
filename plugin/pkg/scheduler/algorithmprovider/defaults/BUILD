@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["defaults.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
@@ -31,7 +30,6 @@ go_test(
         "defaults_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

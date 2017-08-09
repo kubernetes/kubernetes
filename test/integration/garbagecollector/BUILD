@@ -11,10 +11,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = ["garbage_collector_test.go"],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",

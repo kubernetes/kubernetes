@@ -29,7 +29,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
@@ -66,7 +65,6 @@ go_test(
         "sync_result_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
@@ -80,7 +78,6 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = ["runtime_cache_test.go"],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

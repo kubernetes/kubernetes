@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "encode.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 

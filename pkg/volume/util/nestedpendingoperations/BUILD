@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["nestedpendingoperations.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -25,7 +24,6 @@ go_test(
     name = "go_default_test",
     srcs = ["nestedpendingoperations_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume/util/types:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

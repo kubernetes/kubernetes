@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["simpleredis.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/garyburd/redigo/redis:go_default_library"],
 )
 

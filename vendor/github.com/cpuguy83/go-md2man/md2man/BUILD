@@ -13,7 +13,6 @@ go_library(
         "md2man.go",
         "roff.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/russross/blackfriday:go_default_library"],
 )
 

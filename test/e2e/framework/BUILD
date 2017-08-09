@@ -40,7 +40,6 @@ go_library(
         "util.go",
         "volume_util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",

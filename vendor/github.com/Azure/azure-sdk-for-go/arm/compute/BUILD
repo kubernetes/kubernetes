@@ -24,7 +24,6 @@ go_library(
         "virtualmachinescalesetvms.go",
         "virtualmachinesizes.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",

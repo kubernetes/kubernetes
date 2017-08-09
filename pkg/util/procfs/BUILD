@@ -21,7 +21,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/golang/glog:go_default_library",
@@ -43,9 +42,6 @@ go_test(
         "example_proc_cgroup",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",

@@ -32,7 +32,6 @@ go_library(
         "volume_create_options.go",
         "volume_update_options.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

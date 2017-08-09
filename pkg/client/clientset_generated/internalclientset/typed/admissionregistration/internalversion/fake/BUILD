@@ -15,7 +15,6 @@ go_library(
         "fake_externaladmissionhookconfiguration.go",
         "fake_initializerconfiguration.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion:go_default_library",

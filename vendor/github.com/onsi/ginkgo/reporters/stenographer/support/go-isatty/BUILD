@@ -23,7 +23,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
 )
 
 filegroup(

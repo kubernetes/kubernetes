@@ -18,7 +18,6 @@ go_library(
         "forward_assertions.go",
         "http_assertions.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",

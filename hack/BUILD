@@ -59,7 +59,6 @@ test_suite(
 go_binary(
     name = "hack",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -67,11 +66,9 @@ go_test(
     srcs = ["e2e_test.go"],
     data = glob(["testdata/**"]),
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["e2e.go"],
-    tags = ["automanaged"],
 )

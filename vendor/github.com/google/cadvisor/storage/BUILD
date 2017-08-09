@@ -13,7 +13,6 @@ go_library(
         "common_flags.go",
         "storage.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/google/cadvisor/info/v1:go_default_library"],
 )
 

@@ -14,7 +14,6 @@ go_library(
         "results.go",
         "urls.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors:go_default_library",

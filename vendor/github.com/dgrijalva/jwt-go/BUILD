@@ -25,7 +25,6 @@ go_library(
         "signing_method.go",
         "token.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

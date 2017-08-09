@@ -13,7 +13,6 @@ go_library(
         "duration_convert.go",
         "timestamp.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

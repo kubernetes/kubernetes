@@ -14,7 +14,6 @@ go_library(
         "virtualdisk.go",
         "vmdm.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

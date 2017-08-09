@@ -13,7 +13,6 @@ go_library(
         "bytes.go",
         "strings.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

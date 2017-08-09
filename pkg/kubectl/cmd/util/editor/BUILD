@@ -12,7 +12,6 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
@@ -43,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["editor_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

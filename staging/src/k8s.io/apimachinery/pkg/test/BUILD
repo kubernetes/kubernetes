@@ -19,7 +19,6 @@ go_test(
         "runtime_unversioned_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -43,7 +42,6 @@ go_library(
         "util.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/testapigroup:go_default_library",

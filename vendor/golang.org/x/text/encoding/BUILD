@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["encoding.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/text/encoding/internal/identifier:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",

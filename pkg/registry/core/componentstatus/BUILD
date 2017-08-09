@@ -15,7 +15,6 @@ go_library(
         "rest.go",
         "validator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/probe:go_default_library",
@@ -36,7 +35,6 @@ go_test(
         "validator_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/probe:go_default_library",

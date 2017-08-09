@@ -14,7 +14,6 @@ go_library(
         "methods.go",
         "service_content.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",

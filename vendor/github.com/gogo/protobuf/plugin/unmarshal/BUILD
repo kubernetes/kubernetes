@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["unmarshal.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

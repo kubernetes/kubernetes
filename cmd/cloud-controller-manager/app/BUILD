@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["controllermanager.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",

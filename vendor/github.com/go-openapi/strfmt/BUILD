@@ -17,7 +17,6 @@ go_library(
         "format.go",
         "time.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/asaskevich/govalidator:go_default_library",
         "//vendor/github.com/go-openapi/errors:go_default_library",

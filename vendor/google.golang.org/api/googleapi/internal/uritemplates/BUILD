@@ -13,7 +13,6 @@ go_library(
         "uritemplates.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

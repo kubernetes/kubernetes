@@ -27,7 +27,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/spec_iterator:go_default_library",

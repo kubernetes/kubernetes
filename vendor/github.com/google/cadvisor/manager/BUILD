@@ -13,7 +13,6 @@ go_library(
         "container.go",
         "manager.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/go-units:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

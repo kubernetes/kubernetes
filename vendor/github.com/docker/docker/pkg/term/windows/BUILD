@@ -19,7 +19,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/Azure/go-ansiterm:go_default_library",
         "//vendor/github.com/Sirupsen/logrus:go_default_library",

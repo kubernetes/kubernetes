@@ -24,7 +24,6 @@ go_library(
         "srv.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/pathutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",

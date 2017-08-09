@@ -13,7 +13,6 @@ go_library(
         "wait.go",
         "wait_time.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

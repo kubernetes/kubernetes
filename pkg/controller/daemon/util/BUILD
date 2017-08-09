@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["daemonset_util.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -44,7 +43,6 @@ go_test(
     name = "go_default_test",
     srcs = ["daemonset_util_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

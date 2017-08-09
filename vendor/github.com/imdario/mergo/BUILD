@@ -15,7 +15,6 @@ go_library(
         "merge.go",
         "mergo.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

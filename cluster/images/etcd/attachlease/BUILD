@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "attachlease",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["attachlease.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

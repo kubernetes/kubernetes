@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "environment",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["conformance.go"],
-    tags = ["automanaged"],
     deps = ["//pkg/kubelet/cadvisor:go_default_library"],
 )
 

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["simple_testclient.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

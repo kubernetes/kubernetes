@@ -15,7 +15,6 @@ go_test(
         "types_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 
@@ -28,7 +27,6 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "requests.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/rackspace/gophercloud:go_default_library",
         "//vendor/github.com/rackspace/gophercloud/openstack/compute/v2/extensions/bootfromvolume:go_default_library",

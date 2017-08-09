@@ -13,7 +13,6 @@ go_library(
         "extension.pb.go",
         "extensions.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes:go_default_library",

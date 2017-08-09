@@ -15,7 +15,6 @@ go_library(
         "remote_runtime.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

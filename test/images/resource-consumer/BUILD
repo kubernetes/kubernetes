@@ -11,7 +11,6 @@ load(
 go_binary(
     name = "resource-consumer",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -21,7 +20,6 @@ go_library(
         "resource_consumer_handler.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = ["//test/images/resource-consumer/common:go_default_library"],
 )
 

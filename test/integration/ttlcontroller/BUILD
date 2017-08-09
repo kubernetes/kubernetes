@@ -15,7 +15,6 @@ go_test(
         "ttlcontroller_test.go",
     ],
     tags = [
-        "automanaged",
         "etcd",
         "integration",
     ],

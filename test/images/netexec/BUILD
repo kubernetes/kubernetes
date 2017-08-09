@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "netexec",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["netexec.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 

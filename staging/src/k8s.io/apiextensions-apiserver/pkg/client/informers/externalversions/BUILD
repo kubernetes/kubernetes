@@ -13,7 +13,6 @@ go_library(
         "factory.go",
         "generic.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",

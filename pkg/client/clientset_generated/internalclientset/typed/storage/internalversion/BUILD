@@ -15,7 +15,6 @@ go_library(
         "storage_client.go",
         "storageclass.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

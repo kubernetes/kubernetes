@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["aws_credentials.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
@@ -26,7 +25,6 @@ go_test(
     name = "go_default_test",
     srcs = ["aws_credentials_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

@@ -17,7 +17,6 @@ go_library(
         "rotate.go",
         "sync.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",
         "//vendor/github.com/coreos/pkg/health:go_default_library",

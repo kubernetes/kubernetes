@@ -13,7 +13,6 @@ go_library(
         "ratelimit.go",
         "reader.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

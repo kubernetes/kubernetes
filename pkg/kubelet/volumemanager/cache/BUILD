@@ -14,7 +14,6 @@ go_library(
         "actual_state_of_world.go",
         "desired_state_of_world.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
@@ -33,7 +32,6 @@ go_test(
         "desired_state_of_world_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "tlsconfig_clone_go16.go",
         "tlsconfig_clone_go17.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

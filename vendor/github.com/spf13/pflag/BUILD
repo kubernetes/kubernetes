@@ -37,7 +37,6 @@ go_library(
         "uint8.go",
         "uint_slice.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

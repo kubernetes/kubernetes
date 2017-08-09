@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",

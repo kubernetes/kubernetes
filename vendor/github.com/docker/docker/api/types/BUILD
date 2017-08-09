@@ -29,7 +29,6 @@ go_library(
         "types.go",
         "volume.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",
         "//vendor/github.com/docker/docker/api/types/filters:go_default_library",

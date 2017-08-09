@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["discovery.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",

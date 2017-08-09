@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fake_exec.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/utils/exec:go_default_library"],
 )
 

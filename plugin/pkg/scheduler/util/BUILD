@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["backoff_utils_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 
@@ -23,7 +22,6 @@ go_library(
         "testutil.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

@@ -22,7 +22,6 @@ go_library(
         "responses.go",
         "signer.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

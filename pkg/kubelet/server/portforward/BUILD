@@ -16,7 +16,6 @@ go_library(
         "portforward.go",
         "websocket.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -36,7 +35,6 @@ go_test(
         "websocket_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",

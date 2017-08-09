@@ -21,7 +21,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
     ] + select({

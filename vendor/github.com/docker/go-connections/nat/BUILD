@@ -14,7 +14,6 @@ go_library(
         "parse.go",
         "sort.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

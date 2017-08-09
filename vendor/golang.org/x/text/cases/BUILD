@@ -18,7 +18,6 @@ go_library(
         "tables.go",
         "trieval.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/text/language:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",

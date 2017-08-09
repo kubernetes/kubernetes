@@ -17,7 +17,6 @@ go_library(
         "hawkular.go",
         "influxdb.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
@@ -46,7 +45,6 @@ go_test(
         "influxdb_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

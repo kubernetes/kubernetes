@@ -15,7 +15,6 @@ go_library(
         "fake_controllerrevision.go",
         "fake_statefulset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/apps:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/apps/internalversion:go_default_library",

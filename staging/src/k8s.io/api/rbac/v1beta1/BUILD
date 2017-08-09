@@ -18,7 +18,6 @@ go_library(
         "types_swagger_doc_generated.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",

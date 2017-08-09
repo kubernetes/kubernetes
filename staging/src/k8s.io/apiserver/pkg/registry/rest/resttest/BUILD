@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["resttest.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

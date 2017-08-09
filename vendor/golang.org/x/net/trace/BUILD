@@ -14,7 +14,6 @@ go_library(
         "histogram.go",
         "trace.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/net/internal/timeseries:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "rpc_client.go",
         "types.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["assume_role_provider.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/client:go_default_library",

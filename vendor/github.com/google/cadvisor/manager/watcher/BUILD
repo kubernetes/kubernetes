@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["watcher.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

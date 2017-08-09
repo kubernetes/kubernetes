@@ -21,7 +21,6 @@ go_library(
         "type_specific_codegen.go",
         "value.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

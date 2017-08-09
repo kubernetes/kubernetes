@@ -14,7 +14,6 @@ go_library(
         "interfaces.go",
         "wardleinitializer.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion:go_default_library",
@@ -24,7 +23,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["wardleinitializer_test.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",

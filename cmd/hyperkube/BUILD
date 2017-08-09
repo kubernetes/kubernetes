@@ -13,7 +13,6 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "hyperkube",
     library = ":go_default_library",
-    tags = ["automanaged"],
     x_defs = version_x_defs(),
 )
 
@@ -21,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["hyperkube_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -44,7 +42,6 @@ go_library(
         "main.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",

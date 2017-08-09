@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "route_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -43,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["route_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",

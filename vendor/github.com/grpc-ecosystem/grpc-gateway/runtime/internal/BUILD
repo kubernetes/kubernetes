@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["stream_chunk.pb.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 

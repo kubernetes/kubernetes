@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "host_path.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
@@ -35,7 +34,6 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/util/file:go_default_library",

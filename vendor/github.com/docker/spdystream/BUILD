@@ -16,7 +16,6 @@ go_library(
         "stream.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/spdystream/spdy:go_default_library"],
 )
 

@@ -13,7 +13,6 @@ go_library(
         "OpenAPIv2.go",
         "OpenAPIv2.pb.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes/any:go_default_library",

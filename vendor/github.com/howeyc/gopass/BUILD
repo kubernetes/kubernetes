@@ -13,7 +13,6 @@ go_library(
         "pass.go",
         "terminal.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/crypto/ssh/terminal:go_default_library"],
 )
 

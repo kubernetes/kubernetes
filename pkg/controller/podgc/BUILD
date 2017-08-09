@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "gc_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -36,7 +35,6 @@ go_test(
     name = "go_default_test",
     srcs = ["gc_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",

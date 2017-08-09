@@ -16,7 +16,6 @@ go_library(
         "unixtime.go",
         "utility.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

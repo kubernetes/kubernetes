@@ -13,7 +13,6 @@ go_library(
         "error.go",
         "lexer.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

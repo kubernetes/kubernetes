@@ -22,7 +22,6 @@ go_library(
         "statefulset.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

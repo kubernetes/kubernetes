@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/apis/componentconfig:go_default_library"],
 )
 
@@ -29,7 +28,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",

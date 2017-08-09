@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "interval_tree.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

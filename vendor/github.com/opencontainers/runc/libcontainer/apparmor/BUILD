@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = ["apparmor_disabled.go"],
     cgo = True,
-    tags = ["automanaged"],
 )
 
 filegroup(

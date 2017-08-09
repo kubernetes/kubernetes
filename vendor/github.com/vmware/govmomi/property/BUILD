@@ -14,7 +14,6 @@ go_library(
         "filter.go",
         "wait.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/methods:go_default_library",

@@ -19,7 +19,6 @@ go_library(
     data = [
         "@com_coreos_etcd//:etcd",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

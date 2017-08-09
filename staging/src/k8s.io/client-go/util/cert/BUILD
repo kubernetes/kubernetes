@@ -16,7 +16,6 @@ go_test(
     ],
     data = glob(["testdata/**"]),
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -30,7 +29,6 @@ go_library(
     data = [
         "testdata/dontUseThisKey.pem",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

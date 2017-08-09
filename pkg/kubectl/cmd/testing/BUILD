@@ -11,7 +11,6 @@ go_library(
         "fake.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
     ],

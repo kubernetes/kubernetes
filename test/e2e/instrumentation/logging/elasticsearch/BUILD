@@ -14,7 +14,6 @@ go_library(
         "kibana.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",

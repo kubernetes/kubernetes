@@ -15,7 +15,6 @@ go_library(
         "machine.go",
         "metric.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

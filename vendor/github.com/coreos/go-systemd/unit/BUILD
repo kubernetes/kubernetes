@@ -15,7 +15,6 @@ go_library(
         "option.go",
         "serialize.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

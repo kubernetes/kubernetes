@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "endpoints_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
@@ -43,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["endpoints_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

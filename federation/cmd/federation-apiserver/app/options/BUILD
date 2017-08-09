@@ -13,7 +13,6 @@ go_library(
         "options.go",
         "validation.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/features:go_default_library",

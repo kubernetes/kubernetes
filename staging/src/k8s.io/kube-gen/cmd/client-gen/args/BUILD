@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["args.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library"],
 )
 

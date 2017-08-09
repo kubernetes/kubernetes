@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["i18n.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/generated:go_default_library",
         "//vendor/github.com/chai2010/gettext-go/gettext:go_default_library",
@@ -23,7 +22,6 @@ go_test(
     name = "go_default_test",
     srcs = ["i18n_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

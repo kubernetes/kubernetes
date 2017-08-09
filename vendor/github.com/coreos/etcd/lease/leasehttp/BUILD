@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "http.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/lease:go_default_library",

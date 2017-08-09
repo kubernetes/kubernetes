@@ -14,7 +14,6 @@ go_library(
         "mirror_client.go",
         "pod_manager.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -36,7 +35,6 @@ go_test(
         "pod_manager_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",

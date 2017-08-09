@@ -13,7 +13,6 @@ go_library(
         "fields.go",
         "yaml.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )
 

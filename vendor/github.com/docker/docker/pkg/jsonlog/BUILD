@@ -15,7 +15,6 @@ go_library(
         "jsonlogbytes.go",
         "time_marshalling.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

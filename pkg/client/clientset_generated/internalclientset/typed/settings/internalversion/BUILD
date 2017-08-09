@@ -15,7 +15,6 @@ go_library(
         "podpreset.go",
         "settings_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/settings:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

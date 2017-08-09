@@ -17,7 +17,6 @@ go_library(
         "tables.go",
         "trieval.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

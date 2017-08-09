@@ -19,7 +19,6 @@ go_library(
         "sinker.go",
         "tee.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

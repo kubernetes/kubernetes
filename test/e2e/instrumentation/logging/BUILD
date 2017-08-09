@@ -13,7 +13,6 @@ go_library(
         "generic_soak.go",
         "imports.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",

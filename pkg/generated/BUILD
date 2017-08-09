@@ -13,7 +13,6 @@ go_library(
         "bindata.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

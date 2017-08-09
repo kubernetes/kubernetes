@@ -15,7 +15,6 @@ go_library(
         "results.go",
         "urls.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v2/tenants:go_default_library",

@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["ttl_controller.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -48,7 +47,6 @@ go_test(
     name = "go_default_test",
     srcs = ["ttl_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

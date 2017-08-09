@@ -14,7 +14,6 @@ go_library(
         "jwt.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
@@ -29,7 +28,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["jwt_test.go"],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",

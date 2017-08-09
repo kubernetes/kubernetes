@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

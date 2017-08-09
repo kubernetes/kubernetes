@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["controller_utils.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",

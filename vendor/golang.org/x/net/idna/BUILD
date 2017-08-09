@@ -13,7 +13,6 @@ go_library(
         "idna.go",
         "punycode.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

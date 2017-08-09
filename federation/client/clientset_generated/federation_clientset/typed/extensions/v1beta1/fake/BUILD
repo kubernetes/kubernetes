@@ -18,7 +18,6 @@ go_library(
         "fake_ingress.go",
         "fake_replicaset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

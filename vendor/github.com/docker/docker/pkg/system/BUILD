@@ -51,7 +51,6 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/docker/go-units:go_default_library",

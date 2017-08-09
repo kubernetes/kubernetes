@@ -14,7 +14,6 @@ go_library(
         "helpers.go",
         "types.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -26,7 +26,6 @@ go_library(
         "values.go",
         "xml.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/errors:go_default_library",
         "//vendor/github.com/go-openapi/strfmt:go_default_library",

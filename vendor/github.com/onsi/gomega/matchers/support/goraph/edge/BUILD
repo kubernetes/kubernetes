@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["edge.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/onsi/gomega/matchers/support/goraph/node:go_default_library"],
 )
 

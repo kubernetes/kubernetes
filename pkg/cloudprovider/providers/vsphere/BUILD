@@ -14,7 +14,6 @@ go_library(
         "vsphere.go",
         "vsphere_util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -37,7 +36,6 @@ go_test(
     name = "go_default_test",
     srcs = ["vsphere_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",

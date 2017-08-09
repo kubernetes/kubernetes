@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["reconciler.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
@@ -37,7 +36,6 @@ go_test(
     name = "go_default_test",
     srcs = ["reconciler_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/mount:go_default_library",

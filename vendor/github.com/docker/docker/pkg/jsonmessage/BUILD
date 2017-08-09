@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["jsonmessage.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/jsonlog:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",

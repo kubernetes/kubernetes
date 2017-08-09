@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1:go_default_library",
@@ -28,7 +27,6 @@ go_library(
 go_binary(
     name = "client-go",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

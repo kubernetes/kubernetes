@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "go-to-protobuf",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/kube-gen/cmd/go-to-protobuf/protobuf:go_default_library",

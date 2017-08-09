@@ -14,7 +14,6 @@ go_library(
         "serialize.go",
         "token.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

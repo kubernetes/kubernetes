@@ -14,7 +14,6 @@ go_library(
         "mustmatchpatterns.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -26,7 +25,6 @@ go_test(
     name = "go_default_test",
     srcs = ["mustmatchpatterns_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",

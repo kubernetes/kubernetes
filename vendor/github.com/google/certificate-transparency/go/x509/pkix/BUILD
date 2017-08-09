@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pkix.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/google/certificate-transparency/go/asn1:go_default_library"],
 )
 

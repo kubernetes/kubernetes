@@ -15,7 +15,6 @@ go_library(
         "job.go",
         "statefulset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",

@@ -15,7 +15,6 @@ go_library(
         "interfaces.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -25,7 +24,6 @@ go_test(
         "utils_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )
 

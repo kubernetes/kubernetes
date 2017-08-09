@@ -15,7 +15,6 @@ go_library(
         "reader.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library"],
 )
 

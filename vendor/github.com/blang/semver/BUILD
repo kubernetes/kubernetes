@@ -16,7 +16,6 @@ go_library(
         "sort.go",
         "sql.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

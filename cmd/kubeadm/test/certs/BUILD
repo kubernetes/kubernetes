@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
     deps = ["//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library"],
 )
 

@@ -15,7 +15,6 @@ go_library(
         "statefulset.go",
         "statefulset_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",

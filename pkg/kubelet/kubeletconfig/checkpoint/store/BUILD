@@ -15,7 +15,6 @@ go_test(
         "store_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
@@ -35,7 +34,6 @@ go_library(
         "fsstore.go",
         "store.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",

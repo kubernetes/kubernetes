@@ -19,7 +19,6 @@ go_library(
         "util.go",
         "wal.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//third_party/forked/etcd221/pkg/fileutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",

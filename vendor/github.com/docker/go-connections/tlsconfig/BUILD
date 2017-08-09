@@ -14,7 +14,6 @@ go_library(
         "config_client_ciphers.go",
         "config_legacy_client_ciphers.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
 )
 

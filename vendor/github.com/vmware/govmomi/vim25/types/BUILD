@@ -19,7 +19,6 @@ go_library(
         "registry.go",
         "types.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

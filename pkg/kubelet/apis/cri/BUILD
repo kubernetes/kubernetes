@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["services.go"],
-    tags = ["automanaged"],
     deps = ["//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library"],
 )
 

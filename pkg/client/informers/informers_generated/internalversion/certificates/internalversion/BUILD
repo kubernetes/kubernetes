@@ -13,7 +13,6 @@ go_library(
         "certificatesigningrequest.go",
         "interface.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["crudtester.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/federatedtypes:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

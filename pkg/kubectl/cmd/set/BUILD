@@ -16,7 +16,6 @@ go_library(
         "set_selector.go",
         "set_subject.go",
     ],
-    tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
         "//pkg/api:go_default_library",
@@ -52,7 +51,6 @@ go_test(
         "//examples:config",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",

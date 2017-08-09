@@ -14,7 +14,6 @@ go_library(
         "synchronization.go",
         "types.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -24,7 +24,6 @@ go_library(
         "scale_expansion.go",
         "thirdpartyresource.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

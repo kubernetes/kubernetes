@@ -17,7 +17,6 @@ go_library(
         "subscription.go",
         "subscription_set.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/godbus/dbus:go_default_library"],
 )
 

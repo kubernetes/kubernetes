@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["aggregator.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",

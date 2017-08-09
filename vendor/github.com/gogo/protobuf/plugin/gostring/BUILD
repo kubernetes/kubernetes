@@ -13,7 +13,6 @@ go_library(
         "gostring.go",
         "gostringtest.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/plugin/testgen:go_default_library",

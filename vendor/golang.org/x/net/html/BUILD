@@ -21,7 +21,6 @@ go_library(
         "render.go",
         "token.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/net/html/atom:go_default_library"],
 )
 

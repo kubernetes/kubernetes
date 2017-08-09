@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 
@@ -31,7 +30,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({

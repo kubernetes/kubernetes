@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["status.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/equal:go_default_library",

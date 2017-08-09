@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["client.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",

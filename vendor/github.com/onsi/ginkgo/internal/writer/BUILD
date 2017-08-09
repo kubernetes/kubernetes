@@ -13,7 +13,6 @@ go_library(
         "fake_writer.go",
         "writer.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

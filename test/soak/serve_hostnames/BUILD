@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "serve_hostnames",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["serve_hostnames.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",

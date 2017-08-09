@@ -25,7 +25,6 @@ go_library(
         "watch_ranges.go",
         "watcher.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",

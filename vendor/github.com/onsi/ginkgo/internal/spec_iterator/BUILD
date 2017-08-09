@@ -16,7 +16,6 @@ go_library(
         "sharded_parallel_spec_iterator.go",
         "spec_iterator.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/onsi/ginkgo/internal/spec:go_default_library"],
 )
 

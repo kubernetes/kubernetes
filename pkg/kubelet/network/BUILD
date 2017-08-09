@@ -13,7 +13,6 @@ go_library(
         "network.go",
         "plugins.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",

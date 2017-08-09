@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["testing.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",

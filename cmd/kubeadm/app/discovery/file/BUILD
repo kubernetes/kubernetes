@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["file.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",

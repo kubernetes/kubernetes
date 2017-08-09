@@ -43,7 +43,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/certificate-transparency/go/asn1:go_default_library",
         "//vendor/github.com/google/certificate-transparency/go/x509/pkix:go_default_library",

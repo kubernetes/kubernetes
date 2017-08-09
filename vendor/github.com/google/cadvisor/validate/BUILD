@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validate.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/cadvisor/container/docker:go_default_library",
         "//vendor/github.com/google/cadvisor/manager:go_default_library",

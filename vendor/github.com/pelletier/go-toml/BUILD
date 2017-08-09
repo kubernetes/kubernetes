@@ -23,7 +23,6 @@ go_library(
         "toml.go",
         "tomltree_conversions.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/pelletier/go-buffruneio:go_default_library"],
 )
 

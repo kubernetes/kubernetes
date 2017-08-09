@@ -15,7 +15,6 @@ go_library(
         "config.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
@@ -39,7 +38,6 @@ go_test(
         "config_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",

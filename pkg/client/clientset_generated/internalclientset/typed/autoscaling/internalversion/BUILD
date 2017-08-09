@@ -15,7 +15,6 @@ go_library(
         "generated_expansion.go",
         "horizontalpodautoscaler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

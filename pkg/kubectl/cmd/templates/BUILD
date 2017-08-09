@@ -14,7 +14,6 @@ go_library(
         "templater.go",
         "templates.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
     ],

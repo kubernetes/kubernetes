@@ -16,7 +16,6 @@ go_test(
         "rules_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/admission/install:go_default_library",
@@ -36,7 +35,6 @@ go_library(
         "doc.go",
         "rules.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/admission/install:go_default_library",

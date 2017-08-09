@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interfaces.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 

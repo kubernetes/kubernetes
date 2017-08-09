@@ -24,7 +24,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/golang.org/x/sys/windows:go_default_library",

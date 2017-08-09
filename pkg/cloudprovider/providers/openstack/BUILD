@@ -20,7 +20,6 @@ go_library(
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/service:go_default_library",
@@ -73,7 +72,6 @@ go_test(
         "openstack_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

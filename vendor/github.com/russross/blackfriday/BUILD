@@ -17,7 +17,6 @@ go_library(
         "markdown.go",
         "smartypants.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/shurcooL/sanitized_anchor_name:go_default_library"],
 )
 

@@ -13,7 +13,6 @@ go_library(
         "container_runtime.go",
         "options.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",

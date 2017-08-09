@@ -13,7 +13,6 @@ go_library(
         "discovery.go",
         "srv.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",

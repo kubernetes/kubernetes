@@ -31,7 +31,6 @@ go_library(
         "util.go",
         "volume_host.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",
@@ -169,7 +168,6 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

@@ -20,7 +20,6 @@ go_library(
         "subjectaccessreview.go",
         "subjectaccessreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/authorization/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

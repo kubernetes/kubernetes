@@ -35,7 +35,6 @@ go_library(
         "service_expansion.go",
         "serviceaccount.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

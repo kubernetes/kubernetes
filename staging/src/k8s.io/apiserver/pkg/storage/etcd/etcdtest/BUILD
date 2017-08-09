@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "etcdtest.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

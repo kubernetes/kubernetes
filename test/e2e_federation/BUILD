@@ -22,7 +22,6 @@ go_library(
         "upgrade.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",

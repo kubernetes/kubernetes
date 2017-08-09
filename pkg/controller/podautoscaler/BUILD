@@ -16,7 +16,6 @@ go_library(
         "rate_limitters.go",
         "replica_calculator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -58,7 +57,6 @@ go_test(
         "replica_calculator_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",

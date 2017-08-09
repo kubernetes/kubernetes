@@ -26,7 +26,6 @@ go_library(
         "tags.go",
         "volumes.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -66,7 +65,6 @@ go_test(
         "tags_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

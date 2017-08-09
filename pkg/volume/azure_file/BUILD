@@ -16,7 +16,6 @@ go_library(
         "azure_util.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
@@ -38,7 +37,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_file_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/fake:go_default_library",

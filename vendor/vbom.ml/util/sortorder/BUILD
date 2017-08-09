@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "natsort.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

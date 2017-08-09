@@ -22,7 +22,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/api/types/blkiodev:go_default_library",
         "//vendor/github.com/docker/docker/api/types/mount:go_default_library",

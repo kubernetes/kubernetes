@@ -14,10 +14,7 @@ go_test(
         "main_test.go",
         "openshift_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/master:go_default_library",
         "//test/integration/framework:go_default_library",

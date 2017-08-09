@@ -16,7 +16,6 @@ go_library(
         "server.go",
         "websocket.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

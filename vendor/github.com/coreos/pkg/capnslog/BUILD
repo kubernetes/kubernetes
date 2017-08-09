@@ -24,7 +24,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/go-systemd/journal:go_default_library"],
 )
 

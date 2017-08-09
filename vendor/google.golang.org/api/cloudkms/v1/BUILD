@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["cloudkms-gen.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",

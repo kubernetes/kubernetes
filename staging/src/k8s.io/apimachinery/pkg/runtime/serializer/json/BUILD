@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["meta_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -21,7 +20,6 @@ go_library(
         "json.go",
         "meta.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
@@ -36,7 +34,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["json_test.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

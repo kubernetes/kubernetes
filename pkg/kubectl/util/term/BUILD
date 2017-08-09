@@ -21,7 +21,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/interrupt:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
@@ -36,7 +35,6 @@ go_test(
     name = "go_default_test",
     srcs = ["term_writer_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

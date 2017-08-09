@@ -14,7 +14,6 @@ go_library(
         "registry.go",
         "strategy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/settings:go_default_library",

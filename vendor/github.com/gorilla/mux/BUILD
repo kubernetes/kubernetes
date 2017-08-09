@@ -15,7 +15,6 @@ go_library(
         "regexp.go",
         "route.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/gorilla/context:go_default_library"],
 )
 

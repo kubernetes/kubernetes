@@ -14,7 +14,6 @@ go_library(
         "arc.go",
         "lru.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/hashicorp/golang-lru/simplelru:go_default_library"],
 )
 

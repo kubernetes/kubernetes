@@ -21,7 +21,6 @@ go_library(
         "swagger_builder.go",
         "swagger_webservice.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/emicklei/go-restful/log:go_default_library",

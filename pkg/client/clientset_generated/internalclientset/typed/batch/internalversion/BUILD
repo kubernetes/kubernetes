@@ -16,7 +16,6 @@ go_library(
         "generated_expansion.go",
         "job.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/batch:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

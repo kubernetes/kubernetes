@@ -14,7 +14,6 @@ go_library(
         "fake_batch_client.go",
         "fake_job.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

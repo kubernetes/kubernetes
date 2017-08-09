@@ -17,7 +17,6 @@ go_library(
         "urls.go",
         "urlsmap.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

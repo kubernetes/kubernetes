@@ -16,7 +16,6 @@ go_library(
         "sender.go",
         "token.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/dgrijalva/jwt-go:go_default_library"],
 )
 

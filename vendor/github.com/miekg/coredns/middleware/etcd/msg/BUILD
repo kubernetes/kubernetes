@@ -13,7 +13,6 @@ go_library(
         "path.go",
         "service.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/miekg/dns:go_default_library"],
 )
 

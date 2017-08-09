@@ -15,7 +15,6 @@ go_library(
         "ecdh_es.go",
         "key_wrap.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

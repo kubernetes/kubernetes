@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["httpstream_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -21,7 +20,6 @@ go_library(
         "doc.go",
         "httpstream.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

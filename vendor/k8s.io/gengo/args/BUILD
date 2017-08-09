@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["args.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",

@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "n-way-http",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["server.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

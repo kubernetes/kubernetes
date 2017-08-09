@@ -13,7 +13,6 @@ go_library(
         "certificatesigningrequest.go",
         "expansion_generated.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["scanner.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/hashicorp/hcl/hcl/token:go_default_library"],
 )
 

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["merge_logger.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
 )
 

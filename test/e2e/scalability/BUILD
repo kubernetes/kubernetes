@@ -15,7 +15,6 @@ go_library(
         "framework.go",
         "load.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",

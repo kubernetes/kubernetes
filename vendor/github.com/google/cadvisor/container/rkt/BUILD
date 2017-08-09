@@ -15,7 +15,6 @@ go_library(
         "handler.go",
         "helpers.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/rkt/api/v1alpha:go_default_library",

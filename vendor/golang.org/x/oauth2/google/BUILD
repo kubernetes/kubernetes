@@ -16,7 +16,6 @@ go_library(
         "jwt.go",
         "sdk.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

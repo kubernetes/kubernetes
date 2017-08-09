@@ -13,7 +13,6 @@ go_library(
         "assetfs.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -23,7 +23,6 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
@@ -44,7 +43,6 @@ go_test(
     name = "go_default_test",
     srcs = ["taint_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -59,7 +57,6 @@ go_test(
         "serialization_test.go",
         "unstructured_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/api/testapi:go_default_library",

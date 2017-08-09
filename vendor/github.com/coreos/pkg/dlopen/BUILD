@@ -19,7 +19,6 @@ go_library(
     }),
     cgo = True,
     clinkopts = ["-ldl"],
-    tags = ["automanaged"],
 )
 
 filegroup(

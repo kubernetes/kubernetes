@@ -21,7 +21,6 @@ go_library(
         "transformer.go",
         "trieval.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/text/cases:go_default_library",
         "//vendor/golang.org/x/text/runes:go_default_library",

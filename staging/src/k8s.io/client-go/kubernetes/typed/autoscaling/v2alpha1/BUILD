@@ -15,7 +15,6 @@ go_library(
         "generated_expansion.go",
         "horizontalpodautoscaler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/autoscaling/v2alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

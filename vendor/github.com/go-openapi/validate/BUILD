@@ -21,7 +21,6 @@ go_library(
         "validator.go",
         "values.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/analysis:go_default_library",
         "//vendor/github.com/go-openapi/errors:go_default_library",

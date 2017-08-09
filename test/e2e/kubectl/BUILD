@@ -14,7 +14,6 @@ go_library(
         "kubectl.go",
         "portforward.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/controller:go_default_library",

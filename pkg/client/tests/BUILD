@@ -17,7 +17,6 @@ go_test(
         "remotecommand_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
@@ -48,7 +47,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

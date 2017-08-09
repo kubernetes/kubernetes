@@ -13,7 +13,6 @@ go_library(
         "delegate.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/rackspace/gophercloud:go_default_library",
         "//vendor/github.com/rackspace/gophercloud/openstack/identity/v2/tokens:go_default_library",

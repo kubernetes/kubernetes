@@ -15,7 +15,6 @@ go_library(
         "huffman.go",
         "tables.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -12,13 +12,11 @@ go_test(
     name = "go_default_test",
     srcs = ["clock_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["clock.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -19,10 +19,7 @@ go_test(
         "scheduler_test.go",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -68,7 +65,6 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

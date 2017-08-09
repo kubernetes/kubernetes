@@ -25,7 +25,6 @@ go_library(
         "use_context.go",
         "view.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
     ],
@@ -66,7 +65,6 @@ go_test(
         "view_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

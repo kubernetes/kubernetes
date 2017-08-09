@@ -14,7 +14,6 @@ go_library(
         "fakefs.go",
         "filesystem.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/afero:go_default_library"],
 )
 

@@ -34,7 +34,6 @@ go_library(
         "timestamp.go",
         "timestamp_gogo.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

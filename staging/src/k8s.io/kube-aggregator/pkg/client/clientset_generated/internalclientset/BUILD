@@ -13,7 +13,6 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",

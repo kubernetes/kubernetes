@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["authz_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
@@ -25,7 +24,6 @@ go_library(
         "builtin.go",
         "delegating.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",

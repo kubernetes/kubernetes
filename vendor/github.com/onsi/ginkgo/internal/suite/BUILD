@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["suite.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/containernode:go_default_library",

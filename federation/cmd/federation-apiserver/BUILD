@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "federation-apiserver",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["apiserver.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",

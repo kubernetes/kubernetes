@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "parse.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "base64.go",
         "bcrypt.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/crypto/blowfish:go_default_library"],
 )
 

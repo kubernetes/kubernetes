@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
@@ -28,7 +27,6 @@ go_test(
     data = ["//cmd/kubeadm"],
     library = ":go_default_library",
     tags = [
-        "automanaged",
         "integration",
         "skip",
     ],

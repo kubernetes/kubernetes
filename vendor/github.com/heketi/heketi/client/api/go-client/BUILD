@@ -18,7 +18,6 @@ go_library(
         "topology.go",
         "volume.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
         "//vendor/github.com/heketi/heketi/pkg/glusterfs/api:go_default_library",

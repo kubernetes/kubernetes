@@ -19,7 +19,6 @@ go_library(
         "int64.go",
         "string.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_genrule(
@@ -54,7 +53,6 @@ go_test(
     name = "go_default_test",
     srcs = ["set_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

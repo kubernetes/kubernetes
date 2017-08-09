@@ -16,7 +16,6 @@ go_library(
         "set.go",
         "verifiers.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

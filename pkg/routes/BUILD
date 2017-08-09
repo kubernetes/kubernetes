@@ -14,7 +14,6 @@ go_library(
         "logs.go",
         "ui.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/mux:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "dirmap.go",
         "file.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

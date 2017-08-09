@@ -28,7 +28,6 @@ go_library(
         "service.go",
         "serviceaccount.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

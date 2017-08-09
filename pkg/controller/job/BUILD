@@ -15,7 +15,6 @@ go_library(
         "job_controller.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -47,7 +46,6 @@ go_test(
         "utils_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

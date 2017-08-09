@@ -49,7 +49,6 @@ go_library(
         "type_support.go",
         "with_transform.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",
         "//vendor/github.com/onsi/gomega/internal/oraclematcher:go_default_library",

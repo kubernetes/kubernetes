@@ -15,10 +15,7 @@ go_test(
         "main_test.go",
         "persistent_volumes_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

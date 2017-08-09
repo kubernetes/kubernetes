@@ -17,7 +17,6 @@ go_library(
         "runners.go",
         "tmpdir.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

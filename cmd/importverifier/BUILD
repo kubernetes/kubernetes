@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "importverifier",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["importverifier.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

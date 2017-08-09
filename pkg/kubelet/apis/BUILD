@@ -13,7 +13,6 @@ go_library(
         "well_known_annotations.go",
         "well_known_labels.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

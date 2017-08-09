@@ -18,7 +18,6 @@ go_library(
         "path.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/mailru/easyjson/jlexer:go_default_library",
         "//vendor/github.com/mailru/easyjson/jwriter:go_default_library",

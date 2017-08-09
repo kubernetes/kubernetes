@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "keystone.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

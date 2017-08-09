@@ -32,7 +32,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/pkg/sftp:go_default_library",
         "//vendor/github.com/spf13/afero/mem:go_default_library",

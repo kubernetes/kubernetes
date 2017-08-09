@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["command.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/plugin/compare:go_default_library",
         "//vendor/github.com/gogo/protobuf/plugin/defaultcheck:go_default_library",

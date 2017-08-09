@@ -14,7 +14,6 @@ go_library(
         "factory.go",
         "plugins.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -56,7 +55,6 @@ go_test(
         "plugins_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testing:go_default_library",

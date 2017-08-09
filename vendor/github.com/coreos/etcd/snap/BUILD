@@ -15,7 +15,6 @@ go_library(
         "metrics.go",
         "snapshotter.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/ioutil:go_default_library",

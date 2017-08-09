@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/test/certs:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",

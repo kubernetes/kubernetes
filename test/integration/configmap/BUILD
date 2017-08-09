@@ -14,10 +14,7 @@ go_test(
         "configmap_test.go",
         "main_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//test/integration:go_default_library",

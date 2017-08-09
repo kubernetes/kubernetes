@@ -25,7 +25,6 @@ go_library(
         "states.go",
         "utilities.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
 )
 

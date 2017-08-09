@@ -14,7 +14,6 @@ go_library(
         "error.go",
         "mapstructure.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

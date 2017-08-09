@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["volumehelper.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/types:go_default_library",

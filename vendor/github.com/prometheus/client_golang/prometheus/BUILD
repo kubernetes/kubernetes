@@ -30,7 +30,6 @@ go_library(
         "value.go",
         "vec.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

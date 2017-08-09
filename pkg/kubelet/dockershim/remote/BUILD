@@ -13,7 +13,6 @@ go_library(
         "docker_server.go",
         "docker_service.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

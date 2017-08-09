@@ -32,7 +32,6 @@ go_library(
         "tag.go",
         "xml_object.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/jsonpointer:go_default_library",
         "//vendor/github.com/go-openapi/jsonreference:go_default_library",

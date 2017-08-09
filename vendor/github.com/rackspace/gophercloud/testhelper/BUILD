@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "http_responses.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

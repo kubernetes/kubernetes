@@ -14,7 +14,6 @@ go_library(
         "timed_store.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["healthz.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/google/cadvisor/http/mux:go_default_library"],
 )
 

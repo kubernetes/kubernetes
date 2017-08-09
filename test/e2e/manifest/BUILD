@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["manifest.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/generated:go_default_library",

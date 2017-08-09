@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["triple.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
 )
 

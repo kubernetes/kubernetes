@@ -18,7 +18,6 @@ go_library(
         "types.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

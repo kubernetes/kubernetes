@@ -16,7 +16,6 @@ go_library(
         "pv_controller_base.go",
         "volume_host.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -63,7 +62,6 @@ go_test(
         "recycle_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/controller:go_default_library",

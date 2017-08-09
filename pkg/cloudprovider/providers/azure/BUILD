@@ -27,7 +27,6 @@ go_library(
         "azure_wrap.go",
         "azure_zones.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -59,7 +58,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/network:go_default_library",

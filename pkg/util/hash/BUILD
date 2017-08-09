@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["hash.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
 )
 
@@ -19,7 +18,6 @@ go_test(
     name = "go_default_test",
     srcs = ["hash_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/davecgh/go-spew/spew:go_default_library"],
 )
 

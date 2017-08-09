@@ -14,7 +14,6 @@ go_library(
         "path.go",
         "pathaction.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

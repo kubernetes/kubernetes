@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["controller_history_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/controller:go_default_library",
@@ -34,7 +33,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["controller_history.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/client/retry:go_default_library",
         "//pkg/util/hash:go_default_library",

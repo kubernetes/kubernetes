@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "lessor.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/lease/leasepb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/backend:go_default_library",

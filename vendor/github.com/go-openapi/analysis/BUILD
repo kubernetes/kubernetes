@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["analyzer.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/jsonpointer:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

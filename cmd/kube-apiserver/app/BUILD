@@ -15,7 +15,6 @@ go_library(
         "plugins.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",

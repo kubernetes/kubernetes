@@ -19,7 +19,6 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -53,6 +52,5 @@ go_test(
     name = "go_default_test",
     srcs = ["defaults_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/apis/componentconfig:go_default_library"],
 )

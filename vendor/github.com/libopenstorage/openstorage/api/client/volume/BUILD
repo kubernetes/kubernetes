@@ -13,7 +13,6 @@ go_library(
         "client.go",
         "volume.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/libopenstorage/openstorage/api:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/api/client:go_default_library",

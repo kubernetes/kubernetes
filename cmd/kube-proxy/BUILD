@@ -18,14 +18,12 @@ go_binary(
         "-static",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["proxy.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",

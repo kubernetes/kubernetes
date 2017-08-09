@@ -21,7 +21,6 @@ go_library(
         "stringwriter.go",
         "toc.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

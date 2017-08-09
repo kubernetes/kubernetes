@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "port-forward-tester",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["portforwardtester.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

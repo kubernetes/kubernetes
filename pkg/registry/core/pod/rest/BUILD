@@ -14,7 +14,6 @@ go_library(
         "log.go",
         "subresources.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -37,7 +36,6 @@ go_test(
     name = "go_default_test",
     srcs = ["log_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

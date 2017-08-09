@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["provider.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",
         "//vendor/github.com/coreos/go-oidc/key:go_default_library",

@@ -14,10 +14,7 @@ go_test(
         "main_test.go",
         "storage_classes_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//test/integration/framework:go_default_library",

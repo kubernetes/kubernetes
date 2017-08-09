@@ -11,7 +11,6 @@ load(
 go_binary(
     name = "codecgen",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -20,7 +19,6 @@ go_library(
         "gen.go",
         "z.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

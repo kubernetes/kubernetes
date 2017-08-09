@@ -14,7 +14,6 @@ go_library(
         "util.go",
         "viper.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/hashicorp/hcl:go_default_library",

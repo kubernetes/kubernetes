@@ -15,7 +15,6 @@ go_library(
         "priorityclass.go",
         "scheduling_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/scheduling/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

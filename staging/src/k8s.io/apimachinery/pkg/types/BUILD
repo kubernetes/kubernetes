@@ -16,7 +16,6 @@ go_library(
         "patch.go",
         "uid.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

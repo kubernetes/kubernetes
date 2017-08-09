@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["container_node.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/internal/leafnodes:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",

@@ -15,7 +15,6 @@ go_library(
         "factory.go",
         "handler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/engine-api/client:go_default_library",

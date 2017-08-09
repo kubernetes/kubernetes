@@ -18,7 +18,6 @@ go_library(
         "format.go",
         "spew.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

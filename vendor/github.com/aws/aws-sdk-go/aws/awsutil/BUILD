@@ -16,7 +16,6 @@ go_library(
         "prettify.go",
         "string_value.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/jmespath/go-jmespath:go_default_library"],
 )
 

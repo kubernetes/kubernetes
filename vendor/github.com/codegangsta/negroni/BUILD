@@ -17,7 +17,6 @@ go_library(
         "response_writer.go",
         "static.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

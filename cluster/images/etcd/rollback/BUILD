@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "rollback",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["rollback.go"],
-    tags = ["automanaged"],
     deps = [
         "//third_party/forked/etcd221/wal:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",

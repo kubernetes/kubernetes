@@ -14,10 +14,7 @@ go_test(
         "evictions_test.go",
         "main_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/controller/disruption:go_default_library",
         "//test/integration/framework:go_default_library",

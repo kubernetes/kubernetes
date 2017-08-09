@@ -19,7 +19,6 @@ go_library(
         "selector.go",
         "visitor.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
     ],
@@ -59,9 +58,6 @@ go_test(
         "//test/fixtures",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["providers.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",

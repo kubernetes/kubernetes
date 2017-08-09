@@ -75,7 +75,6 @@ go_library(
         "ZoneService.go",
         "cloudstack.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

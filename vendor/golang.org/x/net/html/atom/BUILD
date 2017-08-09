@@ -13,7 +13,6 @@ go_library(
         "atom.go",
         "table.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

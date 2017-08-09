@@ -14,7 +14,6 @@ go_library(
         "md_docs.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/cpuguy83/go-md2man/md2man:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

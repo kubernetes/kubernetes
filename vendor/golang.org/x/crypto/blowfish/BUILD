@@ -14,7 +14,6 @@ go_library(
         "cipher.go",
         "const.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

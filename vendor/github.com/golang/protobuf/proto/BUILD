@@ -22,7 +22,6 @@ go_library(
         "text.go",
         "text_parser.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

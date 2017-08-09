@@ -20,7 +20,6 @@ go_library(
         "util.go",
         "verification.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/http:go_default_library",
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",

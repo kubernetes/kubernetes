@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["async_assertion.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/internal/oraclematcher:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",

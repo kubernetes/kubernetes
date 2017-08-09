@@ -15,14 +15,12 @@ go_test(
         "//pkg/auth/authorizer/abac:example_policy",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/kubeapiserver/authorizer/modes:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["config.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",

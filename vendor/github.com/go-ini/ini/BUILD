@@ -13,7 +13,6 @@ go_library(
         "ini.go",
         "struct.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

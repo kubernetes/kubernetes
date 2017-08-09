@@ -15,7 +15,6 @@ go_library(
         "server.go",
         "stats.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/raft:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",

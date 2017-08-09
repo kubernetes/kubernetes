@@ -16,7 +16,6 @@ go_library(
         "httpstream.go",
         "websocket.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

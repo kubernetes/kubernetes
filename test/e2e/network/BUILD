@@ -28,7 +28,6 @@ go_library(
         "serviceloadbalancers.go",
         "util_iperf.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

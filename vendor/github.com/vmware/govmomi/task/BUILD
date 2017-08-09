@@ -13,7 +13,6 @@ go_library(
         "error.go",
         "wait.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/progress:go_default_library",

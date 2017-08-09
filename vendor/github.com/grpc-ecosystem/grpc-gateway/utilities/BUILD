@@ -14,7 +14,6 @@ go_library(
         "pattern.go",
         "trie.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

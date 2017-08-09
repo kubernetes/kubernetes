@@ -14,7 +14,6 @@ go_library(
         "signatures.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/google/certificate-transparency/go/x509:go_default_library"],
 )
 

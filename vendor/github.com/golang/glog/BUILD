@@ -13,7 +13,6 @@ go_library(
         "glog.go",
         "glog_file.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

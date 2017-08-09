@@ -15,7 +15,6 @@ go_test(
         "lruexpirecache_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
@@ -28,7 +27,6 @@ go_library(
         "cache.go",
         "lruexpirecache.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/hashicorp/golang-lru:go_default_library"],
 )
 

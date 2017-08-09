@@ -13,7 +13,6 @@ go_library(
         "requests.go",
         "results.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/tokens:go_default_library"],
 )
 

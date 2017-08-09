@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["rest.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/validation:go_default_library",

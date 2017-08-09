@@ -21,7 +21,6 @@ go_library(
         "secrets.go",
         "services.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -51,7 +50,6 @@ go_test(
         "services_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/quota:go_default_library",

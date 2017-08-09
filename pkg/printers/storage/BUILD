@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/printers:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1alpha1:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "schedule.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/net/context:go_default_library"],
 )
 

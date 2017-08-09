@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["idempotency.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",

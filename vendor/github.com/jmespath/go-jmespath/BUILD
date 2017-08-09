@@ -19,7 +19,6 @@ go_library(
         "toktype_string.go",
         "util.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

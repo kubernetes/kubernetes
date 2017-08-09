@@ -35,7 +35,6 @@ go_library(
         "simple.go",
         "time.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

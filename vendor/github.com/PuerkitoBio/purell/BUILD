@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["purell.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/PuerkitoBio/urlesc:go_default_library",
         "//vendor/golang.org/x/net/idna:go_default_library",

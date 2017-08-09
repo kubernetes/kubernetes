@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["persistent_volumes.go"],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/e2e/upgrades:go_default_library",

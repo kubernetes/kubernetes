@@ -15,7 +15,6 @@ go_library(
         "zfs.go",
         "zpool.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/pborman/uuid:go_default_library"],
 )
 

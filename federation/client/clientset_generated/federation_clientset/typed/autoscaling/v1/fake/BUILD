@@ -14,7 +14,6 @@ go_library(
         "fake_autoscaling_client.go",
         "fake_horizontalpodautoscaler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "client.go",
         "default_retryer.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/client/metadata:go_default_library",

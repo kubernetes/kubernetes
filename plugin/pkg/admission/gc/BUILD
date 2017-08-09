@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["gc_admission.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -28,7 +27,6 @@ go_test(
     name = "go_default_test",
     srcs = ["gc_admission_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",

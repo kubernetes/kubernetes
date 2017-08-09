@@ -17,7 +17,6 @@ go_library(
         "generator_for_type.go",
         "tags.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",

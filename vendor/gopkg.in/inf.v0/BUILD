@@ -13,7 +13,6 @@ go_library(
         "dec.go",
         "rounder.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

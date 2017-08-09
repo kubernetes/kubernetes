@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["sysinfo.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",

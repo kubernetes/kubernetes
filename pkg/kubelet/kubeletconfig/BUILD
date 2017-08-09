@@ -15,7 +15,6 @@ go_library(
         "rollback.go",
         "watch.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/validation:go_default_library",

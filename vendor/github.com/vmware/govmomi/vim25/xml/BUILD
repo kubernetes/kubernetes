@@ -16,7 +16,6 @@ go_library(
         "typeinfo.go",
         "xml.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

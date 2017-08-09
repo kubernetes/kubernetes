@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["imports.go"],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/instrumentation/logging:go_default_library",
         "//test/e2e/instrumentation/monitoring:go_default_library",

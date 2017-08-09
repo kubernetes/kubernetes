@@ -18,7 +18,6 @@ go_library(
         "statistic.go",
         "time.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/influxdata/influxdb/pkg/escape:go_default_library"],
 )
 

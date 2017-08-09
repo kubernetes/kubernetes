@@ -17,7 +17,6 @@ go_library(
         "plugins.go",
         "provider.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -34,7 +33,6 @@ go_test(
         "provider_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/docker/api/types:go_default_library"],
 )
 

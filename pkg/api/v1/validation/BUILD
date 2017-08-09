@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/helper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

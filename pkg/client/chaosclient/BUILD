@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["chaosclient.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 
@@ -19,7 +18,6 @@ go_test(
     name = "go_default_test",
     srcs = ["chaosclient_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

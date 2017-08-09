@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["label.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

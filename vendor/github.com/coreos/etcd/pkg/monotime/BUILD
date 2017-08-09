@@ -14,7 +14,6 @@ go_library(
         "monotime.go",
         "nanotime.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

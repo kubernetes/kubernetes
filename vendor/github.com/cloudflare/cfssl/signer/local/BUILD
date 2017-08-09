@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["local.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/cloudflare/cfssl/certdb:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/config:go_default_library",

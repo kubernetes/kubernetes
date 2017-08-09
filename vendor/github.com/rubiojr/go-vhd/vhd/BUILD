@@ -13,7 +13,6 @@ go_library(
         "util.go",
         "vhd.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -15,7 +15,6 @@ go_library(
         "customresource_discovery_controller.go",
         "customresource_handler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

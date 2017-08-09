@@ -16,7 +16,6 @@ go_library(
         "doc.go",
         "generated_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

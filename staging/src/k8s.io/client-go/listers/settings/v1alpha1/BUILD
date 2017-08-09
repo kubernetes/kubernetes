@@ -13,7 +13,6 @@ go_library(
         "expansion_generated.go",
         "podpreset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/settings/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

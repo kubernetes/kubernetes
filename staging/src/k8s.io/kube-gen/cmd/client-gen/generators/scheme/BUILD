@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["generator_for_scheme.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",

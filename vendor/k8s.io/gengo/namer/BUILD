@@ -16,7 +16,6 @@ go_library(
         "order.go",
         "plural_namer.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],
 )
 

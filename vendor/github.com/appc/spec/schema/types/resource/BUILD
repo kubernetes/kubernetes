@@ -16,7 +16,6 @@ go_library(
         "scale_int.go",
         "suffix.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/inf.v0:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "fake_apiextensions_client.go",
         "fake_customresourcedefinition.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1:go_default_library",

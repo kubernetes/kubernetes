@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "results.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
         "//vendor/github.com/rackspace/gophercloud:go_default_library",

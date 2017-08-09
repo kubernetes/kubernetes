@@ -21,7 +21,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -48,7 +47,6 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/util/dbus:go_default_library",

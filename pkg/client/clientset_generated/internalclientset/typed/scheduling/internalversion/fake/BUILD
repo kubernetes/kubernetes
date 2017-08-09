@@ -14,7 +14,6 @@ go_library(
         "fake_priorityclass.go",
         "fake_scheduling_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion:go_default_library",

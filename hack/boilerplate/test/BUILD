@@ -13,7 +13,6 @@ go_library(
         "fail.go",
         "pass.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -14,7 +14,6 @@ go_library(
         "api.pb.go",
         "status.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/go.pedge.io/pb/go/google/protobuf:go_default_library",

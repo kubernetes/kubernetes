@@ -14,7 +14,6 @@ go_library(
         "config.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
@@ -22,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["config_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

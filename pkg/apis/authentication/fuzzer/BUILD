@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library"],
 )
 

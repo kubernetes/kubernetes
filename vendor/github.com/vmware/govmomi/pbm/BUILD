@@ -13,7 +13,6 @@ go_library(
         "client.go",
         "pbm_util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/pbm/methods:go_default_library",
         "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",

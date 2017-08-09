@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["handlers.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/abbot/go-http-auth:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

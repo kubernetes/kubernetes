@@ -16,7 +16,6 @@ go_library(
         "parser.go",
         "spec.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

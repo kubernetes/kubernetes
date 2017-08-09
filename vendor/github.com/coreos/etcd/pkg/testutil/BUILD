@@ -15,7 +15,6 @@ go_library(
         "recorder.go",
         "testutil.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

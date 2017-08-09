@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fake.go"],
-    tags = ["automanaged"],
     deps = ["//pkg/util/sysctl:go_default_library"],
 )
 

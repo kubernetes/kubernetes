@@ -14,7 +14,6 @@ go_library(
         "cluster.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/membership:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",

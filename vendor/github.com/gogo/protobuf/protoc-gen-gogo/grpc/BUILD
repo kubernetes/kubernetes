@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["grpc.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/descriptor:go_default_library",
         "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/generator:go_default_library",

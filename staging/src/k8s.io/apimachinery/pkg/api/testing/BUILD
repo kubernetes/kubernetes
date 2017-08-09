@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["codec.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

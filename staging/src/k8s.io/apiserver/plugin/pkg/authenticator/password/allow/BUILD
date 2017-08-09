@@ -12,13 +12,11 @@ go_test(
     name = "go_default_test",
     srcs = ["allow_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["allow.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",

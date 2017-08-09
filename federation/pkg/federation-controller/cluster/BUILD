@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["clustercontroller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
@@ -35,7 +34,6 @@ go_library(
         "clustercontroller.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/cache:go_default_library",

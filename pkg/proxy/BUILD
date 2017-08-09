@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 

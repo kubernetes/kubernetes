@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["disruption.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
@@ -48,7 +47,6 @@ go_test(
     name = "go_default_test",
     srcs = ["disruption_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

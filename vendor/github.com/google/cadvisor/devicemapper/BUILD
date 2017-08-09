@@ -16,7 +16,6 @@ go_library(
         "thin_pool_watcher.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 

@@ -14,7 +14,6 @@ go_library(
         "rbac.go",
         "subject_locator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
@@ -32,7 +31,6 @@ go_test(
         "subject_locator_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",

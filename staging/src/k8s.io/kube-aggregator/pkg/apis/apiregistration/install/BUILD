@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

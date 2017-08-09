@@ -14,7 +14,6 @@ go_library(
         "controllermanager.go",
         "plugins.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
@@ -58,7 +57,6 @@ go_test(
     name = "go_default_test",
     srcs = ["controllermanager_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/ingress:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

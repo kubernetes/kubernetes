@@ -17,7 +17,6 @@ go_library(
         "types.go",
         "wait.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/framework:go_default_library",

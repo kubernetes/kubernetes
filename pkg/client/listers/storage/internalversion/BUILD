@@ -13,7 +13,6 @@ go_library(
         "expansion_generated.go",
         "storageclass.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

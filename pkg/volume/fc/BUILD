@@ -17,7 +17,6 @@ go_library(
         "fc.go",
         "fc_util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -37,7 +36,6 @@ go_test(
         "fc_util_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

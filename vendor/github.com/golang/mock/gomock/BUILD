@@ -15,7 +15,6 @@ go_library(
         "controller.go",
         "matchers.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

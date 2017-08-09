@@ -16,7 +16,6 @@ go_test(
         "patch_test.go",
     ],
     tags = [
-        "automanaged",
         "etcd",
         "integration",
     ],

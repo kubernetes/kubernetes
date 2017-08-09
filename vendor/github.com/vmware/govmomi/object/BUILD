@@ -65,7 +65,6 @@ go_library(
         "virtual_machine.go",
         "vmware_distributed_virtual_switch.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",

@@ -15,7 +15,6 @@ go_library(
         "metrics_grabber.go",
         "stackdriver.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",

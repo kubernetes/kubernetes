@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["cidr_allocator_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller/testutil:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -29,7 +28,6 @@ go_library(
         "cloud_cidr_allocator.go",
         "range_allocator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",

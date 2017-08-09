@@ -16,7 +16,6 @@ go_library(
         "tlds_pseudo.go",
         "xurls.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -19,7 +19,6 @@ go_library(
         "local.go",
         "tr.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/chai2010/gettext-go/gettext/mo:go_default_library",
         "//vendor/github.com/chai2010/gettext-go/gettext/plural:go_default_library",

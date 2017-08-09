@@ -13,7 +13,6 @@ go_library(
         "error.go",
         "parser.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",
         "//vendor/github.com/hashicorp/hcl/hcl/scanner:go_default_library",

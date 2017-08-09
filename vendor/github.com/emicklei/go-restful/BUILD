@@ -37,7 +37,6 @@ go_library(
         "web_service.go",
         "web_service_container.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/emicklei/go-restful/log:go_default_library"],
 )
 

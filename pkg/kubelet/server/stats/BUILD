@@ -18,7 +18,6 @@ go_library(
         "summary.go",
         "volume_stat_calculator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -46,7 +45,6 @@ go_test(
         "summary_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "formula.go",
         "table.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

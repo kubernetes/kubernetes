@@ -16,7 +16,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",

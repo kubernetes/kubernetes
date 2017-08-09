@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -33,7 +32,6 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

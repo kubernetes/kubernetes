@@ -13,7 +13,6 @@ go_library(
         "api.go",
         "service.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awsutil:go_default_library",

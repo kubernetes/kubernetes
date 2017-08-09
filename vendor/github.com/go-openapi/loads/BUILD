@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["spec.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/analysis:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

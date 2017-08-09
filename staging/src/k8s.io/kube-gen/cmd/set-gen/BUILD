@@ -11,7 +11,6 @@ load(
 go_binary(
     name = "set-gen",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 exports_files([
@@ -21,7 +20,6 @@ exports_files([
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",

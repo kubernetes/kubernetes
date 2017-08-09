@@ -17,7 +17,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",

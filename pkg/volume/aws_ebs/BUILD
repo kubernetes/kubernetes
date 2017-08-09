@@ -16,7 +16,6 @@ go_library(
         "aws_util.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
@@ -41,7 +40,6 @@ go_test(
         "aws_ebs_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/util/mount:go_default_library",

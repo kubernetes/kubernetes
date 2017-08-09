@@ -25,11 +25,9 @@ go_test(
     name = "go_default_test",
     srcs = ["tail_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["tail.go"],
-    tags = ["automanaged"],
 )

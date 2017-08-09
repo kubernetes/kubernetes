@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pointer.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/go-openapi/swag:go_default_library"],
 )
 

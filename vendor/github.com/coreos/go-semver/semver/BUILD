@@ -13,7 +13,6 @@ go_library(
         "semver.go",
         "sort.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

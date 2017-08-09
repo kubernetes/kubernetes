@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["secretbox.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/crypto/poly1305:go_default_library",
         "//vendor/golang.org/x/crypto/salsa20/salsa:go_default_library",

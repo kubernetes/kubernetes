@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["conditions.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

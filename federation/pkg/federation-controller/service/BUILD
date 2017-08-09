@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["servicecontroller.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -47,7 +46,6 @@ go_test(
     name = "go_default_test",
     srcs = ["servicecontroller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",

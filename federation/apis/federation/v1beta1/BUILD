@@ -22,7 +22,6 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//pkg/api:go_default_library",

@@ -17,7 +17,6 @@ go_library(
         "testfile_rewriter.go",
         "testing_t_rewriter.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

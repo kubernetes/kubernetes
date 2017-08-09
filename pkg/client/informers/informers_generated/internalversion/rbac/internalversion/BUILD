@@ -16,7 +16,6 @@ go_library(
         "role.go",
         "rolebinding.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

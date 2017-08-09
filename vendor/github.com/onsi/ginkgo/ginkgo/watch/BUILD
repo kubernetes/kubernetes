@@ -17,7 +17,6 @@ go_library(
         "package_hashes.go",
         "suite.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/onsi/ginkgo/ginkgo/testsuite:go_default_library"],
 )
 

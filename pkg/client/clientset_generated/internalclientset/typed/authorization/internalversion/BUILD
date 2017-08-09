@@ -20,7 +20,6 @@ go_library(
         "subjectaccessreview.go",
         "subjectaccessreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

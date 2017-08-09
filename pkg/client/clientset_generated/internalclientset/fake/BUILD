@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "register.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",

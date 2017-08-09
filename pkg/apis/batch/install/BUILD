@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",

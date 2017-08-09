@@ -18,7 +18,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty:go_default_library",

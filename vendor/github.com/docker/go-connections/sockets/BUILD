@@ -24,7 +24,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/proxy:go_default_library",
     ] + select({

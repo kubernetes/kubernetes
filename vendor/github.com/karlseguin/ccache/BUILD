@@ -18,7 +18,6 @@ go_library(
         "layeredcache.go",
         "secondarycache.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -13,7 +13,6 @@ go_library(
         "authenticate.go",
         "registry.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

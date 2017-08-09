@@ -14,7 +14,6 @@ go_library(
         "if.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/vmware/govmomi/vim25/types:go_default_library"],
 )
 

@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "plugins.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

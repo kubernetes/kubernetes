@@ -22,7 +22,6 @@ go_library(
         "sysctl.go",
         "upgrade.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",

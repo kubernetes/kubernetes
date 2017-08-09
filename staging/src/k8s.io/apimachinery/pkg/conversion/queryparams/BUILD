@@ -14,13 +14,11 @@ go_library(
         "convert.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_xtest",
     srcs = ["convert_test.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",

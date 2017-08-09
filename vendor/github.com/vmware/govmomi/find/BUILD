@@ -15,7 +15,6 @@ go_library(
         "finder.go",
         "recurser.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/list:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",

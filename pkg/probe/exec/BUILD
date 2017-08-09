@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["exec.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/probe:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -23,7 +22,6 @@ go_test(
     name = "go_default_test",
     srcs = ["exec_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/probe:go_default_library"],
 )
 

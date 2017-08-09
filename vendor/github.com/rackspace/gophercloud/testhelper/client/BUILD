@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fake.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/rackspace/gophercloud:go_default_library",
         "//vendor/github.com/rackspace/gophercloud/testhelper:go_default_library",

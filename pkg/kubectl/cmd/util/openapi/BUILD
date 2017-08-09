@@ -18,7 +18,6 @@ go_library(
         "openapi_cache.go",
         "openapi_getter.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/version:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
@@ -41,7 +40,6 @@ go_test(
         "openapi_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",

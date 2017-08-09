@@ -15,7 +15,6 @@ go_test(
         "merge_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
@@ -36,7 +35,6 @@ go_library(
         "merge.go",
         "query.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

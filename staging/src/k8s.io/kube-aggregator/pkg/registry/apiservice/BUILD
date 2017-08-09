@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["strategy.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

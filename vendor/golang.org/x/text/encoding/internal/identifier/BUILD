@@ -13,7 +13,6 @@ go_library(
         "identifier.go",
         "mib.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

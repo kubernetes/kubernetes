@@ -15,7 +15,6 @@ go_library(
         "request_cache.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
@@ -37,7 +36,6 @@ go_test(
         "server_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

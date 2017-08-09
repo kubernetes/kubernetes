@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pbutil.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
 )
 

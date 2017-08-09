@@ -13,7 +13,6 @@ go_library(
         "info.go",
         "machine.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",

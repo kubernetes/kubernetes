@@ -23,7 +23,6 @@ go_library(
         "watcher.go",
         "watcher_group.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/lease:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/backend:go_default_library",

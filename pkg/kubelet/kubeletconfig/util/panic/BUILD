@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["panic.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library"],
 )
 

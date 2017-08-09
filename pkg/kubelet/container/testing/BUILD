@@ -17,7 +17,6 @@ go_library(
         "os.go",
         "runtime_mock.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/volume:go_default_library",

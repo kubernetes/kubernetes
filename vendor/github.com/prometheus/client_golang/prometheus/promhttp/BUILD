@@ -17,7 +17,6 @@ go_library(
         "instrument_client_1_8.go",
         "instrument_server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",

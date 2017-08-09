@@ -18,14 +18,12 @@ go_binary(
         "-static",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["scheduler.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/version/verflag:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",

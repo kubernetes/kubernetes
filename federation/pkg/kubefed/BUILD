@@ -15,7 +15,6 @@ go_library(
         "kubefed.go",
         "unjoin.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -52,7 +51,6 @@ go_test(
         "unjoin_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",

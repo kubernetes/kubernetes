@@ -16,7 +16,6 @@ go_library(
         "tokenreview.go",
         "tokenreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

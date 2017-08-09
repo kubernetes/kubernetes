@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["health.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/httputil:go_default_library"],
 )
 

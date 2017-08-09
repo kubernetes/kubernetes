@@ -22,7 +22,6 @@ go_library(
         "tables.go",
         "tags.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/text/internal/tag:go_default_library"],
 )
 

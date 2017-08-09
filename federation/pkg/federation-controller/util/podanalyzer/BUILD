@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pod_helper.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 
@@ -19,7 +18,6 @@ go_test(
     name = "go_default_test",
     srcs = ["pod_helper_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

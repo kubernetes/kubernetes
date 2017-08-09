@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["docker.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/engine-api/types:go_default_library"],
 )
 

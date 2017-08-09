@@ -14,7 +14,6 @@ go_library(
         "error.go",
         "http.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

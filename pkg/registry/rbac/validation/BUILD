@@ -16,7 +16,6 @@ go_test(
         "rule_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
@@ -33,7 +32,6 @@ go_library(
         "policy_comparator.go",
         "rule.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",

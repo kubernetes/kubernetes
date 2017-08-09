@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["codec.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

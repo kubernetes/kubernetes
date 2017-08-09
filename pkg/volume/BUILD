@@ -27,7 +27,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -56,7 +55,6 @@ go_test(
         "util_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -80,7 +78,6 @@ go_test(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/volume/testing:go_default_library",

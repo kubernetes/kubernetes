@@ -16,7 +16,6 @@ go_library(
         "utils.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/ugorji/go/codec:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

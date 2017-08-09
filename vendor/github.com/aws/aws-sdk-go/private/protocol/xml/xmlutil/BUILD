@@ -14,7 +14,6 @@ go_library(
         "unmarshal.go",
         "xml_to_struct.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library"],
 )
 

@@ -9,14 +9,12 @@ load(
 go_binary(
     name = "edit",
     library = ":go_default_library",
-    tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["record.go"],
-    tags = ["automanaged"],
     visibility = ["//visibility:private"],
     deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )

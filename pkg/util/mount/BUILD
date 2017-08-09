@@ -23,7 +23,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
@@ -48,7 +47,6 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",

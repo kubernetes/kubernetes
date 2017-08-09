@@ -27,7 +27,6 @@ go_library(
         "urlpick.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/stats:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/httputil:go_default_library",

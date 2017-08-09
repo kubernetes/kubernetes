@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["configfiles.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",

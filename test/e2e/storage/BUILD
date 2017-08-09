@@ -31,7 +31,6 @@ go_library(
         "vsphere_volume_placement.go",
         "vsphere_volume_vsan_policy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/helper:go_default_library",

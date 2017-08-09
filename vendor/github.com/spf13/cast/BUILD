@@ -13,7 +13,6 @@ go_library(
         "cast.go",
         "caste.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/jwalterweatherman:go_default_library"],
 )
 

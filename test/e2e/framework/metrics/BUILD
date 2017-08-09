@@ -18,7 +18,6 @@ go_library(
         "metrics_grabber.go",
         "scheduler_metrics.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/master/ports:go_default_library",

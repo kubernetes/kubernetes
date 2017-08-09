@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "endian.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

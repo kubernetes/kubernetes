@@ -37,7 +37,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/kr/fs:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",

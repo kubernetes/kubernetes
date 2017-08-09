@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["network.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -16,7 +16,6 @@ go_test(
         "main_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller/deployment/util:go_default_library",
         "//test/integration/framework:go_default_library",
@@ -27,7 +26,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/deployment:go_default_library",

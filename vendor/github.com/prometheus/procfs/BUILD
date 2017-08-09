@@ -23,7 +23,6 @@ go_library(
         "stat.go",
         "xfrm.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/prometheus/procfs/xfs:go_default_library"],
 )
 

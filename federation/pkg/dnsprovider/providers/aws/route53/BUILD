@@ -19,7 +19,6 @@ go_library(
         "zone.go",
         "zones.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/aws/route53/stubs:go_default_library",
@@ -37,7 +36,6 @@ go_test(
     name = "go_default_test",
     srcs = ["route53_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/aws/route53/stubs:go_default_library",

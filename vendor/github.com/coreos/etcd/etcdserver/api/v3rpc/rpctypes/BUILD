@@ -14,7 +14,6 @@ go_library(
         "error.go",
         "md.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",

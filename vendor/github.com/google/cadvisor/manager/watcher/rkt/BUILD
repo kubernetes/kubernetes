@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["rkt.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/rkt/api/v1alpha:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

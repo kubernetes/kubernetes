@@ -17,7 +17,6 @@ go_library(
         "read.go",
         "set.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/gopkg.in/gcfg.v1/scanner:go_default_library",
         "//vendor/gopkg.in/gcfg.v1/token:go_default_library",

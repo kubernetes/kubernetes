@@ -14,7 +14,6 @@ go_library(
         "common.go",
         "marshal.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

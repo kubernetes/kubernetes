@@ -13,7 +13,6 @@ go_library(
         "random_id.go",
         "spec_runner.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/leafnodes:go_default_library",

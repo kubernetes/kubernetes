@@ -15,7 +15,6 @@ go_library(
         "networking_client.go",
         "networkpolicy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/networking:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

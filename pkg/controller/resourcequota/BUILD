@@ -15,7 +15,6 @@ go_library(
         "replenishment_controller.go",
         "resource_quota_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -49,7 +48,6 @@ go_test(
         "resource_quota_controller_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/controller:go_default_library",

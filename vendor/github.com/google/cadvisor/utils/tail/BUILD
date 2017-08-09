@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["tail.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/exp/inotify:go_default_library",

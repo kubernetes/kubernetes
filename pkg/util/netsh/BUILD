@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "netsh.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",

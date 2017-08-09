@@ -15,7 +15,6 @@ go_library(
         "line_delimiter.go",
         "strings.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -26,7 +25,6 @@ go_test(
         "strings_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

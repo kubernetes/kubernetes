@@ -16,7 +16,6 @@ go_test(
         "selfhosting_volumes_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -32,7 +31,6 @@ go_library(
         "selfhosting.go",
         "selfhosting_volumes.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

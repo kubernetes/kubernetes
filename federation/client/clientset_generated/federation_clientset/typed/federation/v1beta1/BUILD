@@ -15,7 +15,6 @@ go_library(
         "federation_client.go",
         "generated_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/scheme:go_default_library",

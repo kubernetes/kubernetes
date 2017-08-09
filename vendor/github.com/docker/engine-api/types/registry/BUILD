@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["registry.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -33,7 +33,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
@@ -85,7 +84,6 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/mount:go_default_library",
     ] + select({

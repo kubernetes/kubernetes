@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["serve_hostname.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(
@@ -30,5 +29,4 @@ filegroup(
 go_binary(
     name = "serve-hostname",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )

@@ -21,7 +21,6 @@ go_library(
         "systemd.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -69,7 +68,6 @@ go_test(
         "rkt_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

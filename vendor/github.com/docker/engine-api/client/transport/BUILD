@@ -13,7 +13,6 @@ go_library(
         "client.go",
         "transport.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/go-connections/sockets:go_default_library"],
 )
 

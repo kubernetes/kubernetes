@@ -14,7 +14,6 @@ go_library(
         "addons.go",
         "manifests.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -48,6 +47,5 @@ go_test(
     name = "go_default_test",
     srcs = ["addons_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//cmd/kubeadm/app/util:go_default_library"],
 )

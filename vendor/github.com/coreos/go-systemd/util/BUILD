@@ -14,7 +14,6 @@ go_library(
         "util_cgo.go",
     ],
     cgo = True,
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/dlopen:go_default_library"],
 )
 

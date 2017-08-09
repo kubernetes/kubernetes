@@ -13,7 +13,6 @@ go_library(
         "cookie.go",
         "json.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

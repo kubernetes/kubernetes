@@ -15,7 +15,6 @@ go_library(
         "rpc.pb.go",
         "rpc.pb.gw.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth/authpb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",

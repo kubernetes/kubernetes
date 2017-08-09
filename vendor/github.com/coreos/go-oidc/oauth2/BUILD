@@ -14,7 +14,6 @@ go_library(
         "error.go",
         "oauth2.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/go-oidc/http:go_default_library"],
 )
 

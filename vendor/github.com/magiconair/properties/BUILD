@@ -19,7 +19,6 @@ go_library(
         "properties.go",
         "rangecheck.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

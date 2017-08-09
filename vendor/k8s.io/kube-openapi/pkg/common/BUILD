@@ -13,7 +13,6 @@ go_library(
         "common.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "controller",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["controller.go"],
-    tags = ["automanaged"],
     deps = ["//test/images/resource-consumer/common:go_default_library"],
 )
 

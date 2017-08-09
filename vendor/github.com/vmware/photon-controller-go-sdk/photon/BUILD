@@ -34,7 +34,6 @@ go_library(
         "virtualnetworks.go",
         "vms.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/vmware/photon-controller-go-sdk/photon/lightwave:go_default_library"],
 )
 

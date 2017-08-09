@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "kubefed",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["kubefed.go"],
-    tags = ["automanaged"],
     deps = ["//federation/cmd/kubefed/app:go_default_library"],
 )
 

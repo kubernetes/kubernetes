@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["influxdb.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/influxdata/influxdb/models:go_default_library"],
 )
 

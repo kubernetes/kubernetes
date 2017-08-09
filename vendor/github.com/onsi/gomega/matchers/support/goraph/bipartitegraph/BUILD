@@ -13,7 +13,6 @@ go_library(
         "bipartitegraph.go",
         "bipartitegraphmatching.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/matchers/support/goraph/edge:go_default_library",
         "//vendor/github.com/onsi/gomega/matchers/support/goraph/node:go_default_library",

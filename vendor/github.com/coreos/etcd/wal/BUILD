@@ -25,7 +25,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",

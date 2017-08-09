@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "namespace_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/namespace/deletion:go_default_library",

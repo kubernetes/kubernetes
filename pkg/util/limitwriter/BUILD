@@ -14,14 +14,12 @@ go_library(
         "doc.go",
         "limitwriter.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["limitwriter_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

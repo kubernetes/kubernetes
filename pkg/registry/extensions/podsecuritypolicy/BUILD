@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",

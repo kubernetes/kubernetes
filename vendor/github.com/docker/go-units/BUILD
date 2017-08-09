@@ -14,7 +14,6 @@ go_library(
         "size.go",
         "ulimit.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

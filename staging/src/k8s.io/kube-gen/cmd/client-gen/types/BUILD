@@ -14,7 +14,6 @@ go_library(
         "helpers.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/gengo/namer:go_default_library"],
 )
 
@@ -22,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

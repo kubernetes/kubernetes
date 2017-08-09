@@ -14,7 +14,6 @@ go_library(
         "doc.go",
         "envvars.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -24,7 +23,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["envvars_test.go"],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

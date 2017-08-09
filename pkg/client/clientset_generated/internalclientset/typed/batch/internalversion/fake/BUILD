@@ -15,7 +15,6 @@ go_library(
         "fake_cronjob.go",
         "fake_job.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/batch:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",

@@ -15,7 +15,6 @@ go_library(
         "namespace_policy.go",
         "policy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/features:go_default_library",
@@ -34,7 +33,6 @@ go_test(
     data = glob([
         "testdata/*",
     ]),
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/api:go_default_library",
@@ -57,7 +55,6 @@ go_test(
     srcs = ["controller_policy_test.go"],
     data = glob(["testdata/**"]),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

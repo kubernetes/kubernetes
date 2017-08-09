@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "remote",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["run_remote.go"],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e_node/remote:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",

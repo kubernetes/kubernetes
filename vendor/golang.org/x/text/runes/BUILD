@@ -13,7 +13,6 @@ go_library(
         "cond.go",
         "runes.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/text/transform:go_default_library"],
 )
 

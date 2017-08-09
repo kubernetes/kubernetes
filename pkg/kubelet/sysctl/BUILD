@@ -15,7 +15,6 @@ go_library(
         "runtime.go",
         "whitelist.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -33,7 +32,6 @@ go_test(
         "whitelist_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

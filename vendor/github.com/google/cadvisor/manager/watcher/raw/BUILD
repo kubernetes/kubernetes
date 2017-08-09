@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["raw.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",

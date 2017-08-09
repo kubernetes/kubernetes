@@ -13,7 +13,6 @@ go_library(
         "const.go",
         "edwards25519.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

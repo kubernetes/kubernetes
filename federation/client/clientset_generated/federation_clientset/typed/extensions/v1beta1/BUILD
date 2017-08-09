@@ -19,7 +19,6 @@ go_library(
         "ingress.go",
         "replicaset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset/scheme:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

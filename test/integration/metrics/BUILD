@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(
@@ -35,10 +34,7 @@ go_test(
         "metrics_test.go",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//test/integration/framework:go_default_library",

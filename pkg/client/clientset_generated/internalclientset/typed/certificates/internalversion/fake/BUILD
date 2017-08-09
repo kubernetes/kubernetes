@@ -15,7 +15,6 @@ go_library(
         "fake_certificatesigningrequest.go",
         "fake_certificatesigningrequest_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion:go_default_library",

@@ -17,7 +17,6 @@ go_library(
         "pkg.go",
         "single.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/gophercloud/gophercloud:go_default_library"],
 )
 

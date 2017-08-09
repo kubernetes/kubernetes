@@ -11,7 +11,6 @@ load(
 go_binary(
     name = "ginkgo",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -32,7 +31,6 @@ go_library(
         "version_command.go",
         "watch_command.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/ginkgo/convert:go_default_library",

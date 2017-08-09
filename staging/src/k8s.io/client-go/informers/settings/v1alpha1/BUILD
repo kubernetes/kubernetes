@@ -13,7 +13,6 @@ go_library(
         "interface.go",
         "podpreset.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/settings/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

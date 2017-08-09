@@ -11,7 +11,6 @@ load(
 go_binary(
     name = "go-bindata",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -21,7 +20,6 @@ go_library(
         "main.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/jteeuwen/go-bindata:go_default_library"],
 )
 

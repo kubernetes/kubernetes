@@ -20,7 +20,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
     ] + select({

@@ -16,7 +16,6 @@ go_library(
         "pod.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/appc/spec/schema/types:go_default_library",
         "//vendor/go4.org/errorutil:go_default_library",

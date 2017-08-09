@@ -15,7 +15,6 @@ go_library(
         "service.go",
         "waiters.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awsutil:go_default_library",

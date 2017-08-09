@@ -16,7 +16,6 @@ go_library(
         "require_forward.go",
         "requirements.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 

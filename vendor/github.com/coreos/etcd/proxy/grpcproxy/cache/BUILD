@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["store.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",

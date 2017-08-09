@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/core:go_default_library",
         "//federation/apis/core/v1:go_default_library",

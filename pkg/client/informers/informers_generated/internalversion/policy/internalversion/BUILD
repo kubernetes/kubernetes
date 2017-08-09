@@ -13,7 +13,6 @@ go_library(
         "interface.go",
         "poddisruptionbudget.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

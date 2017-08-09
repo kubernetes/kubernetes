@@ -18,7 +18,6 @@ go_library(
         "pkcs12.go",
         "safebags.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/crypto/pkcs12/internal/rc2:go_default_library"],
 )
 

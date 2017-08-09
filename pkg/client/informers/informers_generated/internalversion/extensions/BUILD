@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/client/informers/informers_generated/internalversion/extensions/internalversion:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/internalinterfaces:go_default_library",

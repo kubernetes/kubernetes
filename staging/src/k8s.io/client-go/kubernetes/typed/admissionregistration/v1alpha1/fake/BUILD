@@ -15,7 +15,6 @@ go_library(
         "fake_externaladmissionhookconfiguration.go",
         "fake_initializerconfiguration.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

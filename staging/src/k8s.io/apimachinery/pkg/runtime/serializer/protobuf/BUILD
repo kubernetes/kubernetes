@@ -13,7 +13,6 @@ go_library(
         "doc.go",
         "protobuf.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

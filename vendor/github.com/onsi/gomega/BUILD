@@ -13,7 +13,6 @@ go_library(
         "gomega_dsl.go",
         "matchers.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/internal/assertion:go_default_library",
         "//vendor/github.com/onsi/gomega/internal/asyncassertion:go_default_library",

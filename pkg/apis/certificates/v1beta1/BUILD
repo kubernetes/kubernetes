@@ -18,7 +18,6 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

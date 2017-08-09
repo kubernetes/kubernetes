@@ -15,7 +15,6 @@ go_test(
         "helpers_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
@@ -48,7 +47,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/helper/qos:go_default_library",

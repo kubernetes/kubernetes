@@ -37,7 +37,6 @@ go_library(
         "uuid.go",
         "volume.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/appc/spec/schema/common:go_default_library",
         "//vendor/github.com/appc/spec/schema/types/resource:go_default_library",

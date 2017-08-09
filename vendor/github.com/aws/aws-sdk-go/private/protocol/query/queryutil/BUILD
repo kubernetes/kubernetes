@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["queryutil.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library"],
 )
 

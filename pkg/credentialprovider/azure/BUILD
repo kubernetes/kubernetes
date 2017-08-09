@@ -14,7 +14,6 @@ go_library(
         "azure_acr_helper.go",
         "azure_credentials.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/credentialprovider:go_default_library",
@@ -32,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_credentials_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",

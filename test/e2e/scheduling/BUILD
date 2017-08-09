@@ -19,7 +19,6 @@ go_library(
         "priorities.go",
         "rescheduler.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/helper:go_default_library",

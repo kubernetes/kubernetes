@@ -16,7 +16,6 @@ go_library(
         "rest_metrics_client.go",
         "utilization.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v2alpha1:go_default_library",
@@ -41,7 +40,6 @@ go_test(
         "rest_metrics_client_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",

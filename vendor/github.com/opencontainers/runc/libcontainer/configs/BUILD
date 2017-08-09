@@ -34,7 +34,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
 )
 

@@ -20,7 +20,6 @@ go_library(
         "rate_limiter_helper.go",
         "uid_cache.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
@@ -55,7 +54,6 @@ go_test(
     name = "go_default_test",
     srcs = ["garbagecollector_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

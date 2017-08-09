@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["handler.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/NYTimes/gziphandler:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",

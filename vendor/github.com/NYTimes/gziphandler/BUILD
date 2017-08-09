@@ -13,7 +13,6 @@ go_library(
         "gzip.go",
         "gzip_go18.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

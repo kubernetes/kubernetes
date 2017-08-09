@@ -14,7 +14,6 @@ go_library(
         "run_result.go",
         "test_runner.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/ginkgo/testsuite:go_default_library",

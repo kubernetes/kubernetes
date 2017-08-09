@@ -13,7 +13,6 @@ go_library(
         "client.go",
         "udp.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/influxdata/influxdb/models:go_default_library"],
 )
 

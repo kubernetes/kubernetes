@@ -20,7 +20,6 @@ go_library(
         "scan.go",
         "script.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/garyburd/redigo/internal:go_default_library"],
 )
 

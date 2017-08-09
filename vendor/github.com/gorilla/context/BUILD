@@ -13,7 +13,6 @@ go_library(
         "context.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

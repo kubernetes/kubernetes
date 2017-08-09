@@ -17,7 +17,6 @@ go_library(
         "stateful_set_status_updater.go",
         "stateful_set_utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -58,7 +57,6 @@ go_test(
         "stateful_set_utils_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

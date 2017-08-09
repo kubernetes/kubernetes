@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["valuefuzz_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -21,7 +20,6 @@ go_library(
         "fuzzer.go",
         "valuefuzz.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

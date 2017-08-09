@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["init.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//federation/apis/federation:go_default_library",
@@ -44,7 +43,6 @@ go_test(
     name = "go_default_test",
     srcs = ["init_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns:go_default_library",

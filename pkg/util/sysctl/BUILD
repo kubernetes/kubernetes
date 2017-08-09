@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["sysctl.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

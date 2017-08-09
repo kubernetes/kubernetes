@@ -35,7 +35,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
 )
 

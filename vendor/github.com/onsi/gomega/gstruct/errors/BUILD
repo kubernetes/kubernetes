@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["nested_types.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/onsi/gomega/types:go_default_library"],
 )
 

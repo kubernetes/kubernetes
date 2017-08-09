@@ -19,7 +19,6 @@ go_library(
         "plugins.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/core:go_default_library",
         "//federation/apis/core/install:go_default_library",

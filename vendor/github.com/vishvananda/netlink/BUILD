@@ -36,7 +36,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/vishvananda/netlink/nl:go_default_library"],
 )
 

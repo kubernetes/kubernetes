@@ -18,7 +18,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/system:go_default_library",
     ] + select({

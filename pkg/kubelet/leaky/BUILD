@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["leaky.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

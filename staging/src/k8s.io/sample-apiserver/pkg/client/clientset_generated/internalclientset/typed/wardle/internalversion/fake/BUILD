@@ -15,7 +15,6 @@ go_library(
         "fake_flunder.go",
         "fake_wardle_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "reference.go",
         "regexp.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/distribution/digest:go_default_library"],
 )
 

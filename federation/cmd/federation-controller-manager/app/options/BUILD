@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["options.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",

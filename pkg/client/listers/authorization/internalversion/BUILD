@@ -15,7 +15,6 @@ go_library(
         "selfsubjectaccessreview.go",
         "subjectaccessreview.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

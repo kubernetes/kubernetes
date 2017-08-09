@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubefed.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/kubefed:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "model_types.go",
         "types.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

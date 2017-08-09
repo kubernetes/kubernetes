@@ -17,7 +17,6 @@ go_library(
         "stats.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
         "//vendor/github.com/docker/engine-api/types/filters:go_default_library",

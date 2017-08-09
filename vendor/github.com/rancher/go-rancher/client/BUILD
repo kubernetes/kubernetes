@@ -158,7 +158,6 @@ go_library(
         "schemas.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",

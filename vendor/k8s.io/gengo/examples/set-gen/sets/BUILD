@@ -17,7 +17,6 @@ go_library(
         "int64.go",
         "string.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -22,7 +22,6 @@ go_library(
         "symmetric.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/square/go-jose/cipher:go_default_library",
         "//vendor/github.com/square/go-jose/json:go_default_library",

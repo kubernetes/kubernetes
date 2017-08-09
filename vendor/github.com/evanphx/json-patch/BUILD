@@ -13,7 +13,6 @@ go_library(
         "merge.go",
         "patch.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

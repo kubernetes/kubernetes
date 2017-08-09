@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["alarms.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/backend:go_default_library",

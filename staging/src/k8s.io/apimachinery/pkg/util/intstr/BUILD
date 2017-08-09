@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["intstr_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 
@@ -22,7 +21,6 @@ go_library(
         "generated.pb.go",
         "intstr.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

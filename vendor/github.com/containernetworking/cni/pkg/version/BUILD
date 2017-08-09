@@ -15,7 +15,6 @@ go_library(
         "reconcile.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",

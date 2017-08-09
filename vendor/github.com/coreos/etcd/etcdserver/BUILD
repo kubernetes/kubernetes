@@ -28,7 +28,6 @@ go_library(
         "v2_server.go",
         "v3_server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/alarm:go_default_library",
         "//vendor/github.com/coreos/etcd/auth:go_default_library",

@@ -19,7 +19,6 @@ go_library(
         "swarm.go",
         "task.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",
         "//vendor/github.com/docker/docker/api/types/mount:go_default_library",

@@ -15,7 +15,6 @@ go_library(
         "priorityclass.go",
         "scheduling_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

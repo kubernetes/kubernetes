@@ -24,7 +24,6 @@ go_library(
         "yamlh.go",
         "yamlprivateh.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["version.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/go-semver/semver:go_default_library"],
 )
 

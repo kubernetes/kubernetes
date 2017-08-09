@@ -15,7 +15,6 @@ go_library(
         "lex.go",
         "parse.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",
         "//vendor/github.com/hashicorp/hcl/hcl/parser:go_default_library",

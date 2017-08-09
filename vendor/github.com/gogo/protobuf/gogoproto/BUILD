@@ -14,7 +14,6 @@ go_library(
         "gogo.pb.go",
         "helper.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/descriptor:go_default_library",

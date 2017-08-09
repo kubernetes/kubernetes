@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["sliceutils.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -35,7 +34,6 @@ go_test(
     name = "go_default_test",
     srcs = ["sliceutils_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

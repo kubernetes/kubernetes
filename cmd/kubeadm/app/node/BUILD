@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validate.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
@@ -22,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["validate_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",

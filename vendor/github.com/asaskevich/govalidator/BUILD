@@ -19,7 +19,6 @@ go_library(
         "utils.go",
         "validator.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -15,7 +15,6 @@ go_library(
         "storage_client.go",
         "storageclass.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "hollow_kubelet.go",
         "hollow_proxy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",

@@ -14,10 +14,7 @@ go_test(
         "kubectl_test.go",
         "main_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",
         "//test/integration/framework:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "fake_cluster.go",
         "fake_federation_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/federation/v1beta1:go_default_library",

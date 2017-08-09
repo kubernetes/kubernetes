@@ -20,7 +20,6 @@ go_library(
         "fake_subjectaccessreview.go",
         "fake_subjectaccessreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",

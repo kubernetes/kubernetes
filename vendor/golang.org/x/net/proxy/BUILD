@@ -15,7 +15,6 @@ go_library(
         "proxy.go",
         "socks5.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

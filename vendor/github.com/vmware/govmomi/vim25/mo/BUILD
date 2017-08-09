@@ -19,7 +19,6 @@ go_library(
         "retrieve.go",
         "type_info.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/methods:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",

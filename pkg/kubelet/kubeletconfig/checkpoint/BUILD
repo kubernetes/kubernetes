@@ -16,7 +16,6 @@ go_test(
         "download_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -40,7 +39,6 @@ go_library(
         "configmap.go",
         "download.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",

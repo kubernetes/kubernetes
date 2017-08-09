@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["logclient.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/certificate-transparency/go:go_default_library",
         "//vendor/github.com/mreiferson/go-httpclient:go_default_library",

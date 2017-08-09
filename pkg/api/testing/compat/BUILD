@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["compatibility_tester.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/printers:go_default_library",

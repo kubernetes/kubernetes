@@ -13,7 +13,6 @@ go_library(
         "simple.go",
         "upgrade.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federatedtypes/crudtester:go_default_library",

@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "linkcheck",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["links.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/mvdan/xurls:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

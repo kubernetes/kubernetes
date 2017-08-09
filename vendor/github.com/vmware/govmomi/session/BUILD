@@ -13,7 +13,6 @@ go_library(
         "keep_alive.go",
         "manager.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",

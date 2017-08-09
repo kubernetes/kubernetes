@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["delegate.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/common/extensions:go_default_library",

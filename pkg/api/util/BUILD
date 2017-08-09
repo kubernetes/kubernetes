@@ -11,14 +11,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["group_version.go"],
-    tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["group_version_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

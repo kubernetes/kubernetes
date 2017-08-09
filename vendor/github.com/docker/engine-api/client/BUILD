@@ -77,7 +77,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/engine-api/client/transport:go_default_library",

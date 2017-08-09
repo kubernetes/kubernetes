@@ -15,7 +15,6 @@ go_library(
         "fake.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -26,7 +25,6 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

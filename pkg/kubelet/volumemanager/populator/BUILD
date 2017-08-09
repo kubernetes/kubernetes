@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["desired_state_of_world_populator.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -49,7 +48,6 @@ go_test(
     name = "go_default_test",
     srcs = ["desired_state_of_world_populator_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

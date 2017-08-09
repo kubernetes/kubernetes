@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["writer.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/mailru/easyjson/buffer:go_default_library"],
 )
 

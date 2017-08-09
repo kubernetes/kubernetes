@@ -15,7 +15,6 @@ go_library(
         "generator_fake_for_group.go",
         "generator_fake_for_type.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "errors.go",
         "stack.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

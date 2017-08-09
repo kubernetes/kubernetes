@@ -17,7 +17,6 @@ go_library(
         "stream.go",
         "tags.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -14,7 +14,6 @@ go_library(
         "percentiles.go",
         "summary.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",

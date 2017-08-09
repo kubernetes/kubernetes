@@ -14,7 +14,6 @@ go_library(
         "fuzzer.go",
         "pod_specs.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api:go_default_library",

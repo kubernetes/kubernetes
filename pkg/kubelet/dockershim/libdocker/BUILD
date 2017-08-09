@@ -16,7 +16,6 @@ go_test(
         "legacy_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/hash:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
@@ -36,7 +35,6 @@ go_library(
         "kube_docker_client.go",
         "legacy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",

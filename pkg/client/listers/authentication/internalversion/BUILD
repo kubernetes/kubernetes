@@ -13,7 +13,6 @@ go_library(
         "expansion_generated.go",
         "tokenreview.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

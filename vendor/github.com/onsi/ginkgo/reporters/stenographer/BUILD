@@ -14,7 +14,6 @@ go_library(
         "fake_stenographer.go",
         "stenographer.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["closewait.go"],
-    tags = ["automanaged"],
     deps = ["//test/images/net/common:go_default_library"],
 )
 

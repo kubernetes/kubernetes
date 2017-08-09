@@ -13,7 +13,6 @@ go_library(
         "auth_env.go",
         "client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/rackspace/gophercloud:go_default_library",
         "//vendor/github.com/rackspace/gophercloud/openstack:go_default_library",

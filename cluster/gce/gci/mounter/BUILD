@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "mounter",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["mounter.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(

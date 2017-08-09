@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["start.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

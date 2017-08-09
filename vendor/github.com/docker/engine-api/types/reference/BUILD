@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["image_reference.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/docker/distribution/reference:go_default_library"],
 )
 

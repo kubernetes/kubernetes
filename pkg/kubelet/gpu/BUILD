@@ -13,7 +13,6 @@ go_library(
         "gpu_manager_stub.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

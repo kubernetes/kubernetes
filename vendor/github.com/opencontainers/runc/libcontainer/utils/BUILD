@@ -13,7 +13,6 @@ go_library(
         "utils.go",
         "utils_unix.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

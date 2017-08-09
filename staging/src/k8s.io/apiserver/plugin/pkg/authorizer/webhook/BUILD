@@ -15,7 +15,6 @@ go_test(
         "webhook_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -29,7 +28,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["webhook.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",

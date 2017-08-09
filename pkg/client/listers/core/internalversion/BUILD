@@ -31,7 +31,6 @@ go_library(
         "service_expansion.go",
         "serviceaccount.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "staging",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["godeps-json-updater.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 

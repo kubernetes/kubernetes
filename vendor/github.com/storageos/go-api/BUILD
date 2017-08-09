@@ -28,7 +28,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",

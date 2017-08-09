@@ -16,7 +16,6 @@ go_library(
         "pointer.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",
         "//vendor/github.com/onsi/gomega/gstruct/errors:go_default_library",

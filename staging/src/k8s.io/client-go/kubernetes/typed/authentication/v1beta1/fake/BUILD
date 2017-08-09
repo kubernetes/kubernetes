@@ -15,7 +15,6 @@ go_library(
         "fake_tokenreview.go",
         "fake_tokenreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",

@@ -13,7 +13,6 @@ go_library(
         "filesystem.go",
         "walk.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

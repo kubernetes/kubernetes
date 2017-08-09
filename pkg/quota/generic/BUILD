@@ -13,7 +13,6 @@ go_library(
         "evaluator.go",
         "registry.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/quota:go_default_library",

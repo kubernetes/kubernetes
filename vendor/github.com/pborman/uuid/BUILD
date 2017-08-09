@@ -21,7 +21,6 @@ go_library(
         "version1.go",
         "version4.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

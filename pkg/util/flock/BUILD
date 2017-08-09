@@ -20,7 +20,6 @@ go_library(
         ],
         "//conditions:default": [],
     }),
-    tags = ["automanaged"],
     deps = select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "//vendor/golang.org/x/sys/unix:go_default_library",

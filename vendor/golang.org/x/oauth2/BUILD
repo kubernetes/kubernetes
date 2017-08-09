@@ -14,7 +14,6 @@ go_library(
         "token.go",
         "transport.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/oauth2/internal:go_default_library",

@@ -12,13 +12,11 @@ go_test(
     name = "go_default_test",
     srcs = ["kubeconfig_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["kubeconfig.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",

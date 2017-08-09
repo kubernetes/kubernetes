@@ -19,7 +19,6 @@ go_library(
         "sig.go",
         "sig_rsa.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

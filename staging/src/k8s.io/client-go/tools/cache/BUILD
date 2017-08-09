@@ -25,7 +25,6 @@ go_test(
         "undelta_store_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -64,7 +63,6 @@ go_library(
         "thread_safe_store.go",
         "undelta_store.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

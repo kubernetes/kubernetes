@@ -20,7 +20,6 @@ go_library(
         "service_client.go",
         "util.go",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(
