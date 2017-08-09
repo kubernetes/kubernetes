@@ -221,20 +221,6 @@ message DeploymentList {
 }
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
-// DeploymentRollback stores the information required to rollback a deployment.
-message DeploymentRollback {
-  // Required: This must match the Name of a deployment.
-  optional string name = 1;
-
-  // The annotations to be updated to a deployment
-  // +optional
-  map<string, string> updatedAnnotations = 2;
-
-  // The config of this deployment rollback.
-  optional RollbackConfig rollbackTo = 3;
-}
-
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
@@ -269,10 +255,6 @@ message DeploymentSpec {
   // Indicates that the deployment is paused.
   // +optional
   optional bool paused = 7;
-
-  // The config this deployment is rolling back to. Will be cleared after rollback is done.
-  // +optional
-  optional RollbackConfig rollbackTo = 8;
 
   // The maximum time in seconds for a deployment to make progress before it
   // is considered to be failed. The deployment controller will continue to
@@ -455,13 +437,6 @@ message ReplicaSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated ReplicaSetCondition conditions = 6;
-}
-
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
-message RollbackConfig {
-  // The revision to rollback to. If set to 0, rollback to the last revision.
-  // +optional
-  optional int64 revision = 1;
 }
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.

@@ -83,7 +83,6 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
-		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {

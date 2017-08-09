@@ -385,8 +385,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
-	gvr("apps", "v1beta2", "scales"),              // not stored in etcd, part of kapiv1.ReplicationController
-	gvr("apps", "v1beta2", "deploymentrollbacks"), // used to rollback deployment, not stored in etcd
+	gvr("apps", "v1beta2", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v2alpha1

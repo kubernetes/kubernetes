@@ -8759,7 +8759,7 @@
      },
      "rollbackTo": {
       "$ref": "v1beta1.RollbackConfig",
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done."
      },
      "progressDeadlineSeconds": {
       "type": "integer",
@@ -8798,6 +8798,7 @@
    },
    "v1beta1.RollbackConfig": {
     "id": "v1beta1.RollbackConfig",
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "type": "integer",
@@ -8890,7 +8891,7 @@
    },
    "v1beta1.DeploymentRollback": {
     "id": "v1beta1.DeploymentRollback",
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
