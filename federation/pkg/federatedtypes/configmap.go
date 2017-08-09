@@ -41,7 +41,7 @@ type ConfigMapAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewConfigMapAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewConfigMapAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &ConfigMapAdapter{client: client}
 }
 

@@ -44,7 +44,7 @@ type ReplicaSetAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewReplicaSetAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewReplicaSetAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	replicaSchedulingAdapter := replicaSchedulingAdapter{
 		preferencesAnnotationName: FedReplicaSetPreferencesAnnotation,
 		updateStatusFunc: func(obj pkgruntime.Object, schedulingInfo interface{}) error {

@@ -44,7 +44,7 @@ type DaemonSetAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewDaemonSetAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewDaemonSetAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &DaemonSetAdapter{client: client}
 }
 

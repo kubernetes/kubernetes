@@ -34,7 +34,7 @@ func NewControllerFixture(t *testing.T, kind string, adapterFactory federatedtyp
 	f := &ControllerFixture{
 		stopChan: make(chan struct{}),
 	}
-	synccontroller.StartFederationSyncController(kind, adapterFactory, config, f.stopChan, true)
+	synccontroller.StartFederationSyncController(kind, adapterFactory, config, f.stopChan, true, nil)
 	return f
 }
 
