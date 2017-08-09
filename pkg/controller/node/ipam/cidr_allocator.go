@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package ipam
 
 import (
-	"errors"
 	"net"
 
 	v1 "k8s.io/api/core/v1"
 )
-
-var errCIDRRangeNoCIDRsRemaining = errors.New(
-	"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
 
 type nodeAndCIDR struct {
 	cidr     *net.IPNet
@@ -35,7 +31,11 @@ type nodeAndCIDR struct {
 type CIDRAllocatorType string
 
 const (
+	// RangeAllocatorType is the allocator that uses an internal CIDR
+	// range allocator to do node CIDR range allocations.
 	RangeAllocatorType CIDRAllocatorType = "RangeAllocator"
+	// CloudAllocatorType is the allocator that uses cloud platform
+	// support to do node CIDR range allocations.
 	CloudAllocatorType CIDRAllocatorType = "CloudAllocator"
 )
 

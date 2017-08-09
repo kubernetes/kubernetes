@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package ipam
 
 import (
 	"fmt"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/controller/node/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -50,6 +51,7 @@ type cloudCIDRAllocator struct {
 
 var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 
+// NewCloudCIDRAllocator creates a new cloud CIDR allocator.
 func NewCloudCIDRAllocator(
 	client clientset.Interface,
 	cloud cloudprovider.Interface) (ca CIDRAllocator, err error) {
@@ -79,12 +81,12 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	cidrs, err := ca.cloud.AliasRanges(types.NodeName(node.Name))
 
 	if err != nil {
-		recordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		util.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: %v", err)
 	}
 
 	if len(cidrs) == 0 {
-		recordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		util.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
 		glog.V(2).Infof("Node %v has no CIDRs", node.Name)
 		return fmt.Errorf("failed to allocate cidr (none exist)")
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package ipam
 
 import (
 	"net"
@@ -143,7 +143,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			if err = rangeAllocator.cidrs.occupy(cidr); err != nil {
+			if err = rangeAllocator.cidrs.Occupy(cidr); err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
 		}
@@ -225,7 +225,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			err = rangeAllocator.cidrs.occupy(cidr)
+			err = rangeAllocator.cidrs.Occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
@@ -337,7 +337,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				return
 			}
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
-			err = rangeAllocator.cidrs.occupy(cidr)
+			err = rangeAllocator.cidrs.Occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
