@@ -271,6 +271,14 @@ type KubeletConfiguration struct {
 	MaxContainerCount int32
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint
 	CAdvisorPort int32
+	// cAdvisorStatsCacheDuration is the amount of time for cAdvisor to keep stats in memory.
+	// Must be greater than or equal to 0.
+	CAdvisorStatsCacheDuration metav1.Duration
+	// cAdvisorMaxHousekeepingInterval is the largest interval for cAdvisor to allow between container housekeepings.
+	// Must be greater than or equal to 0.
+	CAdvisorMaxHousekeepingInterval metav1.Duration
+	// cAdvisorAllowDynamicHousekeeping indicates whether to allow cAdvisor's housekeeping interval to be dynamic.
+	CAdvisorAllowDynamicHousekeeping bool
 	// healthzPort is the port of the localhost healthz endpoint
 	HealthzPort int32
 	// healthzBindAddress is the IP address for the healthz server to serve
