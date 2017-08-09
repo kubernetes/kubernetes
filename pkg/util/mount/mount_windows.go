@@ -40,35 +40,11 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	if !strings.HasPrefix(target, "c:") && !strings.HasPrefix(target, "C:") {
 		target = "c:" + target
 	}
-	parentDir := getWindowsParentDir(target)
-	err := os.MkdirAll(parentDir, 0755)
+
+	err := os.MkdirAll(target, 0755)
 	if err != nil {
-		glog.Infof("mkdir(%q) failed: %v\n", parentDir, err)
+		glog.Infof("mkdir(%q) failed: %v\n", target, err)
 		return err
-	}
-
-	if len(options) != 1 {
-		glog.Infof("azureMount: mount options number(%n) not equal to 1, skip mounting, mount options: %q\n", len(options), options)
-		return nil
-	}
-	cmd := options[0]
-
-	driverLetter, err := getAvailabeDriverLetter()
-	if err != nil {
-		return err
-	}
-	driverPath := driverLetter + ":"
-	cmd += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", driverPath, source)
-	glog.Infof("azureMount: mount command : %q", cmd)
-
-	_, err = exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
-	}
-
-	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("mklink failed: %v", err)
 	}
 
 	return nil
