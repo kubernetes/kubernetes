@@ -46,15 +46,18 @@ import (
 )
 
 var (
+	// ErrCloudInstance occurs when the cloud provider does not support
+	// the Instances API.
 	ErrCloudInstance = errors.New("cloud provider doesn't support instances")
-
-	// The minimum kubelet version for which the nodecontroller
-	// can safely flip pod.Status to NotReady.
+	// podStatusReconciliationVersion is the the minimum kubelet version
+	// for which the nodecontroller can safely flip pod.Status to
+	// NotReady.
 	podStatusReconciliationVersion = utilversion.MustParseSemantic("v1.2.0")
 )
 
-// DeletePods will delete all pods from master running on given node, and return true
-// if any pods were deleted, or were found pending deletion.
+// DeletePods will delete all pods from master running on given node,
+// and return true if any pods were deleted, or were found pending
+// deletion.
 func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore extensionslisters.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
@@ -109,8 +112,9 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	return remaining, nil
 }
 
-// SetPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
-// and returns an error if it encounters one.
+// SetPodTerminationReason attempts to set a reason and message in the
+// pod status, updates it in the apiserver, and returns an error if it
+// encounters one.
 func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeName string) (*v1.Pod, error) {
 	if pod.Status.Reason == nodepkg.NodeUnreachablePodReason {
 		return pod, nil
@@ -127,6 +131,7 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 	return updatedPod, nil
 }
 
+// ForcefullyDeletePod deletes the pod immediately.
 func ForcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	var zero int64
 	glog.Infof("NodeController is force deleting Pod: %v:%v", pod.Namespace, pod.Name)
@@ -137,8 +142,8 @@ func ForcefullyDeletePod(c clientset.Interface, pod *v1.Pod) error {
 	return err
 }
 
-// ForcefullyDeleteNode immediately the node. The pods on the node are cleaned
-// up by the podGC.
+// ForcefullyDeleteNode deletes the node immediately. The pods on the
+// node are cleaned up by the podGC.
 func ForcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error {
 	if err := kubeClient.Core().Nodes().Delete(nodeName, nil); err != nil {
 		return fmt.Errorf("unable to delete node %q: %v", nodeName, err)
@@ -146,8 +151,8 @@ func ForcefullyDeleteNode(kubeClient clientset.Interface, nodeName string) error
 	return nil
 }
 
-// update ready status of all pods running on given node from master
-// return true if success
+// MarkAllPodsNotReady updates ready status of all pods running on
+// given node from master return true if success
 func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	// Don't set pods to NotReady if the kubelet is running a version that
 	// doesn't understand how to correct readiness.
@@ -207,6 +212,8 @@ func NodeRunningOutdatedKubelet(node *v1.Node) bool {
 	return false
 }
 
+// NodeExistsInCloudProvider returns true if the node exists in the
+// cloud provider.
 func NodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
@@ -221,6 +228,7 @@ func NodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.Nod
 	return true, nil
 }
 
+// RecordNodeEvent records a event related to a node.
 func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
@@ -232,20 +240,22 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
-func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, new_status string) {
+// RecordNodeStatusChange records a event related to a node status change.
+func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
 		UID:       node.UID,
 		Namespace: "",
 	}
-	glog.V(2).Infof("Recording status change %s event message for node %s", new_status, node.Name)
+	glog.V(2).Infof("Recording status change %s event message for node %s", newStatus, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	recorder.Eventf(ref, v1.EventTypeNormal, new_status, "Node %s status is now: %s", node.Name, new_status)
+	recorder.Eventf(ref, v1.EventTypeNormal, newStatus, "Node %s status is now: %s", node.Name, newStatus)
 }
 
-// Returns true in case of success and false otherwise
+// SwapNodeControllerTaint returns true in case of success and false
+// otherwise.
 func SwapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
 	taintToAdd.TimeAdded = metav1.Now()
 	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintToAdd)
@@ -274,6 +284,7 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintTo
 	return true
 }
 
+// CreateAddNodeHandler creates an add node handler.
 func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		obj, err := scheme.Scheme.DeepCopy(originalObj)
@@ -289,6 +300,7 @@ func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	}
 }
 
+// CreateUpdateNodeHandler creates a node update handler.
 func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
 		oldObj, err := scheme.Scheme.DeepCopy(origOldObj)
@@ -310,6 +322,7 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 	}
 }
 
+// CreateDeleteNodeHandler creates a delete node handler.
 func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		obj, err := scheme.Scheme.DeepCopy(originalObj)

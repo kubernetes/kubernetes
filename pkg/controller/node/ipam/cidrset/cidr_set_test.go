@@ -219,9 +219,9 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 
 		// allocate all the CIDRs
 		var cidrs []*net.IPNet
-		var num_cidrs = 256
+		var numCIDRs = 256
 
-		for i := 0; i < num_cidrs; i++ {
+		for i := 0; i < numCIDRs; i++ {
 			if c, err := a.AllocateNext(); err == nil {
 				cidrs = append(cidrs, c)
 			} else {
@@ -239,13 +239,13 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 			a.Release(cidrs[i])
 		}
 		// occupy the last 128 CIDRs
-		for i := num_cidrs / 2; i < num_cidrs; i++ {
+		for i := numCIDRs / 2; i < numCIDRs; i++ {
 			a.Occupy(cidrs[i])
 		}
 
 		// allocate the first 128 CIDRs again
 		var rcidrs []*net.IPNet
-		for i := 0; i < num_cidrs/2; i++ {
+		for i := 0; i < numCIDRs/2; i++ {
 			if c, err := a.AllocateNext(); err == nil {
 				rcidrs = append(rcidrs, c)
 			} else {
@@ -258,7 +258,7 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 		}
 
 		// check Occupy() work properly
-		for i := num_cidrs / 2; i < num_cidrs; i++ {
+		for i := numCIDRs / 2; i < numCIDRs; i++ {
 			rcidrs = append(rcidrs, cidrs[i])
 		}
 		if !reflect.DeepEqual(cidrs, rcidrs) {

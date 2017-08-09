@@ -25,6 +25,8 @@ import (
 	"sync"
 )
 
+// CidrSet manages a set of CIDR ranges from which blocks of IPs can
+// be allocated from.
 type CidrSet struct {
 	sync.Mutex
 	clusterCIDR     *net.IPNet
@@ -46,10 +48,13 @@ const (
 )
 
 var (
+	// ErrCIDRRangeNoCIDRsRemaining occurs when there are no more space
+	// to allocate CIDR ranges.
 	ErrCIDRRangeNoCIDRsRemaining = errors.New(
 		"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
 )
 
+// NewCIDRSet creates a new CidrSet.
 func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *CidrSet {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, _ := clusterMask.Size()
@@ -97,6 +102,7 @@ func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
 	}
 }
 
+// AllocateNext allocates the next free CIDR range.
 func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -166,6 +172,7 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 	return begin, end, nil
 }
 
+// Release releases the given CIDR range.
 func (s *CidrSet) Release(cidr *net.IPNet) error {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {
@@ -179,6 +186,7 @@ func (s *CidrSet) Release(cidr *net.IPNet) error {
 	return nil
 }
 
+// Occupy marks the given CIDR range as used.
 func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {

@@ -51,6 +51,7 @@ type cloudCIDRAllocator struct {
 
 var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 
+// NewCloudCIDRAllocator creates a new cloud CIDR allocator.
 func NewCloudCIDRAllocator(
 	client clientset.Interface,
 	cloud cloudprovider.Interface) (ca CIDRAllocator, err error) {

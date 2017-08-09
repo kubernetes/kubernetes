@@ -31,7 +31,11 @@ type nodeAndCIDR struct {
 type CIDRAllocatorType string
 
 const (
+	// RangeAllocatorType is the allocator that uses an internal CIDR
+	// range allocator to do node CIDR range allocations.
 	RangeAllocatorType CIDRAllocatorType = "RangeAllocator"
+	// CloudAllocatorType is the allocator that uses cloud platform
+	// support to do node CIDR range allocations.
 	CloudAllocatorType CIDRAllocatorType = "CloudAllocator"
 )
 
