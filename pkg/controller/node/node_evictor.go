@@ -16,7 +16,14 @@ limitations under the License.
 
 package node
 
+import (
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/controller/node/scheduler"
+)
+
 type nodeEvictor interface {
+	// startEvictionLoop manages eviction of nodes.
+	startEvictionLoop()
 }
 
 // taintBasedNodeEvictor satisfies the Evictor interface
@@ -35,4 +42,17 @@ func newTaintBasedNodeEvictor(nc *Controller) *taintBasedNodeEvictor {
 
 func newDefaultNodeEvictor(nc *Controller) *defaultNodeEvictor {
 	return &defaultNodeEvictor{nc}
+}
+
+func (ev *taintBasedNodeEvictor) startEvictionLoop() {
+	// Because we don't want a dedicated logic in TaintManager for NC-originated taints and we
+	// normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
+	go wait.Until(ev.nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
+}
+
+func (ev *defaultNodeEvictor) startEvictionLoop() {
+	// When we delete pods off a node, if the node was not empty at the time we then queue an
+	// eviction watcher. If we hit an error, retry deletion.
+	go wait.Until(ev.nc.doEvictionPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
+
 }
