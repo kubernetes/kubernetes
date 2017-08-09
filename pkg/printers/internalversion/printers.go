@@ -1789,7 +1789,7 @@ func printStatus(status *metav1.Status, w io.Writer, options printers.PrintOptio
 	return nil
 }
 
-// Lay out all the containers on eone line if use wide output.
+// Lay out all the containers on one line if use wide output.
 // DEPRECATED: convert to TableHandler and use layoutContainerCells
 func layoutContainers(containers []api.Container, w io.Writer) error {
 	var namesBuffer bytes.Buffer
