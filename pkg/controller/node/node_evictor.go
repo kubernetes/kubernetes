@@ -18,12 +18,16 @@ package node
 
 import (
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/controller/node/scheduler"
 )
 
 type nodeEvictor interface {
 	// startEvictionLoop manages eviction of nodes.
 	startEvictionLoop()
+
+	// addZoneWorker adds zone worker to map of pod evictors/tainters.
+	addZoneWorker(zone string)
 }
 
 // taintBasedNodeEvictor satisfies the Evictor interface
@@ -55,4 +59,16 @@ func (ev *defaultNodeEvictor) startEvictionLoop() {
 	// eviction watcher. If we hit an error, retry deletion.
 	go wait.Until(ev.nc.doEvictionPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
 
+}
+
+func (ev *taintBasedNodeEvictor) addZoneWorker(zone string) {
+	ev.nc.zoneNoExecuteTainter[zone] = scheduler.NewRateLimitedTimedQueue(
+		flowcontrol.NewTokenBucketRateLimiter(
+			ev.nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+}
+
+func (ev *defaultNodeEvictor) addZoneWorker(zone string) {
+	ev.nc.zonePodEvictor[zone] = scheduler.NewRateLimitedTimedQueue(
+		flowcontrol.NewTokenBucketRateLimiter(
+			ev.nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 }

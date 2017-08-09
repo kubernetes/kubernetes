@@ -36,7 +36,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/flowcontrol"
 
 	"k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -554,15 +553,8 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 	zone := utilnode.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
-		if !nc.useTaintBasedEvictions {
-			nc.zonePodEvictor[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
-		} else {
-			nc.zoneNoExecuteTainter[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
-		}
+		nc.nodeEvictor.addZoneWorker(zone)
+
 		// Init the metric for the new zone.
 		glog.Infof("Initializing eviction metric for zone: %v", zone)
 		evictionsNumber.WithLabelValues(zone).Add(0)
