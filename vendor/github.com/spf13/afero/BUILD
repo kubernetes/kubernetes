@@ -26,7 +26,12 @@ go_library(
         "sftp.go",
         "unionFile.go",
         "util.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "const_bsds.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/pkg/sftp:go_default_library",

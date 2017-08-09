@@ -40,9 +40,14 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
-        "threshold_notifier_linux.go",
+        "threshold_notifier_unsupported.go",
         "types.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "threshold_notifier_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
@@ -59,7 +64,6 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -68,7 +72,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

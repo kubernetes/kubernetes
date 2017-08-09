@@ -9,16 +9,19 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "addr_linux.go",
-        "link_linux.go",
-        "nl_linux.go",
-        "route_linux.go",
-        "tc_linux.go",
-        "xfrm_linux.go",
-        "xfrm_policy_linux.go",
-        "xfrm_state_linux.go",
-    ],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "addr_linux.go",
+            "link_linux.go",
+            "nl_linux.go",
+            "route_linux.go",
+            "tc_linux.go",
+            "xfrm_linux.go",
+            "xfrm_policy_linux.go",
+            "xfrm_state_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

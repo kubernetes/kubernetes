@@ -9,7 +9,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["tlsconfig_clone.go"],
+    srcs = [
+        "tlsconfig_clone.go",
+        "tlsconfig_clone_go16.go",
+        "tlsconfig_clone_go17.go",
+    ],
     tags = ["automanaged"],
 )
 

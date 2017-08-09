@@ -41,3 +41,13 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = [
+        "etcdserver.proto",
+        "raft_internal.proto",
+        "rpc.proto",
+    ],
+    visibility = ["//visibility:public"],
+)

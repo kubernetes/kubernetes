@@ -11,7 +11,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
-        "client_unix.go",
         "container_attach.go",
         "container_commit.go",
         "container_copy.go",
@@ -66,7 +65,18 @@ go_library(
         "volume_inspect.go",
         "volume_list.go",
         "volume_remove.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "client_darwin.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "client_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "client_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/distribution/reference:go_default_library",

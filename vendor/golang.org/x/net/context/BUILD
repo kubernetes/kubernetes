@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "context.go",
         "go17.go",
+        "pre_go17.go",
     ],
     tags = ["automanaged"],
 )

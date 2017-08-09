@@ -13,8 +13,19 @@ go_library(
         "jwttoken.go",
         "oidcclient.go",
         "oidcclient_sspi_unsupported.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "oidcclient_sspi.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/vmware/photon-controller-go-sdk/SSPI:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

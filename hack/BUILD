@@ -65,6 +65,7 @@ go_binary(
 go_test(
     name = "go_default_test",
     srcs = ["e2e_test.go"],
+    data = glob(["testdata/**"]),
     library = ":go_default_library",
     tags = ["automanaged"],
 )

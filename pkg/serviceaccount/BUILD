@@ -31,8 +31,8 @@ go_test(
     srcs = ["jwt_test.go"],
     tags = ["automanaged"],
     deps = [
+        ":go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
-        "//pkg/serviceaccount:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",

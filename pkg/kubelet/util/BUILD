@@ -21,14 +21,26 @@ go_library(
     srcs = [
         "doc.go",
         "util.go",
-        "util_linux.go",
-    ],
+        "util_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "util_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "util_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

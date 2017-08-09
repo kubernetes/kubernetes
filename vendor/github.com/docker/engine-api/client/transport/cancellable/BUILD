@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "canceler.go",
+        "canceler_go14.go",
         "cancellable.go",
     ],
     tags = ["automanaged"],

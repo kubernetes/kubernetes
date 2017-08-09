@@ -15,7 +15,12 @@ go_library(
         "resizeevents.go",
         "term.go",
         "term_writer.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "resizeevents_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//pkg/util/interrupt:go_default_library",

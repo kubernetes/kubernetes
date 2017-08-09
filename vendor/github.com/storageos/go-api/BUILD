@@ -22,12 +22,22 @@ go_library(
         "util.go",
         "validation.go",
         "volume.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "client_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/Microsoft/go-winio:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

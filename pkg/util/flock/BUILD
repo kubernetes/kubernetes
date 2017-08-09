@@ -9,9 +9,27 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["flock_unix.go"],
+    srcs = [
+        "flock_other.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "flock_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "flock_unix.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
-    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

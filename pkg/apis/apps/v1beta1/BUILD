@@ -52,10 +52,10 @@ go_test(
     srcs = ["defaults_test.go"],
     tags = ["automanaged"],
     deps = [
+        ":go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
-        "//pkg/apis/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

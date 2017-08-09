@@ -12,8 +12,19 @@ go_library(
     srcs = [
         "colorable_others.go",
         "noncolorable.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "colorable_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

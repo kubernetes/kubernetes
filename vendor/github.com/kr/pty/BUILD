@@ -12,11 +12,25 @@ go_library(
     srcs = [
         "doc.go",
         "ioctl.go",
-        "pty_linux.go",
+        "pty_unsupported.go",
         "run.go",
         "util.go",
-        "ztypes_amd64.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "ioctl_bsd.go",
+            "pty_darwin.go",
+            "ztypes_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "pty_linux.go",
+            "ztypes_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "ztypes_amd64.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
     tags = ["automanaged"],
 )
 

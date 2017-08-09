@@ -32,8 +32,8 @@ go_test(
     srcs = ["conversion_test.go"],
     tags = ["automanaged"],
     deps = [
+        ":go_default_library",
         "//pkg/apis/abac:go_default_library",
-        "//pkg/apis/abac/v0:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )

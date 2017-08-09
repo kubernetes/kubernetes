@@ -19,7 +19,12 @@ go_library(
         "util.go",
         "wal.go",
         "wal_unix.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "wal_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",

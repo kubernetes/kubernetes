@@ -18,7 +18,12 @@ go_library(
         "rlimit.go",
         "roundrobin.go",
         "udp_server.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "rlimit_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

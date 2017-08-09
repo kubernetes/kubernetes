@@ -10,9 +10,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "bolt_amd64.go",
-        "bolt_linux.go",
         "bolt_unix.go",
+        "boltsync_unix.go",
         "bucket.go",
         "cursor.go",
         "db.go",
@@ -22,7 +21,20 @@ go_library(
         "node.go",
         "page.go",
         "tx.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "bolt_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "bolt_amd64.go",
+            "bolt_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "bolt_amd64.go",
+            "bolt_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

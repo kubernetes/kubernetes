@@ -12,10 +12,15 @@ go_library(
     srcs = [
         "backend.go",
         "batch_tx.go",
-        "boltoption_linux.go",
+        "boltoption_default.go",
         "doc.go",
         "metrics.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "boltoption_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/boltdb/bolt:go_default_library",

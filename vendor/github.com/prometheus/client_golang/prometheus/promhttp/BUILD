@@ -10,6 +10,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "delegator_1_7.go",
         "delegator_1_8.go",
         "http.go",
         "instrument_client.go",

@@ -14,9 +14,19 @@ go_library(
         "delegate.go",
         "exec.go",
         "find.go",
-        "os_unix.go",
         "raw_exec.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "os_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",

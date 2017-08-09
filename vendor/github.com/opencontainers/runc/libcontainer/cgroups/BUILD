@@ -10,15 +10,23 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cgroups.go",
-        "stats.go",
-        "utils.go",
-    ],
+        "cgroups_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "cgroups.go",
+            "stats.go",
+            "utils.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/docker/go-units:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-    ],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/docker/go-units:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

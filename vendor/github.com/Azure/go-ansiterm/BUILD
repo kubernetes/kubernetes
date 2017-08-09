@@ -38,6 +38,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/Azure/go-ansiterm/winterm:all-srcs",
+    ],
     tags = ["automanaged"],
 )

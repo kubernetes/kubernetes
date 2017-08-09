@@ -25,8 +25,16 @@ cgo_genrule(
 
 go_library(
     name = "go_default_library",
-    srcs = [],
-    library = ":cgo_codegen",
+    srcs = [
+        "dlopen.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "dlopen_example.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
+    clinkopts = ["-ldl"],
     tags = ["automanaged"],
 )
 

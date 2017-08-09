@@ -9,7 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["setsize.go"],
+    srcs = [
+        "setsize.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "setsize_unsupported.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",

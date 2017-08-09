@@ -12,8 +12,25 @@ go_library(
     srcs = [
         "reparse.go",
         "syscall.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "backup.go",
+            "file.go",
+            "fileinfo.go",
+            "pipe.go",
+            "privilege.go",
+            "sd.go",
+            "zsyscall_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

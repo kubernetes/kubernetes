@@ -11,11 +11,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "control.go",
+        "go16.go",
         "go17.go",
         "handler_server.go",
         "http2_client.go",
         "http2_server.go",
         "http_util.go",
+        "pre_go16.go",
         "transport.go",
     ],
     tags = ["automanaged"],

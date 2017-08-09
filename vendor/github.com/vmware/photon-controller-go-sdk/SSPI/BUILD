@@ -9,7 +9,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["sspi_unsupported.go"],
+    srcs = [
+        "sspi_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "sspi.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

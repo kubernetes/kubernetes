@@ -162,7 +162,12 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "kubelet_pods_windows_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

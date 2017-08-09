@@ -12,7 +12,12 @@ go_library(
     srcs = [
         "ct.go",
         "ct_ansi.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "ct_win.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

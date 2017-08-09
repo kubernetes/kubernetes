@@ -22,8 +22,11 @@ cgo_genrule(
 
 go_library(
     name = "go_default_library",
-    srcs = ["util.go"],
-    library = ":cgo_codegen",
+    srcs = [
+        "util.go",
+        "util_cgo.go",
+    ],
+    cgo = True,
     tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/pkg/dlopen:go_default_library"],
 )

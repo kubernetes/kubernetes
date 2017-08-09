@@ -20,8 +20,13 @@ go_library(
         "plugins.go",
         "util.go",
         "volume.go",
-        "volume_linux.go",
-    ],
+        "volume_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "volume_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
@@ -68,16 +73,24 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = [
-        "metrics_du_test.go",
         "metrics_statfs_test.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "metrics_du_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = [
-        "//pkg/volume:go_default_library",
+        ":go_default_library",
         "//pkg/volume/testing:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

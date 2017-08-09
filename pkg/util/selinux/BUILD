@@ -12,10 +12,20 @@ go_library(
     srcs = [
         "doc.go",
         "selinux.go",
-        "selinux_linux.go",
-    ],
+        "selinux_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "selinux_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
-    deps = ["//vendor/github.com/opencontainers/runc/libcontainer/selinux:go_default_library"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/selinux:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

@@ -9,9 +9,21 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["rlimit_linux.go"],
+    srcs = [
+        "rlimit_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "rlimit_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
-    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

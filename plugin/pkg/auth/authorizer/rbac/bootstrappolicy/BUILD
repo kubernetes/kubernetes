@@ -36,12 +36,12 @@ go_test(
     ]),
     tags = ["automanaged"],
     deps = [
+        ":go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
@@ -55,6 +55,7 @@ go_test(
 go_test(
     name = "go_default_test",
     srcs = ["controller_policy_test.go"],
+    data = glob(["testdata/**"]),
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

@@ -9,7 +9,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["inotify_linux.go"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "inotify_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

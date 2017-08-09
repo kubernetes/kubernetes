@@ -18,7 +18,12 @@ go_library(
         "logmap.go",
         "pkg_logger.go",
         "syslog_formatter.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "init_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
     deps = ["//vendor/github.com/coreos/go-systemd/journal:go_default_library"],
 )

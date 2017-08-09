@@ -24,10 +24,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conn.go",
+        "defs.go",
         "netlink.go",
         "reader.go",
     ],
-    library = ":cgo_codegen",
+    cgo = True,
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

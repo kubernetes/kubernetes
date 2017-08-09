@@ -27,6 +27,7 @@ go_library(
     name = "go_default_library",
     srcs = ["kubectl.go"],
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
     deps = ["//cmd/kubectl/app:go_default_library"],
 )
 

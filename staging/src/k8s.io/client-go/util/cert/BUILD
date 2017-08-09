@@ -14,6 +14,7 @@ go_test(
         "csr_test.go",
         "pem_test.go",
     ],
+    data = glob(["testdata/**"]),
     library = ":go_default_library",
     tags = ["automanaged"],
 )

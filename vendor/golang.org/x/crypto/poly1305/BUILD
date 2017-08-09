@@ -11,9 +11,22 @@ go_library(
     name = "go_default_library",
     srcs = [
         "poly1305.go",
-        "poly1305_amd64.s",
-        "sum_amd64.go",
-    ],
+        "sum_ref.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "poly1305_amd64.s",
+            "sum_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "poly1305_amd64.s",
+            "sum_amd64.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "poly1305_amd64.s",
+            "sum_amd64.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

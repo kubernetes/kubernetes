@@ -9,7 +9,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["keyctl.go"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "keyctl.go",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

@@ -28,20 +28,28 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["host_path_test.go"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "host_path_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/file:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/testing:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
-    ],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//pkg/util/file:go_default_library",
+            "//pkg/volume:go_default_library",
+            "//pkg/volume/testing:go_default_library",
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
+            "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

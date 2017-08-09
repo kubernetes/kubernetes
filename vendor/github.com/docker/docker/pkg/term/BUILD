@@ -24,11 +24,30 @@ go_library(
     name = "go_default_library",
     srcs = [
         "ascii.go",
+        "tc_other.go",
         "term.go",
         "term_unix.go",
-    ],
-    library = ":cgo_codegen",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "termios_darwin.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "tc_linux_cgo.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "term_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
     tags = ["automanaged"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
+            "//vendor/github.com/docker/docker/pkg/term/windows:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

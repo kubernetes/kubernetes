@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "test_suite.go",
+        "vendor_check_go15.go",
         "vendor_check_go16.go",
     ],
     tags = ["automanaged"],

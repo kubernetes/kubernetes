@@ -25,8 +25,21 @@ cgo_genrule(
 
 go_library(
     name = "go_default_library",
-    srcs = [],
-    library = ":cgo_codegen",
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "seccomp.go",
+            "seccomp_internal.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
+    clinkopts = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "-lseccomp",
+            "-lseccomp",
+        ],
+        "//conditions:default": [],
+    }),
     tags = ["automanaged"],
 )
 

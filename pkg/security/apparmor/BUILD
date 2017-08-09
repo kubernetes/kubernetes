@@ -13,6 +13,7 @@ go_library(
     srcs = [
         "helpers.go",
         "validate.go",
+        "validate_disabled.go",
     ],
     tags = ["automanaged"],
     deps = [

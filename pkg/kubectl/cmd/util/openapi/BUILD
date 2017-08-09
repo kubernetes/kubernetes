@@ -43,7 +43,7 @@ go_test(
     data = ["//api/openapi-spec:swagger-spec"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        ":go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
