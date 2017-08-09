@@ -197,11 +197,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "cj1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cj1",
 	},
-	gvr("batch", "v2alpha1", "scheduledjobs"): {
-		stub:             `{"metadata": {"name": "cj2"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
-		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cj2",
-		expectedGVK:      gvkP("batch", "v2alpha1", "CronJob"), // scheduledjobs were deprecated by cronjobs
-	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/certificates/v1beta1
