@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -32,7 +33,7 @@ type Mounter struct {
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	if source == "tmpfs" || len(target) < 3 {
-		glog.Infof("Skip mounting source (%s), target (%s)\n, with arguments (%s) in windows", source, target, options)
+		glog.Infof("Skip mounting source (%q), target (%q)\n, with arguments (%q) in windows", source, target, options)
 		return nil
 	}
 
@@ -40,40 +41,39 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		target = "c:" + target
 	}
 	parentDir := getWindowsParentDir(target)
-	err := os.MkdirAll(parentDir, 0700)
+	err := os.MkdirAll(parentDir, 0755)
 	if err != nil {
-		glog.Infof("mkdir(%s) failed: %v\n", parentDir, err)
+		glog.Infof("mkdir(%q) failed: %v\n", parentDir, err)
 		return err
 	}
 
 	/*
 		Comment below code since in Windows Server 2016 RS3, there will be new cmdlet(New-SmbGlobalMapping) to replace "net use"
 		mountCmd := "net"
-		glog.Infof("Mounting cmd (%s) with arguments (%s), source (%s), target (%s)\n", mountCmd, options, source, target)
+		glog.Infof("Mounting cmd (%q) with arguments (%q), source (%q), target (%q)\n", mountCmd, options, source, target)
 		output, err := exec.Command(mountCmd, options...).CombinedOutput()
 		if err != nil {
-			glog.Infof("Mount failed: %v\nMounting command: %s\n", err, mountCmd)
+			glog.Infof("Mount failed: %v\nMounting command: %q\n", err, mountCmd)
 			return err
 		}
-		glog.Infof("Mount succeeded, output: %s", output)
+		glog.Infof("Mount succeeded, output: %q", output)
 	*/
 
 	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
 	if err != nil {
-		glog.Infof("mklink failed: %v\n", err)
+		return fmt.Errorf("mklink failed: %v", err)
 	}
 
 	return nil
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	glog.Infof("Unmount target (%s)\n", target)
+	glog.Infof("Unmount target (%q)\n", target)
 	output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput()
 	if err != nil {
-		glog.Infof("Unmount failed: %v\n", err)
-	} else {
-		glog.Infof("Unmount succeeded, output: %s", output)
+		return fmt.Errorf("Unmount failed: %v", err)
 	}
+	glog.Infof("Unmount succeeded, output: %q", output)
 	return nil
 }
 
@@ -114,9 +114,10 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 }
 
 func getWindowsParentDir(path string) string {
-	index := strings.LastIndex(path, "\\")
+	index := strings.LastIndex(path, string(os.PathSeparator))
 	if index != -1 {
 		return path[:index]
 	}
+
 	return ""
 }

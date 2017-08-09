@@ -212,13 +212,13 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	mountOptions := []string{}
 	source := ""
+	osSeparator := string(os.PathSeparator)
+	source = fmt.Sprintf("%s%s%s.file.%s%s%s", osSeparator, osSeparator, accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), osSeparator, b.shareName)
 
 	if runtime.GOOS == "windows" {
-		source = fmt.Sprintf("\\\\%s.file.%s\\%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
 		mountOptions = []string{"use", "*", source, fmt.Sprintf("/u:AZURE\\%s", accountName), accountKey, "/p:yes"}
 	} else {
 		os.MkdirAll(dir, 0700)
-		source = fmt.Sprintf("//%s.file.%s/%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
 		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 		options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0700,file_mode=0700", accountName, accountKey)}
 		if b.readOnly {
