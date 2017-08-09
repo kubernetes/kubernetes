@@ -33,7 +33,7 @@ type Mounter struct {
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	if source == "tmpfs" || len(target) < 3 {
-		glog.Infof("Skip mounting source (%q), target (%q)\n, with arguments (%q) in windows", source, target, options)
+		glog.Infof("azureMount: Skip mounting source (%q), target (%q)\n, with arguments (%q) in windows", source, target, options)
 		return nil
 	}
 
@@ -47,19 +47,26 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		return err
 	}
 
-	/*
-		Comment below code since in Windows Server 2016 RS3, there will be new cmdlet(New-SmbGlobalMapping) to replace "net use"
-		mountCmd := "net"
-		glog.Infof("Mounting cmd (%q) with arguments (%q), source (%q), target (%q)\n", mountCmd, options, source, target)
-		output, err := exec.Command(mountCmd, options...).CombinedOutput()
-		if err != nil {
-			glog.Infof("Mount failed: %v\nMounting command: %q\n", err, mountCmd)
-			return err
-		}
-		glog.Infof("Mount succeeded, output: %q", output)
-	*/
+	if len(options) != 1 {
+		glog.Infof("azureMount: mount options number(%n) not equal to 1, skip mounting, mount options: %q\n", len(options), options)
+		return nil
+	}
+	cmd := options[0]
 
-	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, source).CombinedOutput()
+	driverLetter, err := getAvailabeDriverLetter()
+	if err != nil {
+		return err
+	}
+	driverPath := driverLetter + ":"
+	cmd += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", driverPath, source)
+	glog.Infof("azureMount: mount command : %q", cmd)
+
+	_, err = exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
+	}
+
+	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("mklink failed: %v", err)
 	}
@@ -68,12 +75,12 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	glog.Infof("Unmount target (%q)\n", target)
+	glog.Infof("azureMount: Unmount target (%q)\n", target)
 	output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v", err)
 	}
-	glog.Infof("Unmount succeeded, output: %q", output)
+	glog.Infof("azureMount: Unmount succeeded, output: %q", output)
 	return nil
 }
 
@@ -120,4 +127,14 @@ func getWindowsParentDir(path string) string {
 	}
 
 	return ""
+}
+
+func getAvailabeDriverLetter() (string, error) {
+	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
+	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil || len(output) == 0 {
+		return "", fmt.Errorf("getAvailabeDriverLetter failed: %v", err)
+	}
+	return string(output)[:1], nil
 }
