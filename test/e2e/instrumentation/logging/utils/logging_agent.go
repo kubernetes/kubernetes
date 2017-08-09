@@ -65,7 +65,12 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 
 	maxRestartCount := 0
 	for _, pod := range agentPods.Items {
-		restartCount := int(pod.Status.ContainerStatuses[0].RestartCount)
+		contStatuses := pod.Status.ContainerStatuses
+		if len(contStatuses) == 0 {
+			framework.Logf("There are no container statuses for pod %s", pod.Name)
+			continue
+		}
+		restartCount := int(contStatuses[0].RestartCount)
 		maxRestartCount = integer.IntMax(maxRestartCount, restartCount)
 
 		framework.Logf("Logging agent %s on node %s was restarted %d times",

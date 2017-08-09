@@ -21339,6 +21339,160 @@
      }
     ]
    },
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/scale": {
+    "get": {
+     "description": "read scale of the specified StatefulSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta1"
+     ],
+     "operationId": "readAppsV1beta1NamespacedStatefulSetScale",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta1"
+     }
+    },
+    "put": {
+     "description": "replace scale of the specified StatefulSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta1"
+     ],
+     "operationId": "replaceAppsV1beta1NamespacedStatefulSetScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta1"
+     }
+    },
+    "patch": {
+     "description": "partially update scale of the specified StatefulSet",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta1"
+     ],
+     "operationId": "patchAppsV1beta1NamespacedStatefulSetScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta1"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Scale",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/status": {
     "get": {
      "description": "read status of the specified StatefulSet",
@@ -23752,78 +23906,6 @@
      }
     ]
    },
-   "/apis/apps/v1beta2/namespaces/{namespace}/deployments/{name}/rollback": {
-    "post": {
-     "description": "create rollback of a Deployment",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "apps_v1beta2"
-     ],
-     "operationId": "createAppsV1beta2NamespacedDeploymentRollback",
-     "parameters": [
-      {
-       "name": "body",
-       "in": "body",
-       "required": true,
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DeploymentRollback"
-       }
-      }
-     ],
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DeploymentRollback"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "post",
-     "x-kubernetes-group-version-kind": {
-      "group": "apps",
-      "kind": "DeploymentRollback",
-      "version": "v1beta2"
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "name of the DeploymentRollback",
-      "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     }
-    ]
-   },
    "/apis/apps/v1beta2/namespaces/{namespace}/deployments/{name}/scale": {
     "get": {
      "description": "read scale of the specified Deployment",
@@ -25339,6 +25421,160 @@
       "uniqueItems": true,
       "type": "string",
       "description": "name of the StatefulSet",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/apis/apps/v1beta2/namespaces/{namespace}/statefulsets/{name}/scale": {
+    "get": {
+     "description": "read scale of the specified StatefulSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta2"
+     ],
+     "operationId": "readAppsV1beta2NamespacedStatefulSetScale",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta2"
+     }
+    },
+    "put": {
+     "description": "replace scale of the specified StatefulSet",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta2"
+     ],
+     "operationId": "replaceAppsV1beta2NamespacedStatefulSetScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta2"
+     }
+    },
+    "patch": {
+     "description": "partially update scale of the specified StatefulSet",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "apps_v1beta2"
+     ],
+     "operationId": "patchAppsV1beta2NamespacedStatefulSetScale",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
+     "x-kubernetes-group-version-kind": {
+      "group": "apps",
+      "kind": "Scale",
+      "version": "v1beta2"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Scale",
       "name": "name",
       "in": "path",
       "required": true
@@ -50956,7 +51192,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.DeploymentRollback": {
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -51025,7 +51261,7 @@
       "format": "int32"
      },
      "rollbackTo": {
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
       "$ref": "#/definitions/io.k8s.api.apps.v1beta1.RollbackConfig"
      },
      "selector": {
@@ -51105,6 +51341,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.RollbackConfig": {
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
@@ -51535,7 +51772,7 @@
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollingUpdateDaemonSet"
      },
      "type": {
-      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+      "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
       "type": "string"
      }
     }
@@ -51639,45 +51876,6 @@
      }
     ]
    },
-   "io.k8s.api.apps.v1beta2.DeploymentRollback": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentRollback stores the information required to rollback a deployment.",
-    "required": [
-     "name",
-     "rollbackTo"
-    ],
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "name": {
-      "description": "Required: This must match the Name of a deployment.",
-      "type": "string"
-     },
-     "rollbackTo": {
-      "description": "The config of this deployment rollback.",
-      "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollbackConfig"
-     },
-     "updatedAnnotations": {
-      "description": "The annotations to be updated to a deployment",
-      "type": "object",
-      "additionalProperties": {
-       "type": "string"
-      }
-     }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "group": "apps",
-      "kind": "DeploymentRollback",
-      "version": "v1beta2"
-     }
-    ]
-   },
    "io.k8s.api.apps.v1beta2.DeploymentSpec": {
     "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
@@ -51707,10 +51905,6 @@
       "description": "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
       "type": "integer",
       "format": "int32"
-     },
-     "rollbackTo": {
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
-      "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollbackConfig"
      },
      "selector": {
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
@@ -51948,16 +52142,6 @@
      }
     }
    },
-   "io.k8s.api.apps.v1beta2.RollbackConfig": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-    "properties": {
-     "revision": {
-      "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
-      "type": "integer",
-      "format": "int64"
-     }
-    }
-   },
    "io.k8s.api.apps.v1beta2.RollingUpdateDaemonSet": {
     "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
@@ -51984,7 +52168,7 @@
     "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
-      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+      "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
       "type": "integer",
       "format": "int32"
      }
@@ -52219,7 +52403,7 @@
       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.RollingUpdateStatefulSetStrategy"
      },
      "type": {
-      "description": "Type indicates the type of the StatefulSetUpdateStrategy.",
+      "description": "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
       "type": "string"
      }
     }
@@ -52593,6 +52777,10 @@
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/io.k8s.api.authorization.v1.ResourceAttributes"
      },
+     "uid": {
+      "description": "UID information about the requesting user.",
+      "type": "string"
+     },
      "user": {
       "description": "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
       "type": "string"
@@ -52807,6 +52995,10 @@
      "resourceAttributes": {
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.ResourceAttributes"
+     },
+     "uid": {
+      "description": "UID information about the requesting user.",
+      "type": "string"
      },
      "user": {
       "description": "User is the user you're testing for. If you specify \"User\" but not \"Group\", then is it interpreted as \"What if User were not a member of any groups",
@@ -58382,7 +58574,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DeploymentRollback": {
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -58451,7 +58643,7 @@
       "format": "int32"
      },
      "rollbackTo": {
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.RollbackConfig"
      },
      "selector": {
@@ -59194,6 +59386,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RollbackConfig": {
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
@@ -61378,7 +61571,7 @@
       "type": "string"
      },
      "retryAfterSeconds": {
-      "description": "If specified, the time in seconds before the operation should be retried.",
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action.",
       "type": "integer",
       "format": "int32"
      },

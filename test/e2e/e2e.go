@@ -40,8 +40,8 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
-	"k8s.io/kubernetes/test/e2e/metrics"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -77,12 +77,24 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
+
+		gceCloud, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
 			framework.TestContext.CloudConfig.ProjectID,
 			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
 			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
+		}
+
+		cloudConfig.Provider = gceCloud
+
+		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZones()
+			if err != nil {
+				return err
+			}
+
+			cloudConfig.Zone, _ = zones.PopAny()
 		}
 
 	case "aws":

@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -288,4 +290,135 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
 	assert.Error(t, err)
+}
+
+func TestLifeCycleHook(t *testing.T) {
+
+	// Setup
+	fakeRuntime, _, m, _ := createTestRuntimeManager()
+
+	gracePeriod := int64(30)
+	cID := kubecontainer.ContainerID{
+		Type: "docker",
+		ID:   "foo",
+	}
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command:         []string{"testCommand"},
+					WorkingDir:      "testWorkingDir",
+				},
+			},
+		},
+	}
+	cmdPostStart := &v1.Lifecycle{
+		PostStart: &v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: []string{"PostStartCMD"},
+			},
+		},
+	}
+
+	httpLifeCycle := &v1.Lifecycle{
+		PreStop: &v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Host: "testHost.com",
+				Path: "/GracefulExit",
+			},
+		},
+	}
+
+	cmdLifeCycle := &v1.Lifecycle{
+		PreStop: &v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: []string{"PreStopCMD"},
+			},
+		},
+	}
+
+	fakeRunner := &containertest.FakeContainerCommandRunner{}
+	fakeHttp := &fakeHTTP{}
+
+	lcHanlder := lifecycle.NewHandlerRunner(
+		fakeHttp,
+		fakeRunner,
+		nil)
+
+	m.runner = lcHanlder
+
+	// Configured and works as expected
+	t.Run("PreStop-CMDExec", func(t *testing.T) {
+		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
+		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
+		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
+			t.Errorf("CMD Prestop hook was not invoked")
+		}
+	})
+
+	// Configured and working HTTP hook
+	t.Run("PreStop-HTTPGet", func(t *testing.T) {
+		defer func() { fakeHttp.url = "" }()
+		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
+
+		if !strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+			t.Errorf("HTTP Prestop hook was not invoked")
+		}
+	})
+
+	// When there is no time to run PreStopHook
+	t.Run("PreStop-NoTimeToRun", func(t *testing.T) {
+		gracePeriodLocal := int64(0)
+
+		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
+		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
+
+		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriodLocal)
+
+		if strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+			t.Errorf("HTTP Should not execute when gracePeriod is 0")
+		}
+	})
+
+	// Post Start script
+	t.Run("PostStart-CmdExe", func(t *testing.T) {
+
+		// Fake all the things you need before trying to create a container
+		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
+		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
+		testPod.Spec.Containers[0].Lifecycle = cmdPostStart
+		testContainer := &testPod.Spec.Containers[0]
+		fakePodStatus := &kubecontainer.PodStatus{
+			ContainerStatuses: []*kubecontainer.ContainerStatus{
+				{
+					ID: kubecontainer.ContainerID{
+						Type: "docker",
+						ID:   testContainer.Name,
+					},
+					Name:      testContainer.Name,
+					State:     kubecontainer.ContainerStateCreated,
+					CreatedAt: time.Unix(0, time.Now().Unix()),
+				},
+			},
+		}
+
+		// Now try to create a container, which should in turn invoke PostStart Hook
+		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "")
+		if err != nil {
+			t.Errorf("startContainer erro =%v", err)
+		}
+		if fakeRunner.Cmd[0] != cmdPostStart.PostStart.Exec.Command[0] {
+			t.Errorf("CMD PostStart hook was not invoked")
+		}
+
+	})
 }

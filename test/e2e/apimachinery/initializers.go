@@ -26,8 +26,10 @@ import (
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/kubernetes/pkg/client/retry"
@@ -133,15 +135,7 @@ var _ = SIGDescribe("Initializers", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// we must remove the initializer when the test is complete and ensure no pods are pending for that initializer
-		defer func() {
-			if err := c.AdmissionregistrationV1alpha1().InitializerConfigurations().Delete(initializerConfigName, nil); err != nil && !errors.IsNotFound(err) {
-				framework.Logf("got error on deleting %s", initializerConfigName)
-			}
-			// poller configuration is 1 second, wait at least that long
-			time.Sleep(3 * time.Second)
-			// clear our initializer from anyone who got it
-			removeInitializersFromAllPods(c, initializerName)
-		}()
+		defer cleanupInitializer(c, initializerConfigName, initializerName)
 
 		// poller configuration is 1 second, wait at least that long
 		time.Sleep(3 * time.Second)
@@ -207,6 +201,67 @@ var _ = SIGDescribe("Initializers", func() {
 		Expect(pod.Initializers).To(BeNil())
 		Expect(pod.Annotations[v1.MirrorPodAnnotationKey]).To(Equal("true"))
 	})
+
+	It("don't cause replicaset controller creating extra pods if the initializer is not handled [Serial]", func() {
+		ns := f.Namespace.Name
+		c := f.ClientSet
+
+		podName := "uninitialized-pod"
+		framework.Logf("Creating pod %s", podName)
+
+		// create and register an initializer, without setting up a controller to handle it.
+		initializerName := "pod.test.e2e.kubernetes.io"
+		initializerConfigName := "e2e-test-initializer"
+		_, err := c.AdmissionregistrationV1alpha1().InitializerConfigurations().Create(&v1alpha1.InitializerConfiguration{
+			ObjectMeta: metav1.ObjectMeta{Name: initializerConfigName},
+			Initializers: []v1alpha1.Initializer{
+				{
+					Name: initializerName,
+					Rules: []v1alpha1.Rule{
+						{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+					},
+				},
+			},
+		})
+		if errors.IsNotFound(err) {
+			framework.Skipf("dynamic configuration of initializers requires the alpha admissionregistration.k8s.io group to be enabled")
+		}
+		Expect(err).NotTo(HaveOccurred())
+
+		// we must remove the initializer when the test is complete and ensure no pods are pending for that initializer
+		defer cleanupInitializer(c, initializerConfigName, initializerName)
+
+		// poller configuration is 1 second, wait at least that long
+		time.Sleep(3 * time.Second)
+
+		// create a replicaset
+		persistedRS, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newReplicaset())
+		Expect(err).NotTo(HaveOccurred())
+		// wait for replicaset controller to confirm that it has handled the creation
+		err = waitForRSObservedGeneration(c, persistedRS.Namespace, persistedRS.Name, persistedRS.Generation)
+		Expect(err).NotTo(HaveOccurred())
+
+		// update the replicaset spec to trigger a resync
+		patch := []byte(`{"spec":{"minReadySeconds":5}}`)
+		persistedRS, err = c.ExtensionsV1beta1().ReplicaSets(ns).Patch(persistedRS.Name, types.StrategicMergePatchType, patch)
+		Expect(err).NotTo(HaveOccurred())
+
+		// wait for replicaset controller to confirm that it has handle the spec update
+		err = waitForRSObservedGeneration(c, persistedRS.Namespace, persistedRS.Name, persistedRS.Generation)
+		Expect(err).NotTo(HaveOccurred())
+
+		// verify that the replicaset controller doesn't create extra pod
+		selector, err := metav1.LabelSelectorAsSelector(persistedRS.Spec.Selector)
+		Expect(err).NotTo(HaveOccurred())
+
+		listOptions := metav1.ListOptions{
+			LabelSelector:        selector.String(),
+			IncludeUninitialized: true,
+		}
+		pods, err := c.Core().Pods(ns).List(listOptions)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(pods.Items)).Should(Equal(1))
+	})
 })
 
 func newUninitializedPod(podName string) *v1.Pod {
@@ -215,6 +270,34 @@ func newUninitializedPod(podName string) *v1.Pod {
 		Pending: []metav1.Initializer{{Name: "Test"}},
 	}
 	return pod
+}
+
+func newReplicaset() *v1beta1.ReplicaSet {
+	name := "initializer-test-replicaset"
+	replicas := int32(1)
+	labels := map[string]string{"initializer-test": "single-replicaset"}
+	return &v1beta1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1beta1.ReplicaSetSpec{
+			Replicas: &replicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers: []v1.Container{
+						{
+							Name:  name + "-container",
+							Image: "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func newInitPod(podName string) *v1.Pod {
@@ -282,4 +365,29 @@ func removeInitializersFromAllPods(c clientset.Interface, initializerName string
 			framework.Logf("Unable to remove initializer from pod %s in ns %s: %v", p.Name, p.Namespace, err)
 		}
 	}
+}
+
+// remove the initializerConfig, and remove the initializer from all pods
+func cleanupInitializer(c clientset.Interface, initializerConfigName, initializerName string) {
+	if err := c.AdmissionregistrationV1alpha1().InitializerConfigurations().Delete(initializerConfigName, nil); err != nil && !errors.IsNotFound(err) {
+		framework.Logf("got error on deleting %s", initializerConfigName)
+	}
+	// poller configuration is 1 second, wait at least that long
+	time.Sleep(3 * time.Second)
+	// clear our initializer from anyone who got it
+	removeInitializersFromAllPods(c, initializerName)
+}
+
+// waits till the RS status.observedGeneration matches metadata.generation.
+func waitForRSObservedGeneration(c clientset.Interface, ns, name string, generation int64) error {
+	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err := c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if generation > rs.Status.ObservedGeneration {
+			return false, nil
+		}
+		return true, nil
+	})
 }

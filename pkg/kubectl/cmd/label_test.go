@@ -289,6 +289,14 @@ func TestLabelErrors(t *testing.T) {
 			args:  []string{"pods"},
 			errFn: func(err error) bool { return strings.Contains(err.Error(), "at least one label update is required") },
 		},
+		"wrong labels": {
+			args:  []string{"pods", "-"},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "at least one label update is required") },
+		},
+		"wrong labels 2": {
+			args:  []string{"pods", "=bar"},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "at least one label update is required") },
+		},
 		"no resources": {
 			args:  []string{"pods-"},
 			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },

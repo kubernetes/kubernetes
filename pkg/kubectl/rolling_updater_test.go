@@ -1501,7 +1501,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 	clientset := internalclientset.New(restClient)
 
 	if rc, err := updateRcWithRetries(
-		clientset, "default", rc, func(c *api.ReplicationController) {
+		clientset.Core(), "default", rc, func(c *api.ReplicationController) {
 			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)

@@ -505,6 +505,7 @@ func TestWebhook(t *testing.T) {
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
 					User:   "jane",
+					UID:    "1",
 					Groups: []string{"group1", "group2"},
 					ResourceAttributes: &v1beta1.ResourceAttributes{
 						Verb:        "GET",

@@ -17,15 +17,9 @@ limitations under the License.
 package priorityclass
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -82,28 +76,4 @@ func (priorityClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, 
 // AllowUnconditionalUpdate is the default update policy for PriorityClass objects.
 func (priorityClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// SelectableFields returns a field set that represents the object.
-func SelectableFields(pc *scheduling.PriorityClass) fields.Set {
-	return generic.ObjectMetaFieldsSet(&pc.ObjectMeta, false)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	pc, ok := obj.(*scheduling.PriorityClass)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a PriorityClass")
-	}
-	return labels.Set(pc.ObjectMeta.Labels), SelectableFields(pc), pc.Initializers != nil, nil
-}
-
-// Matcher is the filter used by the generic etcd backend to watch events
-// from etcd to clients of the apiserver only interested in specific labels/fields.
-func Matcher(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }

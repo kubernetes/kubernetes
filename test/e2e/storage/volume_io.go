@@ -243,7 +243,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("NFS", func() {
+	Describe("NFS", func() {
 		testFile := "nfs_io_test"
 		// client pod uses selinux
 		podSec := v1.PodSecurityContext{
@@ -279,7 +279,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("GlusterFS", func() {
+	Describe("GlusterFS", func() {
 		var name string
 		testFile := "gluster_io_test"
 
@@ -325,7 +325,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	// iSCSI
 	// The iscsiadm utility and iscsi target kernel modules must be installed on all nodes.
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("iSCSI [Feature:Volumes]", func() {
+	Describe("iSCSI [Feature:Volumes]", func() {
 		testFile := "iscsi_io_test"
 
 		BeforeEach(func() {
@@ -362,7 +362,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("Ceph-RBD [Feature:Volumes]", func() {
+	Describe("Ceph-RBD [Feature:Volumes]", func() {
 		var (
 			secret *v1.Secret
 			name   string

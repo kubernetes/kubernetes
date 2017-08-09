@@ -966,7 +966,7 @@ func WaitForClusterSizeFuncWithUnready(c clientset.Interface, sizeFunc func(int)
 	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
 }
 
-func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interface) error {
+func waitForCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interface, tolerateUnreadyCount int) error {
 	var notready []string
 	for start := time.Now(); time.Now().Before(start.Add(scaleUpTimeout)); time.Sleep(20 * time.Second) {
 		pods, err := c.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
@@ -990,18 +990,22 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interf
 				notready = append(notready, pod.Name)
 			}
 		}
-		if len(notready) == 0 {
-			glog.Infof("All pods ready")
+		if len(notready) <= tolerateUnreadyCount {
+			glog.Infof("sufficient number of pods ready. Tolerating %d unready", tolerateUnreadyCount)
 			return nil
 		}
-		glog.Infof("Some pods are not ready yet: %v", notready)
+		glog.Infof("Too many pods are not ready yet: %v", notready)
 	}
 	glog.Info("Timeout on waiting for pods being ready")
 	glog.Info(framework.RunKubectlOrDie("get", "pods", "-o", "json", "--all-namespaces"))
 	glog.Info(framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
 
 	// Some pods are still not running.
-	return fmt.Errorf("Some pods are still not running: %v", notready)
+	return fmt.Errorf("Too many pods are still not running: %v", notready)
+}
+
+func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interface) error {
+	return waitForCaPodsReadyInNamespace(f, c, 0)
 }
 
 func getAnyNode(c clientset.Interface) *v1.Node {

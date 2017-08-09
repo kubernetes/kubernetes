@@ -84,8 +84,9 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				for runIdx := 0; runIdx < podRunCount; runIdx++ {
 					// Starting one pod on each node.
 					for _, pod := range podsByRun[runIdx] {
-						err := pod.Start(f)
-						framework.Logf("Failed to start pod: %v", err)
+						if err := pod.Start(f); err != nil {
+							framework.Logf("Failed to start pod: %v", err)
+						}
 					}
 					<-t.C
 				}

@@ -12418,7 +12418,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DeploymentRollback": {
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -12487,7 +12487,7 @@
       "format": "int32"
      },
      "rollbackTo": {
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.RollbackConfig"
      },
      "selector": {
@@ -12901,6 +12901,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RollbackConfig": {
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
@@ -13697,7 +13698,7 @@
       "type": "string"
      },
      "retryAfterSeconds": {
-      "description": "If specified, the time in seconds before the operation should be retried.",
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action.",
       "type": "integer",
       "format": "int32"
      },

@@ -342,6 +342,12 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
+	if !MasterOSDistroIs(supportedMasterOsDistros...) {
+		Skipf("Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
+	}
+}
+
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
 		Skipf("Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
@@ -377,6 +383,15 @@ func RunIfSystemSpecNameIs(names ...string) {
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
+func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
+	for _, distro := range supportedMasterOsDistros {
+		if strings.ToLower(distro) == strings.ToLower(TestContext.MasterOSDistro) {
 			return true
 		}
 	}
@@ -2536,7 +2551,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint, nil))
+	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
 	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
@@ -3758,6 +3773,43 @@ func RestartKubeProxy(host string) error {
 	return nil
 }
 
+func RestartKubelet(host string) error {
+	// TODO: Make it work for all providers and distros.
+	if !ProviderIs("gce", "aws") {
+		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+	}
+	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
+		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
+	}
+	var cmd string
+	if ProviderIs("gce") && NodeOSDistroIs("debian") {
+		cmd = "sudo /etc/init.d/kubelet restart"
+	} else {
+		cmd = "sudo systemctl restart kubelet"
+	}
+	Logf("Restarting kubelet via ssh, running: %v", cmd)
+	result, err := SSH(cmd, host, TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart kubelet: %v", err)
+	}
+	return nil
+}
+
+func WaitForKubeletUp(host string) error {
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		result, err := SSH(cmd, host, TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			LogSSHResult(result)
+		}
+		if result.Stdout == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for kubelet timed out")
+}
+
 func RestartApiserver(c discovery.ServerVersionInterface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
@@ -3804,6 +3856,38 @@ func WaitForApiserverUp(c clientset.Interface) error {
 		}
 	}
 	return fmt.Errorf("waiting for apiserver timed out")
+}
+
+func RestartControllerManager() error {
+	// TODO: Make it work for all providers and distros.
+	if !ProviderIs("gce", "aws") {
+		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+	}
+	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
+		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)
+	}
+	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1 | xargs sudo docker kill"
+	Logf("Restarting controller-manager via ssh, running: %v", cmd)
+	result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		LogSSHResult(result)
+		return fmt.Errorf("couldn't restart controller-manager: %v", err)
+	}
+	return nil
+}
+
+func WaitForControllerManagerUp() error {
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			LogSSHResult(result)
+		}
+		if result.Stdout == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for controller-manager timed out")
 }
 
 // WaitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.

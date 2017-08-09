@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/blang/semver"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -341,39 +340,25 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
 				"gcr.io/google_containers/busybox:1.24",
-				[]string{"sh", "-c", "touch checkfile && [ -f checkfile ] && echo Found || true"},
+				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			if readOnlyRootFilesystem {
+				podClient.WaitForFailure(podName, framework.PodStartTimeout)
+			} else {
+				podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			}
 
 			return podName
 		}
 
 		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true", func() {
-			podName := createAndWaitUserPod(true)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
-			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
-			}
-
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
-			if strings.Contains(logs, "Found") {
-				framework.Failf("readonly-rootfs container shouldn't be able to write files")
-			}
+			createAndWaitUserPod(true)
 		})
 
 		It("should run the container with writable rootfs when readOnlyRootFilesystem=false", func() {
-			podName := createAndWaitUserPod(false)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
-			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
-			}
-
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
-			if !strings.Contains(logs, "Found") {
-				framework.Failf("non-readonly-rootfs container should be able to write files")
-			}
+			createAndWaitUserPod(false)
 		})
 	})
 
@@ -381,21 +366,10 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		BeforeEach(func() {
 			if framework.TestContext.ContainerRuntime == "docker" {
-				// parse the docker version
-				out, err := exec.Command("docker", "-v").CombinedOutput()
-				if err != nil {
-					framework.Failf("checking docker version failed output %s: %v", string(out), err)
-				}
-				parts := strings.Split(string(out), ",")
-				parts = strings.Split(parts[0], " ")
-				dversion := parts[len(parts)-1]
-				version, err := semver.New(dversion)
-				if err != nil {
-					framework.Failf("parsing docker version %q failed: %v", dversion, err)
-				}
-				if version.LT(semver.Version{Major: 1, Minor: 11}) {
-					// make sure its >= 1.11 thats when "no-new-privileges" was added
-					framework.Skipf("Skipping no_new_privs tests, docker version is < 1.11 it is %s", version.String())
+				isSupported, err := isDockerNoNewPrivilegesSupported()
+				framework.ExpectNoError(err)
+				if !isSupported {
+					framework.Skipf("Skipping because no_new_privs is not supported in this docker")
 				}
 			}
 		})

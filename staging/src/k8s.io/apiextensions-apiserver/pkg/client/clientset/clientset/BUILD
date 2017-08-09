@@ -22,3 +22,21 @@ go_library(
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

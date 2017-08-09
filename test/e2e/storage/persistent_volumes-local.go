@@ -50,8 +50,6 @@ type localTestVolume struct {
 	node *v1.Node
 	// Path to the volume on the host node
 	hostDir string
-	// Path to the volume in the local util container
-	containerDir string
 	// PVC for this volume
 	pvc *v1.PersistentVolumeClaim
 	// PV for this volume
@@ -109,7 +107,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
 		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 		// Choose the first node
-		node0 = &config.nodes.Items[0]
+		node0 = &nodes.Items[0]
 
 		config = &localTestConfig{
 			ns:     f.Namespace.Name,
@@ -322,8 +320,10 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			By("Creating a directory under discovery path")
 			framework.Logf("creating local volume under path %q", volumePath)
 			mkdirCmd := fmt.Sprintf("mkdir %v -m 777", volumePath)
-			_, err := framework.NodeExec(node0.Name, mkdirCmd)
+			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, node0)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Waiting for a PersitentVolume to be created")
 			oldPV, err := waitForLocalPersistentVolume(config.client, volumePath)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -333,22 +333,27 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForPersistentVolumeClaimPhase(
 				v1.ClaimBound, config.client, claim.Namespace, claim.Name, framework.Poll, 1*time.Minute)
-			Expect(claim.Spec.VolumeName).To(Equal(oldPV.Name))
 			Expect(err).NotTo(HaveOccurred())
+
+			claim, err = config.client.Core().PersistentVolumeClaims(config.ns).Get(claim.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(claim.Spec.VolumeName).To(Equal(oldPV.Name))
 
 			// Delete the persistent volume claim: file will be cleaned up and volume be re-created.
 			By("Deleting the persistent volume claim to clean up persistent volume and re-create one")
-			writeCmd, readCmd := createWriteAndReadCmds(volumePath, testFile, testFileContent)
-			_, err = framework.NodeExec(node0.Name, writeCmd)
+			writeCmd, _ := createWriteAndReadCmds(volumePath, testFile, testFileContent)
+			err = framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, node0)
 			Expect(err).NotTo(HaveOccurred())
 			err = config.client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Waiting for a new PersistentVolume to be re-created")
 			newPV, err := waitForLocalPersistentVolume(config.client, volumePath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(newPV.UID).NotTo(Equal(oldPV.UID))
-			result, err := framework.NodeExec(node0.Name, readCmd)
+			fileDoesntExistCmd := createFileDoesntExistCmd(volumePath, testFile)
+			err = framework.IssueSSHCommand(fileDoesntExistCmd, framework.TestContext.Provider, node0)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Code).NotTo(BeZero(), "file should be deleted across local pv recreation, but exists")
 		})
 	})
 })
@@ -362,18 +367,16 @@ func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
 // setupLocalVolume setups a directory to user for local PV
 func setupLocalVolume(config *localTestConfig) *localTestVolume {
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	testDir := filepath.Join(containerBase, testDirName)
 	hostDir := filepath.Join(hostBase, testDirName)
 	// populate volume with testFile containing testFileContent
-	writeCmd, _ := createWriteAndReadCmds(testDir, testFile, testFileContent)
+	writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent)
 	By(fmt.Sprintf("Creating local volume on node %q at path %q", config.node0.Name, hostDir))
 
-	_, err := framework.NodeExec(config.node0.Name, writeCmd)
+	err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 	return &localTestVolume{
-		node:         config.node0,
-		hostDir:      hostDir,
-		containerDir: testDir,
+		node:    config.node0,
+		hostDir: hostDir,
 	}
 }
 
@@ -390,8 +393,8 @@ func cleanupLocalVolume(config *localTestConfig, volume *localTestVolume) {
 	}
 
 	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.containerDir)
-	_, err := framework.NodeExec(config.node0.Name, removeCmd)
+	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
+	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -459,12 +462,19 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume) (*v1.Pod, 
 }
 
 // Create corresponding write and read commands
-// to be executed inside containers with local PV attached
+// to be executed via SSH on the node with the local PV
 func createWriteAndReadCmds(testFileDir string, testFile string, writeTestFileContent string) (writeCmd string, readCmd string) {
 	testFilePath := filepath.Join(testFileDir, testFile)
 	writeCmd = fmt.Sprintf("mkdir -p %s; echo %s > %s", testFileDir, writeTestFileContent, testFilePath)
 	readCmd = fmt.Sprintf("cat %s", testFilePath)
 	return writeCmd, readCmd
+}
+
+// Create command to verify that the file doesn't exist
+// to be executed via SSH on the node with the local PV
+func createFileDoesntExistCmd(testFileDir string, testFile string) string {
+	testFilePath := filepath.Join(testFileDir, testFile)
+	return fmt.Sprintf("[ ! -e %s ]", testFilePath)
 }
 
 // Execute a read or write command in a pod.
@@ -495,7 +505,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 
 	By("Initializing local volume discovery base path")
 	mkdirCmd := fmt.Sprintf("mkdir %v -m 777", path.Join(hostBase, discoveryDir))
-	_, err := framework.NodeExec(config.node0.Name, mkdirCmd)
+	err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -505,7 +515,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", path.Join(hostBase, discoveryDir))
-	_, err := framework.NodeExec(config.node0.Name, removeCmd)
+	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Cleaning up persistent volume")

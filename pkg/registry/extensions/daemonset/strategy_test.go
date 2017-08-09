@@ -21,19 +21,7 @@ import (
 
 	"k8s.io/apiserver/pkg/registry/rest"
 	_ "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
-		"DaemonSet",
-		DaemonSetToSelectableFields(&extensions.DaemonSet{}),
-		nil,
-	)
-}
 
 func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 	// Make sure we correctly implement the interface.

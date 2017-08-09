@@ -14,22 +14,12 @@
 
 FROM docker.elastic.co/elasticsearch/elasticsearch:5.5.1
 
-USER root
-
-RUN mkdir /data
-RUN chown -R elasticsearch:elasticsearch /data
-
-WORKDIR /usr/share/elasticsearch
-
 VOLUME ["/data"]
 EXPOSE 9200 9300
 
-USER elasticsearch
-COPY elasticsearch_logging_discovery bin/
-COPY config/elasticsearch.yml config/
-COPY config/log4j2.properties config/
-COPY run.sh bin/
+COPY elasticsearch_logging_discovery run.sh bin/
+COPY config/elasticsearch.yml config/log4j2.properties config/
 
 USER root
-RUN chown -R elasticsearch:elasticsearch config
+RUN chown -R elasticsearch:elasticsearch ./
 CMD ["bin/run.sh"]

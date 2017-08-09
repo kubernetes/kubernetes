@@ -40,15 +40,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.InitializerConfiguration).Name, nil
 		},
-		PredicateFunc:     initializerconfiguration.MatchInitializerConfiguration,
-		QualifiedResource: admissionregistration.Resource("initializerconfigurations"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("initializerconfigurations"),
+		DefaultQualifiedResource: admissionregistration.Resource("initializerconfigurations"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("initializerconfigurations"),
 
 		CreateStrategy: initializerconfiguration.Strategy,
 		UpdateStrategy: initializerconfiguration.Strategy,
 		DeleteStrategy: initializerconfiguration.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: initializerconfiguration.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

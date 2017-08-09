@@ -402,7 +402,7 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 }
 
 func TestHumanReadableFitError(t *testing.T) {
-	error := &FitError{
+	err := &FitError{
 		Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		FailedPredicates: FailedPredicateMap{
 			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
@@ -410,12 +410,12 @@ func TestHumanReadableFitError(t *testing.T) {
 			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
-	if strings.Contains(error.Error(), NoNodeAvailableMsg) {
-		if strings.Contains(error.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(error.Error(), "NodeUnderMemoryPressure (1)") {
+	if strings.Contains(err.Error(), NoNodeAvailableMsg) {
+		if strings.Contains(err.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(err.Error(), "NodeUnderMemoryPressure (1)") {
 			return
 		}
 	}
-	t.Errorf("Error message doesn't have all the information content: [" + error.Error() + "]")
+	t.Errorf("Error message doesn't have all the information content: [" + err.Error() + "]")
 }
 
 // The point of this test is to show that you:

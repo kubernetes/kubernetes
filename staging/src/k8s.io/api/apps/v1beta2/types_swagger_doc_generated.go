@@ -81,7 +81,7 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 
 var map_DaemonSetUpdateStrategy = map[string]string{
 	"":              "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
 }
 
@@ -124,17 +124,6 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 	return map_DeploymentList
 }
 
-var map_DeploymentRollback = map[string]string{
-	"":                   "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentRollback stores the information required to rollback a deployment.",
-	"name":               "Required: This must match the Name of a deployment.",
-	"updatedAnnotations": "The annotations to be updated to a deployment",
-	"rollbackTo":         "The config of this deployment rollback.",
-}
-
-func (DeploymentRollback) SwaggerDoc() map[string]string {
-	return map_DeploymentRollback
-}
-
 var map_DeploymentSpec = map[string]string{
 	"":                        "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -144,7 +133,6 @@ var map_DeploymentSpec = map[string]string{
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
 	"paused":                  "Indicates that the deployment is paused.",
-	"rollbackTo":              "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
 }
 
@@ -238,15 +226,6 @@ func (ReplicaSetStatus) SwaggerDoc() map[string]string {
 	return map_ReplicaSetStatus
 }
 
-var map_RollbackConfig = map[string]string{
-	"":         "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-	"revision": "The revision to rollback to. If set to 0, rollback to the last revision.",
-}
-
-func (RollbackConfig) SwaggerDoc() map[string]string {
-	return map_RollbackConfig
-}
-
 var map_RollingUpdateDaemonSet = map[string]string{
 	"":               "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of daemon set rolling update.",
 	"maxUnavailable": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
@@ -268,7 +247,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 
 var map_RollingUpdateStatefulSetStrategy = map[string]string{
 	"":          "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
-	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
+	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
 }
 
 func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {
@@ -358,7 +337,7 @@ func (StatefulSetStatus) SwaggerDoc() map[string]string {
 
 var map_StatefulSetUpdateStrategy = map[string]string{
 	"":              "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
-	"type":          "Type indicates the type of the StatefulSetUpdateStrategy.",
+	"type":          "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
 	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
 }
 

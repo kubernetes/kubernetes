@@ -53,3 +53,32 @@ go_library(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/client-go/informers/admissionregistration:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/apps:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/autoscaling:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/batch:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/certificates:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/core:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/extensions:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/internalinterfaces:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/networking:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/policy:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/rbac:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/scheduling:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/settings:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/storage:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

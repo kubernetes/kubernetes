@@ -67,3 +67,22 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
     ],
 )
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/util:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

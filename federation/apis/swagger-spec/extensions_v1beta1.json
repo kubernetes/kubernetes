@@ -4812,7 +4812,7 @@
      "retryAfterSeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "If specified, the time in seconds before the operation should be retried."
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action."
      }
     }
    },
@@ -7118,7 +7118,7 @@
      },
      "rollbackTo": {
       "$ref": "v1beta1.RollbackConfig",
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done."
      },
      "progressDeadlineSeconds": {
       "type": "integer",
@@ -7157,6 +7157,7 @@
    },
    "v1beta1.RollbackConfig": {
     "id": "v1beta1.RollbackConfig",
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "type": "integer",
@@ -7249,7 +7250,7 @@
    },
    "v1beta1.DeploymentRollback": {
     "id": "v1beta1.DeploymentRollback",
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"

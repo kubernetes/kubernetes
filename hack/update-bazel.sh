@@ -24,6 +24,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel fd3ec969104295f8484a32114ce625955a67365d
+kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel d651a70c51ec9a450135ff08ea045d857a6be014
 
 kazel -root="$(kube::realpath ${KUBE_ROOT})"

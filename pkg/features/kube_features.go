@@ -126,6 +126,13 @@ const (
 	//
 	// Enable equivalence class cache for scheduler.
 	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
+
+	// owner: @k82cn
+	// alpha: v1.8
+	//
+	// Taint nodes based on their condition status for 'NetworkUnavailable',
+	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 )
 
 func init() {
@@ -156,4 +163,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// unintentionally on either side:
 	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
+	TaintNodesByCondition:            {Default: false, PreRelease: utilfeature.Alpha},
 }

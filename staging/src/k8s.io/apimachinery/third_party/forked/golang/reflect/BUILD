@@ -17,9 +17,19 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "deep_equal.go",
-        "type.go",
-    ],
+    srcs = ["deep_equal.go"],
+    tags = ["automanaged"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

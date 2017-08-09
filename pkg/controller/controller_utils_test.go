@@ -37,12 +37,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -476,6 +479,361 @@ func TestComputeHash(t *testing.T) {
 
 		if hash == otherHash {
 			t.Errorf("expected different hashes but got the same: %d", hash)
+		}
+	}
+}
+
+func TestRemoveTaintOffNode(t *testing.T) {
+	tests := []struct {
+		name           string
+		nodeHandler    *testutil.FakeNodeHandler
+		nodeName       string
+		taintsToRemove []*v1.Taint
+		expectedTaints []v1.Taint
+		requestCount   int
+	}{
+		{
+			name: "remove one taint from node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToRemove: []*v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+			},
+			requestCount: 4,
+		},
+		{
+			name: "remove multiple taints from node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+								{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+								{Key: "key4", Value: "value4", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToRemove: []*v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key4", Value: "value4", Effect: "NoExecute"},
+			},
+			requestCount: 4,
+		},
+		{
+			name: "remove no-exist taints from node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToRemove: []*v1.Taint{
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 2,
+		},
+		{
+			name: "remove taint from node without taints",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToRemove: []*v1.Taint{
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+			},
+			expectedTaints: nil,
+			requestCount:   2,
+		},
+		{
+			name: "remove empty taint list from node without taints",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:       "node1",
+			taintsToRemove: []*v1.Taint{},
+			expectedTaints: nil,
+			requestCount:   2,
+		},
+		{
+			name: "remove empty taint list from node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:       "node1",
+			taintsToRemove: []*v1.Taint{},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 2,
+		},
+	}
+	for _, test := range tests {
+		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		if err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...); err != nil {
+			t.Errorf("%s: RemoveTaintOffNode() error = %v", test.name, err)
+		}
+
+		node, _ = test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		if !reflect.DeepEqual(node.Spec.Taints, test.expectedTaints) {
+			t.Errorf("%s: failed to remove taint off node: expected %+v, got %+v",
+				test.name, test.expectedTaints, node.Spec.Taints)
+		}
+
+		if test.nodeHandler.RequestCount != test.requestCount {
+			t.Errorf("%s: unexpected request count: expected %+v, got %+v",
+				test.name, test.requestCount, test.nodeHandler.RequestCount)
+		}
+	}
+}
+
+func TestAddOrUpdateTaintOnNode(t *testing.T) {
+	tests := []struct {
+		name           string
+		nodeHandler    *testutil.FakeNodeHandler
+		nodeName       string
+		taintsToAdd    []*v1.Taint
+		expectedTaints []v1.Taint
+		requestCount   int
+	}{
+		{
+			name: "add one taint on node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToAdd: []*v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 3,
+		},
+		{
+			name: "add multiple taints to node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToAdd: []*v1.Taint{
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+				{Key: "key4", Value: "value4", Effect: "NoExecute"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+				{Key: "key4", Value: "value4", Effect: "NoExecute"},
+			},
+			requestCount: 3,
+		},
+		{
+			name: "add exist taints to node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToAdd: []*v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 3,
+		},
+		{
+			name: "add taint to node without taints",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName: "node1",
+			taintsToAdd: []*v1.Taint{
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+			},
+			expectedTaints: []v1.Taint{
+				{Key: "key3", Value: "value3", Effect: "NoSchedule"},
+			},
+			requestCount: 3,
+		},
+		{
+			name: "add empty taint list to node without taints",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:       "node1",
+			taintsToAdd:    []*v1.Taint{},
+			expectedTaints: nil,
+			requestCount:   1,
+		},
+		{
+			name: "add empty taint list to node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+								{Key: "key2", Value: "value2", Effect: "NoExecute"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:    "node1",
+			taintsToAdd: []*v1.Taint{},
+			expectedTaints: []v1.Taint{
+				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 1,
+		},
+	}
+	for _, test := range tests {
+		if err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...); err != nil {
+			t.Errorf("%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
+		}
+
+		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
+		if !reflect.DeepEqual(node.Spec.Taints, test.expectedTaints) {
+			t.Errorf("%s: failed to add taint to node: expected %+v, got %+v",
+				test.name, test.expectedTaints, node.Spec.Taints)
+		}
+
+		if test.nodeHandler.RequestCount != test.requestCount {
+			t.Errorf("%s: unexpected request count: expected %+v, got %+v",
+				test.name, test.requestCount, test.nodeHandler.RequestCount)
 		}
 	}
 }

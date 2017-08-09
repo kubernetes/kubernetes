@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +35,7 @@ import (
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
+	maxUnavailable := intstr.FromInt(1)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -78,7 +78,10 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					},
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
+							MaxUnavailable: &maxUnavailable,
+						},
 					},
 					RevisionHistoryLimit: newInt32(10),
 				},
@@ -108,14 +111,24 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					},
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
+							MaxUnavailable: &maxUnavailable,
+						},
 					},
 					RevisionHistoryLimit: newInt32(1),
 				},
 			},
 		},
-		{ // Update strategy.
-			original: &appsv1beta2.DaemonSet{},
+		{ // OnDeleteDaemonSetStrategyType update strategy.
+			original: &appsv1beta2.DaemonSet{
+				Spec: appsv1beta2.DaemonSetSpec{
+					Template: templateNoLabel,
+					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
 			expected: &appsv1beta2.DaemonSet{
 				Spec: appsv1beta2.DaemonSetSpec{
 					Template: templateNoLabel,
@@ -134,7 +147,10 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1beta2.DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.OnDeleteDaemonSetStrategyType,
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
+							MaxUnavailable: &maxUnavailable,
+						},
 					},
 					RevisionHistoryLimit: newInt32(10),
 				},
@@ -147,6 +163,128 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 		expected := test.expected
 		obj2 := roundTrip(t, runtime.Object(original))
 		got, ok := obj2.(*appsv1beta2.DaemonSet)
+		if !ok {
+			t.Errorf("(%d) unexpected object: %v", i, got)
+			t.FailNow()
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
+		}
+	}
+}
+
+func TestSetDefaultStatefulSet(t *testing.T) {
+	defaultLabels := map[string]string{"foo": "bar"}
+	var defaultPartition int32 = 0
+	var defaultReplicas int32 = 1
+
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: defaultLabels,
+		},
+	}
+
+	tests := []struct {
+		original *appsv1beta2.StatefulSet
+		expected *appsv1beta2.StatefulSet
+	}{
+		{ // Selector, labels and default update strategy
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+		{ // Alternate update strategy
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteStatefulSetStrategyType,
+					},
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.OnDeleteStatefulSetStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+		{ // Parallel pod management policy.
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: defaultLabels,
+					},
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: newInt32(10),
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*appsv1beta2.StatefulSet)
 		if !ok {
 			t.Errorf("(%d) unexpected object: %v", i, got)
 			t.FailNow()

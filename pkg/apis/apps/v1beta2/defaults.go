@@ -43,7 +43,7 @@ func SetDefaults_DaemonSet(obj *appsv1beta2.DaemonSet) {
 	}
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = appsv1beta2.OnDeleteDaemonSetStrategyType
+		updateStrategy.Type = appsv1beta2.RollingUpdateDaemonSetStrategyType
 	}
 	if updateStrategy.Type == appsv1beta2.RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {
@@ -68,8 +68,19 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 	}
 
 	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1beta2.OnDeleteStatefulSetStrategyType
+		obj.Spec.UpdateStrategy.Type = appsv1beta2.RollingUpdateStatefulSetStrategyType
+
+		// UpdateStrategy.RollingUpdate will take default values below.
+		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1beta2.RollingUpdateStatefulSetStrategy{}
 	}
+
+	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+	}
+
 	labels := obj.Spec.Template.Labels
 	if labels != nil {
 		if obj.Spec.Selector == nil {
@@ -89,13 +100,6 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
-	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
-		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
-	}
-
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart

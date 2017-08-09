@@ -1885,6 +1885,20 @@ func TestGetTable(t *testing.T) {
 				},
 			},
 		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			params: url.Values{"includeObject": []string{"Metadata"}},
+			expected: &metav1alpha1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
 	}
 	for i, test := range tests {
 		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
@@ -1901,18 +1915,20 @@ func TestGetTable(t *testing.T) {
 		}
 		if test.statusCode != 0 {
 			if resp.StatusCode != test.statusCode {
-				t.Errorf("%d: unexpected response: %#v", resp)
+				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected response: %#v", resp)
+			t.Errorf("%d: unexpected response: %#v", i, resp)
 		}
 		var itemOut metav1alpha1.Table
-		if _, err = extractBody(resp, &itemOut); err != nil {
+		body, err := extractBody(resp, &itemOut)
+		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(test.expected, &itemOut) {
+			t.Log(body)
 			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
 		}
 	}
@@ -3749,7 +3765,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}

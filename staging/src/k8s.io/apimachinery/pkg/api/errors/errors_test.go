@@ -83,14 +83,33 @@ func TestErrorNew(t *testing.T) {
 	if !IsServerTimeout(NewServerTimeout(resource("tests"), "reason", 0)) {
 		t.Errorf("expected to be %s", metav1.StatusReasonServerTimeout)
 	}
-	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 10)); time != 10 || !ok {
-		t.Errorf("expected to be %s", metav1.StatusReasonServerTimeout)
-	}
-	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
-		t.Errorf("expected to be %s", metav1.StatusReasonTimeout)
-	}
 	if !IsMethodNotSupported(NewMethodNotSupported(resource("foos"), "delete")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonMethodNotAllowed)
+	}
+
+	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 10)); time != 10 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 0)); time != 0 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewTooManyRequests("doing something", 10)); time != 10 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewTooManyRequests("doing something", 1)); time != 1 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, "get", resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(500, "get", resource("tests"), "test", "doing something", 10, true)); time != 10 || !ok {
+		t.Errorf("unexpected %d", time)
+	}
+	if time, ok := SuggestsClientDelay(NewGenericServerResponse(429, "get", resource("tests"), "test", "doing something", 0, true)); time != 0 || ok {
+		t.Errorf("unexpected %d", time)
 	}
 }
 
