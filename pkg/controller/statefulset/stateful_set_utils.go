@@ -311,11 +311,21 @@ func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevisio
 	if err != nil {
 		return nil, err
 	}
-	return history.NewControllerRevision(set,
+	cr, err := history.NewControllerRevision(set,
 		controllerKind,
 		selector,
 		runtime.RawExtension{Raw: patch},
 		revision)
+	if err != nil {
+		return nil, err
+	}
+	if cr.ObjectMeta.Annotations == nil {
+		cr.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for key, value := range set.Annotations {
+		cr.ObjectMeta.Annotations[key] = value
+	}
+	return cr, nil
 }
 
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
