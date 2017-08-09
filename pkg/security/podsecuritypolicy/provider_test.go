@@ -575,7 +575,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		api.SeccompPodAnnotationKey: "foo",
 	}
 
-	errorCases := map[string]struct {
+	successCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -625,7 +625,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
-	for k, v := range errorCases {
+	for k, v := range successCases {
 		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
@@ -639,25 +639,6 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 }
 
 func TestValidateContainerSecurityContextSuccess(t *testing.T) {
-	var notPriv bool = false
-	defaultPod := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{},
-				Containers: []api.Container{
-					{
-						Name: defaultContainerName,
-						SecurityContext: &api.SecurityContext{
-							// expected to be set by defaulting mechanisms
-							Privileged: &notPriv,
-							// fill in the rest for test cases
-						},
-					},
-				},
-			},
-		}
-	}
-
 	// success user strat
 	userPSP := defaultPSP()
 	uid := int64(999)
@@ -751,7 +732,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		api.SeccompPodAnnotationKey: "foo",
 	}
 
-	errorCases := map[string]struct {
+	successCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -809,7 +790,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
-	for k, v := range errorCases {
+	for k, v := range successCases {
 		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
