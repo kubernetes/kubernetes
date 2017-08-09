@@ -51,7 +51,7 @@ readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "Exter
 
 function setup() {
   if [[ -z "${use_kubectl}" ]]; then
-    KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+    KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     detect-project &> /dev/null

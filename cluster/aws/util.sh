@@ -264,7 +264,7 @@ function query-running-minions () {
 
 function detect-node-names () {
   # If this is called directly, VPC_ID might not be set
-  # (this is case from cluster/log-dump.sh)
+  # (this is case from cluster/log-dump/log-dump.sh)
   if [[ -z "${VPC_ID:-}" ]]; then
     VPC_ID=$(get_vpc_id)
   fi

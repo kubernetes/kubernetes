@@ -594,7 +594,7 @@ func clusterSize(deploy deployer) (int, error) {
 
 func DumpClusterLogs(location string) error {
 	log.Printf("Dumping cluster logs to: %v", location)
-	return finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
+	return finishRunning("dump cluster logs", exec.Command("./cluster/log-dump/log-dump.sh", location))
 }
 
 func KubemarkTest() error {
