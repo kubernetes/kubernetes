@@ -36,13 +36,24 @@ import (
 
 func TestIgnoresNonCreate(t *testing.T) {
 	pod := &api.Pod{}
-	for _, op := range []admission.Operation{admission.Update, admission.Delete, admission.Connect} {
+	for _, op := range []admission.Operation{admission.Delete, admission.Connect} {
 		attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", op, nil)
 		handler := admission.NewChainHandler(NewServiceAccount())
 		err := handler.Admit(attrs)
 		if err != nil {
 			t.Errorf("Expected %s operation allowed, got err: %v", op, err)
 		}
+	}
+}
+
+func TestIgnoresUpdateOfInitializedPod(t *testing.T) {
+	pod := &api.Pod{}
+	oldPod := &api.Pod{}
+	attrs := admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), "myns", "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, nil)
+	handler := admission.NewChainHandler(NewServiceAccount())
+	err := handler.Admit(attrs)
+	if err != nil {
+		t.Errorf("Expected update of initialized pod allowed, got err: %v", err)
 	}
 }
 
@@ -309,6 +320,55 @@ func TestAutomountsAPIToken(t *testing.T) {
 		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
 	}
 
+	// Test ServiceAccount admission plugin applies the same changes if the
+	// operation is an update to an uninitialized pod.
+	oldPod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					// the volumeMount in the oldPod shouldn't affect the result.
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "wrong-" + tokenName,
+							ReadOnly:  true,
+							MountPath: DefaultAPITokenMountPath,
+						},
+					},
+				},
+			},
+		},
+	}
+	// oldPod is not intialized.
+	oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
+	pod = &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{},
+			},
+		},
+	}
+	attrs = admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Update, nil)
+	err = admit.Admit(attrs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pod.Spec.ServiceAccountName != DefaultServiceAccountName {
+		t.Errorf("Expected service account %s assigned, got %s", DefaultServiceAccountName, pod.Spec.ServiceAccountName)
+	}
+	if len(pod.Spec.Volumes) != 1 {
+		t.Fatalf("Expected 1 volume, got %d", len(pod.Spec.Volumes))
+	}
+	if !reflect.DeepEqual(expectedVolume, pod.Spec.Volumes[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolume, pod.Spec.Volumes[0])
+	}
+	if len(pod.Spec.Containers[0].VolumeMounts) != 1 {
+		t.Fatalf("Expected 1 volume mount, got %d", len(pod.Spec.Containers[0].VolumeMounts))
+	}
+	if !reflect.DeepEqual(expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0]) {
+		t.Fatalf("Expected\n\t%#v\ngot\n\t%#v", expectedVolumeMount, pod.Spec.Containers[0].VolumeMounts[0])
+	}
+
+	// testing InitContainers
 	pod = &api.Pod{
 		Spec: api.PodSpec{
 			InitContainers: []api.Container{
