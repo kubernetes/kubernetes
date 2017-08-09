@@ -76,7 +76,7 @@ func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runti
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
-	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, responder)
+	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }

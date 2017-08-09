@@ -360,6 +360,7 @@ package_group(
     packages = [
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
+        "//pkg/kubectl/proxy",
     ],
 )
 

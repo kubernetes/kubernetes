@@ -437,9 +437,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		It("should support exec through an HTTP proxy", func() {
-			// Note: We are skipping local since we want to verify an apiserver with HTTPS.
-			// At this time local only supports plain HTTP.
-			framework.SkipIfProviderIs("local")
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
@@ -470,6 +467,32 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
 				}
+			}
+		})
+
+		It("should support exec through kubectl proxy", func() {
+			// Fail if the variable isn't set
+			if framework.TestContext.Host == "" {
+				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
+			}
+
+			By("Starting kubectl proxy")
+			port, proxyCmd, err := startProxyServer()
+			framework.ExpectNoError(err)
+			defer framework.TryKill(proxyCmd)
+
+			//proxyLogs.Reset()
+			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
+			By("Running kubectl via kubectl proxy using " + host)
+			output := framework.NewKubectlCommand(
+				host, fmt.Sprintf("--namespace=%s", ns),
+				"exec", "nginx", "echo", "running", "in", "container",
+			).ExecOrDie()
+
+			// Verify we got the normal output captured by the exec server
+			expectedExecOutput := "running in container\n"
+			if output != expectedExecOutput {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
 			}
 		})
 
@@ -1758,7 +1781,7 @@ func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 
 func startProxyServer() (int, *exec.Cmd, error) {
 	// Specifying port 0 indicates we want the os to pick a random port.
-	cmd := framework.KubectlCmd("proxy", "-p", "0")
+	cmd := framework.KubectlCmd("proxy", "-p", "0", "--disable-filter")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		return -1, nil, err

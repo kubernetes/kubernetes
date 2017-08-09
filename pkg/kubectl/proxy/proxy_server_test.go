@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package proxy
 
 import (
 	"fmt"
@@ -27,7 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/client-go/rest"
 )
 
 func TestAccept(t *testing.T) {
@@ -340,6 +341,12 @@ func TestFileServing(t *testing.T) {
 	}
 }
 
+func newProxy(target *url.URL) http.Handler {
+	p := proxy.NewUpgradeAwareHandler(target, http.DefaultTransport, false, false, &responder{})
+	p.UseRequestLocation = true
+	return p
+}
+
 func TestAPIRequests(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
@@ -353,6 +360,7 @@ func TestAPIRequests(t *testing.T) {
 
 	// httptest.NewServer should always generate a valid URL.
 	target, _ := url.Parse(ts.URL)
+	target.Path = "/"
 	proxy := newProxy(target)
 
 	tests := []struct{ method, body string }{
@@ -404,13 +412,13 @@ func TestPathHandling(t *testing.T) {
 		{"/custom/", "/custom/api/v1/pods/", "/api/v1/pods/"},
 	}
 
-	cc := &restclient.Config{
+	cc := &rest.Config{
 		Host: ts.URL,
 	}
 
 	for _, item := range table {
 		func() {
-			p, err := NewProxyServer("", item.prefix, "/not/used/for/this/test", nil, cc)
+			p, err := NewServer("", item.prefix, "/not/used/for/this/test", nil, cc)
 			if err != nil {
 				t.Fatalf("%#v: %v", item, err)
 			}
