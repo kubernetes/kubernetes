@@ -254,29 +254,27 @@ func startKubeletConfigSyncLoop(s *options.KubeletServer, currentKC string) {
 // a background thread that checks for updates to configs.
 func initKubeletConfigSync(s *options.KubeletServer) (*componentconfig.KubeletConfiguration, error) {
 	jsonstr, err := getRemoteKubeletConfig(s, nil)
-	if err == nil {
-		// We will compare future API server config against the config we just got (jsonstr):
-		startKubeletConfigSyncLoop(s, jsonstr)
-
-		// Convert json from API server to external type struct, and convert that to internal type struct
-		extKC := componentconfigv1alpha1.KubeletConfiguration{}
-		err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(jsonstr), &extKC)
-		if err != nil {
-			return nil, err
-		}
-		api.Scheme.Default(&extKC)
-		kc := componentconfig.KubeletConfiguration{}
-		err = api.Scheme.Convert(&extKC, &kc, nil)
-		if err != nil {
-			return nil, err
-		}
-		return &kc, nil
-	} else {
+	if err != nil {
 		// Couldn't get a configuration from the API server yet.
 		// Restart as soon as anything comes back from the API server.
 		startKubeletConfigSyncLoop(s, "")
 		return nil, err
 	}
+
+	// We will compare future API server config against the config we just got (jsonstr):
+	startKubeletConfigSyncLoop(s, jsonstr)
+
+	// Convert json from API server to external type struct, and convert that to internal type struct
+	extKC := componentconfigv1alpha1.KubeletConfiguration{}
+	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(jsonstr), &extKC); err != nil {
+		return nil, err
+	}
+	api.Scheme.Default(&extKC)
+	kc := componentconfig.KubeletConfiguration{}
+	if err := api.Scheme.Convert(&extKC, &kc, nil); err != nil {
+		return nil, err
+	}
+	return &kc, nil
 }
 
 // Run runs the specified KubeletServer with the given Dependencies.  This should never exit.
