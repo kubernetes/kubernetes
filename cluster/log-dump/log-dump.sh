@@ -173,7 +173,7 @@ function dump_masters() {
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
   else
-    if ! (detect-master &> /dev/null); then
+    if ! (detect-master); then
       echo "Master not detected. Is the cluster up?"
       return
     fi
