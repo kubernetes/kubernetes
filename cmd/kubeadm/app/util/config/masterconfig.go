@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -136,6 +137,19 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
 	}
+
+	// Don't include build or pre-release metadata for minimum version comparison
+	var buffer bytes.Buffer
+	for i, comp := range k8sVersion.Components() {
+		if i > 0 {
+			buffer.WriteString(".")
+		}
+		buffer.WriteString(fmt.Sprintf("%d", comp))
+	}
+
+	// This should never be an error, because we've already parsed it once
+	k8sVersion, _ = version.ParseSemantic(buffer.String())
+
 	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
 		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}

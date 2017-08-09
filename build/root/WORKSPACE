@@ -80,3 +80,11 @@ docker_pull(
     repository = "library/busybox",
     tag = "latest",  # ignored, but kept here for documentation
 )
+
+docker_pull(
+    name = "dind-test-base",
+    digest = "sha256:c83ef23a0de78b8c43933a66d58fdeb61c526c12c1c2ab89db008ffb76b8577b",
+    registry = "gcr.io",
+    repository = "qlee-dev/dind-test-base-amd64",
+    tag = "0.1",
+)
