@@ -31,6 +31,9 @@ type nodeEvictor interface {
 	addZoneWorker(zone string)
 
 	cancelPodEvictionOrMarkNodeAsHealthy(node *v1.Node)
+
+	// setLimiterForZone sets queue limiter for zone within map of pod evictors/tainters.
+	setLimiterForZone(newQPS float32, zone string)
 }
 
 // taintBasedNodeEvictor satisfies the Evictor interface
@@ -82,4 +85,12 @@ func (ev *taintBasedNodeEvictor) cancelPodEvictionOrMarkNodeAsHealthy(node *v1.N
 
 func (ev *defaultNodeEvictor) cancelPodEvictionOrMarkNodeAsHealthy(node *v1.Node) {
 	ev.nc.cancelPodEviction(node)
+}
+
+func (ev *taintBasedNodeEvictor) setLimiterForZone(newQPS float32, zone string) {
+	ev.nc.zoneNoExecuteTainter[zone].SwapLimiter(newQPS)
+}
+
+func (ev *defaultNodeEvictor) setLimiterForZone(newQPS float32, zone string) {
+	ev.nc.zonePodEvictor[zone].SwapLimiter(newQPS)
 }

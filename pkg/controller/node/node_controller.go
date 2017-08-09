@@ -772,11 +772,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 			}
 			// We stop all evictions.
 			for k := range nc.zoneStates {
-				if nc.useTaintBasedEvictions {
-					nc.zoneNoExecuteTainter[k].SwapLimiter(0)
-				} else {
-					nc.zonePodEvictor[k].SwapLimiter(0)
-				}
+				nc.nodeEvictor.setLimiterForZone(0, k)
 			}
 			for k := range nc.zoneStates {
 				nc.zoneStates[k] = stateFullDisruption
@@ -819,27 +815,11 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 func (nc *Controller) setLimiterInZone(zone string, zoneSize int, state ZoneState) {
 	switch state {
 	case stateNormal:
-		if nc.useTaintBasedEvictions {
-			nc.zoneNoExecuteTainter[zone].SwapLimiter(nc.evictionLimiterQPS)
-		} else {
-			nc.zonePodEvictor[zone].SwapLimiter(nc.evictionLimiterQPS)
-		}
+		nc.nodeEvictor.setLimiterForZone(nc.evictionLimiterQPS, zone)
 	case statePartialDisruption:
-		if nc.useTaintBasedEvictions {
-			nc.zoneNoExecuteTainter[zone].SwapLimiter(
-				nc.enterPartialDisruptionFunc(zoneSize))
-		} else {
-			nc.zonePodEvictor[zone].SwapLimiter(
-				nc.enterPartialDisruptionFunc(zoneSize))
-		}
+		nc.nodeEvictor.setLimiterForZone(nc.enterPartialDisruptionFunc(zoneSize), zone)
 	case stateFullDisruption:
-		if nc.useTaintBasedEvictions {
-			nc.zoneNoExecuteTainter[zone].SwapLimiter(
-				nc.enterFullDisruptionFunc(zoneSize))
-		} else {
-			nc.zonePodEvictor[zone].SwapLimiter(
-				nc.enterFullDisruptionFunc(zoneSize))
-		}
+		nc.nodeEvictor.setLimiterForZone(nc.enterFullDisruptionFunc(zoneSize), zone)
 	}
 }
 
