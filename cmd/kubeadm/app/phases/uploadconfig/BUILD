@@ -9,7 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["saveconfig.go"],
+    srcs = ["uploadconfig.go"],
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
