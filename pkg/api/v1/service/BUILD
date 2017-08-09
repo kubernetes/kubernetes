@@ -25,7 +25,6 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/util/net/sets:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )

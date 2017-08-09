@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
@@ -215,97 +213,4 @@ func TestNeedsHealthCheck(t *testing.T) {
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
-}
-
-func TestGetServiceHealthCheckNodePort(t *testing.T) {
-	checkGetServiceHealthCheckNodePort := func(healthCheckNodePort int32, service *api.Service) {
-		res := GetServiceHealthCheckNodePort(service)
-		if res != healthCheckNodePort {
-			t.Errorf("Expected health check node port = %v, got %v",
-				healthCheckNodePort, res)
-		}
-	}
-
-	checkGetServiceHealthCheckNodePort(0, &api.Service{
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeClusterIP,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(0, &api.Service{
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeNodePort,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(0, &api.Service{
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(34567, &api.Service{
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   int32(34567),
-		},
-	})
-}
-
-func TestClearExternalTrafficPolicy(t *testing.T) {
-	testCases := []struct {
-		inputService *api.Service
-	}{
-		// First class fields cases.
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		ClearExternalTrafficPolicy(tc.inputService)
-		if tc.inputService.Spec.ExternalTrafficPolicy != "" {
-			t.Errorf("%v: failed to clear ExternalTrafficPolicy", i)
-			spew.Dump(tc)
-		}
-	}
-}
-
-func TestSetServiceHealthCheckNodePort(t *testing.T) {
-	testCases := []struct {
-		inputService *api.Service
-		hcNodePort   int32
-	}{
-		// First class fields cases.
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-			30012,
-		},
-		{
-			&api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-			0,
-		},
-	}
-
-	for i, tc := range testCases {
-		SetServiceHealthCheckNodePort(tc.inputService, tc.hcNodePort)
-		if tc.inputService.Spec.HealthCheckNodePort != tc.hcNodePort {
-			t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, tc.inputService.Spec.HealthCheckNodePort, tc.hcNodePort)
-		}
-	}
 }

@@ -993,7 +993,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 	if !service.NeedsHealthCheck(created_service) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := service.GetServiceHealthCheckNodePort(created_service)
+	port := created_service.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	} else {
@@ -1031,7 +1031,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 	if !service.NeedsHealthCheck(created_service) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := service.GetServiceHealthCheckNodePort(created_service)
+	port := created_service.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
@@ -1098,7 +1098,7 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 		t.Errorf("Expecting health check not needed, returned health check needed instead")
 	}
 	// Make sure the service does not have the health check node port allocated
-	port := service.GetServiceHealthCheckNodePort(created_service)
+	port := created_service.Spec.HealthCheckNodePort
 	if port != 0 {
 		// Release the node port at the end of the test case.
 		storage.serviceNodePorts.Release(int(port))

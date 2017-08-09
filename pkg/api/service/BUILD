@@ -26,7 +26,6 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/util/net/sets:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )
 

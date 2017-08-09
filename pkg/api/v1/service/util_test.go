@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"k8s.io/api/core/v1"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
@@ -215,97 +213,4 @@ func TestNeedsHealthCheck(t *testing.T) {
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
-}
-
-func TestGetServiceHealthCheckNodePort(t *testing.T) {
-	checkGetServiceHealthCheckNodePort := func(healthCheckNodePort int32, service *v1.Service) {
-		res := GetServiceHealthCheckNodePort(service)
-		if res != healthCheckNodePort {
-			t.Errorf("Expected health check node port = %v, got %v",
-				healthCheckNodePort, res)
-		}
-	}
-
-	checkGetServiceHealthCheckNodePort(0, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeClusterIP,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(0, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(0, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
-		},
-	})
-	checkGetServiceHealthCheckNodePort(34567, &v1.Service{
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-			HealthCheckNodePort:   int32(34567),
-		},
-	})
-}
-
-func TestClearExternalTrafficPolicy(t *testing.T) {
-	testCases := []struct {
-		inputService *v1.Service
-	}{
-		// First class fields cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		ClearExternalTrafficPolicy(tc.inputService)
-		if tc.inputService.Spec.ExternalTrafficPolicy != "" {
-			t.Errorf("%v: failed to clear ExternalTrafficPolicy", i)
-			spew.Dump(tc)
-		}
-	}
-}
-
-func TestSetServiceHealthCheckNodePort(t *testing.T) {
-	testCases := []struct {
-		inputService *v1.Service
-		hcNodePort   int32
-	}{
-		// First class fields cases.
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-			30012,
-		},
-		{
-			&v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
-					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
-				},
-			},
-			0,
-		},
-	}
-
-	for i, tc := range testCases {
-		SetServiceHealthCheckNodePort(tc.inputService, tc.hcNodePort)
-		if tc.inputService.Spec.HealthCheckNodePort != tc.hcNodePort {
-			t.Errorf("%v: got HealthCheckNodePort %v, want %v", i, tc.inputService.Spec.HealthCheckNodePort, tc.hcNodePort)
-		}
-	}
 }

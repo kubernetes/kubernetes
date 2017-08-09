@@ -76,7 +76,7 @@ func RequestsOnlyLocalTraffic(service *v1.Service) bool {
 	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 }
 
-// NeedsHealthCheck Check if service needs health check.
+// NeedsHealthCheck checks if service needs health check.
 func NeedsHealthCheck(service *v1.Service) bool {
 	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
 		return false
@@ -84,28 +84,12 @@ func NeedsHealthCheck(service *v1.Service) bool {
 	return RequestsOnlyLocalTraffic(service)
 }
 
-// GetServiceHealthCheckNodePort Return health check node port for service, if one exists
-func GetServiceHealthCheckNodePort(service *v1.Service) int32 {
-	return service.Spec.HealthCheckNodePort
-}
-
-// ClearExternalTrafficPolicy resets the ExternalTrafficPolicy field.
-func ClearExternalTrafficPolicy(service *v1.Service) {
-	service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType("")
-}
-
-// SetServiceHealthCheckNodePort sets the given health check node port on service.
-// It does not check whether this service needs healthCheckNodePort.
-func SetServiceHealthCheckNodePort(service *v1.Service, hcNodePort int32) {
-	service.Spec.HealthCheckNodePort = hcNodePort
-}
-
-// GetServiceHealthCheckPathPort Return the path and nodePort programmed into the Cloud LB Health Check
+// GetServiceHealthCheckPathPort returns the path and nodePort programmed into the Cloud LB Health Check
 func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
 	if !NeedsHealthCheck(service) {
 		return "", 0
 	}
-	port := GetServiceHealthCheckNodePort(service)
+	port := service.Spec.HealthCheckNodePort
 	if port == 0 {
 		return "", 0
 	}
