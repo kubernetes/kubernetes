@@ -683,17 +683,12 @@ func (nc *Controller) monitorNodeStatus() error {
 			}
 			if observedReadyCondition.Status == v1.ConditionTrue {
 				if nc.useTaintBasedEvictions {
-					removed, err := nc.markNodeAsReachable(node)
-					if err != nil {
-						glog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
-					}
+					removed, _ := nc.markNodeAsHealthy(node)
 					if removed {
 						glog.V(2).Infof("Node %s is healthy again, removing all taints", node.Name)
 					}
 				} else {
-					if nc.cancelPodEviction(node) {
-						glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
-					}
+					nc.cancelPodEviction(node)
 				}
 			}
 
@@ -778,10 +773,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 			glog.V(0).Info("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
 			for i := range nodes {
 				if nc.useTaintBasedEvictions {
-					_, err := nc.markNodeAsReachable(nodes[i])
-					if err != nil {
-						glog.Errorf("Failed to remove taints from Node %v", nodes[i].Name)
-					}
+					nc.markNodeAsHealthy(nodes[i])
 				} else {
 					nc.cancelPodEviction(nodes[i])
 				}
