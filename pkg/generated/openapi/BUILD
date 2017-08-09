@@ -5,8 +5,6 @@ package(default_visibility = ["//visibility:public"])
 
 load("//pkg/generated/openapi:def.bzl", "openapi_library")
 
-licenses(["notice"])
-
 openapi_library(
     name = "go_default_library",
     srcs = ["doc.go"],

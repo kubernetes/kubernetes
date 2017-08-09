@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 load(
     "@io_bazel_rules_go//go:def.bzl",
