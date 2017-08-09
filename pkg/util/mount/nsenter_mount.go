@@ -51,7 +51,7 @@ import (
 //     contents. TODO: remove this requirement.
 // 6.  The host image must have mount, findmnt, and umount binaries in /bin,
 //     /usr/sbin, or /usr/bin
-//
+// 7.  The host image should have systemd-run in /bin, /usr/sbin, or /usr/bin
 // For more information about mount propagation modes, see:
 //   https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
 type NsenterMounter struct {
@@ -62,9 +62,10 @@ type NsenterMounter struct {
 func NewNsenterMounter() *NsenterMounter {
 	m := &NsenterMounter{
 		paths: map[string]string{
-			"mount":   "",
-			"findmnt": "",
-			"umount":  "",
+			"mount":       "",
+			"findmnt":     "",
+			"umount":      "",
+			"systemd-run": "",
 		},
 	}
 	// search for the mount command in other locations besides /usr/bin
@@ -80,6 +81,7 @@ func NewNsenterMounter() *NsenterMounter {
 			break
 		}
 		// TODO: error, so that the kubelet can stop if the mounts don't exist
+		// (don't forget that systemd-run is optional)
 	}
 	return m
 }
@@ -128,15 +130,47 @@ func (n *NsenterMounter) doNsenterMount(source, target, fstype string, options [
 // makeNsenterArgs makes a list of argument to nsenter in order to do the
 // requested mount.
 func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options []string) []string {
+	mountCmd := n.absHostPath("mount")
+	mountArgs := makeMountArgs(source, target, fstype, options)
+
+	if systemdRunPath, hasSystemd := n.paths["systemd-run"]; hasSystemd {
+		// Complete command line:
+		// nsenter --mount=/rootfs/proc/1/ns/mnt -- /bin/systemd-run --description=... --scope -- /bin/mount -t <type> <what> <where>
+		// Expected flow is:
+		// * nsenter breaks out of container's mount namespace and executes
+		//   host's systemd-run.
+		// * systemd-run creates a transient scope (=~ cgroup) and executes its
+		//   argument (/bin/mount) there.
+		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		//   (systemd-run --scope finishes at this point, returning mount's exit
+		//   code and stdout/stderr - thats one of --scope benefits).
+		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
+		//   cgroup) until the fuse daemon dies (another --scope benefit).
+		//   Kubelet container can be restarted and the fuse daemon survives.
+		// * When the daemon dies (e.g. during unmount) systemd removes the
+		//   scope automatically.
+		mountCmd, mountArgs = addSystemdScope(systemdRunPath, target, mountCmd, mountArgs)
+	} else {
+		// Fall back to simple mount when the host has no systemd.
+		// Complete command line:
+		// nsenter --mount=/rootfs/proc/1/ns/mnt -- /bin/mount -t <type> <what> <where>
+		// Expected flow is:
+		// * nsenter breaks out of container's mount namespace and executes host's /bin/mount.
+		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		// * Any fuse daemon runs in cgroup of kubelet docker container,
+		//   restart of kubelet container will kill it!
+
+		// No code here, mountCmd and mountArgs use /bin/mount
+	}
+
 	nsenterArgs := []string{
 		"--mount=/rootfs/proc/1/ns/mnt",
 		"--",
-		n.absHostPath("mount"),
+		mountCmd,
 	}
+	nsenterArgs = append(nsenterArgs, mountArgs...)
 
-	args := makeMountArgs(source, target, fstype, options)
-
-	return append(nsenterArgs, args...)
+	return nsenterArgs
 }
 
 // Unmount runs umount(8) in the host's mount namespace.
@@ -147,7 +181,9 @@ func (n *NsenterMounter) Unmount(target string) error {
 		n.absHostPath("umount"),
 		target,
 	}
-
+	// No need to execute systemd-run here, it's enough that unmount is executed
+	// in the host's mount namespace. It will finish appropriate fuse daemon(s)
+	// running in any scope.
 	glog.V(5).Infof("Unmount command: %v %v", nsenterPath, args)
 	exec := exec.New()
 	outputBytes, err := exec.Command(nsenterPath, args...).CombinedOutput()
