@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/controller/node/scheduler"
@@ -28,6 +29,8 @@ type nodeEvictor interface {
 
 	// addZoneWorker adds zone worker to map of pod evictors/tainters.
 	addZoneWorker(zone string)
+
+	cancelPodEvictionOrMarkNodeAsHealthy(node *v1.Node)
 }
 
 // taintBasedNodeEvictor satisfies the Evictor interface
@@ -71,4 +74,12 @@ func (ev *defaultNodeEvictor) addZoneWorker(zone string) {
 	ev.nc.zonePodEvictor[zone] = scheduler.NewRateLimitedTimedQueue(
 		flowcontrol.NewTokenBucketRateLimiter(
 			ev.nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+}
+
+func (ev *taintBasedNodeEvictor) cancelPodEvictionOrMarkNodeAsHealthy(node *v1.Node) {
+	ev.nc.markNodeAsHealthy(node)
+}
+
+func (ev *defaultNodeEvictor) cancelPodEvictionOrMarkNodeAsHealthy(node *v1.Node) {
+	ev.nc.cancelPodEviction(node)
 }
