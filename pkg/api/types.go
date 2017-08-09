@@ -459,6 +459,10 @@ type PersistentVolumeSpec struct {
 	// simply fail if one is invalid.
 	// +optional
 	MountOptions []string
+	// volumeMode defines if a volume is intended to be used with a formatted filesystem
+	// or to remain in raw block state.
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -474,6 +478,16 @@ const (
 	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
+)
+
+// PersistentVolumeMode describes how a volume is intended to be consumed, either Block or Filesystem.
+type PersistentVolumeMode string
+
+const (
+	// PersistentVolumeBlock means the volume will not be formatted with a filesystem and will remain a raw block device.
+	PersistentVolumeBlock PersistentVolumeMode = "Block"
+	// PersistentVolumeFilesystem means the volume will be or is formatted with a filesystem.
+	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
 type PersistentVolumeStatus struct {
@@ -545,6 +559,10 @@ type PersistentVolumeClaimSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
 	// +optional
 	StorageClassName *string
+	// volumeMode defines what type of volume is required by the claim.
+	// values include Filesystem or Block and default is Filesystem if not present
+	// +optional
+	VolumeMode *PersistentVolumeMode
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -1447,6 +1465,14 @@ type VolumeMount struct {
 	SubPath string
 }
 
+// VolumeDevice describes a mounting of a raw block device within a container.
+type VolumeDevice struct {
+	//Required: This must match the Name of a Volume in the pod.
+	Name string
+	// Required: Path inside of the container that the device will be mounted.
+	DevicePath string
+}
+
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
@@ -1740,6 +1766,9 @@ type Container struct {
 	Resources ResourceRequirements
 	// +optional
 	VolumeMounts []VolumeMount
+	// Block devices to be used by the container..
+	// +optional
+	VolumeDevices []VolumeDevice
 	// +optional
 	LivenessProbe *Probe
 	// +optional

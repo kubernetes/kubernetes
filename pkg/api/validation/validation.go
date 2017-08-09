@@ -63,7 +63,7 @@ const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
-var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
+var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = genericvalidation.BannedOwners
@@ -729,7 +729,7 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource, fldPath *f
 
 	secretMode := secretSource.DefaultMode
 	if secretMode != nil && (*secretMode > 0777 || *secretMode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *secretMode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *secretMode, fileModeErrorMsg))
 	}
 
 	itemsPath := fldPath.Child("items")
@@ -748,7 +748,7 @@ func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, f
 
 	configMapMode := configMapSource.DefaultMode
 	if configMapMode != nil && (*configMapMode > 0777 || *configMapMode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *configMapMode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *configMapMode, fileModeErrorMsg))
 	}
 
 	itemsPath := fldPath.Child("items")
@@ -769,7 +769,7 @@ func validateKeyToPath(kp *api.KeyToPath, fldPath *field.Path) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
 	if kp.Mode != nil && (*kp.Mode > 0777 || *kp.Mode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *kp.Mode, fileModeErrorMsg))
 	}
 
 	return allErrs
@@ -866,7 +866,7 @@ func validateDownwardAPIVolumeFile(file *api.DownwardAPIVolumeFile, fldPath *fie
 		allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
 	}
 	if file.Mode != nil && (*file.Mode > 0777 || *file.Mode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, fileModeErrorMsg))
 	}
 
 	return allErrs
@@ -877,7 +877,7 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 
 	downwardAPIMode := downwardAPIVolume.DefaultMode
 	if downwardAPIMode != nil && (*downwardAPIMode > 0777 || *downwardAPIMode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *downwardAPIMode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *downwardAPIMode, fileModeErrorMsg))
 	}
 
 	for _, file := range downwardAPIVolume.Items {
@@ -967,7 +967,7 @@ func validateProjectedVolumeSource(projection *api.ProjectedVolumeSource, fldPat
 
 	projectionMode := projection.DefaultMode
 	if projectionMode != nil && (*projectionMode > 0777 || *projectionMode < 0) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, volumeModeErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, fileModeErrorMsg))
 	}
 
 	allErrs = append(allErrs, validateProjectionSources(projection, projectionMode, fldPath)...)
@@ -1253,6 +1253,8 @@ var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.
 
 var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRecycle), string(api.PersistentVolumeReclaimRetain))
 
+var supportedVolumeModes = sets.NewString(string(api.PersistentVolumeBlock), string(api.PersistentVolumeFilesystem))
+
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
@@ -1481,7 +1483,15 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("storageClassName"), pv.Spec.StorageClassName, msg))
 		}
 	}
-
+	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == api.PersistentVolumeBlock && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolumeSupport) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("volumeMode"), "PersistentVolume volumeMode is disabled by feature-gate"))
+		return allErrs
+	}
+	if pv.Spec.VolumeMode != nil && len(*pv.Spec.VolumeMode) > 0 {
+		if *pv.Spec.VolumeMode != api.PersistentVolumeFilesystem && *pv.Spec.VolumeMode != api.PersistentVolumeBlock {
+			allErrs = append(allErrs, field.NotSupported(specPath.Child("volumeMode"), *pv.Spec.VolumeMode, supportedVolumeModes.List()))
+		}
+	}
 	return allErrs
 }
 
@@ -1536,6 +1546,15 @@ func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldP
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
 		for _, msg := range ValidateClassName(*spec.StorageClassName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("storageClassName"), *spec.StorageClassName, msg))
+		}
+	}
+	if spec.VolumeMode != nil && *spec.VolumeMode == api.PersistentVolumeBlock && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolumeSupport) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeMode"), "PersistentVolumeClaim volumeMode is disabled by feature-gate"))
+		return allErrs
+	}
+	if spec.VolumeMode != nil && len(*spec.VolumeMode) > 0 {
+		if *spec.VolumeMode != api.PersistentVolumeFilesystem && *spec.VolumeMode != api.PersistentVolumeBlock {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 		}
 	}
 	return allErrs
@@ -1870,6 +1889,41 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 	return allErrs
 }
 
+func ValidateVolumeDevices(devices []api.VolumeDevice, volumes sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	devicepath := sets.NewString()
+
+	if devices != nil && !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolumeSupport) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("volumeDevices"), "Container volumeDevices is disabled by feature-gate"))
+		return allErrs
+	}
+	if devices != nil {
+		for i, dev := range devices {
+			idxPath := fldPath.Index(i)
+			devName := dev.Name
+			devPath := dev.DevicePath
+			if len(devName) == 0 {
+				allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
+			} else if !volumes.Has(devName) {
+				allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
+			}
+			if len(devPath) == 0 {
+				allErrs = append(allErrs, field.Required(idxPath.Child("devicePath"), ""))
+			}
+			if devicepath.Has(devPath) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be unique"))
+			}
+			if !path.IsAbs(devPath) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be an absolute path"))
+			}
+			if len(devPath) > 0 {
+				devicepath.Insert(devPath)
+			}
+		}
+	}
+	return allErrs
+}
+
 func validateProbe(probe *api.Probe, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -2133,6 +2187,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
 		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
+		allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volumes, idxPath.Child("volumeDevices"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
