@@ -30,6 +30,7 @@ import (
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/install"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
 	wardleregistry "k8s.io/sample-apiserver/pkg/registry"
 	fischerstorage "k8s.io/sample-apiserver/pkg/registry/wardle/fischer"
 	flunderstorage "k8s.io/sample-apiserver/pkg/registry/wardle/flunder"
@@ -62,6 +63,8 @@ func init() {
 
 type Config struct {
 	GenericConfig *genericapiserver.Config
+	// SharedInformerFactory provides shared informers for resources
+	SharedInformerFactory informers.SharedInformerFactory
 }
 
 // WardleServer contains state for a Kubernetes cluster master/api server.
