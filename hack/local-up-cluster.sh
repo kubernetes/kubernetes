@@ -30,7 +30,7 @@ RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
-KUBELET_FLAGS=${KUBELET_FLAGS:-""}
+KUBELET_FLAGS=${KUBELET_FLAGS:-"--fail-swap-on=false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the config files and binaries required by NET_PLUGIN in these directory,
