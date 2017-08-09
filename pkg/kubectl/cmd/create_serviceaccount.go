@@ -32,8 +32,8 @@ var (
 		Create a service account with the specified name.`))
 
 	serviceAccountExample = templates.Examples(i18n.T(`
-	  # Create a new service account named my-service-account
-	  kubectl create serviceaccount my-service-account`))
+	  # Create a new service account named my-service-account.
+	  $ kubectl create serviceaccount my-service-account`))
 )
 
 // NewCmdCreateServiceAccount is a macro command to create a new service account

@@ -41,19 +41,19 @@ var (
 
 	scaleExample = templates.Examples(i18n.T(`
 		# Scale a replicaset named 'foo' to 3.
-		kubectl scale --replicas=3 rs/foo
+		$ kubectl scale --replicas=3 rs/foo
 
 		# Scale a resource identified by type and name specified in "foo.yaml" to 3.
-		kubectl scale --replicas=3 -f foo.yaml
+		$ kubectl scale --replicas=3 -f foo.yaml
 
 		# If the deployment named mysql's current size is 2, scale mysql to 3.
-		kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
+		$ kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
 
 		# Scale multiple replication controllers.
-		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
+		$ kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
 		# Scale job named 'cron' to 3.
-		kubectl scale --replicas=3 job/cron`))
+		$ kubectl scale --replicas=3 job/cron`))
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale

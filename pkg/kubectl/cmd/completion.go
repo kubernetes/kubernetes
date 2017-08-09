@@ -63,27 +63,21 @@ var (
 		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`))
 
 	completion_example = templates.Examples(i18n.T(`
-		# Install bash completion on a Mac using homebrew
-		brew install bash-completion
-		printf "
-# Bash completion support
-source $(brew --prefix)/etc/bash_completion
-" >> $HOME/.bash_profile
-		source $HOME/.bash_profile
+		# Install bash completion on a Mac using homebrew.
+		$ brew install bash-completion
+		$ printf "\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion" >> $HOME/.bash_profile
+		$ source $HOME/.bash_profile
 
-		# Load the kubectl completion code for bash into the current shell
-		source <(kubectl completion bash)
+		# Load the kubectl completion code for bash into the current shell.
+		$ source <(kubectl completion bash)
 
-		# Write bash completion code to a file and source if from .bash_profile
-		kubectl completion bash > ~/.kube/completion.bash.inc
-		printf "
-# Kubectl shell completion
-source '$HOME/.kube/completion.bash.inc'
-" >> $HOME/.bash_profile
-		source $HOME/.bash_profile
+		# Write bash completion code to a file and source if from .bash_profile .
+		$ kubectl completion bash > ~/.kube/completion.bash.inc
+		$ printf "\n# Kubectl shell completion\nsource '$HOME/.kube/completion.bash.inc'" >> $HOME/.bash_profile
+		$ source $HOME/.bash_profile
 
-		# Load the kubectl completion code for zsh[1] into the current shell
-		source <(kubectl completion zsh)`))
+		# Load the kubectl completion code for zsh[1] into the current shell.
+		$ source <(kubectl completion zsh)`))
 )
 
 var (

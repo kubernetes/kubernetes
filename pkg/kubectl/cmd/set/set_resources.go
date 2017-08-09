@@ -44,17 +44,17 @@ var (
 		Possible resources include (case insensitive): %s.`)
 
 	resources_example = templates.Examples(`
-		# Set a deployments nginx container cpu limits to "200m" and memory to "512Mi"
-		kubectl set resources deployment nginx -c=nginx --limits=cpu=200m,memory=512Mi
+		# Set a deployments nginx container cpu limits to "200m" and memory to "512Mi".
+		$ kubectl set resources deployment nginx -c=nginx --limits=cpu=200m,memory=512Mi
 
-		# Set the resource request and limits for all containers in nginx
-		kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
+		# Set the resource request and limits for all containers in nginx.
+		$ kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
 
-		# Remove the resource requests for resources on containers in nginx
-		kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
+		# Remove the resource requests for resources on containers in nginx.
+		$ kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
 
-		# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
-		kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o yaml`)
+		# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server.
+		$ kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o yaml`)
 )
 
 // ResourcesOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of

@@ -32,8 +32,8 @@ import (
 
 var (
 	use_context_example = templates.Examples(`
-		# Use the context for the minikube cluster
-		kubectl config use-context minikube`)
+		# Use the context for the minikube cluster.
+		$ kubectl config use-context minikube`)
 )
 
 type useContextOptions struct {

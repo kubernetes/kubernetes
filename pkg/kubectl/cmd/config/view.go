@@ -51,10 +51,10 @@ var (
 
 	view_example = templates.Examples(`
 		# Show Merged kubeconfig settings.
-		kubectl config view
+		$ kubectl config view
 
-		# Get the password for the e2e user
-		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
+		# Get the password for the e2e user.
+		$ kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
 func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {

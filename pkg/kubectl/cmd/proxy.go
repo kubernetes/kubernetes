@@ -41,32 +41,27 @@ var (
 		the remote kubernetes API Server port, except for the path matching the static content path.`))
 
 	proxyExample = templates.Examples(i18n.T(`
-		# To proxy all of the kubernetes api and nothing else, use:
+		# Proxy all of the kubernetes api and nothing else.
+		$ kubectl proxy --api-prefix=/
 
-		    $ kubectl proxy --api-prefix=/
+		# Proxy only part of the kubernetes api and also some static files.
+		# This lets you 'curl localhost:8001/api/v1/pods'.
+		$ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
 
-		# To proxy only part of the kubernetes api and also some static files:
+		# Proxy the entire kubernetes api at a different root.
+		# This lets you 'curl localhost:8001/custom/api/v1/pods'.
+		$ kubectl proxy --api-prefix=/custom/
 
-		    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
-
-		# The above lets you 'curl localhost:8001/api/v1/pods'.
-
-		# To proxy the entire kubernetes api at a different root, use:
-
-		    $ kubectl proxy --api-prefix=/custom/
-
-		# The above lets you 'curl localhost:8001/custom/api/v1/pods'
-
-		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
-		kubectl proxy --port=8011 --www=./local/www/
+		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/ .
+		$ kubectl proxy --port=8011 --www=./local/www/
 
 		# Run a proxy to kubernetes apiserver on an arbitrary local port.
 		# The chosen port for the server will be output to stdout.
-		kubectl proxy --port=0
+		$ kubectl proxy --port=0
 
-		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
-		kubectl proxy --api-prefix=/k8s-api`))
+		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api.
+		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/.
+		$ kubectl proxy --api-prefix=/k8s-api`))
 )
 
 func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {

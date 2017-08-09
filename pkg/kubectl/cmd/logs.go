@@ -38,29 +38,29 @@ import (
 
 var (
 	logsExample = templates.Examples(i18n.T(`
-		# Return snapshot logs from pod nginx with only one container
-		kubectl logs nginx
+		# Return snapshot logs from pod nginx with only one container.
+		$ kubectl logs nginx
 
-		# Return snapshot logs for the pods defined by label app=nginx
-		kubectl logs -lapp=nginx
+		# Return snapshot logs for the pods defined by label app=nginx.
+		$ kubectl logs -lapp=nginx
 
-		# Return snapshot of previous terminated ruby container logs from pod web-1
-		kubectl logs -p -c ruby web-1
+		# Return snapshot of previous terminated ruby container logs from pod web-1.
+		$ kubectl logs -p -c ruby web-1
 
-		# Begin streaming the logs of the ruby container in pod web-1
-		kubectl logs -f -c ruby web-1
+		# Begin streaming the logs of the ruby container in pod web-1.
+		$ kubectl logs -f -c ruby web-1
 
-		# Display only the most recent 20 lines of output in pod nginx
-		kubectl logs --tail=20 nginx
+		# Display only the most recent 20 lines of output in pod nginx.
+		$ kubectl logs --tail=20 nginx
 
-		# Show all logs from pod nginx written in the last hour
-		kubectl logs --since=1h nginx
+		# Show all logs from pod nginx written in the last hour.
+		$ kubectl logs --since=1h nginx
 
-		# Return snapshot logs from first container of a job named hello
-		kubectl logs job/hello
+		# Return snapshot logs from first container of a job named hello.
+		$ kubectl logs job/hello
 
-		# Return snapshot logs from container nginx-1 of a deployment named nginx
-		kubectl logs deployment/nginx -c nginx-1`))
+		# Return snapshot logs from container nginx-1 of a deployment named nginx.
+		$ kubectl logs deployment/nginx -c nginx-1`))
 
 	selectorTail int64 = 10
 )

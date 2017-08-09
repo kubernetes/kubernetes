@@ -40,14 +40,14 @@ var (
 	Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding.`)
 
 	subject_example = templates.Examples(`
-	# Update a ClusterRoleBinding for serviceaccount1
-	kubectl set subject clusterrolebinding admin --serviceaccount=namespace:serviceaccount1
+	# Update a ClusterRoleBinding for serviceaccount1.
+	$ kubectl set subject clusterrolebinding admin --serviceaccount=namespace:serviceaccount1
 
-	# Update a RoleBinding for user1, user2, and group1
-	kubectl set subject rolebinding admin --user=user1 --user=user2 --group=group1
+	# Update a RoleBinding for user1, user2, and group1.
+	$ kubectl set subject rolebinding admin --user=user1 --user=user2 --group=group1
 
-	# Print the result (in yaml format) of updating rolebinding subjects from a local, without hitting the server
-	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
+	# Print the result (in yaml format) of updating rolebinding subjects from a local, without hitting the server.
+	$ kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
 type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject)

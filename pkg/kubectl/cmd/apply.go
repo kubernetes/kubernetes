@@ -80,17 +80,17 @@ var (
 
 	applyExample = templates.Examples(i18n.T(`
 		# Apply the configuration in pod.json to a pod.
-		kubectl apply -f ./pod.json
+		$ kubectl apply -f ./pod.json
 
 		# Apply the JSON passed into stdin to a pod.
-		cat pod.json | kubectl apply -f -
+		$ cat pod.json | kubectl apply -f -
 
-		# Note: --prune is still in Alpha
+		# Note: --prune is still in Alpha.
 		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.
-		kubectl apply --prune -f manifest.yaml -l app=nginx
+		$ kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+		$ kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
 
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )

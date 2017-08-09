@@ -53,10 +53,10 @@ var (
 
 	applyEditLastAppliedExample = templates.Examples(`
 		# Edit the last-applied-configuration annotations by type/name in YAML.
-		kubectl apply edit-last-applied deployment/nginx
+		$ kubectl apply edit-last-applied deployment/nginx
 
 		# Edit the last-applied-configuration annotations by file in JSON.
-		kubectl apply edit-last-applied -f deploy.yaml -o json`)
+		$ kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

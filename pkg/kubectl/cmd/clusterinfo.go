@@ -38,8 +38,8 @@ var (
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`))
 
 	clusterinfoExample = templates.Examples(i18n.T(`
-		# Print the address of the master and cluster services
-		kubectl cluster-info`))
+		# Print the address of the master and cluster services.
+		$ kubectl cluster-info`))
 )
 
 func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {

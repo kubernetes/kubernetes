@@ -71,13 +71,13 @@ var (
 
 	applySetLastAppliedExample = templates.Examples(i18n.T(`
 		# Set the last-applied-configuration of a resource to match the contents of a file.
-		kubectl apply set-last-applied -f deploy.yaml
+		$ kubectl apply set-last-applied -f deploy.yaml
 
 		# Execute set-last-applied against each configuration file in a directory.
-		kubectl apply set-last-applied -f path/
+		$ kubectl apply set-last-applied -f path/
 
 		# Set the last-applied-configuration of a resource to match the contents of a file, will create the annotation if it does not already exist.
-		kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
+		$ kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
 		`))
 )
 

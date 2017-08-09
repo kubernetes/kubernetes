@@ -56,17 +56,17 @@ var (
 		symlinks, devices, pipes, etc).`))
 
 	secretExample = templates.Examples(i18n.T(`
-	  # Create a new secret named my-secret with keys for each file in folder bar
-	  kubectl create secret generic my-secret --from-file=path/to/bar
+	  # Create a new secret named my-secret with keys for each file in folder bar.
+	  $ kubectl create secret generic my-secret --from-file=path/to/bar
 
-	  # Create a new secret named my-secret with specified keys instead of names on disk
-	  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+	  # Create a new secret named my-secret with specified keys instead of names on disk.
+	  $ kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
 
-	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
-	  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
+	  # Create a new secret named my-secret with key1=supersecret and key2=topsecret.
+	  $ kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret
 
-	  # Create a new secret named my-secret from an env file
-	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
+	  # Create a new secret named my-secret from an env file.
+	  $ kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
 )
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
@@ -137,8 +137,8 @@ var (
 		by creating a dockercfg secret and attaching it to your service account.`))
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
-		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
-		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`))
+		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using.
+		  $ kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`))
 )
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
@@ -207,8 +207,8 @@ var (
 		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.`))
 
 	secretForTLSExample = templates.Examples(i18n.T(`
-	  # Create a new TLS secret named tls-secret with the given key pair:
-	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
+	  # Create a new TLS secret named tls-secret with the given key pair.
+	  $ kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
 )
 
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries

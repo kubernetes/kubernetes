@@ -66,9 +66,11 @@ var (
 		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
         Note: currently selectors can only be set on Service objects.`)
 	selectorExample = templates.Examples(`
-        # set the labels and selector before creating a deployment/service pair.
-        kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
-        kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
+        	# Set the selector before creating a deployment/service pair.
+        	$ kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
+
+		# Set the label before creating a deployment/service pair.
+        	$ kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
 // NewCmdSelector is the "set selector" command.

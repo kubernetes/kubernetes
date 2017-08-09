@@ -47,11 +47,11 @@ var (
 	getContextsLong = templates.LongDesc(`Displays one or many contexts from the kubeconfig file.`)
 
 	getContextsExample = templates.Examples(`
-		# List all the contexts in your kubeconfig file
-		kubectl config get-contexts
+		# List all the contexts in your kubeconfig file.
+		$ kubectl config get-contexts
 
 		# Describe one context in your kubeconfig file.
-		kubectl config get-contexts my-context`)
+		$ kubectl config get-contexts my-context`)
 )
 
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which

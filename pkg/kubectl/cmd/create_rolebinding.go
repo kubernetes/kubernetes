@@ -32,8 +32,8 @@ var (
 		Create a RoleBinding for a particular Role or ClusterRole.`))
 
 	roleBindingExample = templates.Examples(i18n.T(`
-		  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole
-		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
+		  # Create a RoleBinding for user1, user2, and group1 using the admin ClusterRole.
+		  $ kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
 // RoleBinding is a command to ease creating RoleBindings.

@@ -50,13 +50,13 @@ var (
 
 	create_cluster_example = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values.
-		kubectl config set-cluster e2e --server=https://1.2.3.4
+		$ kubectl config set-cluster e2e --server=https://1.2.3.4
 
-		# Embed certificate authority data for the e2e cluster entry
-		kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
+		# Embed certificate authority data for the e2e cluster entry.
+		$ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.ca.crt
 
-		# Disable cert checking for the dev cluster entry
-		kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
+		# Disable cert checking for the dev cluster entry.
+		$ kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
 )
 
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

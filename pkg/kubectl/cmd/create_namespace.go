@@ -32,8 +32,8 @@ var (
 		Create a namespace with the specified name.`))
 
 	namespaceExample = templates.Examples(i18n.T(`
-	  # Create a new namespace named my-namespace
-	  kubectl create namespace my-namespace`))
+	  # Create a new namespace named my-namespace.
+	  $ kubectl create namespace my-namespace`))
 )
 
 // NewCmdCreateNamespace is a macro command to create a new namespace

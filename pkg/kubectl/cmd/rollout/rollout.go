@@ -31,11 +31,11 @@ var (
 		Manage the rollout of a resource.` + rollout_valid_resources)
 
 	rollout_example = templates.Examples(`
-		# Rollback to the previous deployment
-		kubectl rollout undo deployment/abc
+		# Rollback to the previous deployment.
+		$ kubectl rollout undo deployment/abcm
 		
-		# Check the rollout status of a daemonset
-		kubectl rollout status daemonset/foo`)
+		# Check the rollout status of a daemonset.
+		$ kubectl rollout status daemonset/foo`)
 
 	rollout_valid_resources = dedent.Dedent(`
 		Valid resource types include:

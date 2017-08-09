@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -95,7 +96,7 @@ var (
 
 	cordon_example = templates.Examples(i18n.T(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo`))
+		$ kubectl cordon foo`))
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {

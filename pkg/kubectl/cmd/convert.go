@@ -47,14 +47,13 @@ var (
 
 	convert_example = templates.Examples(i18n.T(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
-		kubectl convert -f pod.yaml
+		$ kubectl convert -f pod.yaml
 
-		# Convert the live state of the resource specified by 'pod.yaml' to the latest version
-		# and print to stdout in json format.
-		kubectl convert -f pod.yaml --local -o json
+		# Convert the live state of the resource specified by 'pod.yaml' to the latest version and print to stdout in json format.
+		$ kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
-		kubectl convert -f . | kubectl create -f -`))
+		$ kubectl convert -f . | kubectl create -f -`))
 )
 
 // NewCmdConvert creates a command object for the generic "convert" action, which

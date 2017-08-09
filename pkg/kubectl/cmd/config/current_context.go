@@ -37,8 +37,8 @@ var (
 		Displays the current-context`)
 
 	current_context_example = templates.Examples(`
-		# Display the current-context
-		kubectl config current-context`)
+		# Display the current-context.
+		$ kubectl config current-context`)
 )
 
 func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

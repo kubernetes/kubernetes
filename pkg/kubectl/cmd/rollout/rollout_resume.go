@@ -57,8 +57,8 @@ var (
 		Currently only deployments support being resumed.`)
 
 	resume_example = templates.Examples(`
-		# Resume an already paused deployment
-		kubectl rollout resume deployment/nginx`)
+		# Resume an already paused deployment.
+		$ kubectl rollout resume deployment/nginx`)
 )
 
 func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -62,23 +62,23 @@ var (
 		NAME is the name of a particular Kubernetes resource.`)
 
 	canIExample = templates.Examples(`
-		# Check to see if I can create pods in any namespace
-		kubectl auth can-i create pods --all-namespaces
+		# Check to see if I can create pods in any namespace.
+		$ kubectl auth can-i create pods --all-namespaces
 
-		# Check to see if I can list deployments in my current namespace
-		kubectl auth can-i list deployments.extensions
+		# Check to see if I can list deployments in my current namespace.
+		$ kubectl auth can-i list deployments.extensions
 
-		# Check to see if I can do everything in my current namespace ("*" means all)
-		kubectl auth can-i '*' '*'
+		# Check to see if I can do everything in my current namespace ("*" means all).
+		$ kubectl auth can-i '*' '*'
 
-		# Check to see if I can get the job named "bar" in namespace "foo"
-		kubectl auth can-i list jobs.batch/bar -n foo
+		# Check to see if I can get the job named "bar" in namespace "foo".
+		$ kubectl auth can-i list jobs.batch/bar -n foo
 
-		# Check to see if I can read pod logs
-		kubectl auth can-i get pods --subresource=log
+		# Check to see if I can read pod logs.
+		$ kubectl auth can-i get pods --subresource=log
 
-		# Check to see if I can access the URL /logs/
-		kubectl auth can-i get /logs/`)
+		# Check to see if I can access the URL /logs/.
+		$ kubectl auth can-i get /logs/`)
 )
 
 func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {

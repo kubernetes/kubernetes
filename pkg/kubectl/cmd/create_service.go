@@ -50,11 +50,11 @@ var (
     Create a clusterIP service with the specified name.`))
 
 	serviceClusterIPExample = templates.Examples(i18n.T(`
-    # Create a new clusterIP service named my-cs
-    kubectl create service clusterip my-cs --tcp=5678:8080
+    # Create a new clusterIP service named my-cs.
+    $ kubectl create service clusterip my-cs --tcp=5678:8080
 
-    # Create a new clusterIP service named my-cs (in headless mode)
-    kubectl create service clusterip my-cs --clusterip="None"`))
+    # Create a new clusterIP service named my-cs (in headless mode).
+    $ kubectl create service clusterip my-cs --clusterip="None"`))
 )
 
 func addPortFlags(cmd *cobra.Command) {
@@ -117,8 +117,8 @@ var (
     Create a nodeport service with the specified name.`))
 
 	serviceNodePortExample = templates.Examples(i18n.T(`
-    # Create a new nodeport service named my-ns
-    kubectl create service nodeport my-ns --tcp=5678:8080`))
+    # Create a new nodeport service named my-ns.
+    $ kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
@@ -174,8 +174,8 @@ var (
     Create a LoadBalancer service with the specified name.`))
 
 	serviceLoadBalancerExample = templates.Examples(i18n.T(`
-    # Create a new LoadBalancer service named my-lbs
-    kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
+    # Create a new LoadBalancer service named my-lbs.
+    $ kubectl create service loadbalancer my-lbs --tcp=5678:8080`))
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
@@ -233,8 +233,8 @@ var (
 	that exist off platform, on other clusters, or locally.`))
 
 	serviceExternalNameExample = templates.Examples(i18n.T(`
-	# Create a new ExternalName service named my-ns 
-	kubectl create service externalname my-ns --external-name bar.com`))
+	# Create a new ExternalName service named my-ns.
+	$ kubectl create service externalname my-ns --external-name bar.com`))
 )
 
 // NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service
