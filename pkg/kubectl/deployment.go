@@ -36,16 +36,6 @@ type BaseDeploymentGenerator struct {
 	Images []string
 }
 
-// ParamNames: return the parameters expected by the BaseDeploymentGenerator.
-// This method is here to aid in validation. When given a Generator, you can
-// learn what it expects by calling this method.
-func (BaseDeploymentGenerator) ParamNames() []GeneratorParam {
-	return []GeneratorParam{
-		{"name", true},
-		{"image", true},
-	}
-}
-
 // validate: check if the caller has forgotten to set one of our fields.
 func (b BaseDeploymentGenerator) validate() error {
 	if len(b.Name) == 0 {
@@ -55,29 +45,6 @@ func (b BaseDeploymentGenerator) validate() error {
 		return fmt.Errorf("at least one image must be specified")
 	}
 	return nil
-}
-
-// baseDeploymentGeneratorFromParams: return a new BaseDeploymentGenerator with
-// the fields set from params. The returned BaseDeploymentGenerator should have
-// all required fields set and will pass validate() with no errors.
-func baseDeploymentGeneratorFromParams(params map[string]interface{}) (*BaseDeploymentGenerator, error) {
-	paramNames := (BaseDeploymentGenerator{}).ParamNames()
-	err := ValidateParams(paramNames, params)
-	if err != nil {
-		return nil, err
-	}
-	name, isString := params["name"].(string)
-	if !isString {
-		return nil, fmt.Errorf("expected string, saw %v for 'name'", name)
-	}
-	imageStrings, isArray := params["image"].([]string)
-	if !isArray {
-		return nil, fmt.Errorf("expected []string, found :%v", imageStrings)
-	}
-	return &BaseDeploymentGenerator{
-		Name:   name,
-		Images: imageStrings,
-	}, nil
 }
 
 // structuredGenerate: determine the fields of a deployment. The struct that
@@ -127,14 +94,6 @@ type DeploymentBasicGeneratorV1 struct {
 // Ensure it supports the generator pattern that uses parameters specified during construction
 var _ StructuredGenerator = &DeploymentBasicGeneratorV1{}
 
-func (s DeploymentBasicGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
-	base, err := baseDeploymentGeneratorFromParams(params)
-	if err != nil {
-		return nil, err
-	}
-	return (&DeploymentBasicGeneratorV1{*base}).StructuredGenerate()
-}
-
 // StructuredGenerate outputs a deployment object using the configured fields
 func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	podSpec, labels, selector, err := s.structuredGenerate()
@@ -164,14 +123,6 @@ type DeploymentBasicAppsGeneratorV1 struct {
 
 // Ensure it supports the generator pattern that uses parameters specified during construction
 var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1{}
-
-func (s DeploymentBasicAppsGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
-	base, err := baseDeploymentGeneratorFromParams(params)
-	if err != nil {
-		return nil, err
-	}
-	return (&DeploymentBasicAppsGeneratorV1{*base}).StructuredGenerate()
-}
 
 // StructuredGenerate outputs a deployment object using the configured fields
 func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, error) {

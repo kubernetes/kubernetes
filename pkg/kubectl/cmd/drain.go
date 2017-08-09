@@ -631,6 +631,9 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			return err
 		}
 		oldData, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
 		node, ok := obj.(*corev1.Node)
 		if !ok {
 			return fmt.Errorf("unexpected Type%T, expected Node", obj)
@@ -642,6 +645,9 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			node.Spec.Unschedulable = desired
 			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 			if err != nil {
 				return err

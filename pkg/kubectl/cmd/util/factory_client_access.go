@@ -510,10 +510,12 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
 		}
 	case "deployment":
-		generator = map[string]kubectl.Generator{
-			DeploymentBasicV1Beta1GeneratorName:     kubectl.DeploymentBasicGeneratorV1{},
-			DeploymentBasicAppsV1Beta1GeneratorName: kubectl.DeploymentBasicAppsGeneratorV1{},
-		}
+		// Create Deployment has only StructuredGenerators and no
+		// param-based Generators.
+		// The StructuredGenerators are as follows (as of 2017-07-17):
+		// DeploymentBasicV1Beta1GeneratorName -> kubectl.DeploymentBasicGeneratorV1
+		// DeploymentBasicAppsV1Beta1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1
+		generator = map[string]kubectl.Generator{}
 	case "run":
 		generator = map[string]kubectl.Generator{
 			RunV1GeneratorName:                 kubectl.BasicReplicationController{},

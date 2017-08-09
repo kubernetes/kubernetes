@@ -124,17 +124,6 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 	return map_DeploymentList
 }
 
-var map_DeploymentRollback = map[string]string{
-	"":                   "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentRollback stores the information required to rollback a deployment.",
-	"name":               "Required: This must match the Name of a deployment.",
-	"updatedAnnotations": "The annotations to be updated to a deployment",
-	"rollbackTo":         "The config of this deployment rollback.",
-}
-
-func (DeploymentRollback) SwaggerDoc() map[string]string {
-	return map_DeploymentRollback
-}
-
 var map_DeploymentSpec = map[string]string{
 	"":                        "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -144,7 +133,6 @@ var map_DeploymentSpec = map[string]string{
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
 	"paused":                  "Indicates that the deployment is paused.",
-	"rollbackTo":              "The config this deployment is rolling back to. Will be cleared after rollback is done.",
 	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
 }
 
@@ -236,15 +224,6 @@ var map_ReplicaSetStatus = map[string]string{
 
 func (ReplicaSetStatus) SwaggerDoc() map[string]string {
 	return map_ReplicaSetStatus
-}
-
-var map_RollbackConfig = map[string]string{
-	"":         "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-	"revision": "The revision to rollback to. If set to 0, rollback to the last revision.",
-}
-
-func (RollbackConfig) SwaggerDoc() map[string]string {
-	return map_RollbackConfig
 }
 
 var map_RollingUpdateDaemonSet = map[string]string{

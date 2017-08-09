@@ -29,6 +29,8 @@ type synchronizedOpenAPIGetter struct {
 	openAPISchema Resources
 	err           error
 
+	serverVersion string
+	cacheDir      string
 	openAPIClient discovery.OpenAPISchemaInterface
 }
 
@@ -40,10 +42,12 @@ type Getter interface {
 	Get() (Resources, error)
 }
 
-// NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
-// from a server, and then stores in memory for subsequent invocations
-func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
+// NewOpenAPIGetter returns an object to return OpenAPIDatas which either read from a
+// local file cache or read from a server, and then stored in memory for subsequent invocations
+func NewOpenAPIGetter(cacheDir, serverVersion string, openAPIClient discovery.OpenAPISchemaInterface) Getter {
 	return &synchronizedOpenAPIGetter{
+		serverVersion: serverVersion,
+		cacheDir:      cacheDir,
 		openAPIClient: openAPIClient,
 	}
 }
@@ -51,13 +55,15 @@ func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
 // Resources implements Getter
 func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
 	g.Do(func() {
-		s, err := g.openAPIClient.OpenAPISchema()
+		client := NewCachingOpenAPIClient(g.openAPIClient, g.serverVersion, g.cacheDir)
+		result, err := client.OpenAPIData()
 		if err != nil {
 			g.err = err
 			return
 		}
 
-		g.openAPISchema, g.err = NewOpenAPIData(s)
+		// Save the result
+		g.openAPISchema = result
 	})
 
 	// Return the save result

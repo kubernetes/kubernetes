@@ -953,6 +953,7 @@ function delete-subnetworks() {
 #
 # Assumed vars:
 #   KUBE_TEMP: temporary directory
+#   NUM_NODES: #nodes in the cluster
 #
 # Args:
 #  $1: host name
@@ -1044,7 +1045,13 @@ function create-master() {
   create-certs "${MASTER_RESERVED_IP}"
   create-etcd-certs ${MASTER_NAME}
 
-  create-master-instance "${MASTER_RESERVED_IP}" &
+  if [[ "${NUM_NODES}" -ge "50" ]]; then
+    # We block on master creation for large clusters to avoid doing too much
+    # unnecessary work in case master start-up fails (like creation of nodes).
+    create-master-instance "${MASTER_RESERVED_IP}"
+  else
+    create-master-instance "${MASTER_RESERVED_IP}" &
+  fi
 }
 
 # Adds master replica to etcd cluster.

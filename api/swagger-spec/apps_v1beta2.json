@@ -1896,67 +1896,6 @@
     ]
    },
    {
-    "path": "/apis/apps/v1beta2/namespaces/{namespace}/deployments/{name}/rollback",
-    "description": "API at /apis/apps/v1beta2",
-    "operations": [
-     {
-      "type": "v1beta2.DeploymentRollback",
-      "method": "POST",
-      "summary": "create rollback of a Deployment",
-      "nickname": "createNamespacedDeploymentRollback",
-      "parameters": [
-       {
-        "type": "string",
-        "paramType": "query",
-        "name": "pretty",
-        "description": "If 'true', then the output is pretty printed.",
-        "required": false,
-        "allowMultiple": false
-       },
-       {
-        "type": "v1beta2.DeploymentRollback",
-        "paramType": "body",
-        "name": "body",
-        "description": "",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "namespace",
-        "description": "object name and auth scope, such as for teams and projects",
-        "required": true,
-        "allowMultiple": false
-       },
-       {
-        "type": "string",
-        "paramType": "path",
-        "name": "name",
-        "description": "name of the DeploymentRollback",
-        "required": true,
-        "allowMultiple": false
-       }
-      ],
-      "responseMessages": [
-       {
-        "code": 200,
-        "message": "OK",
-        "responseModel": "v1beta2.DeploymentRollback"
-       }
-      ],
-      "produces": [
-       "application/json",
-       "application/yaml",
-       "application/vnd.kubernetes.protobuf"
-      ],
-      "consumes": [
-       "*/*"
-      ]
-     }
-    ]
-   },
-   {
     "path": "/apis/apps/v1beta2/namespaces/{namespace}/deployments/{name}/scale",
     "description": "API at /apis/apps/v1beta2",
     "operations": [
@@ -7282,10 +7221,6 @@
       "type": "boolean",
       "description": "Indicates that the deployment is paused."
      },
-     "rollbackTo": {
-      "$ref": "v1beta2.RollbackConfig",
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
-     },
      "progressDeadlineSeconds": {
       "type": "integer",
       "format": "int32",
@@ -7318,17 +7253,6 @@
      "maxSurge": {
       "type": "string",
       "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods."
-     }
-    }
-   },
-   "v1beta2.RollbackConfig": {
-    "id": "v1beta2.RollbackConfig",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it.",
-    "properties": {
-     "revision": {
-      "type": "integer",
-      "format": "int64",
-      "description": "The revision to rollback to. If set to 0, rollback to the last revision."
      }
     }
    },
@@ -7411,36 +7335,6 @@
      "message": {
       "type": "string",
       "description": "A human readable message indicating details about the transition."
-     }
-    }
-   },
-   "v1beta2.DeploymentRollback": {
-    "id": "v1beta2.DeploymentRollback",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentRollback stores the information required to rollback a deployment.",
-    "required": [
-     "name",
-     "rollbackTo"
-    ],
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
-     },
-     "name": {
-      "type": "string",
-      "description": "Required: This must match the Name of a deployment."
-     },
-     "updatedAnnotations": {
-      "type": "object",
-      "description": "The annotations to be updated to a deployment"
-     },
-     "rollbackTo": {
-      "$ref": "v1beta2.RollbackConfig",
-      "description": "The config of this deployment rollback."
      }
     }
    },
