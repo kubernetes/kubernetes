@@ -25,6 +25,7 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/controller/namespace:go_default_library",
+        "//pkg/features:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e_node/builder:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",

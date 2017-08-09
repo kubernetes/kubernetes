@@ -343,6 +343,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvr("", "v1", "rangeallocations"),     // stored in various places in etcd but cannot be directly created
 	gvr("", "v1", "componentstatuses"),    // status info not stored in etcd
 	gvr("", "v1", "serializedreferences"), // used for serilization, not stored in etcd
+	gvr("", "v1", "nodeconfigsources"),    // subfield of node.spec, but shouldn't be directly created
 	gvr("", "v1", "podstatusresults"),     // wrapper object not stored in etcd
 	// --
 

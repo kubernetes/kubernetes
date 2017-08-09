@@ -54865,6 +54865,29 @@
      }
     }
    },
+   "io.k8s.api.core.v1.NodeConfigSource": {
+    "description": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "configMapRef": {
+      "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "kind": "NodeConfigSource",
+      "version": "v1"
+     }
+    ]
+   },
    "io.k8s.api.core.v1.NodeDaemonEndpoints": {
     "description": "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
     "properties": {
@@ -54967,6 +54990,10 @@
    "io.k8s.api.core.v1.NodeSpec": {
     "description": "NodeSpec describes the attributes that a node is created with.",
     "properties": {
+     "configSource": {
+      "description": "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeConfigSource"
+     },
      "externalID": {
       "description": "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
       "type": "string"

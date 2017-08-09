@@ -30,7 +30,7 @@ import (
 var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKubeletConfig] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 
-	Context("When a configmap called `kubelet-{node-name}` is added to the `kube-system` namespace", func() {
+	Context("When the config source on a Node is updated to point to new config", func() {
 		It("The Kubelet on that node should restart to take up the new config", func() {
 			// Get the current KubeletConfiguration (known to be valid) by
 			// querying the configz endpoint for the current node.

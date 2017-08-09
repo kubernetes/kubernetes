@@ -2913,6 +2913,19 @@ type NodeSpec struct {
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint
+
+	// If specified, the source to get node configuration from
+	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +optional
+	ConfigSource *NodeConfigSource
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+type NodeConfigSource struct {
+	metav1.TypeMeta
+	ConfigMapRef *ObjectReference
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

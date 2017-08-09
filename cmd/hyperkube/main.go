@@ -20,6 +20,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
@@ -36,7 +37,12 @@ func main() {
 	hk.AddServer(NewKubeAPIServer())
 	hk.AddServer(NewKubeControllerManager())
 	hk.AddServer(NewScheduler())
-	hk.AddServer(NewKubelet())
+	if kubelet, err := NewKubelet(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	} else {
+		hk.AddServer(kubelet)
+	}
 	hk.AddServer(NewKubeProxy())
 	hk.AddServer(NewKubeAggregator())
 
