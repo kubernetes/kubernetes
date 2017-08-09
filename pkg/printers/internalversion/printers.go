@@ -1579,10 +1579,10 @@ func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, opti
 	reference := fmt.Sprintf("%s/%s",
 		obj.Spec.ScaleTargetRef.Kind,
 		obj.Spec.ScaleTargetRef.Name)
-	minPods := "<unset>"
+	minPods := int32(1)
 	metrics := formatHPAMetrics(obj.Spec.Metrics, obj.Status.CurrentMetrics)
 	if obj.Spec.MinReplicas != nil {
-		minPods = fmt.Sprintf("%d", *obj.Spec.MinReplicas)
+		minPods = *obj.Spec.MinReplicas
 	}
 	maxPods := obj.Spec.MaxReplicas
 	currentReplicas := obj.Status.CurrentReplicas

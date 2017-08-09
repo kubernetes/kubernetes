@@ -2047,7 +2047,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<none>\t1\t10\t4\t<unknown>\n",
 		},
 		// pods source type (no current)
 		{
