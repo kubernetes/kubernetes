@@ -185,14 +185,24 @@ func (q *writeQueue) push(wr FrameWriteRequest) {
 	q.s = append(q.s, wr)
 }
 
+// ReverseWriteQueue is used to Reverse WriteQueue q in fixed interval
+func (q *writeQueue)ReverseWriteQueue(left, right int){
+	for i, j:= left, right; i < j; i, j = i + 1, j - 1 {
+	q.s[i], q.s[j] = q.s[j], q.s[i]
+	}
+}
+
 func (q *writeQueue) shift() FrameWriteRequest {
 	if len(q.s) == 0 {
 		panic("invalid use of queue")
 	}
 	wr := q.s[0]
 	// TODO: less copy-happy queue.
-	copy(q.s, q.s[1:])
-	q.s[len(q.s)-1] = FrameWriteRequest{}
+	//copy(q.s, q.s[1:])
+	//q.s[len(q.s)-1] = FrameWriteRequest{}
+	q.s[0] = FrameWriteRequest{}
+	q.ReverseWriteQueue(1, len(q.s)-1)
+	q.ReverseWriteQueue(0, len(q.s)-1)
 	q.s = q.s[:len(q.s)-1]
 	return wr
 }
