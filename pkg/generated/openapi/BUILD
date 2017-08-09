@@ -1,3 +1,6 @@
+# doc.go is managed by kazel, so gazelle should ignore it.
+# gazelle:exclude doc.go
+
 package(default_visibility = ["//visibility:public"])
 
 load("//pkg/generated/openapi:def.bzl", "openapi_library")

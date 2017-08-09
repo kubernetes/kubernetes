@@ -4,6 +4,5 @@
 		"^_.*"
 	],
 	"AddSourcesRules": true,
-	"VendorMultipleBuildFiles": true,
 	"K8sOpenAPIGen": true
 }

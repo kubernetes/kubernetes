@@ -1,3 +1,8 @@
+# gazelle:exclude _artifacts
+# gazelle:exclude _gopath
+# gazelle:exclude _output
+# gazelle:exclude _tmp
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
