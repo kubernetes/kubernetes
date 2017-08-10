@@ -199,7 +199,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(err)
 		unmanagedNodes := nodeCount - status.ready
 
-		By("Schedule more pods than can fit and wait for claster to scale-up")
+		By("Schedule more pods than can fit and wait for cluster to scale-up")
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb, false, 1*time.Second)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
@@ -719,7 +719,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	numPods := len(nodes.Items) * podsPerNode
 	testId := string(uuid.NewUUID()) // So that we can label and find pods
 	labelMap := map[string]string{"test_id": testId}
-	framework.ExpectNoError(runReplicatedPodOnEachNode(f, nodes.Items, namespace, podsPerNode, "reschedulable-pods", labelMap))
+	framework.ExpectNoError(runReplicatedPodOnEachNode(f, nodes.Items, namespace, podsPerNode, "reschedulable-pods", labelMap, 0))
 
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, "reschedulable-pods")
 
@@ -907,7 +907,7 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
-func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) {
+func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
@@ -929,9 +929,12 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		if expectRunning {
 			framework.ExpectNoError(err)
 		}
-		return
+		return func() error {
+			return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, id)
+		}
 	}
 	framework.Failf("Failed to reserve memory within timeout")
+	return nil
 }
 
 // WaitForClusterSize waits until the cluster size matches the given function.
@@ -961,7 +964,7 @@ func WaitForClusterSizeFuncWithUnready(c clientset.Interface, sizeFunc func(int)
 			glog.Infof("Cluster has reached the desired size")
 			return nil
 		}
-		glog.Infof("Waiting for cluster, current size %d, not ready nodes %d", numNodes, numNodes-numReady)
+		glog.Infof("Waiting for cluster with func, current size %d, not ready nodes %d", numNodes, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for appropriate cluster size", timeout)
 }
@@ -1201,7 +1204,7 @@ func buildAntiAffinity(labels map[string]string) *v1.Affinity {
 // 3. for each node:
 // 3a. enable scheduling on that node
 // 3b. increase number of replicas in RC by podsPerNode
-func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespace string, podsPerNode int, id string, labels map[string]string) error {
+func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespace string, podsPerNode int, id string, labels map[string]string, memRequest int64) error {
 	By("Run a pod on each node")
 	for _, node := range nodes {
 		err := makeNodeUnschedulable(f.ClientSet, &node)
@@ -1223,6 +1226,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		Image:          framework.GetPauseImageName(f.ClientSet),
 		Replicas:       0,
 		Labels:         labels,
+		MemRequest:     memRequest,
 	}
 	err := framework.RunRC(*config)
 	if err != nil {
@@ -1272,6 +1276,14 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		}
 	}
 	return nil
+}
+
+// wrap runReplicatedPodOnEachNode to return cleanup
+func runReplicatedPodOnEachNodeWithCleanup(f *framework.Framework, nodes []v1.Node, namespace string, podsPerNode int, id string, labels map[string]string, memRequest int64) (func(), error) {
+	err := runReplicatedPodOnEachNode(f, nodes, namespace, podsPerNode, id, labels, memRequest)
+	return func() {
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, id)
+	}, err
 }
 
 // Increase cluster size by newNodesForScaledownTests to create some unused nodes
