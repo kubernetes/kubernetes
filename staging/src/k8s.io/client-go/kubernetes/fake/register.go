@@ -27,6 +27,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -80,6 +81,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	autoscalingv1.AddToScheme(scheme)
 	autoscalingv2alpha1.AddToScheme(scheme)
 	batchv1.AddToScheme(scheme)
+	batchv1beta1.AddToScheme(scheme)
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
