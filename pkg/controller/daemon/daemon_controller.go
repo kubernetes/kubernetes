@@ -63,18 +63,18 @@ import (
 
 const (
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
-	BurstReplicas = 250
+	burstReplicas = 250
 
 	// If sending a status upate to API server fails, we retry a finite number of times.
-	StatusUpdateRetries = 1
+	statusUpdateRetries = 1
 
 	// Reasons for DaemonSet events
-	// SelectingAllReason is added to an event when a DaemonSet selects all Pods.
-	SelectingAllReason = "SelectingAll"
-	// FailedPlacementReason is added to an event when a DaemonSet can't schedule a Pod to a specified node.
-	FailedPlacementReason = "FailedPlacement"
-	// FailedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
-	FailedDaemonPodReason = "FailedDaemonPod"
+	// selectingAllReason is added to an event when a DaemonSet selects all Pods.
+	selectingAllReason = "SelectingAll"
+	// failedPlacementReason is added to an event when a DaemonSet can't schedule a Pod to a specified node.
+	failedPlacementReason = "FailedPlacement"
+	// failedDaemonPodReason is added to an event when the status of a Pod of a DaemonSet is 'Failed'.
+	failedDaemonPodReason = "FailedDaemonPod"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -148,7 +148,7 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
-		burstReplicas:       BurstReplicas,
+		burstReplicas:       burstReplicas,
 		expectations:        controller.NewControllerExpectations(),
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
 		suspendedDaemonPods: map[string]sets.String{},
@@ -842,7 +842,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					glog.V(2).Infof(msg)
 					// Emit an event so that it's discoverable to users.
-					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
+					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, failedDaemonPodReason, msg)
 					podsToDelete = append(podsToDelete, pod.Name)
 					failedPodsObserved++
 				} else {
@@ -975,7 +975,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	toUpdate := clone.(*extensions.DaemonSet)
 
 	var updateErr, getErr error
-	for i := 0; i < StatusUpdateRetries; i++ {
+	for i := 0; i < statusUpdateRetries; i++ {
 		toUpdate.Status.ObservedGeneration = ds.Generation
 		toUpdate.Status.DesiredNumberScheduled = int32(desiredNumberScheduled)
 		toUpdate.Status.CurrentNumberScheduled = int32(currentNumberScheduled)
@@ -1076,7 +1076,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, SelectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, selectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 
@@ -1286,14 +1286,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 				emitEvent = true
 			}
 			if emitEvent {
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, failedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
 	}
 	// only emit this event if insufficient resource is the only thing
 	// preventing the daemon pod from scheduling
 	if shouldSchedule && insufficientResourceErr != nil {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
+		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, failedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
 		shouldSchedule = false
 	}
 	return
