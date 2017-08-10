@@ -246,6 +246,11 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}
 
 	<-stopCh
+
+	if s.GenericAPIServer.AuditBackend != nil {
+		s.GenericAPIServer.AuditBackend.Shutdown()
+	}
+
 	return nil
 }
 

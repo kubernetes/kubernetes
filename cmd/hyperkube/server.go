@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type serverRunFunc func(s *Server, args []string) error
+type serverRunFunc func(s *Server, args []string, stopCh <-chan struct{}) error
 
 // Server describes a server that this binary can morph into.
 type Server struct {
@@ -34,6 +34,7 @@ type Server struct {
 	Long            string        // Longer free form description of the server
 	Run             serverRunFunc // Run the server.  This is not expected to return.
 	AlternativeName string
+	RespectsStopCh  bool
 
 	flags *pflag.FlagSet // Flags for the command (and all dependents)
 	name  string

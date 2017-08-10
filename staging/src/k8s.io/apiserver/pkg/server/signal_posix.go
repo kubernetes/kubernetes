@@ -1,5 +1,7 @@
+// +build !windows
+
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package protobuf
+package server
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/gengo/types"
+	"os"
+	"syscall"
 )
 
-// extractBoolTagOrDie gets the comment-tags for the key and asserts that, if
-// it exists, the value is boolean.  If the tag did not exist, it returns
-// false.
-func extractBoolTagOrDie(key string, lines []string) bool {
-	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	return val
-}
+var shutdownSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}

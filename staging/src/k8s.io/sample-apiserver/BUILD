@@ -15,7 +15,8 @@ go_library(
     name = "go_default_library",
     srcs = ["main.go"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/cmd/server:go_default_library",
     ],

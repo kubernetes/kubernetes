@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 )
@@ -30,9 +29,10 @@ func NewFederationAPIServer() *Server {
 	hks := Server{
 		SimpleUsage: "federation-apiserver",
 		Long:        "The API entrypoint for the federation control plane",
-		Run: func(_ *Server, args []string) error {
-			return app.Run(s, wait.NeverStop)
+		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
+			return app.Run(s, stopCh)
 		},
+		RespectsStopCh: true,
 	}
 	s.AddFlags(hks.Flags())
 	return &hks

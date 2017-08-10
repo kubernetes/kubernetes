@@ -29,7 +29,7 @@ func NewFederationCMServer() *Server {
 	hks := Server{
 		SimpleUsage: "federation-controller-manager",
 		Long:        "Controller manager for federation control plane. Manages federation service endpoints and controllers",
-		Run: func(_ *Server, args []string) error {
+		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
 			return app.Run(s)
 		},
 	}
