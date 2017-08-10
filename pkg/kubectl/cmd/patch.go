@@ -52,6 +52,8 @@ type PatchOptions struct {
 
 	Local bool
 
+	PrintOpts    printers.PrintOptions
+	Printer      printers.ResourcePrinter
 	OutputFormat string
 }
 
@@ -104,8 +106,8 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: patchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			options.OutputFormat = cmdutil.GetFlagString(cmd, "output")
-			err := RunPatch(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(f, cmd, out))
+			cmdutil.CheckErr(options.RunPatch(f, out, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
@@ -125,9 +127,21 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
+func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+
+	printer, err := f.PrinterWithOptions(o.PrintOpts, o.Local)
+	if err != nil {
+		return err
+	}
+	o.Printer = printer
+
+	return nil
+}
+
+func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	switch {
-	case options.Local && len(args) != 0:
+	case o.Local && len(args) != 0:
 		return fmt.Errorf("cannot specify --local and server resources")
 	}
 
@@ -166,7 +180,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	r := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -187,7 +201,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 
-		if !options.Local {
+		if !o.Local {
 			dataChangedMsg := "not patched"
 			helper := resource.NewHelper(client, mapping)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
@@ -227,14 +241,14 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 
-			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
-				return f.PrintResourceInfoForCommand(cmd, info, out)
+			if len(o.OutputFormat) > 0 && o.OutputFormat != "name" {
+				return o.Printer.PrintObj(info.Object, out)
 			}
 			mapper, _, err := f.UnstructuredObject()
 			if err != nil {
 				return err
 			}
-			f.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+			f.PrintSuccess(mapper, o.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			return nil
 		}
 
@@ -262,7 +276,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err := info.Refresh(targetObj, true); err != nil {
 			return err
 		}
-		return f.PrintResourceInfoForCommand(cmd, info, out)
+		return o.Printer.PrintObj(info.Object, out)
 	})
 	if err != nil {
 		return err

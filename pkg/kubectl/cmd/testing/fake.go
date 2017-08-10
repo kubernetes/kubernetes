@@ -358,22 +358,6 @@ func (f *FakeFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOption
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
-	printer, err := f.PrinterWithOptions(printOpts, false)
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
-		printer, err = f.DecoratedPrinterWithOptions(printOpts, false, nil)
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
-}
-
 func (f *FakeFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
 	resource, _ = mapper.ResourceSingularizer(resource)
 	dryRunMsg := ""
@@ -689,22 +673,6 @@ func (f *fakeAPIFactory) PrinterWithOptions(options printers.PrintOptions, isLoc
 
 func (f *fakeAPIFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
-}
-
-func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
-	printer, err := f.PrinterWithOptions(printOpts, false)
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
-		printer, err = f.DecoratedPrinterWithOptions(printOpts, false, nil)
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
 }
 
 func (f *fakeAPIFactory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {

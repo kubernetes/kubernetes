@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -36,6 +37,9 @@ type CreateOptions struct {
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
 	EditBeforeCreate bool
+
+	PrintOpts printers.PrintOptions
+	Printer   printers.ResourcePrinter
 }
 
 var (
@@ -70,7 +74,8 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				return
 			}
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, &options))
+			cmdutil.CheckErr(options.Complete(f, cmd, out, errOut))
+			cmdutil.CheckErr(options.RunCreate(f, cmd, out, errOut))
 		},
 	}
 
@@ -111,9 +116,21 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *CreateOptions) error {
-	if options.EditBeforeCreate {
-		return RunEditOnCreate(f, out, errOut, cmd, &options.FilenameOptions)
+func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+
+	printer, err := f.PrinterWithOptions(o.PrintOpts, false)
+	if err != nil {
+		return err
+	}
+	o.Printer = printer
+
+	return nil
+}
+
+func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
+	if o.EditBeforeCreate {
+		return RunEditOnCreate(f, out, errOut, cmd, &o.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -139,8 +156,8 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		SelectorParam(o.Selector).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -176,7 +193,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 
 		shortOutput := output == "name"
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, out)
+			return o.Printer.PrintObj(info.Object, out)
 		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)

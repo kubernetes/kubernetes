@@ -249,11 +249,6 @@ type BuilderFactory interface {
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations
 	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
-	// attempts to print an info object based on the specified output format. If the
-	// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
 	// One stop shopping for a Builder
 	NewBuilder(allowRemoteCalls bool) *resource.Builder
 	// Resource builder for working with unstructured objects

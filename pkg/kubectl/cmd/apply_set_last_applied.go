@@ -36,6 +36,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -56,6 +57,9 @@ type SetLastAppliedOptions struct {
 	Factory          cmdutil.Factory
 	Out              io.Writer
 	ErrOut           io.Writer
+
+	PrintOpts printers.PrintOptions
+	Printer   printers.ResourcePrinter
 }
 
 type PatchBuffer struct {
@@ -116,6 +120,13 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	if err != nil {
 		return err
 	}
+
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+	printer, err := f.PrinterWithOptions(o.PrintOpts, false)
+	if err != nil {
+		return err
+	}
+	o.Printer = printer
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
 	return err
@@ -195,7 +206,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+				return o.Printer.PrintObj(info.Object, o.Out)
 			}
 			f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 
