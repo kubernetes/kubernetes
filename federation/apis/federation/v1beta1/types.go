@@ -154,4 +154,8 @@ const (
 
 	// FederationClusterSelectorAnnotation is used to determine placement of objects on federated clusters
 	FederationClusterSelectorAnnotation string = "federation.alpha.kubernetes.io/cluster-selector"
+
+	// FederationOnlyClusterSelector is the cluster selector to indicate any object in
+	// federation having this annotation should not be synced to federated clusters.
+	FederationOnlyClusterSelector string = "federation.kubernetes.io/federation-control-plane=true"
 )
