@@ -73,9 +73,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1beta2.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: defaultLabels,
-					},
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
 						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
@@ -106,9 +103,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					},
 				},
 				Spec: appsv1beta2.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: defaultLabels,
-					},
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
 						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
@@ -196,7 +190,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 		original *appsv1beta2.StatefulSet
 		expected *appsv1beta2.StatefulSet
 	}{
-		{ // Selector, labels and default update strategy
+		{ // labels and default update strategy
 			original: &appsv1beta2.StatefulSet{
 				Spec: appsv1beta2.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -207,9 +201,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: defaultLabels,
-					},
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
@@ -237,9 +228,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: defaultLabels,
-					},
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
@@ -262,9 +250,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1beta2.StatefulSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: defaultLabels,
-					},
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1beta2.ParallelPodManagement,
@@ -455,119 +440,6 @@ func TestDefaultDeploymentAvailability(t *testing.T) {
 
 	if *(d.Spec.Replicas)-int32(maxUnavailable) <= 0 {
 		t.Fatalf("the default value of maxUnavailable can lead to no active replicas during rolling update")
-	}
-}
-
-func TestSetDefaultReplicaSet(t *testing.T) {
-	tests := []struct {
-		rs             *appsv1beta2.ReplicaSet
-		expectLabels   bool
-		expectSelector bool
-	}{
-		{
-			rs: &appsv1beta2.ReplicaSet{
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectLabels:   true,
-			expectSelector: true,
-		},
-		{
-			rs: &appsv1beta2.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"bar": "foo",
-					},
-				},
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectLabels:   false,
-			expectSelector: true,
-		},
-		{
-			rs: &appsv1beta2.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"bar": "foo",
-					},
-				},
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"some": "other",
-						},
-					},
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectLabels:   false,
-			expectSelector: false,
-		},
-		{
-			rs: &appsv1beta2.ReplicaSet{
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"some": "other",
-						},
-					},
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-			expectLabels:   true,
-			expectSelector: false,
-		},
-	}
-
-	for _, test := range tests {
-		rs := test.rs
-		obj2 := roundTrip(t, runtime.Object(rs))
-		rs2, ok := obj2.(*appsv1beta2.ReplicaSet)
-		if !ok {
-			t.Errorf("unexpected object: %v", rs2)
-			t.FailNow()
-		}
-		if test.expectSelector != reflect.DeepEqual(rs2.Spec.Selector.MatchLabels, rs2.Spec.Template.Labels) {
-			if test.expectSelector {
-				t.Errorf("expected: %v, got: %v", rs2.Spec.Template.Labels, rs2.Spec.Selector)
-			} else {
-				t.Errorf("unexpected equality: %v", rs.Spec.Selector)
-			}
-		}
-		if test.expectLabels != reflect.DeepEqual(rs2.Labels, rs2.Spec.Template.Labels) {
-			if test.expectLabels {
-				t.Errorf("expected: %v, got: %v", rs2.Spec.Template.Labels, rs2.Labels)
-			} else {
-				t.Errorf("unexpected equality: %v", rs.Labels)
-			}
-		}
 	}
 }
 
