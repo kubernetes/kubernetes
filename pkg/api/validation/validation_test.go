@@ -5060,7 +5060,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid opaque integer resource requirement: request must be <= limit": {
-			expectedError: "must be greater than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
+			expectedError: "must be less than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
 			spec: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{
