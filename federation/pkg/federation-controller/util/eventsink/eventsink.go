@@ -72,12 +72,7 @@ func init() {
 }
 
 func (fes *FederatedEventSink) Create(event *v1.Event) (*v1.Event, error) {
-	kubeEvent := &v1.Event{}
-	if err := scheme.Convert(event, kubeEvent, nil); err != nil {
-		return nil, err
-	}
-
-	ret, err := fes.clientset.Core().Events(kubeEvent.Namespace).Create(kubeEvent)
+	ret, err := fes.clientset.Core().Events(event.Namespace).Create(event)
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +85,7 @@ func (fes *FederatedEventSink) Create(event *v1.Event) (*v1.Event, error) {
 }
 
 func (fes *FederatedEventSink) Update(event *v1.Event) (*v1.Event, error) {
-	kubeEvent := &v1.Event{}
-	if err := scheme.Convert(event, kubeEvent, nil); err != nil {
-		return nil, err
-	}
-
-	ret, err := fes.clientset.Core().Events(kubeEvent.Namespace).Update(kubeEvent)
+	ret, err := fes.clientset.Core().Events(event.Namespace).Update(event)
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +98,7 @@ func (fes *FederatedEventSink) Update(event *v1.Event) (*v1.Event, error) {
 }
 
 func (fes *FederatedEventSink) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
-	kubeEvent := &v1.Event{}
-	if err := scheme.Convert(event, kubeEvent, nil); err != nil {
-		return nil, err
-	}
-
-	ret, err := fes.clientset.Core().Events(kubeEvent.Namespace).Patch(kubeEvent.Name, types.StrategicMergePatchType, data)
+	ret, err := fes.clientset.Core().Events(event.Namespace).Patch(event.Name, types.StrategicMergePatchType, data)
 	if err != nil {
 		return nil, err
 	}
