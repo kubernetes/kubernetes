@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -40,11 +41,34 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	if !strings.HasPrefix(target, "c:") && !strings.HasPrefix(target, "C:") {
 		target = "c:" + target
 	}
-
-	err := os.MkdirAll(target, 0755)
+	parentDir := filepath.Dir(target)
+	err := os.MkdirAll(parentDir, 0755)
 	if err != nil {
-		glog.Infof("mkdir(%q) failed: %v\n", target, err)
+		glog.Infof("mkdir(%q) failed: %v\n", parentDir, err)
 		return err
+	}
+
+	if len(options) != 1 {
+		glog.Warningf("azureMount: mount options(%q) command(%n) not equal to 1, skip mounting.\n", options, len(options))
+		return nil
+	}
+	cmd := options[0]
+
+	driverLetter, err := getAvailabeDriverLetter()
+	if err != nil {
+		return err
+	}
+	driverPath := driverLetter + ":"
+	cmd += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", driverPath, source)
+
+	_, err = exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
+	}
+
+	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("mklink failed: %v", err)
 	}
 
 	return nil
@@ -94,4 +118,14 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, nil
+}
+
+func getAvailabeDriverLetter() (string, error) {
+	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
+	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil || len(output) == 0 {
+		return "", fmt.Errorf("getAvailabeDriverLetter failed: %v", err)
+	}
+	return string(output)[:1], nil
 }
