@@ -48,43 +48,43 @@ images:
     machine: n1-standard-1
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
-  cosstable-resource1:
+  cosstable2-resource1:
     image: cos-stable-59-9460-64-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
-  cosstable-resource2:
+  cosstable2-resource2:
     image: cos-stable-59-9460-64-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
-  cosstable-resource3:
+  cosstable2-resource3:
     image: cos-stable-59-9460-64-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
-  cosbeta-resource1:
-    image: cos-beta-60-9592-70-0
+  cosstable1-resource1:
+    image: cos-stable-60-9592-76-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
-  cosbeta-resource2:
-    image: cos-beta-60-9592-70-0
+  cosstable1-resource2:
+    image: cos-stable-60-9592-76-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
     tests:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
-  cosbeta-resource3:
-    image: cos-beta-60-9592-70-0
+  cosstable1-resource3:
+    image: cos-stable-60-9592-76-0
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
@@ -109,6 +109,27 @@ images:
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
+    tests:
+      - 'resource tracking for 105 pods per node \[Benchmark\]'
+  cos-docker112-resource1:
+    image: cos-stable-60-9592-76-0
+    project: cos-cloud
+    machine: n1-standard-1
+    metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
+    tests:
+      - 'resource tracking for 0 pods per node \[Benchmark\]'
+  cos-docker112-resource2:
+    image: cos-stable-60-9592-76-0
+    project: cos-cloud
+    machine: n1-standard-1
+    metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
+    tests:
+      - 'resource tracking for 35 pods per node \[Benchmark\]'
+  cos-docker112-resource3:
+    image: cos-stable-60-9592-76-0
+    project: cos-cloud
+    machine: n1-standard-1
+    metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
     tests:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   coreosalpha-resource1:
