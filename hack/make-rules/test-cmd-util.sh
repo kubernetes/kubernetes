@@ -1062,7 +1062,7 @@ run_kubectl_apply_deployments_tests() {
   kube::test::get_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # apply base deployment
-  kubectl apply -f hack/testdata/null-propagation/deployment.yaml "${kube_flags[@]}"
+  kubectl apply -f hack/testdata/null-propagation/deployment-l1.yaml "${kube_flags[@]}"
   # check right deployment exists
   kube::test::get_object_assert 'deployments my-depl' "{{${id_field}}}" 'my-depl'
   # check right labels exists
@@ -1070,8 +1070,18 @@ run_kubectl_apply_deployments_tests() {
   kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" 'l1'
   kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" 'l1'
 
+  # apply new deployment with new template labels
+  kubectl apply -f hack/testdata/null-propagation/deployment-l2.yaml "${kube_flags[@]}"
+  # check right labels exists
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l1}}" '<no value>'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.template.metadata.labels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.spec.selector.matchLabels.l2}}" 'l2'
+  kube::test::get_object_assert 'deployments my-depl' "{{.metadata.labels.l2}}" 'l2'
+
   # cleanup
-  # safer to explicitly remove replicasets and pods although we didn't change the deployment selector and orphan things
+  # need to explicitly remove replicasets and pods because we changed the deployment selector and orphaned things
   kubectl delete deployments,rs,pods --all --cascade=false --grace-period=0
   # Post-Condition: no Deployments, ReplicaSets, Pods exist
   kube::test::wait_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
