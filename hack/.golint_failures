@@ -235,6 +235,7 @@ pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/cri/v1alpha1/runtime
+pkg/kubelet/apis/device-plugin/v1alpha1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
 pkg/kubelet/certificate

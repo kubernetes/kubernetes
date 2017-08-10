@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -105,6 +106,8 @@ type kubeGenericRuntimeManager struct {
 
 	// The version cache of runtime daemon.
 	versionCache *cache.ObjectCache
+
+	containerManager cm.ContainerManager
 }
 
 type KubeGenericRuntime interface {
@@ -130,6 +133,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	containerManager cm.ContainerManager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -142,6 +146,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
 		imageService:        newInstrumentedImageManagerService(imageService),
 		keyring:             credentialprovider.NewDockerKeyring(),
+		containerManager:    containerManager,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
