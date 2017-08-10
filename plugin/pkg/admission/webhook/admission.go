@@ -21,6 +21,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -106,6 +108,7 @@ type GenericAdmissionWebhook struct {
 	negotiatedSerializer runtime.NegotiatedSerializer
 	clientCert           []byte
 	clientKey            []byte
+	proxyTransport       *http.Transport
 }
 
 var (
@@ -113,6 +116,10 @@ var (
 	_ = admissioninit.WantsClientCert(&GenericAdmissionWebhook{})
 	_ = admissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
 )
+
+func (a *GenericAdmissionWebhook) SetProxyTransport(pt *http.Transport) {
+	a.proxyTransport = pt
+}
 
 func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceResolver) {
 	a.serviceResolver = sr
@@ -242,20 +249,27 @@ func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) 
 		return nil, err
 	}
 
+	var dial func(network, addr string) (net.Conn, error)
+	if a.proxyTransport != nil && a.proxyTransport.Dial != nil {
+		dial = a.proxyTransport.Dial
+	}
+
 	// TODO: cache these instead of constructing one each time
 	cfg := &rest.Config{
 		Host:    u.Host,
 		APIPath: u.Path,
 		TLSClientConfig: rest.TLSClientConfig{
-			CAData:   h.ClientConfig.CABundle,
-			CertData: a.clientCert,
-			KeyData:  a.clientKey,
+			ServerName: h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc",
+			CAData:     h.ClientConfig.CABundle,
+			CertData:   a.clientCert,
+			KeyData:    a.clientKey,
 		},
 		UserAgent: "kube-apiserver-admission",
 		Timeout:   30 * time.Second,
 		ContentConfig: rest.ContentConfig{
 			NegotiatedSerializer: a.negotiatedSerializer,
 		},
+		Dial: dial,
 	}
 	return rest.UnversionedRESTClientFor(cfg)
 }
