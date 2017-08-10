@@ -747,3 +747,8 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	vclib.RecordvSphereMetric(vclib.OperationDeleteVolume, requestTime, err)
 	return err
 }
+
+// HasClusterID returns true if the cluster has a clusterID
+func (vs *VSphere) HasClusterID() bool {
+	return true
+}
