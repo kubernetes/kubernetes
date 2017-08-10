@@ -10,25 +10,25 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["clusterroles_test.go"],
+    srcs = ["token_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
-    ],
+    deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["clusterroles.go"],
+    srcs = [
+        "tlsbootstrap.go",
+        "token.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
+        "//cmd/kubeadm/app/util/token:go_default_library",
+        "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//pkg/bootstrap/api:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
