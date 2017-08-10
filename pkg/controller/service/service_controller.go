@@ -261,16 +261,11 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	var err error
 
 	if !wantsLoadBalancer(service) {
-		needDelete := true
 		_, exists, err := s.balancer.GetLoadBalancer(s.clusterName, service)
 		if err != nil {
 			return fmt.Errorf("Error getting LB for service %s: %v", key, err), retryable
 		}
-		if !exists {
-			needDelete = false
-		}
-
-		if needDelete {
+		if exists {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(s.clusterName, service); err != nil {
