@@ -2807,6 +2807,52 @@ func TestValidatePorts(t *testing.T) {
 	}
 }
 
+func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
+	testCases := []api.EnvVar{
+		{
+			Name: "ephemeral-storage-limits",
+			ValueFrom: &api.EnvVarSource{
+				ResourceFieldRef: &api.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "limits.ephemeral-storage",
+				},
+			},
+		},
+		{
+			Name: "ephemeral-storage-requests",
+			ValueFrom: &api.EnvVarSource{
+				ResourceFieldRef: &api.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "requests.ephemeral-storage",
+				},
+			},
+		},
+	}
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, testCase := range testCases {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expected success, got: %v", errs)
+		}
+	}
+
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, testCase := range testCases {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %v", testCase.Name)
+		}
+	}
+}
+
 func TestValidateEnv(t *testing.T) {
 	successCase := []api.EnvVar{
 		{Name: "abc", Value: "value"},
