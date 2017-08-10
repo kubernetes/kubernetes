@@ -4839,6 +4839,7 @@ func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *v1.ServiceSpec, out *api.
 	out.ExternalName = in.ExternalName
 	out.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
+	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	return nil
 }
 
@@ -4859,6 +4860,7 @@ func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *v1.
 	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
 	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
+	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	return nil
 }
 
