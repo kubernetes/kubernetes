@@ -45,6 +45,10 @@ import (
 	"github.com/golang/glog"
 )
 
+const (
+	MatchInterPodAffinity = "MatchInterPodAffinity"
+)
+
 // NodeInfo: Other types for predicate functions...
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)

@@ -67,8 +67,8 @@ type SortableList struct {
 	CompFunc LessFunc
 }
 
-// LessFunc is a function that receives two Pods and returns true if the first
-// pod should be placed before pod2 when the list is sorted.
+// LessFunc is a function that receives two items and returns true if the first
+// item should be placed before the second one when the list is sorted.
 type LessFunc func(item1, item2 interface{}) bool
 
 var _ = sort.Interface(&SortableList{})
@@ -87,4 +87,11 @@ func (l *SortableList) Swap(i, j int) {
 // before Item2 when CompFunc(Item1, Item2) returns true.
 func (l *SortableList) Sort() {
 	sort.Sort(l)
+}
+
+// HigherPriorityPod return true when priority of the first pod is higher than
+// the second one. It takes arguments of the type "interface{}" to be used with
+// SortableList, but expects those arguments to be *v1.Pod.
+func HigherPriorityPod(pod1, pod2 interface{}) bool {
+	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
 }

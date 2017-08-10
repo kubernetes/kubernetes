@@ -40,8 +40,8 @@ type matchingPodAntiAffinityTerm struct {
 	node *v1.Node
 }
 
-// NOTE: When new fields are added/removed or logic is changed, please make sure
-// that RemovePod and AddPod functions are updated to work with the new changes.
+// NOTE: When new fields are added/removed or logic is changed, please make sure that
+// RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
 type predicateMetadata struct {
 	pod           *v1.Pod
 	podBestEffort bool
@@ -172,13 +172,17 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 		podRequest:           meta.podRequest,
 		serviceAffinityInUse: meta.serviceAffinityInUse,
 	}
+	newPredMeta.podPorts = map[int]bool{}
 	for k, v := range meta.podPorts {
 		newPredMeta.podPorts[k] = v
 	}
+	newPredMeta.matchingAntiAffinityTerms = map[string][]matchingPodAntiAffinityTerm{}
 	for k, v := range meta.matchingAntiAffinityTerms {
 		newPredMeta.matchingAntiAffinityTerms[k] = append([]matchingPodAntiAffinityTerm(nil), v...)
 	}
-	newPredMeta.serviceAffinityMatchingPodServices = append([]*v1.Service(nil), meta.serviceAffinityMatchingPodServices...)
-	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil), meta.serviceAffinityMatchingPodList...)
+	newPredMeta.serviceAffinityMatchingPodServices = append([]*v1.Service(nil),
+		meta.serviceAffinityMatchingPodServices...)
+	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil),
+		meta.serviceAffinityMatchingPodList...)
 	return (algorithm.PredicateMetadata)(newPredMeta)
 }

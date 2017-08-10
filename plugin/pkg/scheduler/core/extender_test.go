@@ -183,6 +183,8 @@ func (f *FakeExtender) IsBinder() bool {
 	return true
 }
 
+var _ algorithm.SchedulerExtender = &FakeExtender{}
+
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
 		name                 string

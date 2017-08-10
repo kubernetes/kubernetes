@@ -52,6 +52,7 @@ type pausePodConfig struct {
 	NodeName                          string
 	Ports                             []v1.ContainerPort
 	OwnerReferences                   []metav1.OwnerReference
+	PriorityClassName                 string
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -555,8 +556,9 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Ports: conf.Ports,
 				},
 			},
-			Tolerations: conf.Tolerations,
-			NodeName:    conf.NodeName,
+			Tolerations:       conf.Tolerations,
+			NodeName:          conf.NodeName,
+			PriorityClassName: conf.PriorityClassName,
 		},
 	}
 	if conf.Resources != nil {

@@ -320,7 +320,7 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	n.generation++
 }
 
-// RemovePod subtracts pod information to this NodeInfo.
+// RemovePod subtracts pod information from this NodeInfo.
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	k1, err := getPodKey(pod)
 	if err != nil {
