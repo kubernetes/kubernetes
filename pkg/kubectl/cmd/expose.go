@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -72,8 +73,16 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
+type ExposeServiceOptions struct {
+	*resource.FilenameOptions
+
+	PrintOpts printers.PrintOptions
+}
+
 func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	options := &ExposeServiceOptions{
+		FilenameOptions: &resource.FilenameOptions{},
+	}
 
 	validArgs, argAliases := []string{}, []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
@@ -88,8 +97,8 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    exposeLong,
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExpose(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(f, cmd, out))
+			cmdutil.CheckErr(options.RunExpose(f, out, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
@@ -112,14 +121,19 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
 
 	usage := "identifying the resource to expose a service"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
-func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+	return nil
+}
+
+func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -129,7 +143,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -254,7 +268,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, false, mapper, object, out)
+				return f.PrintObject(o.PrintOpts, false, mapper, object, out)
 			}
 			f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "exposed")
 			return nil
@@ -270,7 +284,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(o.PrintOpts, false, mapper, object, out)
 		}
 
 		f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "exposed")

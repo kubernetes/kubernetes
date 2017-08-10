@@ -59,6 +59,8 @@ type AnnotateOptions struct {
 	newAnnotations    map[string]string
 	removeAnnotations []string
 
+	PrintOpts printers.PrintOptions
+
 	// Common share fields
 	out io.Writer
 }
@@ -158,6 +160,8 @@ func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []str
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
+
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
@@ -290,7 +294,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 		}
 		if len(o.outputFormat) > 0 {
-			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
+			return f.PrintObject(o.PrintOpts, o.local, mapper, outputObj, o.out)
 		}
 		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil

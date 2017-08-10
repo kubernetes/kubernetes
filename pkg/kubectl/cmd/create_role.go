@@ -31,6 +31,7 @@ import (
 	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -113,6 +114,7 @@ type CreateRoleOptions struct {
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
 	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	PrintOpts    printers.PrintOptions
 }
 
 // Role is a command to ease creating Roles.
@@ -148,6 +150,8 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return err
 	}
 	c.Name = name
+
+	c.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
 	// Remove duplicate verbs.
 	verbs := []string{}
@@ -205,7 +209,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	}
 
 	c.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, false, c.Mapper, obj, c.Out)
+		return f.PrintObject(c.PrintOpts, false, c.Mapper, obj, c.Out)
 	}
 
 	clientSet, err := f.ClientSet()

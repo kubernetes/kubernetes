@@ -312,5 +312,6 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 		return nil
 	}
 
-	return f.PrintObject(cmd, false, mapper, obj, out)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	return f.PrintObject(printOpts, false, mapper, obj, out)
 }

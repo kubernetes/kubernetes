@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/i18n"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -45,8 +46,16 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
 )
 
+type AutoscaleOptions struct {
+	*resource.FilenameOptions
+
+	PrintOpts printers.PrintOptions
+}
+
 func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	options := &AutoscaleOptions{
+		FilenameOptions: &resource.FilenameOptions{},
+	}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -57,8 +66,8 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    autoscaleLong,
 		Example: autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunAutoscale(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(f, cmd, out))
+			cmdutil.CheckErr(options.RunAutoscale(f, out, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
@@ -72,14 +81,19 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	usage := "identifying the resource to autoscale."
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, options.FilenameOptions, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 
-func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+	return nil
+}
+
+func (o *AutoscaleOptions) RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -94,7 +108,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -162,7 +176,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			object = hpa.Object
 		}
 		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(o.PrintOpts, false, mapper, object, out)
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
@@ -176,7 +190,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 		count++
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(o.PrintOpts, false, mapper, object, out)
 		}
 
 		f.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")

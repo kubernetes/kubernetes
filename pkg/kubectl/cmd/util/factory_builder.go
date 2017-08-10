@@ -23,8 +23,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -114,7 +112,7 @@ func (f *ring2Factory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, ou
 	}
 }
 
-func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *ring2Factory) PrintObject(printOpts printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	// try to get a typed object
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
@@ -138,7 +136,6 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 		return err
 	}
 
-	printOpts := ExtractCmdPrintOptions(cmd)
 	printer, err := f.DecoratedPrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err

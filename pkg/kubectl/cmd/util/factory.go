@@ -187,7 +187,7 @@ type ClientAccessFactory interface {
 
 	// EditorEnvs returns a group of environment variables that the edit command
 	// can range over in order to determine if the user has specified an editor
-	// of their choice.
+	// of their choice.PrintO
 	EditorEnvs() []string
 
 	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
@@ -245,8 +245,8 @@ type BuilderFactory interface {
 	// Returns a versioned printer if the resulting standard printer is generic.
 	// Returns an error if the given RESTMapping is nil or has an empty groupversion.
 	DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
-	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	// PrintObject prints an api object given a set of *printers.PrintOptions to modify the output format
+	PrintObject(printOpts printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations
 	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	// One stop shopping for a Builder

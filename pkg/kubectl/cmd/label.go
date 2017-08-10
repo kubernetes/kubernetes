@@ -61,6 +61,8 @@ type LabelOptions struct {
 	newLabels    map[string]string
 	removeLabels []string
 
+	PrintOpts printers.PrintOptions
+
 	// Common shared fields
 	out io.Writer
 }
@@ -155,6 +157,8 @@ func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string
 	o.selector = cmdutil.GetFlagString(cmd, "selector")
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
 	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
 	if err != nil {
@@ -292,7 +296,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 		}
 		if o.outputFormat != "" {
-			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
+			return f.PrintObject(o.PrintOpts, o.local, mapper, outputObj, o.out)
 		}
 		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)
 		return nil
