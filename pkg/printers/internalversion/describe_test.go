@@ -1213,19 +1213,21 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 
 	for _, test := range tests {
 		test.hpa.ObjectMeta = metav1.ObjectMeta{
-			Name:      "bar",
+			Name:      "some-rc",
 			Namespace: "foo",
 		}
 		fake := fake.NewSimpleClientset(&test.hpa)
 		desc := HorizontalPodAutoscalerDescriber{fake}
-		str, err := desc.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+		str, err := desc.Describe("foo", "some-rc", printers.DescriberSettings{ShowEvents: true})
 		if err != nil {
 			t.Errorf("Unexpected error for test %s: %v", test.name, err)
 		}
-		if str == "" {
-			t.Errorf("Unexpected empty string for test %s.  Expected HPA Describer output", test.name)
+		if !strings.Contains(str, "some-rc") ||
+			!strings.Contains(str, "foo") ||
+			!strings.Contains(str, "ReplicationController/some-rc") ||
+			!strings.Contains(str, "10") {
+			t.Errorf("unexpected out for %q: %s", test.name, str)
 		}
-		t.Logf("Description for %q:\n%s", test.name, str)
 	}
 }
 
