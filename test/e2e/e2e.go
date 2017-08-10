@@ -78,10 +78,19 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceCloud, err := gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
-			framework.TestContext.CloudConfig.ProjectID,
-			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
-			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
+			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
+			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
+			Region:             region,
+			Zone:               zone,
+			ManagedZones:       managedZones,
+			NetworkURL:         "",
+			SubnetworkURL:      "",
+			NodeTags:           nil,
+			NodeInstancePrefix: "",
+			TokenSource:        nil,
+			UseMetadataServer:  false})
+
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
