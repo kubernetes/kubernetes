@@ -16,7 +16,10 @@ limitations under the License.
 
 package transport
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // Config holds various options for establishing a transport.
 type Config struct {
@@ -36,6 +39,12 @@ type Config struct {
 
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
+
+	// ConnectionTimeout specifies the maximum interval transmitted data may
+	// remain unacknowledged (at the TCP layer) before the peer is considered
+	// dead and the connection is forcefully closed. A timeout <= 0 indicates
+	// no timeout.
+	ConnectionTimeout time.Duration
 
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use

@@ -110,6 +110,9 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// The maximum interval data may remain unacknowledged by an apiserver before the connection is considered dead and is forcefully closed.
+	ConnectionTimeout time.Duration
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
@@ -406,12 +409,13 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAFile:     config.TLSClientConfig.CAFile,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		RateLimiter:   config.RateLimiter,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
+		RateLimiter:       config.RateLimiter,
+		UserAgent:         config.UserAgent,
+		Transport:         config.Transport,
+		WrapTransport:     config.WrapTransport,
+		QPS:               config.QPS,
+		Burst:             config.Burst,
+		Timeout:           config.Timeout,
+		ConnectionTimeout: config.ConnectionTimeout,
 	}
 }
