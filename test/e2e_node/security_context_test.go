@@ -433,4 +433,65 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
+	Context("When creating a pod with privileged", func() {
+		makeUserPod := func(podName, image string, command []string, privileged bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+							SecurityContext: &v1.SecurityContext{
+								Privileged: &privileged,
+							},
+						},
+					},
+				},
+			}
+		}
+		createAndWaitUserPod := func(privileged bool) string {
+			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
+			podClient.Create(makeUserPod(podName,
+				"gcr.io/google_containers/busybox:1.24",
+				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
+				privileged,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+
+			return podName
+		}
+
+		It("should run the container as privileged when true", func() {
+			podName := createAndWaitUserPod(true)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+			}
+
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			if strings.Contains(logs, "Operation not permitted") {
+				framework.Failf("privileged container should be able to create dummy device")
+			}
+		})
+
+		It("should run the container as unprivileged when false", func() {
+			podName := createAndWaitUserPod(false)
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+			}
+
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			if !strings.Contains(logs, "Operation not permitted") {
+				framework.Failf("unprivileged container shouldn't be able to create dummy device")
+			}
+		})
+	})
+
 })
