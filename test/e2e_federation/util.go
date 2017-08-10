@@ -144,7 +144,7 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 	return clientset.CoreV1().Services(namespace).Create(service)
 }
 
-func createLBService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
+func createLBService(clientset *fedclientset.Clientset, namespace, name string, clusters fedframework.ClusterSlice) (*v1.Service, error) {
 	if clientset == nil || len(namespace) == 0 {
 		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
 	}
@@ -152,10 +152,53 @@ func createLBService(clientset *fedclientset.Clientset, namespace, name string) 
 
 	// Tests can be run in parallel, so we need a different nodePort for
 	// each test.
-	// We add 1 to FederatedSvcNodePortLast because IntnRange's range end
-	// is not inclusive.
-	nodePort := int32(rand.IntnRange(FederatedSvcNodePortFirst, FederatedSvcNodePortLast+1))
+	// we add in a array all the "available" ports
+	availablePorts := make([]int32, FederatedSvcNodePortLast-FederatedSvcNodePortFirst)
+	for i := range availablePorts {
+		availablePorts[i] = int32(FederatedSvcNodePortFirst + i)
+	}
 
+	var err error
+	var service *v1.Service
+	retry := 10 // the function should retry the service creation on different port only 10 time.
+
+	// until the availablePort list is not empty, lets try to create the service
+	for len(availablePorts) > 0 && retry > 0 {
+		// select the Id of an available port
+		i := rand.Intn(len(availablePorts))
+
+		By(fmt.Sprintf("try creating federated service %q in namespace %q with nodePort %d", name, namespace, availablePorts[i]))
+
+		service, err = createServiceWithNodePort(clientset, namespace, name, availablePorts[i])
+		if err == nil {
+			// check if service have been created properly in all clusters.
+			// if the service is not present in one of the clusters, we should cleanup all services
+			if err = checkServicesCreation(namespace, name, clusters); err == nil {
+				// everything was created properly so returns the federated service.
+				return service, nil
+			}
+		}
+
+		// in case of error, cleanup everything
+		if service != nil {
+			if err = deleteService(clientset, namespace, name, nil); err != nil {
+				framework.ExpectNoError(err, "Deleting service %q after a partial createService() error", service.Name)
+				return nil, err
+			}
+
+			cleanupServiceShardsAndProviderResources(namespace, service, clusters)
+		}
+
+		// creation failed, lets try with another port
+		// first remove from the availablePorts the port with which the creation failed
+		availablePorts = append(availablePorts[:i], availablePorts[i+1:]...)
+		retry--
+	}
+
+	return nil, err
+}
+
+func createServiceWithNodePort(clientset *fedclientset.Clientset, namespace, name string, nodePort int32) (*v1.Service, error) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -181,6 +224,33 @@ func createLBService(clientset *fedclientset.Clientset, namespace, name string) 
 	return clientset.CoreV1().Services(namespace).Create(service)
 }
 
+// checkServicesCreation checks if the service have been created successfuly in all the clusters.
+// if the service is not present in at least one of the clusters, this function returns an error.
+func checkServicesCreation(namespace, serviceName string, clusters fedframework.ClusterSlice) error {
+	framework.Logf("check if service %q have been created in %d clusters", serviceName, len(clusters))
+	for _, cluster := range clusters {
+		name := cluster.Name
+		err := wait.PollImmediate(framework.Poll, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
+			var err error
+			_, err = cluster.Clientset.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				// Get failed with an error, try again.
+				framework.Logf("Failed to find service %q in namespace %q, in cluster %q: %v. Trying again in %s", serviceName, namespace, name, err, framework.Poll)
+				return false, err
+			} else if errors.IsNotFound(err) {
+				framework.Logf("Service %q in namespace %q in cluster %q not found. Trying again in %s", serviceName, namespace, name, framework.Poll)
+				return false, nil
+			}
+			By(fmt.Sprintf("Service %q in namespace %q in cluster %q found", serviceName, namespace, name))
+			return true, nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
 	service, err := createService(clientset, namespace, name)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
@@ -188,8 +258,8 @@ func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name stri
 	return service
 }
 
-func createLBServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
-	service, err := createLBService(clientset, namespace, name)
+func createLBServiceOrFail(clientset *fedclientset.Clientset, namespace, name string, clusters fedframework.ClusterSlice) *v1.Service {
+	service, err := createLBService(clientset, namespace, name, clusters)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated service (type: load balancer) %q in namespace %q", name, namespace))
 	return service
@@ -200,8 +270,18 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
 	framework.Logf("Deleting service %q in namespace %v", serviceName, namespace)
+
+	err := deleteService(clientset, namespace, serviceName, orphanDependents)
+	if err != nil {
+		framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	}
+}
+
+func deleteService(clientset *fedclientset.Clientset, namespace string, serviceName string, orphanDependents *bool) error {
 	err := clientset.CoreV1().Services(namespace).Delete(serviceName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
-	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
+	if err != nil {
+		return err
+	}
 	// Wait for the service to be deleted.
 	err = wait.Poll(5*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
 		_, err := clientset.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
@@ -210,10 +290,7 @@ func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, se
 		}
 		return false, err
 	})
-	if err != nil {
-		framework.DescribeSvc(namespace)
-		framework.Failf("Error in deleting service %s: %v", serviceName, err)
-	}
+	return err
 }
 
 func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Service, clusters fedframework.ClusterSlice) {

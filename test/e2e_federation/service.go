@@ -183,7 +183,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
-				service = createLBServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
+				service = createLBServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
 				obj, err := scheme.Scheme.DeepCopy(service)
 				// Cloning shouldn't fail. On the off-chance it does, we
 				// should shallow copy service to serviceShard before
