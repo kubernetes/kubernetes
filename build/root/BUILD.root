@@ -67,6 +67,7 @@ filegroup(
         "//test:all-srcs",
         "//third_party:all-srcs",
         "//vendor:all-srcs",
+        "//walk:all-srcs",
     ],
     tags = ["automanaged"],
 )

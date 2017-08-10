@@ -6,7 +6,10 @@ licenses(["notice"])
 
 openapi_library(
     name = "go_default_library",
-    srcs = ["doc.go"],
+    srcs = [
+        "doc.go",
+        "zz_generated.openapi.go",
+    ],
     openapi_targets = [
         "federation/apis/federation/v1beta1",
         "pkg/apis/abac/v0",
@@ -55,6 +58,13 @@ openapi_library(
         "k8s.io/kube-gen/test/apis/testgroup/v1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
         "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
+    ],
+    deps = [
+        "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
