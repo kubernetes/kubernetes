@@ -48,10 +48,10 @@ func NewPodInformer(client internalclientset.Interface, namespace string, resync
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().Pods(namespace).List(options)
+				return client.CoreV1().Pods(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().Pods(namespace).Watch(options)
+				return client.CoreV1().Pods(namespace).Watch(options)
 			},
 		},
 		&api.Pod{},

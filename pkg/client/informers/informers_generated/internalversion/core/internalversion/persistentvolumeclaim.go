@@ -48,10 +48,10 @@ func NewPersistentVolumeClaimInformer(client internalclientset.Interface, namesp
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().PersistentVolumeClaims(namespace).List(options)
+				return client.CoreV1().PersistentVolumeClaims(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().PersistentVolumeClaims(namespace).Watch(options)
+				return client.CoreV1().PersistentVolumeClaims(namespace).Watch(options)
 			},
 		},
 		&api.PersistentVolumeClaim{},

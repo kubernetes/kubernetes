@@ -48,10 +48,10 @@ func NewReplicationControllerInformer(client internalclientset.Interface, namesp
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ReplicationControllers(namespace).List(options)
+				return client.CoreV1().ReplicationControllers(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ReplicationControllers(namespace).Watch(options)
+				return client.CoreV1().ReplicationControllers(namespace).Watch(options)
 			},
 		},
 		&api.ReplicationController{},

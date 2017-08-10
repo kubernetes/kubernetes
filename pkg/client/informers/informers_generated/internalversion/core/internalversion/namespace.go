@@ -48,10 +48,10 @@ func NewNamespaceInformer(client internalclientset.Interface, resyncPeriod time.
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().Namespaces().List(options)
+				return client.CoreV1().Namespaces().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().Namespaces().Watch(options)
+				return client.CoreV1().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},

@@ -41,6 +41,8 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface
+	// CoreV1 retrieves the CoreV1Client
+	CoreV1() corev1internalversion.CoreV1Interface
 	Core() coreinternalversion.CoreInterface
 	Apps() appsinternalversion.AppsInterface
 	Authentication() authenticationinternalversion.AuthenticationInterface
@@ -81,6 +83,14 @@ type Clientset struct {
 // Admissionregistration retrieves the AdmissionregistrationClient
 func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
 	return c.admissionregistration
+}
+
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1internalversion.CoreV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.CoreV1Client
 }
 
 // Core retrieves the CoreClient

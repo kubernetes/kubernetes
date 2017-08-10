@@ -116,7 +116,7 @@ func getSecret(secretName string) (*api.Secret, error) {
 	}
 	var secret *api.Secret
 	err = wait.PollImmediate(1*time.Second, getSecretTimeout, func() (bool, error) {
-		secret, err = client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+		secret, err = client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 		if err == nil {
 			return true, nil
 		}

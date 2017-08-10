@@ -182,7 +182,7 @@ func CreateKubeconfigSecret(clientset client.Interface, kubeconfig *clientcmdapi
 	}
 
 	if !dryRun {
-		return clientset.Core().Secrets(namespace).Create(secret)
+		return clientset.CoreV1().Secrets(namespace).Create(secret)
 	}
 	return secret, nil
 }

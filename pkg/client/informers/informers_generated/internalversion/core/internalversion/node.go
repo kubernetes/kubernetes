@@ -48,10 +48,10 @@ func NewNodeInformer(client internalclientset.Interface, resyncPeriod time.Durat
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().Nodes().List(options)
+				return client.CoreV1().Nodes().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().Nodes().Watch(options)
+				return client.CoreV1().Nodes().Watch(options)
 			},
 		},
 		&api.Node{},

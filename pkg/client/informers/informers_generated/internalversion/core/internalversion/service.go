@@ -48,10 +48,10 @@ func NewServiceInformer(client internalclientset.Interface, namespace string, re
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().Services(namespace).List(options)
+				return client.CoreV1().Services(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().Services(namespace).Watch(options)
+				return client.CoreV1().Services(namespace).Watch(options)
 			},
 		},
 		&api.Service{},

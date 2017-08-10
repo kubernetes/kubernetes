@@ -48,10 +48,10 @@ func NewPodTemplateInformer(client internalclientset.Interface, namespace string
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().PodTemplates(namespace).List(options)
+				return client.CoreV1().PodTemplates(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().PodTemplates(namespace).Watch(options)
+				return client.CoreV1().PodTemplates(namespace).Watch(options)
 			},
 		},
 		&api.PodTemplate{},

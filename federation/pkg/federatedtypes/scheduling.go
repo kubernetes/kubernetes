@@ -111,7 +111,7 @@ func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string
 		if err != nil {
 			return nil, err
 		}
-		return clientset.Core().Pods(metadata.GetNamespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
+		return clientset.CoreV1().Pods(metadata.GetNamespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	}
 	currentReplicasPerCluster, estimatedCapacity, err := clustersReplicaState(clusterNames, key, objectGetter, podsGetter)
 	if err != nil {
