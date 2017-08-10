@@ -39,6 +39,8 @@ type ViewOptions struct {
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
+
+	Printer printers.ResourcePrinter
 }
 
 var (
@@ -53,12 +55,12 @@ var (
 
 		# Get the password for the e2e user
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
+
+	defaultOutputFormat = "yaml"
 )
 
 func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
-	// Default to yaml
-	defaultOutputFormat := "yaml"
 
 	cmd := &cobra.Command{
 		Use:     "view",
@@ -66,24 +68,9 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.Complete()
-			outputFormat := cmdutil.GetFlagString(cmd, "output")
-			if outputFormat == "wide" {
-				fmt.Fprintf(errOut, "--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
-				// TODO: once printing is abstracted, this should be handled at flag declaration time
-				cmd.Flags().Set("output", defaultOutputFormat)
-			}
-			if outputFormat == "" {
-				fmt.Fprintf(errOut, "Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
-				// TODO: once printing is abstracted, this should be handled at flag declaration time
-				cmd.Flags().Set("output", defaultOutputFormat)
-			}
-
-			printer, err := f.PrinterForCommand(cmd, false)
-			cmdutil.CheckErr(err)
-			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
-
-			cmdutil.CheckErr(options.Run(out, printer))
+			options.Complete(f, cmd, out, errOut)
+			cmdutil.CheckErr(options.Complete(f, cmd, out, errOut))
+			cmdutil.CheckErr(options.Run(out))
 		},
 	}
 
@@ -99,7 +86,7 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 	return cmd
 }
 
-func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error {
+func (o ViewOptions) Run(out io.Writer) error {
 	config, err := o.loadConfig()
 	if err != nil {
 		return err
@@ -119,7 +106,7 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 		clientcmdapi.ShortenConfig(config)
 	}
 
-	err = printer.PrintObj(config, out)
+	err = o.Printer.PrintObj(config, out)
 	if err != nil {
 		return err
 	}
@@ -127,14 +114,33 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 	return nil
 }
 
-func (o *ViewOptions) Complete() bool {
+func (o *ViewOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
 	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
 			o.Merge.Set("false")
 		}
 	}
 
-	return true
+	outputFormat := cmdutil.GetFlagString(cmd, "output")
+	if outputFormat == "wide" {
+		fmt.Fprintf(errOut, "--output wide is not available in kubectl config view; reset to default output format (%s)\n\n", defaultOutputFormat)
+		// TODO: once printing is abstracted, this should be handled at flag declaration time
+		cmd.Flags().Set("output", defaultOutputFormat)
+	}
+	if outputFormat == "" {
+		fmt.Fprintf(errOut, "Reset to default output format (%s) as --output is empty\n", defaultOutputFormat)
+		// TODO: once printing is abstracted, this should be handled at flag declaration time
+		cmd.Flags().Set("output", defaultOutputFormat)
+	}
+
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	printer, err := f.PrinterWithOptions(printOpts, false)
+	if err != nil {
+		return err
+	}
+	o.Printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
+
+	return nil
 }
 
 func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {

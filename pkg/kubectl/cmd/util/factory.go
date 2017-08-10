@@ -241,16 +241,10 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
-	// could not be found.
-	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error)
-	// PrinterWithOptions returns the standard printer for the given set of options
+	// PrinterWithOptions returns the standard printer for the given set of options.
 	PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error)
 	// DecoratedPrinterWithOptions returns a printer suitable for displaying versioned resources.
-	// Returns a versioned printer if the resulting standard printer is generic, or attaches internal
-	// resource handlers if the printer is not generic and implements printers.TabularPrintHandler.
+	// Returns a versioned printer if the resulting standard printer is generic.
 	// Returns an error if the given RESTMapping is nil or has an empty groupversion.
 	DecoratedPrinterWithOptions(printOpts printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format

@@ -157,7 +157,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		cmd.Flags().Set("output", outputFormat)
 	}
 	o.encoder = f.JSONEncoder()
-	o.printer, err = f.PrinterForCommand(cmd, o.local)
+
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	o.printer, err = f.PrinterWithOptions(printOpts, o.local)
 	return err
 }
 

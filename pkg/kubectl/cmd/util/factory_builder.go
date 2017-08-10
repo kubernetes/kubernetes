@@ -48,11 +48,6 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error) {
-	options := ExtractCmdPrintOptions(cmd)
-	return f.PrinterWithOptions(options, isLocal)
-}
-
 func (f *ring2Factory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
@@ -152,17 +147,12 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 }
 
 func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false)
+	printOpts := ExtractCmdPrintOptions(cmd)
+	printer, err := f.PrinterWithOptions(printOpts, false)
 	if err != nil {
 		return err
 	}
-	if !printer.IsGeneric() {
-		printOpts := ExtractCmdPrintOptions(cmd)
-		printer, err = f.DecoratedPrinterWithOptions(printOpts, false, nil)
-		if err != nil {
-			return err
-		}
-	}
+
 	return printer.PrintObj(info.Object, out)
 }
 

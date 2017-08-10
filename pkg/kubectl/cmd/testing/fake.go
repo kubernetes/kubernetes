@@ -350,10 +350,6 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
 func (f *FakeFactory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
@@ -363,7 +359,8 @@ func (f *FakeFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOption
 }
 
 func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	printer, err := f.PrinterWithOptions(printOpts, false)
 	if err != nil {
 		return err
 	}
@@ -686,10 +683,6 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
 func (f *fakeAPIFactory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
@@ -699,7 +692,8 @@ func (f *fakeAPIFactory) DecoratedPrinterWithOptions(printOpts printers.PrintOpt
 }
 
 func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	printer, err := f.PrinterWithOptions(printOpts, false)
 	if err != nil {
 		return err
 	}
