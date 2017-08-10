@@ -68,6 +68,8 @@ type Config struct {
 	Location string `json:"location" yaml:"location"`
 	// The name of the VNet that the cluster is deployed in
 	VnetName string `json:"vnetName" yaml:"vnetName"`
+	// The name of the resource group that the Vnet is deployed in
+	VnetResourceGroup string `json:"vnetResourceGroup" yaml:"vnetResourceGroup"`
 	// The name of the subnet that the cluster is deployed in
 	SubnetName string `json:"subnetName" yaml:"subnetName"`
 	// The name of the security group attached to the cluster's subnet
