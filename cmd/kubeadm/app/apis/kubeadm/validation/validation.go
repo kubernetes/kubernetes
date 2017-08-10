@@ -137,6 +137,17 @@ func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) f
 	if len(cfg.DiscoveryTokenAPIServers) < 1 && len(cfg.DiscoveryToken) != 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "DiscoveryTokenAPIServers not set"))
 	}
+
+	if len(cfg.DiscoveryFile) != 0 && len(cfg.DiscoveryTokenCACertHashes) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "DiscoveryTokenCACertHashes cannot be used with DiscoveryFile"))
+	}
+
+	// TODO: convert this warning to an error after v1.8
+	if len(cfg.DiscoveryFile) == 0 && len(cfg.DiscoveryTokenCACertHashes) == 0 && !cfg.DiscoveryTokenUnsafeSkipCAVerification {
+		fmt.Println("[validation] WARNING: using token-based discovery without DiscoveryTokenCACertHashes can be unsafe (see https://kubernetes.io/docs/admin/kubeadm/#kubeadm-join).")
+		fmt.Println("[validation] WARNING: Pass --discovery-token-unsafe-skip-ca-verification to disable this warning. This warning will become an error in Kubernetes 1.9.")
+	}
+
 	// TODO remove once we support multiple api servers
 	if len(cfg.DiscoveryTokenAPIServers) > 1 {
 		fmt.Println("[validation] WARNING: kubeadm doesn't fully support multiple API Servers yet")

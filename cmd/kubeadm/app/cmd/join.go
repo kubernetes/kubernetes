@@ -77,6 +77,21 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		the discovery information is loaded from a URL, HTTPS must be used and
 		the host installed CA bundle is used to verify the connection.
 
+		If you use a shared token for discovery, you should also pass the
+		--discovery-token-ca-cert-hash flag to validate the public key of the
+		root certificate authority (CA) presented by the Kubernetes Master. The
+		value of this flag is specified as "<hash-type>:<hex-encoded-value>",
+		where the supported hash type is "sha256". The hash is calculated over
+		the bytes of the Subject Public Key Info (SPKI) object (as in RFC7469).
+		This value is available in the output of "kubeadm init" or can be
+		calcuated using standard tools. The --discovery-token-ca-cert-hash flag
+		may be repeated multiple times to allow more than one public key.
+
+		If you cannot know the CA public key hash ahead of time, you can pass
+		the --discovery-token-unsafe-skip-ca-verification flag to disable this
+		verification. This weakens the kubeadm security model since other nodes
+		can potentially impersonate the Kubernetes Master.
+
 		The TLS bootstrap mechanism is also driven via a shared token. This is
 		used to temporarily authenticate with the Kubernetes Master to submit a
 		certificate signing request (CSR) for a locally created key pair. By
@@ -117,6 +132,13 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
 		"A token used for TLS bootstrapping")
+	cmd.PersistentFlags().StringSliceVar(
+		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
+	cmd.PersistentFlags().BoolVar(
+		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
+
 	cmd.PersistentFlags().StringVar(
 		&cfg.Token, "token", "",
 		"Use this token for both discovery-token and tls-bootstrap-token")
