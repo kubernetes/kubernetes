@@ -106,26 +106,28 @@ func TestInitFederation(t *testing.T) {
 		dryRun                       string
 		apiserverArgOverrides        string
 		cmArgOverrides               string
+		controllerOptionalSecrets    map[string]string
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
 		isRBACAPIAvailable           bool
 	}{
 		{
-			federation:            "union",
-			kubeconfigGlobal:      fakeKubeFiles[0],
-			kubeconfigExplicit:    "",
-			dnsZoneName:           "example.test.",
-			lbIP:                  lbIP,
-			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
-			serverImage:           "example.test/foo:bar",
-			etcdPVCapacity:        "5Gi",
-			etcdPersistence:       "true",
-			expectedErr:           "",
-			dnsProvider:           util.FedDNSProviderCoreDNS,
-			dnsProviderConfig:     "dns-provider.conf",
-			dryRun:                "",
-			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
-			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+			federation:                "union",
+			kubeconfigGlobal:          fakeKubeFiles[0],
+			kubeconfigExplicit:        "",
+			dnsZoneName:               "example.test.",
+			lbIP:                      lbIP,
+			apiserverServiceType:      v1.ServiceTypeLoadBalancer,
+			serverImage:               "example.test/foo:bar",
+			etcdPVCapacity:            "5Gi",
+			etcdPersistence:           "true",
+			expectedErr:               "",
+			dnsProvider:               util.FedDNSProviderCoreDNS,
+			dnsProviderConfig:         "dns-provider.conf",
+			dryRun:                    "",
+			apiserverArgOverrides:     "--client-ca-file=override,--log-dir=override",
+			cmArgOverrides:            "--dns-provider=override,--log-dir=override",
+			controllerOptionalSecrets: map[string]string{"key1": "val1"},
 		},
 		{
 			federation:           "union",
@@ -246,7 +248,7 @@ func TestInitFederation(t *testing.T) {
 			tc.etcdImage = defaultEtcdImage
 		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.controllerOptionalSecrets)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -292,7 +294,9 @@ func TestInitFederation(t *testing.T) {
 		if tc.apiserverEnableTokenAuth {
 			cmd.Flags().Set("apiserver-enable-token-auth", "true")
 		}
-
+		for key, val := range tc.controllerOptionalSecrets {
+			cmd.Flags().Set("controller-secrets", fmt.Sprintf("%s=%s", key, val))
+		}
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -621,7 +625,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, controllerSecrets map[string]string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -1064,6 +1068,23 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				},
 			},
 		},
+	}
+	optional := true
+	for name, mountPath := range controllerSecrets {
+		cm.Spec.Template.Spec.Volumes = append(cm.Spec.Template.Spec.Volumes, v1.Volume{
+			Name: name,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: name,
+					Optional:   &optional,
+				},
+			},
+		})
+		cm.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			cm.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+				Name:      name,
+				MountPath: mountPath,
+				ReadOnly:  true})
 	}
 	if isRBACAPIAvailable {
 		cm.Spec.Template.Spec.ServiceAccountName = "federation-controller-manager"
