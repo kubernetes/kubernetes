@@ -340,7 +340,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(restMapper, discoveryClient, 30*time.Second, ctx.Stop)
+	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
 
 	return true, nil
 }

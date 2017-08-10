@@ -283,7 +283,8 @@ func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
 					Completions: &completions,
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							RestartPolicy: v1.RestartPolicyOnFailure,
+							RestartPolicy:                 v1.RestartPolicyOnFailure,
+							TerminationGracePeriodSeconds: &zero,
 							Containers: []v1.Container{
 								{
 									Name:    "c",
