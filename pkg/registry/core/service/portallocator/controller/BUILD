@@ -12,7 +12,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/retry:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
@@ -21,6 +20,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 

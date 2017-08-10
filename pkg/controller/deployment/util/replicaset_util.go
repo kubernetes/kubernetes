@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )

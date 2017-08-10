@@ -19,7 +19,6 @@ go_library(
         "uid_cache.go",
     ],
     deps = [
-        "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/garbagecollector/metaonly:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )

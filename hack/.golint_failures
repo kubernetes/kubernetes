@@ -150,7 +150,6 @@ pkg/capabilities
 pkg/client/chaosclient
 pkg/client/informers/informers_generated/internalversion/internalinterfaces
 pkg/client/leaderelectionconfig
-pkg/client/retry
 pkg/client/tests
 pkg/client/unversioned/testclient/simple
 pkg/cloudprovider
@@ -748,6 +747,7 @@ staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/integer
 staging/src/k8s.io/client-go/util/jsonpath
+staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1

@@ -59,7 +59,6 @@ filegroup(
         "//pkg/client/listers/settings/internalversion:all-srcs",
         "//pkg/client/listers/storage/internalversion:all-srcs",
         "//pkg/client/metrics:all-srcs",
-        "//pkg/client/retry:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/tests:all-srcs",
         "//pkg/client/unversioned:all-srcs",

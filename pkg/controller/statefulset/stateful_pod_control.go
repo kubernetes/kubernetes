@@ -30,7 +30,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/client-go/util/retry"
 )
 
 // StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,

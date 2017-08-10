@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/client/retry:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/apps:go_default_library",
@@ -47,6 +46,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 
