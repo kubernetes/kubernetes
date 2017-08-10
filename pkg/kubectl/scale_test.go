@@ -257,7 +257,7 @@ func TestValidateReplicationController(t *testing.T) {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
 		if err == nil && test.expectError {
-			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
+			t.Errorf("expected an error: %v (%s)", err, test.test)
 		}
 	}
 }
@@ -520,7 +520,7 @@ func TestValidateJob(t *testing.T) {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
 		if err == nil && test.expectError {
-			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
+			t.Errorf("expected an error: %v (%s)", err, test.test)
 		}
 	}
 }
@@ -781,7 +781,7 @@ func TestValidateDeployment(t *testing.T) {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
 		if err == nil && test.expectError {
-			t.Errorf("unexpected non-error: %v (%s)", err, test.test)
+			t.Errorf("expected an error: %v (%s)", err, test.test)
 		}
 	}
 }
