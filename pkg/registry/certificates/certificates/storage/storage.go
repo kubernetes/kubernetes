@@ -45,6 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 		CreateStrategy: csrregistry.Strategy,
 		UpdateStrategy: csrregistry.Strategy,
 		DeleteStrategy: csrregistry.Strategy,
+		ExportStrategy: csrregistry.Strategy,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
