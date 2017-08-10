@@ -521,7 +521,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner role
-			framework.BindClusterRole(c.Rbac(), "system:persistent-volume-provisioner", ns,
+			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
 
 			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),

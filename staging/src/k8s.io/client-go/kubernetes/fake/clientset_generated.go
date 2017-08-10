@@ -54,6 +54,8 @@ import (
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	fakerbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1/fake"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
@@ -237,13 +239,18 @@ func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
 	return &fakepolicyv1beta1.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
-// RbacV1beta1 retrieves the RbacV1beta1Client
-func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	return &fakerbacv1beta1.FakeRbacV1beta1{Fake: &c.Fake}
+// RbacV1 retrieves the RbacV1Client
+func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
+	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
 }
 
-// Rbac retrieves the RbacV1beta1Client
-func (c *Clientset) Rbac() rbacv1beta1.RbacV1beta1Interface {
+// Rbac retrieves the RbacV1Client
+func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
+	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
+}
+
+// RbacV1beta1 retrieves the RbacV1beta1Client
+func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
 	return &fakerbacv1beta1.FakeRbacV1beta1{Fake: &c.Fake}
 }
 
