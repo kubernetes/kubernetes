@@ -19,6 +19,7 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
@@ -60,6 +61,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 
 	printColumnNames(w, NodeColumns)
 	var usage api.ResourceList
+	sort.Sort(nodeMetricsByName(metrics))
 	for _, m := range metrics {
 		err := api.Scheme.Convert(&m.Usage, &usage, nil)
 		if err != nil {
@@ -88,6 +90,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		printValue(w, PodColumn)
 	}
 	printColumnNames(w, PodColumns)
+	sort.Sort(podMetricsByName(metrics))
 	for _, m := range metrics {
 		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
 		if err != nil {
@@ -183,3 +186,15 @@ func printSingleResourceUsage(out io.Writer, resourceType api.ResourceName, quan
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
 }
+
+type podMetricsByName []metricsapi.PodMetrics
+
+func (b podMetricsByName) Len() int           { return len(b) }
+func (b podMetricsByName) Less(i, j int) bool { return b[i].Name < b[j].Name }
+func (b podMetricsByName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+
+type nodeMetricsByName []metricsapi.NodeMetrics
+
+func (b nodeMetricsByName) Len() int           { return len(b) }
+func (b nodeMetricsByName) Less(i, j int) bool { return b[i].Name < b[j].Name }
+func (b nodeMetricsByName) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
