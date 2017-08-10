@@ -42,13 +42,13 @@ func TestViewCluster(t *testing.T) {
 			"my-cluster": {Server: "https://192.168.0.1:3434"},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":  {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluser": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
+			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
+			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":  {Token: "minikube-token"},
-			"my-cluser": {Token: "minikube-token"},
+			"minikube":   {Token: "minikube-token"},
+			"my-cluster": {Token: "minikube-token"},
 		},
 	}
 	test := viewClusterTest{
@@ -71,7 +71,7 @@ contexts:
 - context:
     cluster: my-cluster
     user: mu-cluster
-  name: my-cluser
+  name: my-cluster
 current-context: minikube
 kind: Config
 preferences: {}
@@ -79,7 +79,7 @@ users:
 - name: minikube
   user:
     token: minikube-token
-- name: my-cluser
+- name: my-cluster
   user:
     token: minikube-token` + "\n"}
 	test.run(t)
@@ -94,13 +94,13 @@ func TestViewClusterMinify(t *testing.T) {
 			"my-cluster": {Server: "https://192.168.0.1:3434"},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":  {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluser": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
+			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
+			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
 		},
 		CurrentContext: "minikube",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"minikube":  {Token: "minikube-token"},
-			"my-cluser": {Token: "minikube-token"},
+			"minikube":   {Token: "minikube-token"},
+			"my-cluster": {Token: "minikube-token"},
 		},
 	}
 	test := viewClusterTest{

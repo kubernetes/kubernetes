@@ -22,6 +22,7 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -114,6 +115,56 @@ func (test createClusterTest) run(t *testing.T) {
 		}
 		if cluster.Server != test.expectedConfig.Clusters[test.args[0]].Server {
 			t.Errorf("Fail in %q\n expected cluster server %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].Server, cluster.Server)
+		}
+	}
+}
+
+func TestValidate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		cco         createClusterOptions
+		expectedErr string
+	}{
+		{
+			name: "Test for empty cluster name",
+			cco: createClusterOptions{
+				name: "",
+			},
+			expectedErr: "you must specify a non-empty cluster name",
+		},
+		{
+			name: "Test for specify a certificate authority and insecure mode at the same time",
+			cco: createClusterOptions{
+				name: "my-cluster",
+				insecureSkipTLSVerify: flag.True,
+				certificateAuthority:  flag.NewStringFlag("~/.kube/e2e/kubernetes.ca.crt"),
+			},
+			expectedErr: "you cannot specify a certificate authority and insecure mode at the same time",
+		},
+		{
+			name: "Test for certificate-authority null",
+			cco: createClusterOptions{
+				name:        "my-cluster",
+				embedCAData: flag.True,
+			},
+			expectedErr: "you must specify a --certificate-authority to embed",
+		},
+		{
+			name: "Test for error certificate-authority path",
+			cco: createClusterOptions{
+				name:                 "my-cluster",
+				embedCAData:          flag.True,
+				certificateAuthority: flag.NewStringFlag("//"), //error path
+			},
+			expectedErr: "could not read certificate-authority data from //: read //: is a directory",
+		},
+	}
+
+	for _, tc := range testCases {
+		if err := tc.cco.validate(); err != nil {
+			if err.Error() != tc.expectedErr {
+				t.Errorf("Fail in %q\n expected error %v\n but got %v\n ", tc.name, tc.expectedErr, err)
+			}
 		}
 	}
 }
