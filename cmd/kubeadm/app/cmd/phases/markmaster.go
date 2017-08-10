@@ -34,10 +34,10 @@ func NewCmdMarkMaster() *cobra.Command {
 		Aliases: []string{"markmaster"},
 		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) < 1 || len(args[0]) == 0 {
-				return fmt.Errorf("missing required argument node-name")
+				return fmt.Error("missing required argument node-name")
 			}
 			if len(args) > 1 {
-				return fmt.Errorf("too many arguments, only one argument supported: node-name")
+				return fmt.Error("too many arguments, only one argument supported: node-name")
 			}
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			if err != nil {
