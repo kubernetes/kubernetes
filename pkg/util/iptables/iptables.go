@@ -94,10 +94,12 @@ const (
 )
 
 const (
-	cmdIPTablesSave    string = "iptables-save"
-	cmdIPTablesRestore string = "iptables-restore"
-	cmdIPTables        string = "iptables"
-	cmdIp6tables       string = "ip6tables"
+	cmdIPTablesSave     string = "iptables-save"
+	cmdIPTablesRestore  string = "iptables-restore"
+	cmdIPTables         string = "iptables"
+	cmdIP6TablesRestore string = "ip6tables-restore"
+	cmdIP6TablesSave    string = "ip6tables-save"
+	cmdIP6Tables        string = "ip6tables"
 )
 
 // Option flag for Restore
@@ -140,7 +142,7 @@ type runner struct {
 // newInternal returns a new Interface which will exec iptables, and allows the
 // caller to change the iptables-restore lockfile path
 func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol, lockfilePath string) Interface {
-	vstring, err := getIPTablesVersionString(exec)
+	vstring, err := getIPTablesVersionString(exec, protocol)
 	if err != nil {
 		glog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
 		vstring = MinCheckVersion
@@ -156,7 +158,7 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		protocol:        protocol,
 		hasCheck:        getIPTablesHasCheckCommand(vstring),
 		waitFlag:        getIPTablesWaitFlag(vstring),
-		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
 	// TODO this needs to be moved to a separate Start() or Run() function so that New() has zero side
@@ -207,7 +209,7 @@ func (runner *runner) connectToFirewallD() {
 
 // GetVersion returns the version string.
 func (runner *runner) GetVersion() (string, error) {
-	return getIPTablesVersionString(runner.exec)
+	return getIPTablesVersionString(runner.exec, runner.protocol)
 }
 
 // EnsureChain is part of Interface.
@@ -310,9 +312,10 @@ func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	defer runner.mu.Unlock()
 
 	// run and return
+	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
 	args := []string{"-t", string(table)}
-	glog.V(4).Infof("running iptables-save %v", args)
-	cmd := runner.exec.Command(cmdIPTablesSave, args...)
+	glog.V(4).Infof("running %s %v", iptablesSaveCmd, args)
+	cmd := runner.exec.Command(iptablesSaveCmd, args...)
 	// Since CombinedOutput() doesn't support redirecting it to a buffer,
 	// we need to workaround it by redirecting stdout and stderr to buffer
 	// and explicitly calling Run() [CombinedOutput() underneath itself
@@ -370,8 +373,9 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 
 	// run the command and return the output or an error including the output and error
 	fullArgs := append(runner.restoreWaitFlag, args...)
-	glog.V(4).Infof("running iptables-restore %v", fullArgs)
-	cmd := runner.exec.Command(cmdIPTablesRestore, fullArgs...)
+	iptablesRestoreCmd := iptablesRestoreCommand(runner.protocol)
+	glog.V(4).Infof("running %s %v", iptablesRestoreCmd, fullArgs)
+	cmd := runner.exec.Command(iptablesRestoreCmd, fullArgs...)
 	cmd.SetStdin(bytes.NewBuffer(data))
 	b, err := cmd.CombinedOutput()
 	if err != nil {
@@ -380,17 +384,32 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 	return nil
 }
 
-func (runner *runner) iptablesCommand() string {
-	if runner.IsIpv6() {
-		return cmdIp6tables
+func iptablesSaveCommand(protocol Protocol) string {
+	if protocol == ProtocolIpv6 {
+		return cmdIP6TablesSave
+	} else {
+		return cmdIPTablesSave
+	}
+}
+
+func iptablesRestoreCommand(protocol Protocol) string {
+	if protocol == ProtocolIpv6 {
+		return cmdIP6TablesRestore
+	} else {
+		return cmdIPTablesRestore
+	}
+}
+
+func iptablesCommand(protocol Protocol) string {
+	if protocol == ProtocolIpv6 {
+		return cmdIP6Tables
 	} else {
 		return cmdIPTables
 	}
 }
 
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
-	iptablesCmd := runner.iptablesCommand()
-
+	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
 	glog.V(5).Infof("running iptables %s %v", string(op), args)
@@ -418,8 +437,9 @@ func trimhex(s string) string {
 // Present for compatibility with <1.4.11 versions of iptables.  This is full
 // of hack and half-measures.  We should nix this ASAP.
 func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
-	glog.V(1).Infof("running iptables-save -t %s", string(table))
-	out, err := runner.exec.Command(cmdIPTablesSave, "-t", string(table)).CombinedOutput()
+	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
+	glog.V(1).Infof("running %s -t %s", iptablesSaveCmd, string(table))
+	out, err := runner.exec.Command(iptablesSaveCmd, "-t", string(table)).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("error checking rule: %v", err)
 	}
@@ -540,9 +560,10 @@ func getIPTablesWaitFlag(vstring string) []string {
 
 // getIPTablesVersionString runs "iptables --version" to get the version string
 // in the form "X.X.X"
-func getIPTablesVersionString(exec utilexec.Interface) (string, error) {
+func getIPTablesVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
-	bytes, err := exec.Command(cmdIPTables, "--version").CombinedOutput()
+	iptablesCmd := iptablesCommand(protocol)
+	bytes, err := exec.Command(iptablesCmd, "--version").CombinedOutput()
 	if err != nil {
 		return "", err
 	}
@@ -558,8 +579,8 @@ func getIPTablesVersionString(exec utilexec.Interface) (string, error) {
 // --wait support landed in v1.6.1+ right before --version support, so
 // any version of iptables-restore that supports --version will also
 // support --wait
-func getIPTablesRestoreWaitFlag(exec utilexec.Interface) []string {
-	vstring, err := getIPTablesRestoreVersionString(exec)
+func getIPTablesRestoreWaitFlag(exec utilexec.Interface, protocol Protocol) []string {
+	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
 	if err != nil || vstring == "" {
 		glog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
 		return nil
@@ -574,13 +595,14 @@ func getIPTablesRestoreWaitFlag(exec utilexec.Interface) []string {
 
 // getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
 // in the form "X.X.X"
-func getIPTablesRestoreVersionString(exec utilexec.Interface) (string, error) {
+func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
 
 	// iptables-restore hasn't always had --version, and worse complains
 	// about unrecognized commands but doesn't exit when it gets them.
 	// Work around that by setting stdin to nothing so it exits immediately.
-	cmd := exec.Command(cmdIPTablesRestore, "--version")
+	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
+	cmd := exec.Command(iptablesRestoreCmd, "--version")
 	cmd.SetStdin(bytes.NewReader([]byte{}))
 	bytes, err := cmd.CombinedOutput()
 	if err != nil {
