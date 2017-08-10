@@ -200,10 +200,6 @@ type Controller struct {
 	// tainted nodes, if they're not tolerated.
 	runTaintManager bool
 
-	// if set to true Controller will taint Nodes with 'TaintNodeNotReady' and 'TaintNodeUnreachable'
-	// taints instead of evicting Pods itself.
-	useTaintBasedEvictions bool
-
 	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	taintNodeByCondition bool
@@ -298,7 +294,6 @@ func NewNodeController(
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]ZoneState),
 		runTaintManager:             runTaintManager,
-		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 	}
 
 	if useTaintBasedEvictions {
