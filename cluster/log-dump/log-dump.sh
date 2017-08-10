@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 : ${KUBE_CONFIG_FILE:="config-test.sh"}
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
