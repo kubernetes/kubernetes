@@ -95,22 +95,3 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, nil
 }
-
-func getWindowsParentDir(path string) string {
-	index := strings.LastIndex(path, string(os.PathSeparator))
-	if index != -1 {
-		return path[:index]
-	}
-
-	return ""
-}
-
-func getAvailabeDriverLetter() (string, error) {
-	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
-	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil || len(output) == 0 {
-		return "", fmt.Errorf("getAvailabeDriverLetter failed: %v", err)
-	}
-	return string(output)[:1], nil
-}
