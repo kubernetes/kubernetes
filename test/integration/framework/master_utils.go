@@ -28,9 +28,9 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
-	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1beta1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
