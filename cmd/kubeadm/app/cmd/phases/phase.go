@@ -35,6 +35,7 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdPreFlight())
 	cmd.AddCommand(NewCmdSelfhosting())
 	cmd.AddCommand(NewCmdMarkMaster())
+	cmd.AddCommand(NewCmdUploadConfig())
 
 	return cmd
 }

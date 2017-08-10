@@ -41,6 +41,7 @@ import (
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -265,6 +266,11 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 5: Install and deploy all addons, and configure things as necessary
+
+	// Upload currently used configuration to the cluster
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
+		return err
+	}
 
 	// Create the necessary ServiceAccounts
 	if err := apiconfigphase.CreateServiceAccounts(client); err != nil {

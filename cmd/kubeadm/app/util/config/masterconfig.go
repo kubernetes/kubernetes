@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
@@ -72,7 +74,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 // TryLoadMasterConfiguration tries to loads a Master configuration from the given file (if defined)
-func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfiguration) error {
+func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfiguration) error {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -85,4 +87,35 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapi.MasterConfigurat
 	}
 
 	return nil
+}
+
+// ConfigFileAndDefaultsToInternalConfig takes a path to a config file and a versioned configuration that can serve as the default config
+// If cfgPath is specified, defaultversionedcfg will always get overridden. Otherwise, the default config (often populated by flags) will be used.
+// Then the external, versioned configuration is defaulted and converted to the internal type.
+// Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
+// Lastly, the internal config is validated and returned.
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiext.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+	internalcfg := &kubeadmapi.MasterConfiguration{}
+
+	// Loads configuration from config file, if provided
+	// Nb. --config overrides command line flags
+	if err := TryLoadMasterConfiguration(cfgPath, defaultversionedcfg); err != nil {
+		return nil, err
+	}
+
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
+	// static default values to cfg only for values not provided with flags
+	api.Scheme.Default(defaultversionedcfg)
+	api.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
+
+	// Applies dynamic defaults to settings not provided with flags
+	if err := SetInitDynamicDefaults(internalcfg); err != nil {
+		return nil, err
+	}
+
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err := validation.ValidateMasterConfiguration(internalcfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+	return internalcfg, nil
 }

@@ -96,6 +96,12 @@ const (
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
+	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
+	MasterConfigurationConfigMap = "kubeadm-config"
+
+	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
+	MasterConfigurationConfigMapKey = "MasterConfiguration"
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
 

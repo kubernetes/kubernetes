@@ -24,7 +24,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -141,24 +140,9 @@ func runCmdFuncKubeConfig(cmdFunc func(outDir string, cfg *kubeadmapi.MasterConf
 	// are shared between sub commands and gets access to current value e.g. flags value.
 
 	return func(cmd *cobra.Command, args []string) {
-		internalcfg := &kubeadmapi.MasterConfiguration{}
 
-		// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
-		// static default values to cfg only for values not provided with flags
-		api.Scheme.Default(cfg)
-		api.Scheme.Convert(cfg, internalcfg, nil)
-
-		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags
-		err := configutil.TryLoadMasterConfiguration(*cfgPath, internalcfg)
-		kubeadmutil.CheckErr(err)
-
-		// Applies dynamic defaults to settings not provided with flags
-		err = configutil.SetInitDynamicDefaults(internalcfg)
-		kubeadmutil.CheckErr(err)
-
-		// Validates cfg (flags/configs + defaults + dynamic defaults)
-		err = validation.ValidateMasterConfiguration(internalcfg).ToAggregate()
+		// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
 
 		// Execute the cmdFunc
