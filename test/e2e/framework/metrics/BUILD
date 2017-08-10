@@ -11,6 +11,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "api_server_metrics.go",
+        "cluster_autoscaler_metrics.go",
         "controller_manager_metrics.go",
         "generic_metrics.go",
         "kubelet_metrics.go",
