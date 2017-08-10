@@ -103,9 +103,9 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
+	p, err := f.PrinterWithOptions(printers.PrintOptions{
 		ColumnLabels: []string{},
-	})
+	}, true)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()

@@ -99,9 +99,14 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
+
+	// fetch resource printer with "isLocal" set to "true"
+	// in order to still allow this command to succeed in the
+	// event that --local is set and there is no connection
+	// to an api server.
+	p, err := f.PrinterWithOptions(printers.PrintOptions{
 		ColumnLabels: []string{},
-	})
+	}, true)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()

@@ -160,8 +160,6 @@ type ClientAccessFactory interface {
 	// AddHandler receives a printers.TabularPrintHandler, a list of columns, and a print function and
 	// registers the print function with the given printer.
 	AddHandler(p printers.TabularPrintHandler, columns, columsnWithWide []string, printFunc interface{}) error
-	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
 	// Returns the patched object in bytes and any error that occured during the encoding or
 	// in case the object is already paused.

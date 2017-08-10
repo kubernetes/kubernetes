@@ -415,12 +415,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
-	f.AddDefaultHandlers(p)
-	return p, nil
-}
-
 // TODO(juanvallejo): change printersinternal.AddHandlers to printersinternal.GetDefaultHandlers and return
 // a *printers.HandlerEntry list. Handle any errors returned from generating this list.
 func (f *ring0Factory) AddDefaultHandlers(handler printers.TabularPrintHandler) {
