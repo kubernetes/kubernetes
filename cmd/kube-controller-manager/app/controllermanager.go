@@ -107,7 +107,7 @@ func ResyncPeriod(s *options.CMServer) func() time.Duration {
 func Run(s *options.CMServer) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
-	if err := s.Validate(KnownControllers(), ControllersDisabledByDefault.List()); err != nil {
+	if err := s.Validate(KnownControllers()); err != nil {
 		return err
 	}
 

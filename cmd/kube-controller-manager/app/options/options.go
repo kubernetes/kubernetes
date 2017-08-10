@@ -235,7 +235,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 }
 
 // Validate is used to validate the options and config before launching the controller manager
-func (s *CMServer) Validate(allControllers []string, disabledByDefaultControllers []string) error {
+func (s *CMServer) Validate(allControllers []string) error {
 	var errs []error
 
 	allControllersSet := sets.NewString(allControllers...)
