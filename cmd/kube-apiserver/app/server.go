@@ -552,6 +552,7 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
+		// TODO we need to update this to batch/v1beta1 when it's enabled by default
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
