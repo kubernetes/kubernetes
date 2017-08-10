@@ -23,13 +23,17 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/net/websocket"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
+	portforwardws "k8s.io/client-go/tools/portforward/ws"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/client-go/transport/ws"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -39,15 +43,18 @@ import (
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
 type PortForwardOptions struct {
-	Namespace     string
-	PodName       string
-	RESTClient    *restclient.RESTClient
-	Config        *restclient.Config
-	PodClient     coreclient.PodsGetter
-	Ports         []string
-	PortForwarder portForwarder
-	StopChannel   chan struct{}
-	ReadyChannel  chan struct{}
+	Namespace      string
+	PodName        string
+	RESTClient     *restclient.RESTClient
+	Config         *restclient.Config
+	Protocol       string
+	MaxConnections int
+	PodClient      coreclient.PodsGetter
+	Ports          []string
+	PortForwarder  portForwarder
+	Out, Err       io.Writer
+	StopChannel    chan struct{}
+	ReadyChannel   chan struct{}
 }
 
 var (
@@ -67,10 +74,9 @@ var (
 
 func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	opts := &PortForwardOptions{
-		PortForwarder: &defaultPortForwarder{
-			cmdOut: cmdOut,
-			cmdErr: cmdErr,
-		},
+		Out:      cmdOut,
+		Err:      cmdErr,
+		Protocol: "spdy",
 	}
 	cmd := &cobra.Command{
 		Use:     "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
@@ -90,29 +96,10 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.Flags().StringVar(&opts.Protocol, "protocol", opts.Protocol, "The protocol used to connect to the server. Accepts 'spdy' or 'websocket'.")
+	cmd.Flags().IntVar(&opts.MaxConnections, "max-connections", opts.MaxConnections, "The maximum number of simultaneous connections when using websockets. Defaults to two per port.")
 	// TODO support UID
 	return cmd
-}
-
-type portForwarder interface {
-	ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error
-}
-
-type defaultPortForwarder struct {
-	cmdOut, cmdErr io.Writer
-}
-
-func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
-	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
-	if err != nil {
-		return err
-	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
-	if err != nil {
-		return err
-	}
-	return fw.ForwardPorts()
 }
 
 // Complete completes all the required options for port-forward cmd.
@@ -129,6 +116,17 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	} else {
 		o.PodName = args[0]
 		o.Ports = args[1:]
+	}
+
+	switch o.Protocol {
+	case "spdy":
+		o.PortForwarder = spdyPortForwarder{}
+		o.MaxConnections = 0
+	case "websocket":
+		o.PortForwarder = wsPortForwarder{}
+		o.MaxConnections = 2 * len(o.Ports)
+	default:
+		return fmt.Errorf("only 'spdy' and 'websocket' are supported for --protocol")
 	}
 
 	o.Namespace, _, err = f.DefaultNamespace()
@@ -201,4 +199,42 @@ func (o PortForwardOptions) RunPortForward() error {
 		SubResource("portforward")
 
 	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+}
+
+type portForwarder interface {
+	ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error
+}
+
+type spdyPortForwarder struct{}
+
+func (spdyPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
+	if err != nil {
+		return err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
+	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, opts.Out, opts.Err)
+	if err != nil {
+		return err
+	}
+	return fw.ForwardPorts()
+}
+
+type wsPortForwarder struct{}
+
+func (wsPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+	dialer, err := ws.NewDialer(opts.Config)
+	if err != nil {
+		return err
+	}
+	dialFn := func(port uint16, subprotocols ...string) (*websocket.Conn, error) {
+		query := url.Query()
+		query.Set("ports", strconv.Itoa(int(port)))
+		return dialer.Dial(url.Path, query, subprotocols...)
+	}
+	fw, err := portforwardws.New(dialFn, opts.Ports, opts.MaxConnections, opts.StopChannel, opts.ReadyChannel, opts.Out, opts.Err)
+	if err != nil {
+		return err
+	}
+	return fw.ForwardPorts()
 }

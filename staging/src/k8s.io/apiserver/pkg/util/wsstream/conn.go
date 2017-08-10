@@ -190,6 +190,19 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.R
 	return conn.selectedProtocol, rwc, nil
 }
 
+// OpenChannels initializes and returns channels for reading and writing. It returns
+// the selected subprotocol, a slice of channels, and an error. It spawns a goroutine
+// to process data coming from the remote server.
+func (conn *Conn) OpenChannels(ws *websocket.Conn) (string, []io.ReadWriteCloser, error) {
+	go conn.handle(ws)
+	<-conn.ready
+	rwc := make([]io.ReadWriteCloser, len(conn.channels))
+	for i := range conn.channels {
+		rwc[i] = conn.channels[i]
+	}
+	return conn.selectedProtocol, rwc, nil
+}
+
 func (conn *Conn) initialize(ws *websocket.Conn) {
 	negotiated := ws.Config().Protocol
 	conn.selectedProtocol = negotiated[0]
@@ -250,7 +263,7 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		conn.resetTimeout()
 		var data []byte
 		if err := websocket.Message.Receive(ws, &data); err != nil {
-			if err != io.EOF {
+			if err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
 				glog.Errorf("Error on socket receive: %v", err)
 			}
 			break
