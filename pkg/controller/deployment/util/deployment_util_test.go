@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -147,7 +147,7 @@ func generatePod(labels map[string]string, image string) v1.Pod {
 func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   k8s_api_v1.SimpleNameGenerator.GenerateName("replicaset"),
+			Name:   apiv1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels: labels,
 		},
 		Spec: extensions.ReplicaSetSpec{
@@ -190,7 +190,7 @@ func generateRS(deployment extensions.Deployment) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             randomUID(),
-			Name:            k8s_api_v1.SimpleNameGenerator.GenerateName("replicaset"),
+			Name:            apiv1.SimpleNameGenerator.GenerateName("replicaset"),
 			Labels:          template.Labels,
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
