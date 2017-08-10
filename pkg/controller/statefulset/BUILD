@@ -19,7 +19,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
@@ -60,7 +59,6 @@ go_test(
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -84,7 +82,6 @@ go_test(
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme:go_default_library",
     ],
 )
 

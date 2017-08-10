@@ -21,7 +21,6 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -113,10 +112,9 @@ func TestCompactRules(t *testing.T) {
 
 	for k, tc := range testcases {
 		rules := tc.Rules
-		originalRules, err := api.Scheme.DeepCopy(tc.Rules)
-		if err != nil {
-			t.Errorf("%s: couldn't copy rules: %v", k, err)
-			continue
+		originalRules := make([]rbac.PolicyRule, len(tc.Rules))
+		for i := range tc.Rules {
+			originalRules[i] = *tc.Rules[i].DeepCopy()
 		}
 		compacted, err := CompactRules(tc.Rules)
 		if err != nil {

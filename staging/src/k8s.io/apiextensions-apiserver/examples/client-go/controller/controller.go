@@ -84,21 +84,15 @@ func (c *ExampleController) onAdd(obj interface{}) {
 	fmt.Printf("[CONTROLLER] OnAdd %s\n", example.ObjectMeta.SelfLink)
 
 	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use exampleScheme.Copy() to make a deep copy of original object and modify this copy
+	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
-	copyObj, err := c.ExampleScheme.Copy(example)
-	if err != nil {
-		fmt.Printf("ERROR creating a deep copy of example object: %v\n", err)
-		return
-	}
-
-	exampleCopy := copyObj.(*crv1.Example)
+	exampleCopy := example.DeepCopy()
 	exampleCopy.Status = crv1.ExampleStatus{
 		State:   crv1.ExampleStateProcessed,
 		Message: "Successfully processed by controller",
 	}
 
-	err = c.ExampleClient.Put().
+	err := c.ExampleClient.Put().
 		Name(example.ObjectMeta.Name).
 		Namespace(example.ObjectMeta.Namespace).
 		Resource(crv1.ExampleResourcePlural).
