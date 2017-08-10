@@ -466,7 +466,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 		return err
 	}
 
-	objList, err := resource.NewHelper(c, mapping).List(namespace, mapping.GroupVersionKind.Version, p.selector, false)
+	objList, err := resource.NewHelper(c, mapping).List(namespace, mapping.GroupVersionKind.Version, p.selector, false, false)
 	if err != nil {
 		return err
 	}
