@@ -61,16 +61,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# TODO(pipejakob): Use dl.k8s.io/bazel once the redirection uses the correct bucket.
+KUBERNETES_BAZEL_RELEASE_URL="${KUBERNETES_BAZEL_RELEASE_URL:-${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release-dev/bazel}}"
 # If KUBERNETES_RELEASE_URL is overridden but KUBERNETES_CI_RELEASE_URL is not then set KUBERNETES_CI_RELEASE_URL to KUBERNETES_RELEASE_URL.
 KUBERNETES_CI_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL:-${KUBERNETES_RELEASE_URL:-https://dl.k8s.io/ci}}"
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
+KUBE_BRANCH_REGEX="[a-z0-9\-\_\.]+"
+KUBE_PULL_REQUEST_REGEX="[0-9]+"
+KUBE_COMMIT_REGEX="[a-f0-9]+"
+
 KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*))?$"
 KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+KUBE_BAZEL_VERSION_REGEX="^bazel/((v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?)|(${KUBE_PULL_REQUEST_REGEX}/${KUBE_BRANCH_REGEX}:${KUBE_COMMIT_REGEX}(,${KUBE_PULL_REQUEST_REGEX}:${KUBE_COMMIT_REGEX})+))$"
 
-# Sets KUBE_VERSION variable if an explicit version number was provided (e.g. "v1.0.6",
-# "v1.2.0-alpha.1.881+376438b69c7612") or resolves the "published" version
-# <path>/<version> (e.g. "release/stable",' "ci/latest-1") by reading from GCS.
+# Sets KUBE_VERSION variable if an explicit version number was provided (e.g.
+# "v1.0.6", "v1.2.0-alpha.1.881+376438b69c7612", "bazel/101/master:21...") or
+# resolves the "published" version <path>/<version> (e.g. "release/stable",'
+# "ci/latest-1") by reading from GCS.
 #
 # See the docs on getting builds for more information about version
 # publication.
@@ -80,7 +88,9 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a
 # Vars set:
 #   KUBE_VERSION
 function set_binary_version() {
-  if [[ "${1}" =~ "/" ]]; then
+  if [[ "${1}" == bazel/* ]]; then
+    export KUBE_VERSION=${1}
+  elif [[ "${1}" =~ "/" ]]; then
     export KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
   else
     export KUBE_VERSION=${1}
@@ -183,6 +193,9 @@ if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
   # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
   # this will be used by get-kube-binaries.sh.
   KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
+elif [[ ${KUBE_VERSION} =~ ${KUBE_BAZEL_VERSION_REGEX} ]]; then
+  KUBE_VERSION=${KUBE_VERSION#bazel/}
+  KUBERNETES_RELEASE_URL="${KUBERNETES_BAZEL_RELEASE_URL}"
 elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
   echo "Version doesn't match regexp" >&2
   exit 1
