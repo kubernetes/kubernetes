@@ -133,7 +133,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta1
 	gvr("apps", "v1beta1", "statefulsets"): {
-		stub:             `{"metadata": {"name": "ss1"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		stub:             `{"metadata": {"name": "ss1"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss1",
 	},
 	gvr("apps", "v1beta1", "deployments"): {
@@ -149,7 +149,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
 	gvr("apps", "v1beta2", "statefulsets"): {
-		stub:             `{"metadata": {"name": "ss2"}, "spec": {"template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		stub:             `{"metadata": {"name": "ss2"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
 		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss2",
 		expectedGVK:      gvkP("apps", "v1beta1", "StatefulSet"),
 	},
@@ -196,11 +196,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("batch", "v2alpha1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cj1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cj1",
-	},
-	gvr("batch", "v2alpha1", "scheduledjobs"): {
-		stub:             `{"metadata": {"name": "cj2"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
-		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cj2",
-		expectedGVK:      gvkP("batch", "v2alpha1", "CronJob"), // scheduledjobs were deprecated by cronjobs
 	},
 	// --
 
@@ -348,6 +343,7 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvr("", "v1", "rangeallocations"),     // stored in various places in etcd but cannot be directly created
 	gvr("", "v1", "componentstatuses"),    // status info not stored in etcd
 	gvr("", "v1", "serializedreferences"), // used for serilization, not stored in etcd
+	gvr("", "v1", "nodeconfigsources"),    // subfield of node.spec, but shouldn't be directly created
 	gvr("", "v1", "podstatusresults"),     // wrapper object not stored in etcd
 	// --
 

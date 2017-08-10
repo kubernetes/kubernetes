@@ -67,14 +67,21 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 		glog.Errorf("Photon Controller attacher: Attach failed to get volume source")
 		return "", err
 	}
+	attached, err := attacher.photonDisks.DiskIsAttached(volumeSource.PdID, nodeName)
 
-	glog.V(4).Infof("Photon Controller: Attach disk called for host %s", hostName)
-
-	// TODO: if disk is already attached?
-	err = attacher.photonDisks.AttachDisk(volumeSource.PdID, nodeName)
 	if err != nil {
-		glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.PdID, nodeName, err)
-		return "", err
+		glog.Warningf("Photon Controller: couldn't check if disk is Attached for host %s, will try attach disk: %+v", hostName, err)
+		attached = false
+	}
+
+	if !attached {
+		glog.V(4).Infof("Photon Controller: Attach disk called for host %s", hostName)
+
+		err = attacher.photonDisks.AttachDisk(volumeSource.PdID, nodeName)
+		if err != nil {
+			glog.Errorf("Error attaching volume %q to node %q: %+v", volumeSource.PdID, nodeName, err)
+			return "", err
+		}
 	}
 
 	PdidWithNoHypens := strings.Replace(volumeSource.PdID, "-", "", -1)

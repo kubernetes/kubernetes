@@ -180,6 +180,18 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// Only used for dynamic configuration.
+	// The length of the trial period for this configuration. If the Kubelet records CrashLoopThreshold or
+	// more startups during this period, the current configuration will be marked bad and the
+	// Kubelet will roll-back to the last-known-good. Default 10 minutes.
+	ConfigTrialDuration metav1.Duration
+	// Only used for dynamic configuration.
+	// If this number of Kubelet "crashes" during ConfigTrialDuration meets this threshold,
+	// the configuration fails the trial and the Kubelet rolls back to its last-known-good config.
+	// Crash-loops are detected by counting Kubelet startups, so one startup is implicitly added
+	// to this threshold to always allow a single restart per config change.
+	// Default 10, mimimum allowed is 0, maximum allowed is 10.
+	CrashLoopThreshold int32
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string
@@ -215,17 +227,10 @@ type KubeletConfiguration struct {
 	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string
-	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
-	// are provided, this flag will be ignored.
-	CertDirectory string
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
-	RootDirectory string
 	// seccompProfileRoot is the directory path for seccomp profiles.
 	SeccompProfileRoot string
 	// allowPrivileged enables containers to request privileged mode.
@@ -314,12 +319,6 @@ type KubeletConfiguration struct {
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
-	// cloudProvider is the provider for cloud services.
-	// +optional
-	CloudProvider string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	// +optional
-	CloudConfigFile string
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	// +optional
 	KubeletCgroups string

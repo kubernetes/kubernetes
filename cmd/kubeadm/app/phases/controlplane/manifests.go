@@ -45,78 +45,66 @@ const (
 	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
-
-	etcd                  = "etcd"
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
 )
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
-func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
-
-	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return err
-	}
+func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version, manifestsDir string) error {
 
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
 	// Prepare static pod specs
 	staticPodSpecs := map[string]v1.Pod{
-		kubeAPIServer: componentPod(v1.Container{
-			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, cfg.UnifiedControlPlaneImage),
+		kubeadmconstants.KubeAPIServer: componentPod(v1.Container{
+			Name:          kubeadmconstants.KubeAPIServer,
+			Image:         images.GetCoreImage(kubeadmconstants.KubeAPIServer, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getAPIServerCommand(cfg, k8sVersion),
-			VolumeMounts:  mounts.GetVolumeMounts(kubeAPIServer),
+			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer),
 			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:     componentResources("250m"),
 			Env:           getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeAPIServer)),
-		kubeControllerManager: componentPod(v1.Container{
-			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, cfg.UnifiedControlPlaneImage),
+		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
+		kubeadmconstants.KubeControllerManager: componentPod(v1.Container{
+			Name:          kubeadmconstants.KubeControllerManager,
+			Image:         images.GetCoreImage(kubeadmconstants.KubeControllerManager, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getControllerManagerCommand(cfg, k8sVersion),
-			VolumeMounts:  mounts.GetVolumeMounts(kubeControllerManager),
+			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager),
 			LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
 			Resources:     componentResources("200m"),
 			Env:           getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeControllerManager)),
-		kubeScheduler: componentPod(v1.Container{
-			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, cfg.UnifiedControlPlaneImage),
+		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
+		kubeadmconstants.KubeScheduler: componentPod(v1.Container{
+			Name:          kubeadmconstants.KubeScheduler,
+			Image:         images.GetCoreImage(kubeadmconstants.KubeScheduler, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getSchedulerCommand(cfg),
-			VolumeMounts:  mounts.GetVolumeMounts(kubeScheduler),
+			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler),
 			LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),
 			Resources:     componentResources("100m"),
 			Env:           getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeScheduler)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(cfg.Etcd.Endpoints) == 0 {
 
 		etcdPod := componentPod(v1.Container{
-			Name:    etcd,
+			Name:    kubeadmconstants.Etcd,
 			Command: getEtcdCommand(cfg),
-			Image:   images.GetCoreImage(images.KubeEtcdImage, cfg, cfg.Etcd.Image),
+			Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, "", cfg.Etcd.Image),
 			// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 			VolumeMounts:  []v1.VolumeMount{newVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
 			LivenessProbe: componentProbe(2379, "/health", v1.URISchemeHTTP),
 		}, []v1.Volume{newVolume(etcdVolumeName, cfg.Etcd.DataDir)})
 
-		staticPodSpecs[etcd] = etcdPod
+		staticPodSpecs[kubeadmconstants.Etcd] = etcdPod
 	}
 
-	manifestsPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
-	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q [%v]", manifestsPath, err)
+	if err := os.MkdirAll(manifestsDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %q [%v]", manifestsDir, err)
 	}
 	for name, spec := range staticPodSpecs {
-		filename := filepath.Join(manifestsPath, name+".yaml")
+		filename := kubeadmconstants.GetStaticPodFilepath(name, manifestsDir)
 		serialized, err := yaml.Marshal(spec)
 		if err != nil {
 			return fmt.Errorf("failed to marshal manifest for %q to YAML [%v]", name, err)

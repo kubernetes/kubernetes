@@ -181,7 +181,7 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 	responsewriters.WriteRawJSON(statusCode, obj, r.w)
 }
 
-func (r *responder) Error(err error) {
+func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
 	http.Error(r.w, err.Error(), http.StatusInternalServerError)
 }
 

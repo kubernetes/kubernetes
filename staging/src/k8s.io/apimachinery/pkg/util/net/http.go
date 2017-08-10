@@ -277,6 +277,13 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 }
 
+// DialerFunc implements Dialer for the provided function.
+type DialerFunc func(req *http.Request) (net.Conn, error)
+
+func (fn DialerFunc) Dial(req *http.Request) (net.Conn, error) {
+	return fn(req)
+}
+
 // Dialer dials a host and writes a request to it.
 type Dialer interface {
 	// Dial connects to the host specified by req's URL, writes the request to the connection, and

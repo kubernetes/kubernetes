@@ -25,19 +25,19 @@ import (
 // mutatePodSpec makes a Static Pod-hosted PodSpec suitable for self-hosting
 func mutatePodSpec(cfg *kubeadmapi.MasterConfiguration, name string, podSpec *v1.PodSpec) {
 	mutators := map[string][]func(*kubeadmapi.MasterConfiguration, *v1.PodSpec){
-		kubeAPIServer: {
+		kubeadmconstants.KubeAPIServer: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
 			setVolumesOnKubeAPIServerPodSpec,
 		},
-		kubeControllerManager: {
+		kubeadmconstants.KubeControllerManager: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
 			setVolumesOnKubeControllerManagerPodSpec,
 		},
-		kubeScheduler: {
+		kubeadmconstants.KubeScheduler: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,

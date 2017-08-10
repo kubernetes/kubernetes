@@ -792,7 +792,6 @@ staging/src/k8s.io/sample-apiserver/pkg/apiserver
 staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/externalversions/internalinterfaces
 staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion/internalinterfaces
 staging/src/k8s.io/sample-apiserver/pkg/cmd/server
-staging/src/k8s.io/sample-apiserver/pkg/registry
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e

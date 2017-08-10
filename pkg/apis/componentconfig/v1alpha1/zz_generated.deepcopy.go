@@ -21,7 +21,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	core_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	reflect "reflect"
@@ -294,6 +295,24 @@ func (in *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
 func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.ConfigTrialDuration != nil {
+		in, out := &in.ConfigTrialDuration, &out.ConfigTrialDuration
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
+	}
+	if in.CrashLoopThreshold != nil {
+		in, out := &in.CrashLoopThreshold, &out.CrashLoopThreshold
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
@@ -471,7 +490,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.RegisterWithTaints != nil {
 		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-		*out = make([]v1.Taint, len(*in))
+		*out = make([]core_v1.Taint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

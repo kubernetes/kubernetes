@@ -2630,6 +2630,7 @@ func TestPrintService(t *testing.T) {
 
 func TestPrintPodDisruptionBudget(t *testing.T) {
 	minAvailable := intstr.FromInt(22)
+	maxUnavailable := intstr.FromInt(11)
 	tests := []struct {
 		pdb    policy.PodDisruptionBudget
 		expect string
@@ -2649,6 +2650,22 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 				},
 			},
 			"pdb1\t22\tN/A\t5\t0s\n",
+		},
+		{
+			policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "ns2",
+					Name:              "pdb2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MaxUnavailable: &maxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 5,
+				},
+			},
+			"pdb2\tN/A\t11\t5\t0s\n",
 		}}
 
 	buf := bytes.NewBuffer([]byte{})

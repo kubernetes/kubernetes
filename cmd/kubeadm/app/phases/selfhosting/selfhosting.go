@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -33,14 +32,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-)
-
-const (
-	kubeAPIServer         = "kube-apiserver"
-	kubeControllerManager = "kube-controller-manager"
-	kubeScheduler         = "kube-scheduler"
-
-	selfHostingPrefix = "self-hosted-"
 )
 
 // CreateSelfHostedControlPlane is responsible for turning a Static Pod-hosted control plane to a self-hosted one
@@ -64,12 +55,9 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		return err
 	}
 
-	// The sequence here isn't set in stone, but seems to work well to start with the API server
-	components := []string{kubeAPIServer, kubeControllerManager, kubeScheduler}
-
-	for _, componentName := range components {
+	for _, componentName := range kubeadmconstants.MasterComponents {
 		start := time.Now()
-		manifestPath := buildStaticManifestFilepath(componentName)
+		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, kubeadmconstants.GetStaticPodDirectory())
 
 		// Load the Static Pod file in order to be able to create a self-hosted variant of that file
 		podSpec, err := loadPodSpecFromFile(manifestPath)
@@ -116,17 +104,17 @@ func buildDaemonSet(cfg *kubeadmapi.MasterConfiguration, name string, podSpec *v
 	// Return a DaemonSet based on that Spec
 	return &extensions.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      addSelfHostedPrefix(name),
+			Name:      kubeadmconstants.AddSelfHostedPrefix(name),
 			Namespace: metav1.NamespaceSystem,
 			Labels: map[string]string{
-				"k8s-app": addSelfHostedPrefix(name),
+				"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
 			},
 		},
 		Spec: extensions.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"k8s-app": addSelfHostedPrefix(name),
+						"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
 					},
 				},
 				Spec: *podSpec,
@@ -151,17 +139,7 @@ func loadPodSpecFromFile(manifestPath string) (*v1.PodSpec, error) {
 	return &staticPod.Spec, nil
 }
 
-// buildStaticManifestFilepath returns the location on the disk where the Static Pod should be present
-func buildStaticManifestFilepath(componentName string) string {
-	return filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, componentName+".yaml")
-}
-
 // buildSelfHostedWorkloadLabelQuery creates the right query for matching a self-hosted Pod
 func buildSelfHostedWorkloadLabelQuery(componentName string) string {
-	return fmt.Sprintf("k8s-app=%s", addSelfHostedPrefix(componentName))
-}
-
-// addSelfHostedPrefix adds the self-hosted- prefix to the component name
-func addSelfHostedPrefix(componentName string) string {
-	return fmt.Sprintf("%s%s", selfHostingPrefix, componentName)
+	return fmt.Sprintf("k8s-app=%s", kubeadmconstants.AddSelfHostedPrefix(componentName))
 }

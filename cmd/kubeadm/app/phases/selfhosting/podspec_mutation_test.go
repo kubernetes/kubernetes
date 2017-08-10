@@ -32,7 +32,7 @@ func TestMutatePodSpec(t *testing.T) {
 		expected  v1.PodSpec
 	}{
 		{
-			component: kubeAPIServer,
+			component: kubeadmconstants.KubeAPIServer,
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
@@ -45,7 +45,7 @@ func TestMutatePodSpec(t *testing.T) {
 			},
 		},
 		{
-			component: kubeControllerManager,
+			component: kubeadmconstants.KubeControllerManager,
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
@@ -58,7 +58,7 @@ func TestMutatePodSpec(t *testing.T) {
 			},
 		},
 		{
-			component: kubeScheduler,
+			component: kubeadmconstants.KubeScheduler,
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{

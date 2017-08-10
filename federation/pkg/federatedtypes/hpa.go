@@ -36,14 +36,14 @@ import (
 const (
 	HpaKind           = "horizontalpodautoscaler"
 	HpaControllerName = "horizontalpodautoscalers"
-	// This is a tunable which does not change replica nums
-	// on an existing local hpa, before this timeout, if it
-	// did scale already (avoids thrashing of replicas around).
-	scaleForbiddenWindow = 5 * time.Minute
 	// This is used as the default min for hpa object submitted
 	// to federation, in a situation where the default is for
 	// some reason not present (Spec.MinReplicas == nil)
 	hpaMinReplicaDefault = int32(1)
+	// This is a tunable which does not change replica nums
+	// on an existing local hpa, before this timeout, if it
+	// did scale already (avoids thrashing of replicas around).
+	ScaleForbiddenWindow = 2 * time.Minute
 )
 
 func init() {
@@ -51,11 +51,22 @@ func init() {
 }
 
 type HpaAdapter struct {
-	client federationclientset.Interface
+	client               federationclientset.Interface
+	scaleForbiddenWindow time.Duration
 }
 
-func NewHpaAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
-	return &HpaAdapter{client: client}
+func NewHpaAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
+	var scaleForbiddenWindow time.Duration
+	if adapterSpecificArgs != nil && adapterSpecificArgs[HpaKind] != nil {
+		scaleForbiddenWindow = adapterSpecificArgs[HpaKind].(*metav1.Duration).Duration
+	} else {
+		scaleForbiddenWindow = ScaleForbiddenWindow
+	}
+
+	return &HpaAdapter{
+		client:               client,
+		scaleForbiddenWindow: scaleForbiddenWindow,
+	}
 }
 
 func (a *HpaAdapter) Kind() string {
@@ -237,7 +248,7 @@ func (a *HpaAdapter) GetSchedule(obj pkgruntime.Object, key string, clusters []*
 	}
 
 	return &hpaSchedulingInfo{
-		scheduleState: getHpaScheduleState(obj, currentClusterObjs),
+		scheduleState: a.getHpaScheduleState(obj, currentClusterObjs),
 		fedStatus:     fedStatus,
 	}, nil
 }
@@ -288,7 +299,7 @@ func getCurrentClusterObjs(informer fedutil.FederatedInformer, key string, clust
 //
 // The above algorithm is run to first distribute max and then distribute min to those clusters
 // which get max.
-func getHpaScheduleState(fedObj pkgruntime.Object, currentObjs map[string]pkgruntime.Object) map[string]*replicaNums {
+func (a *HpaAdapter) getHpaScheduleState(fedObj pkgruntime.Object, currentObjs map[string]pkgruntime.Object) map[string]*replicaNums {
 	fedHpa := fedObj.(*autoscalingv1.HorizontalPodAutoscaler)
 	requestedMin := hpaMinReplicaDefault
 	if fedHpa.Spec.MinReplicas != nil {
@@ -322,7 +333,7 @@ func getHpaScheduleState(fedObj pkgruntime.Object, currentObjs map[string]pkgrun
 	// beyond min/max limits.
 	// schedStatus currently have status of existing hpas.
 	// It will eventually have desired status for this reconcile.
-	clusterLists, currentReplicas, scheduleState := prepareForScheduling(currentObjs)
+	clusterLists, currentReplicas, scheduleState := a.prepareForScheduling(currentObjs)
 
 	remainingReplicas := replicaNums{
 		min: requestedReplicas.min - currentReplicas.min,
@@ -362,7 +373,7 @@ func getHpaScheduleState(fedObj pkgruntime.Object, currentObjs map[string]pkgrun
 	// We then go ahead to give the replicas to those which do not
 	// have any hpa. In this pass however we try to ensure that all
 	// our Max are consumed in this reconcile.
-	distributeMaxReplicas(toDistribute.max, clusterLists, rdc, currentObjs, scheduleState)
+	a.distributeMaxReplicas(toDistribute.max, clusterLists, rdc, currentObjs, scheduleState)
 
 	// We distribute min to those clusters which:
 	// 1 - can adjust min (our increase step would be only 1)
@@ -371,7 +382,7 @@ func getHpaScheduleState(fedObj pkgruntime.Object, currentObjs map[string]pkgrun
 	// some clusters still needing them. We adjust this in finalise by
 	// assigning min replicas to 1 into those clusters which got max
 	// but min remains 0.
-	distributeMinReplicas(toDistribute.min, clusterLists, rdc, currentObjs, scheduleState)
+	a.distributeMinReplicas(toDistribute.min, clusterLists, rdc, currentObjs, scheduleState)
 
 	return finaliseScheduleState(scheduleState)
 }
@@ -474,7 +485,7 @@ func updateStatus(fedHpa *autoscalingv1.HorizontalPodAutoscaler, newStatus hpaFe
 // existing objs.
 // currentObjs has the list of all clusters, with obj as nil
 // for those clusters which do not have hpa yet.
-func prepareForScheduling(currentObjs map[string]pkgruntime.Object) (hpaLists, replicaNums, map[string]*replicaNums) {
+func (a *HpaAdapter) prepareForScheduling(currentObjs map[string]pkgruntime.Object) (hpaLists, replicaNums, map[string]*replicaNums) {
 	lists := hpaLists{
 		availableMax: sets.NewString(),
 		availableMin: sets.NewString(),
@@ -493,10 +504,10 @@ func prepareForScheduling(currentObjs map[string]pkgruntime.Object) (hpaLists, r
 			continue
 		}
 
-		if maxReplicasReducible(obj) {
+		if a.maxReplicasReducible(obj) {
 			lists.availableMax.Insert(cluster)
 		}
-		if minReplicasReducible(obj) {
+		if a.minReplicasReducible(obj) {
 			lists.availableMin.Insert(cluster)
 		}
 
@@ -609,7 +620,7 @@ func reduceMaxReplicas(excessMax int32, availableMaxList sets.String, scheduled 
 // rdc: replicadistributioncount for max and min.
 // currentObjs: list of current cluster hpas.
 // scheduled: schedule state which will be updated in place.
-func distributeMaxReplicas(toDistributeMax int32, lists hpaLists, rdc replicaNums,
+func (a *HpaAdapter) distributeMaxReplicas(toDistributeMax int32, lists hpaLists, rdc replicaNums,
 	currentObjs map[string]pkgruntime.Object, scheduled map[string]*replicaNums) int32 {
 	for cluster, replicas := range scheduled {
 		if toDistributeMax == 0 {
@@ -618,7 +629,7 @@ func distributeMaxReplicas(toDistributeMax int32, lists hpaLists, rdc replicaNum
 		if replicas == nil {
 			continue
 		}
-		if maxReplicasNeeded(currentObjs[cluster]) {
+		if a.maxReplicasNeeded(currentObjs[cluster]) {
 			replicas.max++
 			if lists.availableMax.Len() > 0 {
 				popped, notEmpty := lists.availableMax.PopAny()
@@ -708,7 +719,7 @@ func distributeMaxReplicas(toDistributeMax int32, lists hpaLists, rdc replicaNum
 // rdc: replicadistributioncount for max and min.
 // currentObjs: list of current cluster hpas.
 // scheduled: schedule state which will be updated in place.
-func distributeMinReplicas(toDistributeMin int32, lists hpaLists, rdc replicaNums,
+func (a *HpaAdapter) distributeMinReplicas(toDistributeMin int32, lists hpaLists, rdc replicaNums,
 	currentObjs map[string]pkgruntime.Object, scheduled map[string]*replicaNums) int32 {
 	for cluster, replicas := range scheduled {
 		if toDistributeMin == 0 {
@@ -719,7 +730,7 @@ func distributeMinReplicas(toDistributeMin int32, lists hpaLists, rdc replicaNum
 		if replicas == nil || currentObjs[cluster] == nil {
 			continue
 		}
-		if minReplicasIncreasable(currentObjs[cluster]) {
+		if a.minReplicasIncreasable(currentObjs[cluster]) {
 			if lists.availableMin.Len() > 0 {
 				popped, notEmpty := lists.availableMin.PopAny()
 				if notEmpty {
@@ -842,18 +853,18 @@ func isPristine(hpa *autoscalingv1.HorizontalPodAutoscaler) bool {
 
 // isScaleable tells if it already has been a reasonable amount of
 // time since this hpa scaled. Its used to avoid fast thrashing.
-func isScaleable(hpa *autoscalingv1.HorizontalPodAutoscaler) bool {
+func (a *HpaAdapter) isScaleable(hpa *autoscalingv1.HorizontalPodAutoscaler) bool {
 	if hpa.Status.LastScaleTime == nil {
 		return false
 	}
-	t := hpa.Status.LastScaleTime.Add(scaleForbiddenWindow)
+	t := hpa.Status.LastScaleTime.Add(a.scaleForbiddenWindow)
 	if t.After(time.Now()) {
 		return false
 	}
 	return true
 }
 
-func maxReplicasReducible(obj pkgruntime.Object) bool {
+func (a *HpaAdapter) maxReplicasReducible(obj pkgruntime.Object) bool {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
 	if (hpa.Spec.MinReplicas != nil) &&
 		(((hpa.Spec.MaxReplicas - 1) - *hpa.Spec.MinReplicas) < 0) {
@@ -862,7 +873,7 @@ func maxReplicasReducible(obj pkgruntime.Object) bool {
 	if isPristine(hpa) {
 		return true
 	}
-	if !isScaleable(hpa) {
+	if !a.isScaleable(hpa) {
 		return false
 	}
 	if (hpa.Status.DesiredReplicas < hpa.Status.CurrentReplicas) ||
@@ -879,14 +890,14 @@ func maxReplicasReducible(obj pkgruntime.Object) bool {
 // are not being used here, the max adjustment will lead it to become equal to min,
 // but will not be able to scale down further and offer max to some other cluster
 // which needs replicas.
-func minReplicasReducible(obj pkgruntime.Object) bool {
+func (a *HpaAdapter) minReplicasReducible(obj pkgruntime.Object) bool {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
 	if isPristine(hpa) && (hpa.Spec.MinReplicas != nil) &&
 		(*hpa.Spec.MinReplicas > 1) &&
 		(*hpa.Spec.MinReplicas <= hpa.Spec.MaxReplicas) {
 		return true
 	}
-	if !isScaleable(hpa) {
+	if !a.isScaleable(hpa) {
 		return false
 	}
 	if (hpa.Spec.MinReplicas != nil) &&
@@ -898,9 +909,9 @@ func minReplicasReducible(obj pkgruntime.Object) bool {
 	return false
 }
 
-func maxReplicasNeeded(obj pkgruntime.Object) bool {
+func (a *HpaAdapter) maxReplicasNeeded(obj pkgruntime.Object) bool {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
-	if !isScaleable(hpa) {
+	if !a.isScaleable(hpa) {
 		return false
 	}
 
@@ -911,9 +922,9 @@ func maxReplicasNeeded(obj pkgruntime.Object) bool {
 	return false
 }
 
-func minReplicasIncreasable(obj pkgruntime.Object) bool {
+func (a *HpaAdapter) minReplicasIncreasable(obj pkgruntime.Object) bool {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
-	if !isScaleable(hpa) ||
+	if !a.isScaleable(hpa) ||
 		((hpa.Spec.MinReplicas != nil) &&
 			(*hpa.Spec.MinReplicas) >= hpa.Spec.MaxReplicas) {
 		return false

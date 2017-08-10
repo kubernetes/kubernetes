@@ -95,8 +95,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                        {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                                    {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
-		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJob"}:                               {},
-		{Group: "batch", Version: "v2alpha1", Kind: "ScheduledJobList"}:                           {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
 		{Group: "componentconfig", Version: "v1alpha1", Kind: "KubeProxyConfiguration"}:           {},

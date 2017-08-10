@@ -10,13 +10,18 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["rest_test.go"],
+    srcs = [
+        "namer_test.go",
+        "rest_test.go",
+    ],
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

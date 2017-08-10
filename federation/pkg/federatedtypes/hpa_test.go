@@ -18,7 +18,6 @@ package federatedtypes
 
 import (
 	"testing"
-	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -191,12 +190,15 @@ func TestGetHpaScheduleState(t *testing.T) {
 		},
 	}
 
+	adapter := &HpaAdapter{
+		scaleForbiddenWindow: ScaleForbiddenWindow,
+	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			if testCase.fedHpa == nil {
 				testCase.fedHpa = defaultFedHpa
 			}
-			scheduledState := getHpaScheduleState(testCase.fedHpa, testCase.localHpas)
+			scheduledState := adapter.getHpaScheduleState(testCase.fedHpa, testCase.localHpas)
 			checkClusterConditions(t, testCase.fedHpa, scheduledState)
 			if testCase.expectedReplicas != nil {
 				for cluster, replicas := range testCase.expectedReplicas {
@@ -216,8 +218,8 @@ func updateHpaStatus(hpa *autoscalingv1.HorizontalPodAutoscaler, currentUtilisat
 	now := metav1.Now()
 	scaledTime := now
 	if scaleable {
-		// definitely more then 5 minutes ago
-		scaledTime = metav1.NewTime(now.Time.Add(-6 * time.Minute))
+		// definitely more then ScaleForbiddenWindow time ago
+		scaledTime = metav1.NewTime(now.Time.Add(-2 * ScaleForbiddenWindow))
 	}
 	hpa.Status.LastScaleTime = &scaledTime
 	return hpa

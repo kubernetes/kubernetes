@@ -280,6 +280,12 @@ func TestCreateApplyRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	set.Spec.Template.Spec.Containers[0].Name = "foo"
+	if set.Annotations == nil {
+		set.Annotations = make(map[string]string)
+	}
+	key := "foo"
+	expectedValue := "bar"
+	set.Annotations[key] = expectedValue
 	restoredSet, err := applyRevision(set, revision)
 	if err != nil {
 		t.Fatal(err)
@@ -290,6 +296,13 @@ func TestCreateApplyRevision(t *testing.T) {
 	}
 	if !history.EqualRevision(revision, restoredRevision) {
 		t.Errorf("wanted %v got %v", string(revision.Data.Raw), string(restoredRevision.Data.Raw))
+	}
+	value, ok := restoredRevision.Annotations[key]
+	if !ok {
+		t.Errorf("missing annotation %s", key)
+	}
+	if value != expectedValue {
+		t.Errorf("for annotation %s wanted %s got %s", key, expectedValue, value)
 	}
 }
 

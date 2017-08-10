@@ -55,18 +55,14 @@ type fakeResponder struct {
 	w http.ResponseWriter
 }
 
-func (r *fakeResponder) Error(err error) {
+func (r *fakeResponder) Error(w http.ResponseWriter, req *http.Request, err error) {
 	if r.called {
 		r.t.Errorf("Error responder called again!\nprevious error: %v\nnew error: %v", r.err, err)
 	}
 
-	if r.w != nil {
-		r.w.WriteHeader(fakeStatusCode)
-		_, writeErr := r.w.Write([]byte(err.Error()))
-		assert.NoError(r.t, writeErr)
-	} else {
-		r.t.Logf("No ResponseWriter set")
-	}
+	w.WriteHeader(fakeStatusCode)
+	_, writeErr := w.Write([]byte(err.Error()))
+	assert.NoError(r.t, writeErr)
 
 	r.called = true
 	r.err = err
@@ -459,7 +455,7 @@ type noErrorsAllowed struct {
 	t *testing.T
 }
 
-func (r *noErrorsAllowed) Error(err error) {
+func (r *noErrorsAllowed) Error(w http.ResponseWriter, req *http.Request, err error) {
 	r.t.Error(err)
 }
 

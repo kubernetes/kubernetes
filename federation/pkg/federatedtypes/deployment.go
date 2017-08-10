@@ -44,7 +44,7 @@ type DeploymentAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewDeploymentAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewDeploymentAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	schedulingAdapter := replicaSchedulingAdapter{
 		preferencesAnnotationName: FedDeploymentPreferencesAnnotation,
 		updateStatusFunc: func(obj pkgruntime.Object, schedulingInfo interface{}) error {

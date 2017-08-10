@@ -74,6 +74,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -189,7 +190,15 @@ type Bootstrap interface {
 }
 
 // Builder creates and initializes a Kubelet instance
-type Builder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, hostnameOverride, nodeIP, providerID string) (Bootstrap, error)
+type Builder func(kubeCfg *componentconfig.KubeletConfiguration,
+	kubeDeps *Dependencies,
+	crOptions *options.ContainerRuntimeOptions,
+	hostnameOverride,
+	nodeIP,
+	providerID,
+	cloudProvider,
+	certDirectory,
+	rootDirectory string) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -218,23 +227,24 @@ type Dependencies struct {
 	Options                 []Option
 
 	// Injected Dependencies
-	Auth               server.AuthInterface
-	CAdvisorInterface  cadvisor.Interface
-	Cloud              cloudprovider.Interface
-	ContainerManager   cm.ContainerManager
-	DockerClient       libdocker.Interface
-	EventClient        v1core.EventsGetter
-	KubeClient         clientset.Interface
-	ExternalKubeClient clientgoclientset.Interface
-	Mounter            mount.Interface
-	NetworkPlugins     []network.NetworkPlugin
-	OOMAdjuster        *oom.OOMAdjuster
-	OSInterface        kubecontainer.OSInterface
-	PodConfig          *config.PodConfig
-	Recorder           record.EventRecorder
-	Writer             kubeio.Writer
-	VolumePlugins      []volume.VolumePlugin
-	TLSOptions         *server.TLSOptions
+	Auth                    server.AuthInterface
+	CAdvisorInterface       cadvisor.Interface
+	Cloud                   cloudprovider.Interface
+	ContainerManager        cm.ContainerManager
+	DockerClient            libdocker.Interface
+	EventClient             v1core.EventsGetter
+	KubeClient              clientset.Interface
+	ExternalKubeClient      clientgoclientset.Interface
+	Mounter                 mount.Interface
+	NetworkPlugins          []network.NetworkPlugin
+	OOMAdjuster             *oom.OOMAdjuster
+	OSInterface             kubecontainer.OSInterface
+	PodConfig               *config.PodConfig
+	Recorder                record.EventRecorder
+	Writer                  kubeio.Writer
+	VolumePlugins           []volume.VolumePlugin
+	TLSOptions              *server.TLSOptions
+	KubeletConfigController *kubeletconfig.Controller
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -284,9 +294,17 @@ func getRuntimeAndImageServices(config *componentconfig.KubeletConfiguration) (i
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dependencies, crOptions *options.ContainerRuntimeOptions, hostnameOverride, nodeIP, providerID string) (*Kubelet, error) {
-	if kubeCfg.RootDirectory == "" {
-		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration,
+	kubeDeps *Dependencies,
+	crOptions *options.ContainerRuntimeOptions,
+	hostnameOverride,
+	nodeIP,
+	providerID,
+	cloudProvider,
+	certDirectory,
+	rootDirectory string) (*Kubelet, error) {
+	if rootDirectory == "" {
+		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
 	if kubeCfg.SyncFrequency.Duration <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
@@ -429,7 +447,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		hostname:                       hostname,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
-		rootDirectory:                  kubeCfg.RootDirectory,
+		rootDirectory:                  rootDirectory,
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                   kubeCfg.RegisterNode,
@@ -443,8 +461,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		cloud:                          kubeDeps.Cloud,
-		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
-		externalCloudProvider:     cloudprovider.IsExternal(kubeCfg.CloudProvider),
+		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == cloudProvider),
+		externalCloudProvider:     cloudprovider.IsExternal(cloudProvider),
 		providerID:                providerID,
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
@@ -696,7 +714,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Dep
 
 		ips = append(ips, cloudIPs...)
 		names := append([]string{klet.GetHostname(), hostnameOverride}, cloudNames...)
-		klet.serverCertificateManager, err = certificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names)
+		klet.serverCertificateManager, err = certificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, ips, names, certDirectory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}

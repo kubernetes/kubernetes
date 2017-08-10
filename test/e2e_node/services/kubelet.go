@@ -28,6 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
@@ -92,6 +94,9 @@ const (
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
 	glog.Info("Starting kubelet")
+
+	// set feature gates so we can check which features are enabled and pass the appropriate flags
+	utilfeature.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -164,6 +169,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-minimum-reclaim", "nodefs.available=5%,nodefs.inodesFree=5%", // The minimum reclaimed resources after eviction.
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		// Enable dynamic config if the feature gate is enabled
+		dynamicConfigDir, err := getDynamicConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		cmdArgs = append(cmdArgs, "--dynamic-config-dir", dynamicConfigDir)
+	}
+
 	// Enable kubenet by default.
 	cniBinDir, err := getCNIBinDirectory()
 	if err != nil {
@@ -292,6 +307,15 @@ func getCNIConfDirectory() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, "cni", "net.d"), nil
+}
+
+// getDynamicConfigDir returns the directory for dynamic Kubelet configuration
+func getDynamicConfigDir() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "dynamic-kubelet-config"), nil
 }
 
 // adjustArgsForSystemd escape special characters in kubelet arguments for systemd. Systemd

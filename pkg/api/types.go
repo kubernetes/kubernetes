@@ -2722,6 +2722,18 @@ type ServiceSpec struct {
 	// and ExternalTrafficPolicy is set to Local.
 	// +optional
 	HealthCheckNodePort int32
+
+	// publishNotReadyAddresses, when set to true, indicates that DNS implementations
+	// must publish the notReadyAddresses of subsets for the Endpoints associated with
+	// the Service. The default value is false.
+	// The primary use case for setting this field is to use a StatefulSet's Headless Service
+	// to propagate SRV records for its Pods without respect to their readiness for purpose
+	// of peer discovery.
+	// This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
+	// when that annotation is deprecated and all clients have been converted to use this
+	// field.
+	// +optional
+	PublishNotReadyAddresses bool
 }
 
 type ServicePort struct {
@@ -2913,6 +2925,19 @@ type NodeSpec struct {
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint
+
+	// If specified, the source to get node configuration from
+	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +optional
+	ConfigSource *NodeConfigSource
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+type NodeConfigSource struct {
+	metav1.TypeMeta
+	ConfigMapRef *ObjectReference
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.

@@ -56,6 +56,17 @@ const (
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
 	mounterPath string
+	withSystemd bool
+}
+
+// New returns a mount.Interface for the current system.
+// It provides options to override the default mounter behavior.
+// mounterPath allows using an alternative to `/bin/mount` for mounting.
+func New(mounterPath string) Interface {
+	return &Mounter{
+		mounterPath: mounterPath,
+		withSystemd: detectSystemd(),
+	}
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -69,18 +80,18 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	mounterPath := ""
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"})
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs")
 	if fsTypesNeedMounter.Has(fstype) {
 		mounterPath = mounter.mounterPath
 	}
-	return doMount(mounterPath, defaultMountCommand, source, target, fstype, options)
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options)
 }
 
 // isBind detects whether a bind mount is being requested and makes the remount options to
@@ -109,22 +120,78 @@ func isBind(options []string) (bool, []string) {
 }
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
-func doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
+func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
 	mountArgs := makeMountArgs(source, target, fstype, options)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountCmd = mounterPath
 	}
 
+	if m.withSystemd {
+		// Try to run mount via systemd-run --scope. This will escape the
+		// service where kubelet runs and any fuse daemons will be started in a
+		// specific scope. kubelet service than can be restarted without killing
+		// these fuse daemons.
+		//
+		// Complete command line (when mounterPath is not used):
+		// systemd-run --description=... --scope -- mount -t <type> <what> <where>
+		//
+		// Expected flow:
+		// * systemd-run creates a transient scope (=~ cgroup) and executes its
+		//   argument (/bin/mount) there.
+		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		//   (systemd-run --scope finishes at this point, returning mount's exit
+		//   code and stdout/stderr - thats one of --scope benefits).
+		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
+		//   cgroup) until the fuse daemon dies (another --scope benefit).
+		//   Kubelet service can be restarted and the fuse daemon survives.
+		// * When the fuse daemon dies (e.g. during unmount) systemd removes the
+		//   scope automatically.
+		//
+		// systemd-mount is not used because it's too new for older distros
+		// (CentOS 7, Debian Jessie).
+		mountCmd, mountArgs = addSystemdScope("systemd-run", target, mountCmd, mountArgs)
+	} else {
+		// No systemd-run on the host (or we failed to check it), assume kubelet
+		// does not run as a systemd service.
+		// No code here, mountCmd and mountArgs are already populated.
+	}
+
 	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, mountCmd, source, target, fstype, options, string(output))
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
-			err, mountCmd, source, target, fstype, options, string(output))
+		args := strings.Join(mountArgs, " ")
+		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n", err, mountCmd, args, string(output))
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
+			err, mountCmd, args, string(output))
 	}
 	return err
+}
+
+// detectSystemd returns true if OS runs with systemd as init. When not sure
+// (permission errors, ...), it returns false.
+// There may be different ways how to detect systemd, this one makes sure that
+// systemd-runs (needed by Mount()) works.
+func detectSystemd() bool {
+	if _, err := exec.LookPath("systemd-run"); err != nil {
+		glog.V(2).Infof("Detected OS without systemd")
+		return false
+	}
+	// Try to run systemd-run --scope /bin/true, that should be enough
+	// to make sure that systemd is really running and not just installed,
+	// which happens when running in a container with a systemd-based image
+	// but with different pid 1.
+	cmd := exec.Command("systemd-run", "--description=Kubernetes systemd probe", "--scope", "true")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		glog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
+		glog.V(4).Infof("systemd-run failed with: %v", err)
+		glog.V(4).Infof("systemd-run output: %s", string(output))
+		return false
+	}
+	glog.V(2).Infof("Detected OS with systemd")
+	return true
 }
 
 // makeMountArgs makes the arguments to the mount(8) command.
@@ -144,6 +211,13 @@ func makeMountArgs(source, target, fstype string, options []string) []string {
 	mountArgs = append(mountArgs, target)
 
 	return mountArgs
+}
+
+// addSystemdScope adds "system-run --scope" to given command line
+func addSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
+	descriptionArg := fmt.Sprintf("--description=Kubernetes transient mount for %s", mountName)
+	systemdRunArgs := []string{descriptionArg, "--scope", "--", command}
+	return systemdRunPath, append(systemdRunArgs, args...)
 }
 
 // Unmount unmounts the target.

@@ -23,8 +23,12 @@ import (
 
 // NewKubelet creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubelet() *Server {
-	s := options.NewKubeletServer()
+func NewKubelet() (*Server, error) {
+	s, err := options.NewKubeletServer()
+	if err != nil {
+		return nil, err
+	}
+
 	hks := Server{
 		name:        "kubelet",
 		SimpleUsage: "kubelet",
@@ -39,5 +43,5 @@ func NewKubelet() *Server {
 		},
 	}
 	s.AddFlags(hks.Flags())
-	return &hks
+	return &hks, nil
 }

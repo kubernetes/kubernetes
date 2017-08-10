@@ -41,6 +41,7 @@ import (
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -221,25 +222,27 @@ func (i *Init) Validate(cmd *cobra.Command) error {
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 
-	// PHASE 1: Generate certificates
-	err := cmdphases.CreatePKIAssets(i.cfg)
+	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
 	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
+	}
+
+	// PHASE 1: Generate certificates
+	if err := cmdphases.CreatePKIAssets(i.cfg); err != nil {
 		return err
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-	err = kubeconfigphase.CreateInitKubeConfigFiles(kubeadmconstants.KubernetesDir, i.cfg)
-	if err != nil {
+	if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeadmconstants.KubernetesDir, i.cfg); err != nil {
 		return err
 	}
 
 	// PHASE 3: Bootstrap the control plane
-	if err := controlplanephase.WriteStaticPodManifests(i.cfg); err != nil {
+	if err := controlplanephase.WriteStaticPodManifests(i.cfg, k8sVersion, kubeadmconstants.GetStaticPodDirectory()); err != nil {
 		return err
 	}
 
-	adminKubeConfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
-	client, err := kubeadmutil.CreateClientAndWaitForAPI(adminKubeConfigPath)
+	client, err := kubeadmutil.CreateClientAndWaitForAPI(kubeadmconstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return err
 	}
@@ -258,25 +261,23 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := tokenphase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
+	if err := tokenphase.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
 		return err
 	}
 
 	// PHASE 5: Install and deploy all addons, and configure things as necessary
 
-	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
-	}
-
-	// Create the necessary ServiceAccounts
-	err = apiconfigphase.CreateServiceAccounts(client)
-	if err != nil {
+	// Upload currently used configuration to the cluster
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
 		return err
 	}
 
-	err = apiconfigphase.CreateRBACRules(client, k8sVersion)
-	if err != nil {
+	// Create the necessary ServiceAccounts
+	if err := apiconfigphase.CreateServiceAccounts(client); err != nil {
+		return err
+	}
+
+	if err := apiconfigphase.CreateRBACRules(client, k8sVersion); err != nil {
 		return err
 	}
 

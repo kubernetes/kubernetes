@@ -38,11 +38,6 @@ import (
 const (
 	dnsLabelErrMsg          = "a DNS-1123 label must consist of"
 	dnsSubdomainLabelErrMsg = "a DNS-1123 subdomain"
-	labelErrMsg             = "a valid label must be an empty string or consist of"
-	lowerCaseLabelErrMsg    = "a valid label must consist of"
-	maxLengthErrMsg         = "must be no more than"
-	namePartErrMsg          = "name part must consist of"
-	nameErrMsg              = "a qualified name must consist of"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
 
@@ -9349,19 +9344,10 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 
 	var (
 		missingBasicAuthUsernamePasswordKeys = validBasicAuthSecret()
-		// invalidBasicAuthUsernamePasswordKey  = validBasicAuthSecret()
-		// emptyBasicAuthUsernameKey            = validBasicAuthSecret()
-		// emptyBasicAuthPasswordKey            = validBasicAuthSecret()
 	)
 
 	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthUsernameKey)
 	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthPasswordKey)
-
-	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthUsernameKey] = []byte("bad")
-	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthPasswordKey] = []byte("bad")
-
-	// emptyBasicAuthUsernameKey.Data[api.BasicAuthUsernameKey] = []byte("")
-	// emptyBasicAuthPasswordKey.Data[api.BasicAuthPasswordKey] = []byte("")
 
 	tests := map[string]struct {
 		secret api.Secret
@@ -9369,9 +9355,6 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 	}{
 		"valid": {validBasicAuthSecret(), true},
 		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
-		// "invalid username and password": {invalidBasicAuthUsernamePasswordKey, false},
-		// "empty username":   {emptyBasicAuthUsernameKey, false},
-		// "empty password":   {emptyBasicAuthPasswordKey, false},
 	}
 
 	for name, tc := range tests {

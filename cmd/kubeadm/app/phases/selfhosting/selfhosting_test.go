@@ -25,6 +25,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -543,17 +544,17 @@ func TestBuildDaemonSet(t *testing.T) {
 		dsBytes   []byte
 	}{
 		{
-			component: kubeAPIServer,
+			component: kubeadmconstants.KubeAPIServer,
 			podBytes:  []byte(testAPIServerPod),
 			dsBytes:   []byte(testAPIServerDaemonSet),
 		},
 		{
-			component: kubeControllerManager,
+			component: kubeadmconstants.KubeControllerManager,
 			podBytes:  []byte(testControllerManagerPod),
 			dsBytes:   []byte(testControllerManagerDaemonSet),
 		},
 		{
-			component: kubeScheduler,
+			component: kubeadmconstants.KubeScheduler,
 			podBytes:  []byte(testSchedulerPod),
 			dsBytes:   []byte(testSchedulerDaemonSet),
 		},

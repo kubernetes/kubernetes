@@ -123,8 +123,11 @@ const (
 // necessary to perform the update for the indicated strategy.
 type StatefulSetUpdateStrategy struct {
 	// Type indicates the type of the StatefulSetUpdateStrategy.
+	// Default is RollingUpdate.
+	// +optional
 	Type StatefulSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=StatefulSetStrategyType"`
 	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	// +optional
 	RollingUpdate *RollingUpdateStatefulSetStrategy `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 
@@ -152,6 +155,8 @@ const (
 type RollingUpdateStatefulSetStrategy struct {
 	// Partition indicates the ordinal at which the StatefulSet should be
 	// partitioned.
+	// Default value is 0.
+	// +optional
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 }
 
@@ -479,8 +484,7 @@ type DeploymentList struct {
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
 type DaemonSetUpdateStrategy struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
-	// Default is OnDelete.
+	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
 	// +optional
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 

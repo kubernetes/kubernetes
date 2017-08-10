@@ -18,7 +18,6 @@ package v1beta2
 
 import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -28,22 +27,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_DaemonSet(obj *appsv1beta2.DaemonSet) {
-	labels := obj.Spec.Template.Labels
-
-	// TODO: support templates defined elsewhere when we support them in the API
-	if labels != nil {
-		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = appsv1beta2.OnDeleteDaemonSetStrategyType
+		updateStrategy.Type = appsv1beta2.RollingUpdateDaemonSetStrategyType
 	}
 	if updateStrategy.Type == appsv1beta2.RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {
@@ -68,19 +54,19 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 	}
 
 	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1beta2.OnDeleteStatefulSetStrategyType
+		obj.Spec.UpdateStrategy.Type = appsv1beta2.RollingUpdateStatefulSetStrategyType
+
+		// UpdateStrategy.RollingUpdate will take default values below.
+		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1beta2.RollingUpdateStatefulSetStrategy{}
 	}
-	labels := obj.Spec.Template.Labels
-	if labels != nil {
-		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
+
+	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
 	}
+
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
@@ -89,13 +75,6 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
-	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
-		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
-	}
-
 }
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart
@@ -105,17 +84,6 @@ func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 // - RevisionHistoryLimit set to 10 (not set in extensions)
 // - ProgressDeadlineSeconds set to 600s (not set in extensions)
 func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
-	// Default labels and selector to labels from pod template spec.
-	labels := obj.Spec.Template.Labels
-
-	if labels != nil {
-		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
 	// Set appsv1beta2.DeploymentSpec.Replicas to 1 if it is not set.
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
@@ -153,19 +121,6 @@ func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
 }
 
 func SetDefaults_ReplicaSet(obj *appsv1beta2.ReplicaSet) {
-	labels := obj.Spec.Template.Labels
-
-	// TODO: support templates defined elsewhere when we support them in the API
-	if labels != nil {
-		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &metav1.LabelSelector{
-				MatchLabels: labels,
-			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1

@@ -63,6 +63,8 @@ const (
 	// receiving traffic for the Service from the moment the kubelet starts all
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
+	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
+	// subsequent releases.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
