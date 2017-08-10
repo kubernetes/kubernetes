@@ -1596,6 +1596,7 @@ func autoConvert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, 
 	out.Lun = (*int32)(unsafe.Pointer(in.Lun))
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	out.WWIDs = *(*[]string)(unsafe.Pointer(&in.WWIDs))
 	return nil
 }
 
@@ -1605,14 +1606,11 @@ func Convert_v1_FCVolumeSource_To_api_FCVolumeSource(in *v1.FCVolumeSource, out 
 }
 
 func autoConvert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out *v1.FCVolumeSource, s conversion.Scope) error {
-	if in.TargetWWNs == nil {
-		out.TargetWWNs = make([]string, 0)
-	} else {
-		out.TargetWWNs = *(*[]string)(unsafe.Pointer(&in.TargetWWNs))
-	}
+	out.TargetWWNs = *(*[]string)(unsafe.Pointer(&in.TargetWWNs))
 	out.Lun = (*int32)(unsafe.Pointer(in.Lun))
 	out.FSType = in.FSType
 	out.ReadOnly = in.ReadOnly
+	out.WWIDs = *(*[]string)(unsafe.Pointer(&in.WWIDs))
 	return nil
 }
 

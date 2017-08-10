@@ -57094,17 +57094,13 @@
    },
    "io.k8s.api.core.v1.FCVolumeSource": {
     "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-    "required": [
-     "targetWWNs",
-     "lun"
-    ],
     "properties": {
      "fsType": {
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
       "type": "string"
      },
      "lun": {
-      "description": "Required: FC target lun number",
+      "description": "Optional: FC target lun number",
       "type": "integer",
       "format": "int32"
      },
@@ -57113,7 +57109,14 @@
       "type": "boolean"
      },
      "targetWWNs": {
-      "description": "Required: FC target worldwide names (WWNs)",
+      "description": "Optional: FC target worldwide names (WWNs)",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "wwids": {
+      "description": "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
       "type": "array",
       "items": {
        "type": "string"

@@ -1014,10 +1014,12 @@ message ExecAction {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 message FCVolumeSource {
-  // Required: FC target worldwide names (WWNs)
+  // Optional: FC target worldwide names (WWNs)
+  // +optional
   repeated string targetWWNs = 1;
 
-  // Required: FC target lun number
+  // Optional: FC target lun number
+  // +optional
   optional int32 lun = 2;
 
   // Filesystem type to mount.
@@ -1031,6 +1033,11 @@ message FCVolumeSource {
   // the ReadOnly setting in VolumeMounts.
   // +optional
   optional bool readOnly = 4;
+
+  // Optional: FC volume world wide identifiers (wwids)
+  // Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
+  // +optional
+  repeated string wwids = 5;
 }
 
 // FlexVolume represents a generic volume resource that is

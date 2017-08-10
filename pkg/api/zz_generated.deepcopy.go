@@ -2084,6 +2084,11 @@ func (in *FCVolumeSource) DeepCopyInto(out *FCVolumeSource) {
 			**out = **in
 		}
 	}
+	if in.WWIDs != nil {
+		in, out := &in.WWIDs, &out.WWIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

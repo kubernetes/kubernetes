@@ -541,10 +541,11 @@ func (ExecAction) SwaggerDoc() map[string]string {
 
 var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-	"targetWWNs": "Required: FC target worldwide names (WWNs)",
-	"lun":        "Required: FC target lun number",
+	"targetWWNs": "Optional: FC target worldwide names (WWNs)",
+	"lun":        "Optional: FC target lun number",
 	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"wwids":      "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
 }
 
 func (FCVolumeSource) SwaggerDoc() map[string]string {
