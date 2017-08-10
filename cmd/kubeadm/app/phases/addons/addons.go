@@ -30,6 +30,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
@@ -100,14 +101,8 @@ func CreateKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
 	}
 
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(kubeproxyConfigMap); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create a new kube-proxy configmap: %v", err)
-		}
-
-		if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(kubeproxyConfigMap); err != nil {
-			return fmt.Errorf("unable to update the kube-proxy configmap: %v", err)
-		}
+	if err := apiclientutil.CreateConfigMapIfNotExists(client, kubeproxyConfigMap); err != nil {
+		return err
 	}
 
 	kubeproxyDaemonSet := &extensions.DaemonSet{}
