@@ -12,32 +12,24 @@ go_library(
     name = "go_default_library",
     srcs = [
         "vsphere.go",
-        "vsphere_metrics.go",
         "vsphere_util.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib/diskmanagers:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
-        "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
-        "//vendor/github.com/vmware/govmomi/pbm:go_default_library",
-        "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",
-        "//vendor/github.com/vmware/govmomi/property:go_default_library",
-        "//vendor/github.com/vmware/govmomi/session:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
-        "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
-        "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 
@@ -48,6 +40,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
@@ -63,6 +56,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/cloudprovider/providers/vsphere/vclib:all-srcs",
+    ],
     tags = ["automanaged"],
 )

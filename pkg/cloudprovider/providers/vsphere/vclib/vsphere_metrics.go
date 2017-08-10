@@ -14,33 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vsphere
+package vclib
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Cloud Provider API constants
 const (
-	api_createvolume = "CreateVolume"
-	api_deletevolume = "DeleteVolume"
-	api_attachvolume = "AttachVolume"
-	api_detachvolume = "DetachVolume"
+	APICreateVolume = "CreateVolume"
+	APIDeleteVolume = "DeleteVolume"
+	APIAttachVolume = "AttachVolume"
+	APIDetachVolume = "DetachVolume"
 )
 
+// Cloud Provider Operation constants
 const (
-	operation_deletevolume                      = "DeleteVolumeOperation"
-	operation_attachvolume                      = "AttachVolumeOperation"
-	operation_detachvolume                      = "DetachVolumeOperation"
-	operation_diskIsAttached                    = "DiskIsAttachedOperation"
-	operation_disksAreAttached                  = "DisksAreAttachedOperation"
-	operation_createvolume                      = "CreateVolumeOperation"
-	operation_createvolume_with_policy          = "CreateVolumeWithPolicyOperation"
-	operation_createvolume_with_raw_vsan_policy = "CreateVolumeWithRawVSANPolicyOperation"
+	OperationDeleteVolume                  = "DeleteVolumeOperation"
+	OperationAttachVolume                  = "AttachVolumeOperation"
+	OperationDetachVolume                  = "DetachVolumeOperation"
+	OperationDiskIsAttached                = "DiskIsAttachedOperation"
+	OperationDisksAreAttached              = "DisksAreAttachedOperation"
+	OperationCreateVolume                  = "CreateVolumeOperation"
+	OperationCreateVolumeWithPolicy        = "CreateVolumeWithPolicyOperation"
+	OperationCreateVolumeWithRawVSANPolicy = "CreateVolumeWithRawVSANPolicyOperation"
 )
 
-// vsphereApiMetric is for recording latency of Single API Call.
-var vsphereApiMetric = prometheus.NewHistogramVec(
+// vsphereAPIMetric is for recording latency of Single API Call.
+var vsphereAPIMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name: "cloudprovider_vsphere_api_request_duration_seconds",
 		Help: "Latency of vsphere api call",
@@ -48,7 +51,7 @@ var vsphereApiMetric = prometheus.NewHistogramVec(
 	[]string{"request"},
 )
 
-var vsphereApiErrorMetric = prometheus.NewCounterVec(
+var vsphereAPIErrorMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "cloudprovider_vsphere_api_request_errors",
 		Help: "vsphere Api errors",
@@ -73,16 +76,18 @@ var vsphereOperationErrorMetric = prometheus.NewCounterVec(
 	[]string{"operation"},
 )
 
-func registerMetrics() {
-	prometheus.MustRegister(vsphereApiMetric)
-	prometheus.MustRegister(vsphereApiErrorMetric)
+// RegisterMetrics registers all the API and Operation metrics
+func RegisterMetrics() {
+	prometheus.MustRegister(vsphereAPIMetric)
+	prometheus.MustRegister(vsphereAPIErrorMetric)
 	prometheus.MustRegister(vsphereOperationMetric)
 	prometheus.MustRegister(vsphereOperationErrorMetric)
 }
 
-func recordvSphereMetric(actionName string, requestTime time.Time, err error) {
+// RecordvSphereMetric records the vSphere API and Operation metrics
+func RecordvSphereMetric(actionName string, requestTime time.Time, err error) {
 	switch actionName {
-	case api_createvolume, api_deletevolume, api_attachvolume, api_detachvolume:
+	case APICreateVolume, APIDeleteVolume, APIAttachVolume, APIDetachVolume:
 		recordvSphereAPIMetric(actionName, requestTime, err)
 	default:
 		recordvSphereOperationMetric(actionName, requestTime, err)
@@ -91,9 +96,9 @@ func recordvSphereMetric(actionName string, requestTime time.Time, err error) {
 
 func recordvSphereAPIMetric(actionName string, requestTime time.Time, err error) {
 	if err != nil {
-		vsphereApiErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+		vsphereAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
 	} else {
-		vsphereApiMetric.With(prometheus.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
+		vsphereAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(calculateTimeTaken(requestTime))
 	}
 }
 
@@ -105,16 +110,17 @@ func recordvSphereOperationMetric(actionName string, requestTime time.Time, err 
 	}
 }
 
-func recordCreateVolumeMetric(volumeOptions *VolumeOptions, requestTime time.Time, err error) {
+// RecordCreateVolumeMetric records the Create Volume metric
+func RecordCreateVolumeMetric(volumeOptions *VolumeOptions, requestTime time.Time, err error) {
 	var actionName string
 	if volumeOptions.StoragePolicyName != "" {
-		actionName = operation_createvolume_with_policy
+		actionName = OperationCreateVolumeWithPolicy
 	} else if volumeOptions.VSANStorageProfileData != "" {
-		actionName = operation_createvolume_with_raw_vsan_policy
+		actionName = OperationCreateVolumeWithRawVSANPolicy
 	} else {
-		actionName = operation_createvolume
+		actionName = OperationCreateVolume
 	}
-	recordvSphereMetric(actionName, requestTime, err)
+	RecordvSphereMetric(actionName, requestTime, err)
 }
 
 func calculateTimeTaken(requestBeginTime time.Time) (timeTaken float64) {
