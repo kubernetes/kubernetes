@@ -25,6 +25,7 @@ filegroup(
         "//federation/cmd/genfeddocs:all-srcs",
         "//federation/cmd/kubefed:all-srcs",
         "//federation/develop:all-srcs",
+        "//federation/pkg/apiserver:all-srcs",
         "//federation/pkg/dnsprovider:all-srcs",
         "//federation/pkg/federatedtypes:all-srcs",
         "//federation/pkg/federation-controller:all-srcs",
