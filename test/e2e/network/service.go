@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
@@ -1454,7 +1453,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
 		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
-		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
+		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
@@ -1531,7 +1530,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 		}()
 
-		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
+		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
@@ -1636,13 +1635,13 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		}()
 
 		// save the health check node port because it disappears when ESIPP is turned off.
-		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
+		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 
 		By("turning ESIPP off")
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 		})
-		if service.GetServiceHealthCheckNodePort(svc) > 0 {
+		if svc.Spec.HealthCheckNodePort > 0 {
 			framework.Failf("Service HealthCheck NodePort still present")
 		}
 

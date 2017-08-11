@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 
@@ -87,7 +86,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
 	healthCheckPort := gcecloud.GetNodesHealthCheckPort()
 	if !isNodesHealthCheck {
-		healthCheckPort = apiservice.GetServiceHealthCheckNodePort(svc)
+		healthCheckPort = svc.Spec.HealthCheckNodePort
 	}
 	fw.Allowed = []*compute.FirewallAllowed{
 		{
