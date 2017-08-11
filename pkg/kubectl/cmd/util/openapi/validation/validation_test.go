@@ -42,7 +42,7 @@ var _ = Describe("resource validation using OpenAPI Schema", func() {
 	})
 
 	It("validates a valid pod", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 apiVersion: v1
 kind: Pod
 metadata:
@@ -64,7 +64,7 @@ spec:
 	})
 
 	It("finds invalid command (string instead of []string) in Json Pod", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -98,7 +98,7 @@ spec:
 	})
 
 	It("fails because hostPort is string instead of int", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -150,7 +150,7 @@ spec:
 	})
 
 	It("fails because volume is not an array of object", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -191,7 +191,7 @@ spec:
 	})
 
 	It("fails because some string lists have empty strings", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 apiVersion: v1
 kind: Pod
 metadata:

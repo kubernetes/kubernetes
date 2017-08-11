@@ -38,7 +38,7 @@ func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
 	}
 }
 
-func (v *SchemaValidation) Validate(data []byte) error {
+func (v *SchemaValidation) ValidateBytes(data []byte) error {
 	obj, err := parse(data)
 	if err != nil {
 		return err
