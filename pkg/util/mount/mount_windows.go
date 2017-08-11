@@ -33,28 +33,29 @@ type Mounter struct {
 }
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	if source == "tmpfs" || len(target) < 3 {
-		glog.Infof("azureMount: Skip mounting source (%q), target (%q)\n, with arguments (%q) in windows", source, target, options)
-		return nil
-	}
-
 	if !strings.HasPrefix(target, "c:") && !strings.HasPrefix(target, "C:") {
 		target = "c:" + target
 	}
+
+	if source == "tmpfs" {
+		glog.Infof("azureMount: mounting source (%q), target (%q)\n, with options (%q)", source, target, options)
+		os.MkdirAll(target, 0755)
+		return nil
+	}
+
 	parentDir := filepath.Dir(target)
 	err := os.MkdirAll(parentDir, 0755)
 	if err != nil {
-		glog.Infof("mkdir(%q) failed: %v\n", parentDir, err)
-		return err
+		return fmt.Errorf("mkdir(%q) failed: %v", parentDir, err)
 	}
 
 	if len(options) != 1 {
-		glog.Warningf("azureMount: mount options(%q) command(%n) not equal to 1, skip mounting.\n", options, len(options))
+		glog.Warningf("azureMount: mount options(%q) command(%n) not equal to 1, skip mounting.", options, len(options))
 		return nil
 	}
 	cmd := options[0]
 
-	driverLetter, err := getAvailabeDriverLetter()
+	driverLetter, err := getAvailableDriveLetter()
 	if err != nil {
 		return err
 	}
@@ -63,7 +64,11 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 
 	_, err = exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
+		// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
+		// will return error when Windows 2016 RS3 is ready on azure
+		glog.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
+		os.MkdirAll(target, 0755)
+		return nil
 	}
 
 	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
@@ -75,7 +80,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	glog.Infof("azureMount: Unmount target (%q)\n", target)
+	glog.Infof("azureMount: Unmount target (%q)", target)
 	output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v", err)
@@ -89,7 +94,7 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return (mp.Path == dir)
+	return mp.Path == dir
 }
 
 func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
@@ -109,23 +114,19 @@ func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
 }
 
 func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
+	return false, nil
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	return nil
 }
 
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, nil
-}
-
-func getAvailabeDriverLetter() (string, error) {
+func getAvailableDriveLetter() (string, error) {
 	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
 	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil || len(output) == 0 {
-		return "", fmt.Errorf("getAvailabeDriverLetter failed: %v", err)
+		return "", fmt.Errorf("getAvailableDriveLetter failed: %v", err)
 	}
 	return string(output)[:1], nil
 }
