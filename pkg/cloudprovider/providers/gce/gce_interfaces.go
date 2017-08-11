@@ -22,6 +22,7 @@ import compute "google.golang.org/api/compute/v1"
 type CloudAddressService interface {
 	ReserveRegionAddress(*compute.Address, string) error
 	GetRegionAddress(string, string) (*compute.Address, error)
+	GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error)
 	// TODO: Mock `DeleteRegionAddress(name, region string) endpoint
 	// TODO: Mock Global endpoints
 }

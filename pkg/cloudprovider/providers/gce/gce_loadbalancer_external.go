@@ -55,7 +55,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	}
 
 	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
-	loadBalancerIP := apiService.Spec.LoadBalancerIP
+	requestedIP := apiService.Spec.LoadBalancerIP
 	ports := apiService.Spec.Ports
 	portStr := []string{}
 	for _, p := range apiService.Spec.Ports {
@@ -66,10 +66,10 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
-		loadBalancerName, gce.region, loadBalancerIP, portStr, hostNames, serviceName, apiService.Annotations)
+		loadBalancerName, gce.region, requestedIP, portStr, hostNames, serviceName, apiService.Annotations)
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
-	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, loadBalancerIP, ports)
+	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, requestedIP, ports)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	// forwarding rule creation as the last thing that needs to be done in this
 	// function in order to maintain the invariant that "if the forwarding rule
 	// exists, the LB has been fully created".
-	ipAddress := ""
+	ipAddressToUse := ""
 
 	// Through this process we try to keep track of whether it is safe to
 	// release the IP that was allocated.  If the user specifically asked for
@@ -110,75 +110,42 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 		if isSafeToReleaseIP {
 			if err := gce.DeleteRegionAddress(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
-				glog.Errorf("failed to release static IP %s for load balancer (%v(%v), %v): %v", ipAddress, loadBalancerName, serviceName, gce.region, err)
+				glog.Errorf("Failed to release static IP %s for load balancer (%v(%v), %v): %v", ipAddressToUse, loadBalancerName, serviceName, gce.region, err)
 			} else if isNotFound(err) {
-				glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): address %s is not reserved.", loadBalancerName, serviceName, ipAddress)
+				glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): address %s is not reserved.", loadBalancerName, serviceName, ipAddressToUse)
 			} else {
-				glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): released static IP %s", loadBalancerName, serviceName, ipAddress)
+				glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): released static IP %s", loadBalancerName, serviceName, ipAddressToUse)
 			}
 		} else {
-			glog.Warningf("orphaning static IP %s during update of load balancer (%v(%v), %v): %v", ipAddress, loadBalancerName, serviceName, gce.region, err)
+			glog.Warningf("orphaning static IP %s during update of load balancer (%v(%v), %v): %v", ipAddressToUse, loadBalancerName, serviceName, gce.region, err)
 		}
 	}()
 
-	if loadBalancerIP != "" {
-		// If a specific IP address has been requested, we have to respect the
-		// user's request and use that IP. If the forwarding rule was already using
-		// a different IP, it will be harmlessly abandoned because it was only an
-		// ephemeral IP (or it was a different static IP owned by the user, in which
-		// case we shouldn't delete it anyway).
-		if existingAddress, err := gce.GetRegionAddressByIP(gce.region, loadBalancerIP); err != nil && !isNotFound(err) {
-			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", loadBalancerIP, err)
-		} else if err == nil {
-			// The requested IP is a static IP, owned and managed by the user.
-			isUserOwnedIP = true
-			isSafeToReleaseIP = false
-			ipAddress = loadBalancerIP
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided static IP %s (name: %s)", loadBalancerName, serviceName, ipAddress, existingAddress.Name)
-		} else if loadBalancerIP == fwdRuleIP {
-			// The requested IP is not a static IP, but is currently assigned
-			// to this forwarding rule, so we can keep it.
-			isUserOwnedIP = false
-			isSafeToReleaseIP = true
-			ipAddress, _, err = ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
-			if err != nil {
-				return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
-			}
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): using user-provided non-static IP %s", loadBalancerName, serviceName, ipAddress)
-		} else {
-			// The requested IP is not static and it is not assigned to the
-			// current forwarding rule.  It might be attached to a different
-			// rule or it might not be part of this project at all.  Either
-			// way, we can't use it.
-			return nil, fmt.Errorf("requested ip %s is neither static nor assigned to LB %s(%v): %v", loadBalancerIP, loadBalancerName, serviceName, err)
-		}
-	} else {
-		// The user did not request a specific IP.
-		isUserOwnedIP = false
-
-		// This will either allocate a new static IP if the forwarding rule didn't
-		// already have an IP, or it will promote the forwarding rule's current
-		// IP from ephemeral to static, or it will just get the IP if it is
-		// already static.
-		existed := false
-		ipAddress, existed, err = ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
+	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
+	if requestedIP != "" {
+		// If user requests a specific IP address, verify first. No mutation to
+		// the GCE resources will be performed in the verification process.
+		isUserOwnedIP, err = verifyUserRequestedIP(gce, gce.region, requestedIP, fwdRuleIP, lbRefStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to ensure static IP %s: %v", fwdRuleIP, err)
+			return nil, err
 		}
-		if existed {
-			// If the IP was not specifically requested by the user, but it
-			// already existed, it seems to be a failed update cycle.  We can
-			// use this IP and try to run through the process again, but we
-			// should not release the IP unless it is explicitly flagged as OK.
-			isSafeToReleaseIP = false
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): adopting static IP %s", loadBalancerName, serviceName, ipAddress)
-		} else {
-			// For total clarity.  The IP did not pre-exist and the user did
-			// not ask for a particular one, so we can release the IP in case
-			// of failure or success.
-			isSafeToReleaseIP = true
-			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): allocated static IP %s", loadBalancerName, serviceName, ipAddress)
+		ipAddressToUse = requestedIP
+	}
+
+	if !isUserOwnedIP {
+		// If we are not using the user-owned IP, either promote the
+		// emphemeral IP used by the fwd rule, or create a new static IP.
+		ipAddr, existed, err := ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ensure a static IP for the LB: %v", err)
 		}
+		glog.V(4).Infof("EnsureLoadBalancer(%s): ensured IP address %s", lbRefStr, ipAddr)
+		// If the IP was not owned by the user, but it already existed, it
+		// could indicate that the previous update cycle failed. We can use
+		// this IP and try to run through the process again, but we should
+		// not release the IP unless it is explicitly flagged as OK.
+		isSafeToReleaseIP = !existed
+		ipAddressToUse = ipAddr
 	}
 
 	// Deal with the firewall next. The reason we do this here rather than last
@@ -190,13 +157,13 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		return nil, err
 	}
 
-	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports, sourceRanges)
+	firewallExists, firewallNeedsUpdate, err := gce.firewallNeedsUpdate(loadBalancerName, serviceName.String(), gce.region, ipAddressToUse, ports, sourceRanges)
 	if err != nil {
 		return nil, err
 	}
 
 	if firewallNeedsUpdate {
-		desc := makeFirewallDescription(serviceName.String(), ipAddress)
+		desc := makeFirewallDescription(serviceName.String(), ipAddressToUse)
 		// Unlike forwarding rules and target pools, firewalls can be updated
 		// without needing to be deleted and recreated.
 		if firewallExists {
@@ -293,7 +260,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 			createInstances = createInstances[:maxTargetPoolCreateInstances]
 		}
 		// Pass healthchecks to createTargetPool which needs them as health check links in the target pool
-		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), ipAddress, gce.region, clusterID, createInstances, affinityType, hcToCreate); err != nil {
+		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), ipAddressToUse, gce.region, clusterID, createInstances, affinityType, hcToCreate); err != nil {
 			return nil, fmt.Errorf("failed to create target pool %s: %v", loadBalancerName, err)
 		}
 		if hcToCreate != nil {
@@ -315,8 +282,8 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 	}
 	if tpNeedsUpdate || fwdRuleNeedsUpdate {
-		glog.Infof("EnsureLoadBalancer(%v(%v)): creating forwarding rule, IP %s", loadBalancerName, serviceName, ipAddress)
-		if err := gce.createForwardingRule(loadBalancerName, serviceName.String(), gce.region, ipAddress, ports); err != nil {
+		glog.Infof("EnsureLoadBalancer(%v(%v)): creating forwarding rule, IP %s", loadBalancerName, serviceName, ipAddressToUse)
+		if err := gce.createForwardingRule(loadBalancerName, serviceName.String(), gce.region, ipAddressToUse, ports); err != nil {
 			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", loadBalancerName, err)
 		}
 		// End critical section.  It is safe to release the static IP (which
@@ -324,11 +291,11 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		// of a user-requested IP, the "is user-owned" flag will be set,
 		// preventing it from actually being released.
 		isSafeToReleaseIP = true
-		glog.Infof("EnsureLoadBalancer(%v(%v)): created forwarding rule, IP %s", loadBalancerName, serviceName, ipAddress)
+		glog.Infof("EnsureLoadBalancer(%v(%v)): created forwarding rule, IP %s", loadBalancerName, serviceName, ipAddressToUse)
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: ipAddress}}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: ipAddressToUse}}
 
 	return status, nil
 }
@@ -454,6 +421,42 @@ func (gce *GCECloud) DeleteExternalTargetPoolAndChecks(name, region, clusterID s
 	}
 
 	return nil
+}
+
+// verifyUserRequestedIP checks the user-provided IP  to see whether it can be
+// used for the LB.  It also returns whether the IP is considered owned by the
+// user.
+func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP, lbRef string) (isUserOwnedIP bool, err error) {
+	if requestedIP == "" {
+		return false, nil
+	}
+	// If a specific IP address has been requested, we have to respect the
+	// user's request and use that IP. If the forwarding rule was already using
+	// a different IP, it will be harmlessly abandoned because it was only an
+	// ephemeral IP (or it was a different static IP owned by the user, in which
+	// case we shouldn't delete it anyway).
+	existingAddress, err := s.GetRegionAddressByIP(region, requestedIP)
+	if err != nil && !isNotFound(err) {
+		glog.Errorf("verifyUserRequestedIP: failed to check whether the requested IP %q for LB %s exists: %v", requestedIP, lbRef, err)
+		return false, err
+	}
+	if err == nil {
+		// The requested IP is a static IP, owned and managed by the user.
+		glog.V(4).Infof("verifyUserRequestedIP: the requested static IP %q (name: %s) for LB %s exists.", requestedIP, existingAddress.Name, lbRef)
+		return true, nil
+	}
+	if requestedIP == fwdRuleIP {
+		// The requested IP is not a static IP, but is currently assigned
+		// to this forwarding rule, so we can just use it.
+		glog.V(4).Infof("verifyUserRequestedIP: the requested IP %q is not static, but is currently in use by for LB %s", requestedIP, lbRef)
+		return false, nil
+	}
+	// The requested IP is not static and it is not assigned to the
+	// current forwarding rule.  It might be attached to a different
+	// rule or it might not be part of this project at all.  Either
+	// way, we can't use it.
+	glog.Errorf("verifyUserRequestedIP: requested IP %q for LB %s is neither static nor assigned to the LB", requestedIP, lbRef)
+	return false, fmt.Errorf("requested ip %q is neither static nor assigned to the LB", requestedIP)
 }
 
 func (gce *GCECloud) createTargetPool(name, serviceName, ipAddress, region, clusterID string, hosts []*gceInstance, affinityType v1.ServiceAffinity, hc *compute.HttpHealthCheck) error {
