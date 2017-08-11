@@ -231,14 +231,101 @@ spec:
 `))
 
 		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
-			validation.InvalidObjectTypeError{
-				Path: "Pod.spec.containers[0].args[0]",
-				Type: "nil",
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0].args",
+				Err: validation.InvalidObjectTypeError{
+					Path: "Pod.spec.containers[0].args[0]",
+					Type: "nil",
+				},
 			},
-			validation.InvalidObjectTypeError{
-				Path: "Pod.spec.containers[0].command[0]",
-				Type: "nil",
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0].command",
+				Err: validation.InvalidObjectTypeError{
+					Path: "Pod.spec.containers[0].command[0]",
+					Type: "nil",
+				},
 			},
 		})))
+	})
+
+	It("fails if required fields are missing", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - command: ["my", "command"]
+`))
+
+		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "name",
+				},
+			},
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "image",
+				},
+			},
+		})))
+	})
+
+	It("fails if required fields are empty", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - image:
+    name:
+`))
+
+		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "name",
+				},
+			},
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "image",
+				},
+			},
+		})))
+	})
+
+	It("is fine with empty non-mandatory fields", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - image: image
+    name: name
+    command:
+`))
+
+		Expect(err).To(BeNil())
 	})
 })
