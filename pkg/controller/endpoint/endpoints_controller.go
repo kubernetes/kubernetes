@@ -434,6 +434,10 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
+	if currentEndpoints.Subsets == nil {
+		currentEndpoints.Subsets = []v1.EndpointSubset{}
+	}
+
 	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) &&
 		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
