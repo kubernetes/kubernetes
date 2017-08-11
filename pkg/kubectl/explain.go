@@ -24,7 +24,7 @@ import (
 	"github.com/emicklei/go-restful-swagger12"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
+	apiutil "k8s.io/kubernetes/pkg/kubectl/deprecated"
 )
 
 var allModels = make(map[string]*swagger.NamedModel)

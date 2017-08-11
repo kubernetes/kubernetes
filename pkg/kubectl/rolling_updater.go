@@ -23,21 +23,19 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	podutil "k8s.io/kubernetes/pkg/kubectl/deprecated"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
@@ -227,7 +225,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	// the effective scale of the old RC regardless of the configuration
 	// (equivalent to 100% maxUnavailable).
 	if desired == 0 {
-		maxUnavailable = oldRc.Spec.Replicas
+		maxUnavailable = *oldRc.Spec.Replicas
 		minAvailable = 0
 	}
 
@@ -235,7 +233,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		newRc.Name, newRc.Spec.Replicas, desired, oldRc.Name, oldRc.Spec.Replicas, minAvailable, desired+maxSurge)
 
 	// give a caller incremental notification and allow them to exit early
-	goal := desired - newRc.Spec.Replicas
+	goal := desired - *newRc.Spec.Replicas
 	if goal < 0 {
 		goal = -goal
 	}
@@ -243,7 +241,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		if config.OnProgress == nil {
 			return nil
 		}
-		progress := desired - newRc.Spec.Replicas
+		progress := desired - *newRc.Spec.Replicas
 		if progress < 0 {
 			progress = -progress
 		}
@@ -257,7 +255,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	// Scale newRc and oldRc until newRc has the desired number of replicas and
 	// oldRc has 0 replicas.
 	progressDeadline := time.Now().UnixNano() + config.Timeout.Nanoseconds()
-	for newRc.Spec.Replicas != desired || oldRc.Spec.Replicas != 0 {
+	for *newRc.Spec.Replicas != desired || *oldRc.Spec.Replicas != 0 {
 		// Store the existing replica counts for progress timeout tracking.
 		newReplicas := newRc.Spec.Replicas
 		oldReplicas := oldRc.Spec.Replicas
@@ -313,24 +311,24 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 // it detects redundancy or other relevant conditions.
 func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desired, maxSurge, maxUnavailable int32, scaleRetryParams *RetryParams, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
 	// If we're already at the desired, do nothing.
-	if newRc.Spec.Replicas == desired {
+	if *newRc.Spec.Replicas == desired {
 		return newRc, nil
 	}
 
 	// Scale up as far as we can based on the surge limit.
-	increment := (desired + maxSurge) - (oldRc.Spec.Replicas + newRc.Spec.Replicas)
+	increment := (desired + maxSurge) - (*oldRc.Spec.Replicas + *newRc.Spec.Replicas)
 	// If the old is already scaled down, go ahead and scale all the way up.
-	if oldRc.Spec.Replicas == 0 {
-		increment = desired - newRc.Spec.Replicas
+	if *oldRc.Spec.Replicas == 0 {
+		increment = desired - *newRc.Spec.Replicas
 	}
 	// We can't scale up without violating the surge limit, so do nothing.
 	if increment <= 0 {
 		return newRc, nil
 	}
 	// Increase the replica count, and deal with fenceposts.
-	newRc.Spec.Replicas += increment
-	if newRc.Spec.Replicas > desired {
-		newRc.Spec.Replicas = desired
+	*newRc.Spec.Replicas += increment
+	if *newRc.Spec.Replicas > desired {
+		*newRc.Spec.Replicas = desired
 	}
 	// Perform the scale-up.
 	fmt.Fprintf(config.Out, "Scaling %s up to %d\n", newRc.Name, newRc.Spec.Replicas)
@@ -346,7 +344,7 @@ func (r *RollingUpdater) scaleUp(newRc, oldRc *api.ReplicationController, desire
 // when it detects redundancy or other relevant conditions.
 func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desired, minAvailable, maxUnavailable, maxSurge int32, config *RollingUpdaterConfig) (*api.ReplicationController, error) {
 	// Already scaled down; do nothing.
-	if oldRc.Spec.Replicas == 0 {
+	if *oldRc.Spec.Replicas == 0 {
 		return oldRc, nil
 	}
 	// Get ready pods. We shouldn't block, otherwise in case both old and new
@@ -359,8 +357,8 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 	// The old controller is considered as part of the total because we want to
 	// maintain minimum availability even with a volatile old controller.
 	// Scale down as much as possible while maintaining minimum availability
-	allPods := oldRc.Spec.Replicas + newRc.Spec.Replicas
-	newUnavailable := newRc.Spec.Replicas - newAvailable
+	allPods := *oldRc.Spec.Replicas + *newRc.Spec.Replicas
+	newUnavailable := *newRc.Spec.Replicas - newAvailable
 	decrement := allPods - minAvailable - newUnavailable
 	// The decrement normally shouldn't drop below 0 because the available count
 	// always starts below the old replica count, but the old replica count can
@@ -375,14 +373,14 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 		return oldRc, nil
 	}
 	// Reduce the replica count, and deal with fenceposts.
-	oldRc.Spec.Replicas -= decrement
-	if oldRc.Spec.Replicas < 0 {
-		oldRc.Spec.Replicas = 0
+	*oldRc.Spec.Replicas -= decrement
+	if *oldRc.Spec.Replicas < 0 {
+		*oldRc.Spec.Replicas = 0
 	}
 	// If the new is already fully scaled and available up to the desired size, go
 	// ahead and scale old all the way down.
-	if newRc.Spec.Replicas == desired && newAvailable == desired {
-		oldRc.Spec.Replicas = 0
+	if *newRc.Spec.Replicas == desired && newAvailable == desired {
+		*oldRc.Spec.Replicas = 0
 	}
 	// Perform the scale-down.
 	fmt.Fprintf(config.Out, "Scaling %s down to %d\n", oldRc.Name, oldRc.Spec.Replicas)
@@ -423,10 +421,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 			return 0, 0, err
 		}
 		for _, pod := range pods.Items {
-			v1Pod := &v1.Pod{}
-			if err := apiv1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
-				return 0, 0, err
-			}
+			v1Pod := &pod
 			// Do not count deleted pods as ready
 			if v1Pod.DeletionTimestamp != nil {
 				continue
@@ -461,7 +456,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 			// should create it.
 			return nil, false, err
 		}
-		if controller.Spec.Replicas <= 0 {
+		if *controller.Spec.Replicas <= 0 {
 			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d\n", controller.Name, controller.Spec.Replicas)
 		}
 		// The controller wasn't found, so create it.
@@ -470,7 +465,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 		}
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", controller.Spec.Replicas)
 		controller.Annotations[sourceIdAnnotation] = sourceId
-		controller.Spec.Replicas = 0
+		*controller.Spec.Replicas = 0
 		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(controller)
 		return newRc, false, err
 	}

@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -25,4 +26,18 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = [
+        "apps_suite_test.go",
+        "group_kind_visitory_test.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/kubectl/apps:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/gomega:go_default_library",
+    ],
 )
