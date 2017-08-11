@@ -66,12 +66,25 @@ func (cas *FakeCloudAddressService) ReserveRegionAddress(addr *compute.Address, 
 
 func (cas *FakeCloudAddressService) GetRegionAddress(name, region string) (*compute.Address, error) {
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
-		return nil, &googleapi.Error{Code: http.StatusNotFound}
+		return nil, makeGoogleAPINotFoundError("")
 	}
 
 	if addr, exists := cas.addrsByRegionAndName[region][name]; !exists {
-		return nil, &googleapi.Error{Code: http.StatusNotFound}
+		return nil, makeGoogleAPINotFoundError("")
 	} else {
 		return addr, nil
 	}
+}
+
+func (cas *FakeCloudAddressService) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
+	if _, exists := cas.addrsByRegionAndName[region]; !exists {
+		return nil, makeGoogleAPINotFoundError("")
+	}
+
+	for _, addr := range cas.addrsByRegionAndName[region] {
+		if addr.Address == ipAddress {
+			return addr, nil
+		}
+	}
+	return nil, makeGoogleAPINotFoundError("")
 }
