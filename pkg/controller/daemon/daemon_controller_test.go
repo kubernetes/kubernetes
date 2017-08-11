@@ -1613,6 +1613,179 @@ func TestUpdateNode(t *testing.T) {
 	}
 }
 
+// DaemonSets should be resynced when non-daemon pods was deleted.
+func TestDeleteNoDaemonPod(t *testing.T) {
+	var enqueued bool
+
+	cases := []struct {
+		test          string
+		node          *v1.Node
+		existPods     []*v1.Pod
+		deletedPod    *v1.Pod
+		ds            *extensions.DaemonSet
+		shouldEnqueue bool
+	}{
+		{
+			test: "Deleted non-daemon pods to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_0",
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Deleted non-daemon pods (with controller) to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{Controller: func() *bool { res := true; return &res }()},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_0",
+						OwnerReferences: []metav1.OwnerReference{
+							{Controller: func() *bool { res := true; return &res }()},
+						},
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Deleted no scheduled pods",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{Controller: func() *bool { res := true; return &res }()},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_5",
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: false,
+		},
+	}
+
+	for _, c := range cases {
+		for _, strategy := range updateStrategies() {
+			manager, podControl, _ := newTestController()
+			manager.nodeStore.Add(c.node)
+			c.ds.Spec.UpdateStrategy = *strategy
+			manager.dsStore.Add(c.ds)
+			for _, pod := range c.existPods {
+				manager.podStore.Add(pod)
+			}
+			switch strategy.Type {
+			case extensions.OnDeleteDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 2)
+			case extensions.RollingUpdateDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
+			default:
+				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
+			}
+
+			manager.enqueueDaemonSetRateLimited = func(ds *extensions.DaemonSet) {
+				if ds.Name == "ds" {
+					enqueued = true
+				}
+			}
+
+			enqueued = false
+			manager.deletePod(c.deletedPod)
+			if enqueued != c.shouldEnqueue {
+				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
+			}
+		}
+	}
+}
+
 func TestGetNodesToDaemonPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
