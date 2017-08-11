@@ -293,6 +293,8 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
 	p.IncludeUninitialized = options.IncludeUninitialized
+	p.Limit = options.Limit
+	p.Continue = options.Continue
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	if name, ok := p.MatchesSingle(); ok {

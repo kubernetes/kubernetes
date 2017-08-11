@@ -30,14 +30,20 @@ import (
 
 const defaultPageSize = 500
 
+// ListPageFunc returns a list object for the given list options.
 type ListPageFunc func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error)
 
+// SimplePageFunc adapts a context-less list function into one that accepts a context.
 func SimplePageFunc(fn func(opts metav1.ListOptions) (runtime.Object, error)) ListPageFunc {
 	return func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 		return fn(opts)
 	}
 }
 
+// ListPager assists client code in breaking large list queries into multiple
+// smaller chunks of PageSize or smaller. PageFn is expected to accept a
+// metav1.ListOptions that supports paging and return a list. The pager does
+// not alter the field or label selectors on the initial options list.
 type ListPager struct {
 	PageSize int64
 	PageFn   ListPageFunc
@@ -45,6 +51,8 @@ type ListPager struct {
 	FullListIfExpired bool
 }
 
+// New creates a new pager from the provided pager function using the default
+// options.
 func New(fn ListPageFunc) *ListPager {
 	return &ListPager{
 		PageSize:          defaultPageSize,
@@ -53,6 +61,9 @@ func New(fn ListPageFunc) *ListPager {
 	}
 }
 
+// List returns a single list object, but attempts to retrieve smaller chunks from the
+// server to reduce the impact on the server. If the chunk attempt fails, it will load
+// the full list instead.
 func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 	if options.Limit == 0 {
 		options.Limit = p.PageSize
