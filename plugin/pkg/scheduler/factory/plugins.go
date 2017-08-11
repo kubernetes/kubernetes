@@ -73,7 +73,7 @@ var (
 
 	// maps that hold registered algorithm types
 	fitPredicateMap          = make(map[string]FitPredicateFactory)
-	essentialFitPredicateMap = make(map[string]FitPredicateFactory)
+	mandatoryFitPredicateMap = make(map[string]FitPredicateFactory)
 	priorityFunctionMap      = make(map[string]PriorityConfigFactory)
 	algorithmProviderMap     = make(map[string]AlgorithmProviderConfig)
 
@@ -100,14 +100,14 @@ func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string 
 	return RegisterFitPredicateFactory(name, func(PluginFactoryArgs) algorithm.FitPredicate { return predicate })
 }
 
-// RegisterEssentialFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
+// RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
 // kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
 // registered.
-func RegisterEssentialFitPredicate(name string, predicate algorithm.FitPredicate) string {
+func RegisterMandatoryFitPredicate(name string, predicate algorithm.FitPredicate) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	essentialFitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	mandatoryFitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
 	return name
 }
 
@@ -322,7 +322,7 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	}
 
 	// Always include required fit predicates.
-	for name, factory := range essentialFitPredicateMap {
+	for name, factory := range mandatoryFitPredicateMap {
 		if _, found := predicates[name]; !found {
 			predicates[name] = factory(args)
 		}
