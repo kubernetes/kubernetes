@@ -682,8 +682,8 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		// Skip terminating pods
-		if pod.DeletionTimestamp != nil {
+		// Skip terminated pods, consider terminating pods ie: pods serving terminationGracePeriod
+		if pod.DeletionTimestamp != nil && pod.DeletionTimestamp.Before(metav1.Now()) {
 			continue
 		}
 		nodeName := pod.Spec.NodeName
