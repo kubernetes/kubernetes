@@ -3755,6 +3755,16 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	Scopes []ResourceQuotaScope
+	// If specified, indicates this ResourceQuota applies to that priority class
+	// If not specified, this ResourceQuota applies to all priority classes.
+	// +optional
+	PriorityClassName string
+	// The priority value. Various system components use this field to find the
+	// priority of the ResourceQuota. When Priority Admission Controller is enabled, it
+	// prevents users from setting this field. The admission controller populates
+	// this field from PriorityClassName.
+	// +optional
+	Priority *int32
 }
 
 // ResourceQuotaStatus defines the enforced hard limits and observed use

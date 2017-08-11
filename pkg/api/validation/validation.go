@@ -61,6 +61,7 @@ const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = genericvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
+const invalidPriorityClassName string = `a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.'`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -3803,6 +3804,13 @@ func ValidateResourceQuotaStatus(status *api.ResourceQuotaStatus, fld *field.Pat
 
 func ValidateResourceQuotaSpec(resourceQuotaSpec *api.ResourceQuotaSpec, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	// validate PriorityClassName in resourceQuotaSpec
+	if len(resourceQuotaSpec.PriorityClassName) > 0 {
+		for _, msg := range ValidatePriorityClassName(resourceQuotaSpec.PriorityClassName, false) {
+			allErrs = append(allErrs, field.Invalid(fld.Child("priorityClassName"), resourceQuotaSpec.PriorityClassName, msg))
+		}
+	}
 
 	fldPath := fld.Child("hard")
 	for k, v := range resourceQuotaSpec.Hard {
