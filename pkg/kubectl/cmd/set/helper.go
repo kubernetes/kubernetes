@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/api"
-	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -61,7 +61,7 @@ func handlePodUpdateError(out io.Writer, err error, resource string) {
 				return
 			}
 		} else {
-			if ok := kcmdutil.PrintErrorWithCauses(err, out); ok {
+			if ok := cmdutil.PrintErrorWithCauses(err, out); ok {
 				return
 			}
 		}
