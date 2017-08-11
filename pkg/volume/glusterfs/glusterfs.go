@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -322,12 +323,14 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	if b.hosts == nil {
 		return fmt.Errorf("glusterfs: endpoint is nil")
 	}
-	addr := make(map[string]struct{})
+	addr := sets.String{}
 	if b.hosts.Subsets != nil {
 		for _, s := range b.hosts.Subsets {
 			for _, a := range s.Addresses {
-				addr[a.IP] = struct{}{}
-				addrlist = append(addrlist, a.IP)
+				if !addr.Has(a.IP) {
+					addr.Insert(a.IP)
+					addrlist = append(addrlist, a.IP)
+				}
 			}
 		}
 
