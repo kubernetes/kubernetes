@@ -33,8 +33,9 @@ type flexVolumeMounter struct {
 	// filesystem doesn't exist.
 	blockDeviceMounter mount.Interface
 	// the considered volume spec
-	spec     *volume.Spec
-	readOnly bool
+	spec           *volume.Spec
+	readOnly       bool
+	seLinuxRelabel bool
 	volume.MetricsNil
 }
 

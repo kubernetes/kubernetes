@@ -177,6 +177,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 			volName:               spec.Name(),
 		},
 		runner:             runner,
+		seLinuxRelabel:     *source.SELinuxRelabel,
 		spec:               spec,
 		readOnly:           readOnly,
 		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: runner},
