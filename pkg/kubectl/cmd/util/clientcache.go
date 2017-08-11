@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -58,6 +59,27 @@ type ClientCache struct {
 	// argument evaluation
 	discoveryClientFactory DiscoveryClientFactory
 	discoveryClient        discovery.DiscoveryInterface
+
+	kubernetesClientLoader KubernetesClientCache
+}
+
+type KubernetesClientCache struct {
+	once   sync.Once
+	client *kubernetes.Clientset
+	err    error
+}
+
+func (c *ClientCache) KubernetesClientSet(requiredVersion *schema.GroupVersion) (*kubernetes.Clientset, error) {
+	c.kubernetesClientLoader.once.Do(func() {
+		l := c.kubernetesClientLoader
+		config, err := c.ClientConfigForVersion(requiredVersion)
+		if err != nil {
+			l.err = err
+			return
+		}
+		l.client, l.err = kubernetes.NewForConfig(config)
+	})
+	return c.kubernetesClientLoader.client, c.kubernetesClientLoader.err
 }
 
 // also looks up the discovery client.  We can't do this during init because the flags won't have been set

@@ -27,15 +27,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+
+	apps "k8s.io/api/apps/v1beta1"
+	batch "k8s.io/api/batch/v1"
+	api "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	internalclientset "k8s.io/client-go/kubernetes"
+	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	kubectlapps "k8s.io/kubernetes/pkg/kubectl/apps"
+
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -50,20 +53,48 @@ type Scaler interface {
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
+var _ kubectlapps.GroupKindVisitor = &ScaleProvider{}
+
+type ScaleProvider struct {
+	kubectlapps.DefaultGroupKindVisitor
+	c      internalclientset.Interface
+	result Scaler
+	err    error
+}
+
+func (h *ScaleProvider) VisitReplicationController(kind kubectlapps.GroupKindElement) error {
+	h.result = &ReplicationControllerScaler{h.c.CoreV1()}
+	return nil
+}
+
+func (h *ScaleProvider) VisitReplicaSet(kind kubectlapps.GroupKindElement) error {
+	h.result = &ReplicaSetScaler{h.c.ExtensionsV1beta1()}
+	return nil
+}
+
+func (h *ScaleProvider) VisitJob(kind kubectlapps.GroupKindElement) error {
+	h.result = &JobScaler{h.c.BatchV1()}
+	return nil
+}
+
+func (h *ScaleProvider) VisitDeployment(kind kubectlapps.GroupKindElement) error {
+	h.result = &DeploymentScaler{h.c.ExtensionsV1beta1()}
+	return nil
+}
+
+func (h *ScaleProvider) VisitStatefulSet(kind kubectlapps.GroupKindElement) error {
+	h.result = &StatefulSetScaler{h.c.AppsV1beta2()}
+	return nil
+}
+
 func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return &ReplicationControllerScaler{c.Core()}, nil
-	case extensions.Kind("ReplicaSet"):
-		return &ReplicaSetScaler{c.Extensions()}, nil
-	case batch.Kind("Job"):
-		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetScaler{c.Apps()}, nil
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentScaler{c.Extensions()}, nil
+	e := kubectlapps.GroupKindElement(kind)
+	p := &ScaleProvider{c: c}
+	err := e.Accept(p)
+	if err != nil {
+		return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
 	}
-	return nil, fmt.Errorf("no scaler has been implemented for %q", kind)
+	return p.result, nil
 }
 
 // ScalePrecondition describes a condition that must be true for the scale to take place
@@ -176,7 +207,7 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 			return "", err
 		}
 	}
-	controller.Spec.Replicas = int32(newSize)
+	controller.Spec.Replicas = &int32(newSize)
 	updatedRC, err := scaler.c.ReplicationControllers(namespace).Update(controller)
 	if err != nil {
 		if errors.IsConflict(err) {
@@ -209,7 +240,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 				// the size is changed by other party. Don't need to wait for the new change to complete.
 				return true
 			}
-			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas
+			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == *rc.Spec.Replicas
 		}
 		// If number of replicas doesn't change, then the update may not event
 		// be sent to underlying databse (we don't send no-op changes).
@@ -274,7 +305,7 @@ func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, precondition
 			return "", err
 		}
 	}
-	rs.Spec.Replicas = int32(newSize)
+	rs.Spec.Replicas = &int32(newSize)
 	updatedRS, err := scaler.c.ReplicaSets(namespace).Update(rs)
 	if err != nil {
 		if errors.IsConflict(err) {
@@ -345,7 +376,7 @@ func (scaler *StatefulSetScaler) ScaleSimple(namespace, name string, preconditio
 			return "", err
 		}
 	}
-	ss.Spec.Replicas = int32(newSize)
+	ss.Spec.Replicas = &int32(newSize)
 	updatedStatefulSet, err := scaler.c.StatefulSets(namespace).Update(ss)
 	if err != nil {
 		if errors.IsConflict(err) {
@@ -470,7 +501,7 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 
 	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 	// For now I'm falling back to regular Deployment update operation.
-	deployment.Spec.Replicas = int32(newSize)
+	deployment.Spec.Replicas = &int32(newSize)
 	updatedDeployment, err := scaler.c.Deployments(namespace).Update(deployment)
 	if err != nil {
 		if errors.IsConflict(err) {
