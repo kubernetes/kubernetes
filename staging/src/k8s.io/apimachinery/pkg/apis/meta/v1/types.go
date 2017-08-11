@@ -58,7 +58,7 @@ type TypeMeta struct {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 type ListMeta struct {
-	// SelfLink is a URL representing this object.
+	// selfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
 	// +optional
@@ -72,6 +72,14 @@ type ListMeta struct {
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
+
+	// continue may be set if the user set a limit on the number of items returned, and indicates that
+	// the server has more data available. The value is opaque and may be used to issue another request
+	// to the endpoint that served this list to retrieve the next set of available objects. Continuing a
+	// list may not be possible if the server configuration has changed or more than a few minutes have
+	// passed. The resourceVersion field returned when using this continue value will be identical to
+	// the value in the first response.
+	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
 }
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
@@ -335,6 +343,33 @@ type ListOptions struct {
 	// Timeout for the list/watch call.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
+
+	// limit is a maximum number of responses to return for a list call. If more items exist, the
+	// server will set the `continue` field on the list metadata to a value that can be used with the
+	// same initial query to retrieve the next set of results. Setting a limit may return fewer than
+	// the requested amount of items (up to zero items) in the event all requested objects are
+	// filtered out and clients should only use the presence of the continue field to determine whether
+	// more results are available. Servers may choose not to support the limit argument and will return
+	// all of the available results. If limit is specified and the continue field is empty, clients may
+	// assume that no more results are available. This field is not supported if watch is true.
+	//
+	// The server guarantees that the objects returned when using continue will be identical to issuing
+	// a single list call without a limit - that is, no objects created, modified, or deleted after the
+	// first request is issued will be included in any subsequent continued requests. This is sometimes
+	// referred to as a consistent snapshot, and ensures that a client that is using limit to receive
+	// smaller chunks of a very large result can ensure they see all possible objects. If objects are
+	// updated during a chunked list the version of the object that was present at the time the first list
+	// result was calculated is returned.
+	Limit int64 `json:"limit,omitempty" protobuf:"varint,7,opt,name=limit"`
+	// The continue option should be set when retrieving more results from the server. Since this value
+	// is server defined, clients may only use the continue value from a previous query result with
+	// identical query parameters (except for the value of continue) and the server may reject a continue
+	// value it does not recognize. If the specified continue value is no longer valid whether due to
+	// expiration (generally five to fifteen minutes) or a configuration change on the server the server
+	// will respond with a 410 ResourceExpired error indicating the client must restart their list without
+	// the continue field. This field is not supported when watch is true. Clients may start a watch from
+	// the last resourceVersion value returned by the server and not miss any modifications.
+	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
