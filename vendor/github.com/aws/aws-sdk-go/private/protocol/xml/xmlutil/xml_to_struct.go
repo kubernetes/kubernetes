@@ -40,11 +40,16 @@ func XMLToStruct(d *xml.Decoder, s *xml.StartElement) (*XMLNode, error) {
 	out := &XMLNode{}
 	for {
 		tok, err := d.Token()
-		if tok == nil || err == io.EOF {
-			break
-		}
 		if err != nil {
-			return out, err
+			if err == io.EOF {
+				break
+			} else {
+				return out, err
+			}
+		}
+
+		if tok == nil {
+			break
 		}
 
 		switch typed := tok.(type) {

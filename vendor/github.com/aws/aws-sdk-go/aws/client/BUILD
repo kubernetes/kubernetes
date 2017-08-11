@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "client.go",
         "default_retryer.go",
+        "logger.go",
     ],
     tags = ["automanaged"],
     deps = [

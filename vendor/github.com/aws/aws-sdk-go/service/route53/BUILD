@@ -12,6 +12,8 @@ go_library(
     srcs = [
         "api.go",
         "customizations.go",
+        "doc.go",
+        "errors.go",
         "service.go",
         "unmarshal_error.go",
         "waiters.go",
@@ -26,7 +28,6 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/signer/v4:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/restxml:go_default_library",
-        "//vendor/github.com/aws/aws-sdk-go/private/waiter:go_default_library",
     ],
 )
 

@@ -3,11 +3,11 @@ package credentials
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/go-ini/ini"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/internal/shareddefaults"
 )
 
 // SharedCredsProviderName provides a name of SharedCreds provider
@@ -15,8 +15,6 @@ const SharedCredsProviderName = "SharedCredentialsProvider"
 
 var (
 	// ErrSharedCredentialsHomeNotFound is emitted when the user directory cannot be found.
-	//
-	// @readonly
 	ErrSharedCredentialsHomeNotFound = awserr.New("UserHomeNotFound", "user home directory not found.", nil)
 )
 
@@ -117,21 +115,22 @@ func loadProfile(filename, profile string) (Value, error) {
 //
 // Will return an error if the user's home directory path cannot be found.
 func (p *SharedCredentialsProvider) filename() (string, error) {
-	if p.Filename == "" {
-		if p.Filename = os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); p.Filename != "" {
-			return p.Filename, nil
-		}
-
-		homeDir := os.Getenv("HOME") // *nix
-		if homeDir == "" {           // Windows
-			homeDir = os.Getenv("USERPROFILE")
-		}
-		if homeDir == "" {
-			return "", ErrSharedCredentialsHomeNotFound
-		}
-
-		p.Filename = filepath.Join(homeDir, ".aws", "credentials")
+	if len(p.Filename) != 0 {
+		return p.Filename, nil
 	}
+
+	if p.Filename = os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); len(p.Filename) != 0 {
+		return p.Filename, nil
+	}
+
+	if home := shareddefaults.UserHomeDir(); len(home) == 0 {
+		// Backwards compatibility of home directly not found error being returned.
+		// This error is too verbose, failure when opening the file would of been
+		// a better error to return.
+		return "", ErrSharedCredentialsHomeNotFound
+	}
+
+	p.Filename = shareddefaults.SharedCredentialsFilename()
 
 	return p.Filename, nil
 }

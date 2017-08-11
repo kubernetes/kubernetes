@@ -10,14 +10,18 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "connection_reset_error.go",
         "handlers.go",
         "http_request.go",
         "offset_reader.go",
         "request.go",
         "request_1_8.go",
+        "request_context.go",
         "request_pagination.go",
         "retryer.go",
+        "timeout_read_closer.go",
         "validation.go",
+        "waiter.go",
     ],
     tags = ["automanaged"],
     deps = [

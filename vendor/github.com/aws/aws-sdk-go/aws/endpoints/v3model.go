@@ -79,7 +79,9 @@ func (p partition) EndpointFor(service, region string, opts ...func(*Options)) (
 	opt.Set(opts...)
 
 	s, hasService := p.Services[service]
-	if !hasService {
+	if !(hasService || opt.ResolveUnknownService) {
+		// Only return error if the resolver will not fallback to creating
+		// endpoint based on service endpoint ID passed in.
 		return resolved, NewUnknownServiceError(p.ID, service, serviceList(p.Services))
 	}
 
