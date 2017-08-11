@@ -51,7 +51,7 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 
 	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
-		return fmt.Errorf("unknown object type %q", gvk)
+		return fmt.Errorf("unknown object type %#v", gvk)
 	}
 
 	rootValidation, err := itemFactory(openapi.NewPath(gvk.Kind), obj)
@@ -91,6 +91,7 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 		return schema.GroupVersionKind{}, errors.New("apiVersion isn't string type")
 	}
 	version := apiutil.GetVersion(apiVersion.(string))
+	group := apiutil.GetGroup(apiVersion.(string))
 	kind := fields["kind"]
 	if kind == nil {
 		return schema.GroupVersionKind{}, errors.New("kind not set")
@@ -99,5 +100,5 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 		return schema.GroupVersionKind{}, errors.New("kind isn't string type")
 	}
 
-	return schema.GroupVersionKind{Kind: kind.(string), Version: version}, nil
+	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind.(string)}, nil
 }
