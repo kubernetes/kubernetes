@@ -597,17 +597,6 @@ See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
 				makePortsString(obj.Spec.Ports, true))
 			out.Write([]byte(msg))
 		}
-
-		if _, ok := obj.Annotations[api.AnnotationLoadBalancerSourceRangesKey]; ok {
-			msg := fmt.Sprintf(
-				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
-It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
-Please use the loadBalancerSourceRanges field instead.
-
-See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
-`)
-			out.Write([]byte(msg))
-		}
 	}
 }
 
