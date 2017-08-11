@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,8 +10,12 @@ go_library(
     srcs = [
         "ct.go",
         "ct_ansi.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "ct_win.go",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

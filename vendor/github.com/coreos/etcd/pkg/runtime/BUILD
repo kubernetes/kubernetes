@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -9,8 +7,14 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fds_linux.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "fds_other.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "fds_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -23,7 +21,6 @@ go_library(
         "toml.go",
         "tomltree_conversions.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/pelletier/go-buffruneio:go_default_library"],
 )
 

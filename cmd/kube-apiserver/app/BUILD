@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,7 +13,6 @@ go_library(
         "plugins.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",

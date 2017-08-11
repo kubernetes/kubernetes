@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "kubectl.go",
         "portforward.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/controller:go_default_library",

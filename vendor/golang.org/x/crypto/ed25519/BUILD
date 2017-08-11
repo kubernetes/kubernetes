@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["ed25519.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/crypto/ed25519/internal/edwards25519:go_default_library"],
 )
 

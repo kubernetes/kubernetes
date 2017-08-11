@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 load(
     "@io_bazel_rules_go//go:def.bzl",
@@ -19,7 +17,6 @@ go_library(
         "int64.go",
         "string.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_genrule(
@@ -54,7 +51,6 @@ go_test(
     name = "go_default_test",
     srcs = ["set_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

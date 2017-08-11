@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -9,12 +7,21 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["resource_container_linux.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-    ],
+    srcs = [
+        "resource_container_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "resource_container_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

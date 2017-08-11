@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -22,12 +20,21 @@ go_library(
         "util.go",
         "validation.go",
         "volume.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "client_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/Microsoft/go-winio:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

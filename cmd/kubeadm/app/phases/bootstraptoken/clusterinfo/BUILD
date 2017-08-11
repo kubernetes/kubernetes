@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["clusterinfo_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -25,7 +22,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["clusterinfo.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",

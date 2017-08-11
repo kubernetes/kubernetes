@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "fakefs.go",
         "filesystem.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/afero:go_default_library"],
 )
 

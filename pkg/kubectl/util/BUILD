@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,8 +8,12 @@ go_library(
     srcs = [
         "umask.go",
         "util.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "umask_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",

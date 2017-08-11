@@ -24,9 +24,16 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel d651a70c51ec9a450135ff08ea045d857a6be014
+# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
+kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel e9d1a126ef355ff5d38e20612c889b07728225a4
+kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle 82483596ec203eb9c1849937636f4cbed83733eb
 
-if ! kazel -validate -print-diff -root="$(kube::realpath ${KUBE_ROOT})" ; then
+gazelle_diff=$(gazelle fix -build_file_name=BUILD,BUILD.bazel -external=vendored -mode=diff -repo_root="$(kube::realpath ${KUBE_ROOT})")
+kazel_diff=$(kazel -dry-run -print-diff -root="$(kube::realpath ${KUBE_ROOT})")
+
+if [[ -n "${gazelle_diff}" || -n "${kazel_diff}" ]]; then
+  echo "${gazelle_diff}"
+  echo "${kazel_diff}"
   echo
   echo "Run ./hack/update-bazel.sh"
   exit 1

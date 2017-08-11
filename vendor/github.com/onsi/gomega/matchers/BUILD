@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -49,7 +47,6 @@ go_library(
         "type_support.go",
         "with_transform.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",
         "//vendor/github.com/onsi/gomega/internal/oraclematcher:go_default_library",

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,12 +8,24 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "popcnt_amd64.go",
-        "popcnt_amd64.s",
+        "popcnt_generic.go",
         "sparse.go",
         "util.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "popcnt_amd64.go",
+            "popcnt_amd64.s",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "popcnt_amd64.go",
+            "popcnt_amd64.s",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "popcnt_amd64.go",
+            "popcnt_amd64.s",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

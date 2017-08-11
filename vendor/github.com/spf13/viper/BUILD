@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "util.go",
         "viper.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/hashicorp/hcl:go_default_library",

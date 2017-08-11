@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,8 +13,12 @@ go_library(
         "resizeevents.go",
         "term.go",
         "term_writer.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "resizeevents_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/util/interrupt:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
@@ -31,7 +33,6 @@ go_test(
     name = "go_default_test",
     srcs = ["term_writer_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

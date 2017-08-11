@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["volume_manager.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -41,7 +38,6 @@ go_test(
     name = "go_default_test",
     srcs = ["volume_manager_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/configmap:go_default_library",

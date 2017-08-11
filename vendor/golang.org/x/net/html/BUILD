@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -21,7 +19,6 @@ go_library(
         "render.go",
         "token.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/golang.org/x/net/html/atom:go_default_library"],
 )
 

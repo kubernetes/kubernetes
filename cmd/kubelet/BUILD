@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -12,14 +10,12 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubelet",
     library = ":go_default_library",
-    tags = ["automanaged"],
     x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["kubelet.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",

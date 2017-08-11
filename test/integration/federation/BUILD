@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_test",
@@ -15,10 +13,7 @@ go_test(
         "crud_test.go",
         "main_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/pkg/federatedtypes:go_default_library",
