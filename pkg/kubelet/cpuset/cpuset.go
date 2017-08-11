@@ -231,7 +231,7 @@ func Parse(s string) (CPUSet, error) {
 			}
 			result.Add(elem)
 		} else if len(boundaries) == 2 {
-			// Handle multi-element rnages like "0-5".
+			// Handle multi-element ranges like "0-5".
 			start, err := strconv.Atoi(boundaries[0])
 			if err != nil {
 				return nil, err

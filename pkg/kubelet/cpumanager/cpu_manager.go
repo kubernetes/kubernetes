@@ -79,7 +79,7 @@ type manager struct {
 	// to make UpdateContainerResources() calls against the containers.
 	containerRuntime runtimeService
 
-	// podLister provides a method for listing all the pods on the node
+	// kletGetter provides a method for listing all the pods on the node
 	// so all the containers can be updated in the reconciliation loop.
 	kletGetter kletGetter
 

@@ -635,7 +635,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			killPodNow(klet.podWorkers, kubeDeps.Recorder),
 			kubeDeps.Recorder)
 		if err != nil {
-			glog.Infof("[cpumanager] failed to initialize cpu manager: %v", err)
+			glog.Errorf("failed to initialize cpu manager: %v", err)
 			return nil, err
 		}
 		klet.cpuManager = cpuManager
