@@ -93,9 +93,10 @@ func main() {
 
 	// use kubeletServer to construct the default KubeletDeps
 	kubeletDeps, err := app.UnsecuredDependencies(kubeletServer)
-
-	// add the kubelet config controller to kubeletDeps
-	kubeletDeps.KubeletConfigController = kubeletConfigController
+	if err == nil {
+		// add the kubelet config controller to kubeletDeps
+		kubeletDeps.KubeletConfigController = kubeletConfigController
+	}
 
 	// start the experimental docker shim, if enabled
 	if kubeletFlags.ExperimentalDockershim {
