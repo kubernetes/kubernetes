@@ -144,7 +144,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
-	glog.Infof("Starting stateful set controller")
+	glog.Infof("Starting statefulset controller")
 	defer glog.Infof("Shutting down statefulset controller")
 
 	if !controller.WaitForCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced) {
