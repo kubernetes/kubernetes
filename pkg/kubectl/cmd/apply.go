@@ -60,7 +60,7 @@ type ApplyOptions struct {
 	cmdBaseName     string
 
 	Printer   printers.ResourcePrinter
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 }
 
 const (

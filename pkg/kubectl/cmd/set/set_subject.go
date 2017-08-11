@@ -75,7 +75,7 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintOpts   printers.PrintOptions
+	PrintOpts   *printers.PrintOptions
 	PrintObject func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 }
 

@@ -49,7 +49,7 @@ var (
 type AutoscaleOptions struct {
 	*resource.FilenameOptions
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 }
 
 func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {

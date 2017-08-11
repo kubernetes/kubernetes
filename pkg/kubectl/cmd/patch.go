@@ -52,7 +52,7 @@ type PatchOptions struct {
 
 	Local bool
 
-	PrintOpts    printers.PrintOptions
+	PrintOpts    *printers.PrintOptions
 	Printer      printers.ResourcePrinter
 	OutputFormat string
 }
@@ -89,7 +89,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	// in order to still allow this command to succeed in the
 	// event that --local is set and there is no connection
 	// to an api server.
-	p, err := f.PrinterWithOptions(printers.PrintOptions{
+	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
 	}, true)
 

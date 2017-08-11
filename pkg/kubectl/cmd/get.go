@@ -103,7 +103,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.PrinterWithOptions(printers.PrintOptions{
+	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
 	}, true)
 	cmdutil.CheckErr(err)
@@ -315,7 +315,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, err := f.PrinterWithOptions(printers.PrintOptions{}, false)
+	printer, err := f.PrinterWithOptions(&printers.PrintOptions{}, false)
 	if err != nil {
 		return err
 	}
@@ -462,7 +462,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping, &printOpts)
+				outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping, printOpts)
 			}
 
 			printer, err = f.DecoratedPrinterWithOptions(printOpts, false, mapping)

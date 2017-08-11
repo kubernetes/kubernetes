@@ -38,7 +38,7 @@ type CreateOptions struct {
 	Selector         string
 	EditBeforeCreate bool
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 	Printer   printers.ResourcePrinter
 }
 

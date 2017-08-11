@@ -46,7 +46,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterWithOptions(options printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 	var err error
@@ -67,7 +67,7 @@ func (f *ring2Factory) PrinterWithOptions(options printers.PrintOptions, isLocal
 	return printerWithOptions(mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) DecoratedPrinterWithOptions(options printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) DecoratedPrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	printer, err := f.PrinterWithOptions(options, isLocal)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (f *ring2Factory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, ou
 	}
 }
 
-func (f *ring2Factory) PrintObject(printOpts printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *ring2Factory) PrintObject(printOpts *printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	// try to get a typed object
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)

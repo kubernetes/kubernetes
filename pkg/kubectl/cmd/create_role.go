@@ -114,7 +114,7 @@ type CreateRoleOptions struct {
 	Out          io.Writer
 	PrintObject  func(obj runtime.Object) error
 	PrintSuccess func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintOpts    printers.PrintOptions
+	PrintOpts    *printers.PrintOptions
 }
 
 // Role is a command to ease creating Roles.

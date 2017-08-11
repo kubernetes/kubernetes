@@ -61,7 +61,7 @@ type LabelOptions struct {
 	newLabels    map[string]string
 	removeLabels []string
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 
 	// Common shared fields
 	out io.Writer
@@ -106,7 +106,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	// in order to still allow this command to succeed in the
 	// event that --local is set and there is no connection
 	// to an api server.
-	p, err := f.PrinterWithOptions(printers.PrintOptions{
+	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
 	}, true)
 	cmdutil.CheckErr(err)

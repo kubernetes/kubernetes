@@ -82,9 +82,9 @@ type ResourcesOptions struct {
 	Requests             string
 	ResourceRequirements api.ResourceRequirements
 
-	PrintOpts              printers.PrintOptions
+	PrintOpts              *printers.PrintOptions
 	PrintSuccess           func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintObject            func(printOpts printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(printOpts *printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error)
 	Resources              []string
 }

@@ -155,7 +155,7 @@ func stringBody(body string) io.ReadCloser {
 
 func Example_printReplicationControllerWithNamespace() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{},
 	})
@@ -209,7 +209,7 @@ func Example_printReplicationControllerWithNamespace() {
 
 func Example_printMultiContainersReplicationControllerWithWide() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
@@ -265,7 +265,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 
 func Example_printReplicationController() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	printersinternal.AddHandlers(p)
@@ -320,7 +320,7 @@ func Example_printReplicationController() {
 
 func Example_printPodWithWideFormat() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
@@ -364,7 +364,7 @@ func Example_printPodWithWideFormat() {
 
 func Example_printPodWithShowLabels() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ShowLabels:   true,
 		ColumnLabels: []string{},
 	})
@@ -503,7 +503,7 @@ func newAllPhasePodList() *api.PodList {
 
 func Example_printPodHideTerminated() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	printersinternal.AddHandlers(p)
@@ -540,7 +540,7 @@ func Example_printPodHideTerminated() {
 
 func Example_printPodShowAll() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ShowAll:      true,
 		ColumnLabels: []string{},
 	})
@@ -570,7 +570,7 @@ func Example_printPodShowAll() {
 
 func Example_printServiceWithNamespacesAndLabels() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{"l1"},
 	})

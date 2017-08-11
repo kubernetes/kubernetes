@@ -78,7 +78,7 @@ var (
 type RollingUpdateOptions struct {
 	*resource.FilenameOptions
 
-	PrinterOpts printers.PrintOptions
+	PrinterOpts *printers.PrintOptions
 }
 
 func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {

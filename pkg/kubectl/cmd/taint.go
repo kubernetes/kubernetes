@@ -52,7 +52,7 @@ type TaintOptions struct {
 	out            io.Writer
 	cmd            *cobra.Command
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 }
 
 var (

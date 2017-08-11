@@ -117,7 +117,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.PrinterWithOptions(printers.PrintOptions{
+	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
 	}, true)
 	cmdutil.CheckErr(err)

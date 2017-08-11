@@ -58,7 +58,7 @@ type SetLastAppliedOptions struct {
 	Out              io.Writer
 	ErrOut           io.Writer
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 	Printer   printers.ResourcePrinter
 }
 

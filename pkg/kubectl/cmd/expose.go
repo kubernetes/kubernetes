@@ -76,7 +76,7 @@ var (
 type ExposeServiceOptions struct {
 	*resource.FilenameOptions
 
-	PrintOpts printers.PrintOptions
+	PrintOpts *printers.PrintOptions
 }
 
 func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
