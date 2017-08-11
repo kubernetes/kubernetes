@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -78,7 +79,9 @@ func NewCommandStartCustomResourceDefinitionsServer(out, errOut io.Writer, stopC
 }
 
 func (o CustomResourceDefinitionsServerOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {

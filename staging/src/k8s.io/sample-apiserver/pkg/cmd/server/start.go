@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
@@ -84,7 +85,10 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 }
 
 func (o WardleServerOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, o.Admission.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *WardleServerOptions) Complete() error {
