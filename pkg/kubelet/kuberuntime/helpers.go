@@ -258,7 +258,7 @@ func getSysctlsFromAnnotations(annotations map[string]string) (map[string]string
 }
 
 // getSeccompProfileFromAnnotations gets seccomp profile from annotations.
-// It gets pod's profile if containerName is null.
+// It gets pod's profile if containerName is empty.
 func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
 	// try the pod profile.
 	profile, profileOK := annotations[v1.SeccompPodAnnotationKey]

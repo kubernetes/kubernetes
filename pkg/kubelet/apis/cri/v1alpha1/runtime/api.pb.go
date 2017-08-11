@@ -483,10 +483,11 @@ type LinuxSandboxSecurityContext struct {
 	// privileged containers are expected to be run.
 	Privileged bool `protobuf:"varint,6,opt,name=privileged,proto3" json:"privileged,omitempty"`
 	// Seccomp profile for the sandbox, candidate values are:
-	// * runtime/default: the default profile for the container runtime
+	// * docker/default: the default profile for the docker container runtime
 	// * unconfined: unconfined profile, ie, no seccomp sandboxing
 	// * localhost/<full-path-to-profile>: the profile installed on the node.
 	//   <full-path-to-profile> is the full path of the profile.
+	// Default: "", which is identical with unconfined.
 	SeccompProfilePath string `protobuf:"bytes,7,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"`
 }
 
@@ -1364,10 +1365,11 @@ type LinuxContainerSecurityContext struct {
 	//    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
 	ApparmorProfile string `protobuf:"bytes,9,opt,name=apparmor_profile,json=apparmorProfile,proto3" json:"apparmor_profile,omitempty"`
 	// Seccomp profile for the container, candidate values are:
-	// * runtime/default: the default profile for the container runtime
+	// * docker/default: the default profile for the docker container runtime
 	// * unconfined: unconfined profile, ie, no seccomp sandboxing
 	// * localhost/<full-path-to-profile>: the profile installed on the node.
 	//   <full-path-to-profile> is the full path of the profile.
+	// Default: "", which is identical with unconfined.
 	SeccompProfilePath string `protobuf:"bytes,10,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"`
 	// no_new_privs defines if the flag for no_new_privs should be set on the
 	// container.

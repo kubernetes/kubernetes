@@ -78,7 +78,7 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 	return []dockerOpt{{"seccomp", b.String(), msg}}, nil
 }
 
-// getSeccompSecurityOpts gets container seccomp options from container security context.
+// getSeccompSecurityOpts gets container seccomp options from container seccomp profile.
 // It is an experimental feature and may be promoted to official runtime api in the future.
 func getSeccompSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	seccompOpts, err := getSeccompDockerOpts(seccompProfile)

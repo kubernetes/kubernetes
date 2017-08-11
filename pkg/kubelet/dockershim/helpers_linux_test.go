@@ -61,7 +61,9 @@ func TestLoadSeccompLocalhostProfiles(t *testing.T) {
 		expectedOpts   []string
 		expectErr      bool
 	}{{
-		msg:            "Seccomp localhost/test profile",
+		msg: "Seccomp localhost/test profile",
+		// We are abusing localhost for loading test seccomp profiles.
+		// The profile should be an absolute path while we are using a relative one.
 		seccompProfile: "localhost/fixtures/seccomp/test",
 		expectedOpts:   []string{`seccomp={"foo":"bar"}`},
 		expectErr:      false,
