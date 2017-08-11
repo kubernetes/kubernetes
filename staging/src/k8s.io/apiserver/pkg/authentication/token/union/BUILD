@@ -1,5 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
+licenses(["notice"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -8,25 +10,18 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "group_adder_test.go",
-        "token_group_adder_test.go",
-    ],
+    srcs = ["unionauth_test.go"],
     library = ":go_default_library",
-    deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-    ],
+    tags = ["automanaged"],
+    deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "authenticated_group_adder.go",
-        "group_adder.go",
-        "token_group_adder.go",
-    ],
+    srcs = ["union.go"],
+    tags = ["automanaged"],
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
