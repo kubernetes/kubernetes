@@ -430,6 +430,10 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddIncludeUninitializedFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("include-uninitialized", false, "If true, include the object(s) that have not been realized yet. Such object(s) have a non-empty initializer list.")
+}
+
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
 	cmd.Flags().Duration("pod-running-timeout", defaultTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 }
