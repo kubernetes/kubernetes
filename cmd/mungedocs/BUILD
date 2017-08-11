@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -12,7 +10,6 @@ load(
 go_binary(
     name = "mungedocs",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -34,7 +31,6 @@ go_test(
         "//docs:srcs",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 
@@ -52,7 +48,6 @@ go_library(
         "util.go",
         "whitespace.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 

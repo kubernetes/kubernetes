@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,7 +11,6 @@ go_library(
         "override.go",
         "unicode.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/text/encoding:go_default_library",
         "//vendor/golang.org/x/text/encoding/internal:go_default_library",

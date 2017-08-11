@@ -81,7 +81,7 @@ for group_dirname in "${group_dirnames[@]}"; do
 				found=1
 			fi
 		done
-		if [ "${found}" -ne "1" ] ; then
+		if [[ "${found}" -ne "1" && -f "${group_dirname}/types.go" ]] ; then
 			echo "need to add ${group_dirname}/ to ${client_gen_file}"
 			exit 1
 		fi

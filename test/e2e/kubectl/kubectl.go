@@ -146,8 +146,6 @@ var (
 	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
 
 	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
-
-	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -198,44 +196,6 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 	})
 
 	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
-
-	framework.KubeDescribe("Kubectl run ScheduledJob", func() {
-		var nsFlag string
-		var sjName string
-
-		BeforeEach(func() {
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			sjName = "e2e-test-echo-scheduledjob"
-		})
-
-		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", sjName, nsFlag)
-		})
-
-		It("should create a ScheduledJob", func() {
-			framework.SkipIfMissingResource(f.ClientPool, ScheduledJobGroupVersionResource, f.Namespace.Name)
-
-			schedule := "*/5 * * * ?"
-			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
-				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
-			By("verifying the ScheduledJob " + sjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(sjName, metav1.GetOptions{})
-			if err != nil {
-				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
-			}
-			if sj.Spec.Schedule != schedule {
-				framework.Failf("Failed creating a ScheduledJob with correct schedule %s, but got %s", schedule, sj.Spec.Schedule)
-			}
-			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
-				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s: %#v", sjName, busyboxImage, containers)
-			}
-			restartPolicy := sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy
-			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a ScheduledJob with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
-			}
-		})
-	})
 
 	framework.KubeDescribe("Kubectl run CronJob", func() {
 		var nsFlag string
@@ -437,9 +397,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		It("should support exec through an HTTP proxy", func() {
-			// Note: We are skipping local since we want to verify an apiserver with HTTPS.
-			// At this time local only supports plain HTTP.
-			framework.SkipIfProviderIs("local")
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
@@ -470,6 +427,32 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
 				}
+			}
+		})
+
+		It("should support exec through kubectl proxy", func() {
+			// Fail if the variable isn't set
+			if framework.TestContext.Host == "" {
+				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
+			}
+
+			By("Starting kubectl proxy")
+			port, proxyCmd, err := startProxyServer()
+			framework.ExpectNoError(err)
+			defer framework.TryKill(proxyCmd)
+
+			//proxyLogs.Reset()
+			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
+			By("Running kubectl via kubectl proxy using " + host)
+			output := framework.NewKubectlCommand(
+				host, fmt.Sprintf("--namespace=%s", ns),
+				"exec", "nginx", "echo", "running", "in", "container",
+			).ExecOrDie()
+
+			// Verify we got the normal output captured by the exec server
+			expectedExecOutput := "running in container\n"
+			if output != expectedExecOutput {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got  %q", expectedExecOutput, output)
 			}
 		})
 
@@ -591,7 +574,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		It("should handle in-cluster config", func() {
 			By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			framework.BindClusterRole(f.ClientSet.Rbac(), "view", f.Namespace.Name,
+			framework.BindClusterRole(f.ClientSet.RbacV1beta1(), "view", f.Namespace.Name,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 			err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
@@ -1758,7 +1741,7 @@ func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 
 func startProxyServer() (int, *exec.Cmd, error) {
 	// Specifying port 0 indicates we want the os to pick a random port.
-	cmd := framework.KubectlCmd("proxy", "-p", "0")
+	cmd := framework.KubectlCmd("proxy", "-p", "0", "--disable-filter")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		return -1, nil, err

@@ -20,7 +20,6 @@ cmd/kubeadm/app/discovery/token
 cmd/kubeadm/app/images
 cmd/kubeadm/app/phases/addons
 cmd/kubeadm/app/phases/certs/pkiutil
-cmd/kubeadm/app/phases/token
 cmd/kubeadm/app/preflight
 cmd/kubeadm/app/util
 cmd/kubeadm/app/util/config
@@ -133,6 +132,7 @@ pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
 pkg/apis/rbac
+pkg/apis/rbac/v1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
@@ -182,7 +182,6 @@ pkg/controller/job
 pkg/controller/namespace
 pkg/controller/namespace/deletion
 pkg/controller/node
-pkg/controller/node/testutil
 pkg/controller/podautoscaler
 pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
@@ -309,12 +308,9 @@ pkg/proxy/util
 pkg/proxy/winuserspace
 pkg/quota/evaluator/core
 pkg/quota/generic
-pkg/registry/admissionregistration/externaladmissionhookconfiguration
 pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage
-pkg/registry/admissionregistration/initializerconfiguration
 pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/rest
-pkg/registry/apps/controllerrevision
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset
 pkg/registry/apps/statefulset/storage
@@ -337,11 +333,9 @@ pkg/registry/certificates/certificates
 pkg/registry/certificates/certificates/storage
 pkg/registry/certificates/rest
 pkg/registry/core/componentstatus
-pkg/registry/core/configmap
 pkg/registry/core/endpoint/storage
 pkg/registry/core/event
 pkg/registry/core/event/storage
-pkg/registry/core/limitrange
 pkg/registry/core/limitrange/storage
 pkg/registry/core/namespace
 pkg/registry/core/namespace/storage
@@ -353,7 +347,6 @@ pkg/registry/core/persistentvolumeclaim
 pkg/registry/core/persistentvolumeclaim/storage
 pkg/registry/core/pod
 pkg/registry/core/pod/rest
-pkg/registry/core/podtemplate
 pkg/registry/core/podtemplate/storage
 pkg/registry/core/replicationcontroller
 pkg/registry/core/replicationcontroller/storage
@@ -377,13 +370,10 @@ pkg/registry/extensions/deployment
 pkg/registry/extensions/deployment/storage
 pkg/registry/extensions/ingress
 pkg/registry/extensions/ingress/storage
-pkg/registry/extensions/networkpolicy
 pkg/registry/extensions/networkpolicy/storage
-pkg/registry/extensions/podsecuritypolicy
 pkg/registry/extensions/replicaset
 pkg/registry/extensions/replicaset/storage
 pkg/registry/extensions/rest
-pkg/registry/networking/networkpolicy
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/policy/poddisruptionbudget
@@ -404,7 +394,6 @@ pkg/registry/rbac/validation
 pkg/registry/registrytest
 pkg/registry/scheduling/priorityclass/storage
 pkg/registry/scheduling/rest
-pkg/registry/settings/podpreset
 pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
 pkg/registry/storage/rest
@@ -534,6 +523,7 @@ staging/src/k8s.io/api/extensions/v1beta1
 staging/src/k8s.io/api/imagepolicy/v1alpha1
 staging/src/k8s.io/api/networking/v1
 staging/src/k8s.io/api/policy/v1beta1
+staging/src/k8s.io/api/rbac/v1
 staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
 staging/src/k8s.io/api/scheduling/v1alpha1
@@ -723,6 +713,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/networking/v1
 staging/src/k8s.io/client-go/kubernetes/typed/networking/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1
+staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1beta1
@@ -803,7 +795,6 @@ staging/src/k8s.io/sample-apiserver/pkg/apiserver
 staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/externalversions/internalinterfaces
 staging/src/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion/internalinterfaces
 staging/src/k8s.io/sample-apiserver/pkg/cmd/server
-staging/src/k8s.io/sample-apiserver/pkg/registry
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e
@@ -813,13 +804,13 @@ test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/framework
+test/e2e/framework/metrics
 test/e2e/instrumentation
 test/e2e/instrumentation/logging
 test/e2e/instrumentation/monitoring
 test/e2e/kubectl
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
-test/e2e/metrics
 test/e2e/network
 test/e2e/node
 test/e2e/scalability

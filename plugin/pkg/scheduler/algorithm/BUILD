@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "types.go",
         "well_known_labels.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
@@ -34,7 +31,6 @@ go_test(
         "types_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

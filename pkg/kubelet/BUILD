@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -31,7 +29,6 @@ go_library(
         "util.go",
         "volume_host.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",
@@ -64,6 +61,7 @@ go_library(
         "//pkg/kubelet/gpu:go_default_library",
         "//pkg/kubelet/gpu/nvidia:go_default_library",
         "//pkg/kubelet/images:go_default_library",
+        "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
@@ -161,9 +159,13 @@ go_test(
         "pod_workers_test.go",
         "reason_cache_test.go",
         "runonce_test.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "kubelet_pods_windows_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
@@ -256,6 +258,7 @@ filegroup(
         "//pkg/kubelet/eviction:all-srcs",
         "//pkg/kubelet/gpu:all-srcs",
         "//pkg/kubelet/images:all-srcs",
+        "//pkg/kubelet/kubeletconfig:all-srcs",
         "//pkg/kubelet/kuberuntime:all-srcs",
         "//pkg/kubelet/leaky:all-srcs",
         "//pkg/kubelet/lifecycle:all-srcs",

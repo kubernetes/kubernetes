@@ -211,7 +211,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 	copy(info.externalIPs, service.Spec.ExternalIPs)
 
 	if apiservice.NeedsHealthCheck(service) {
-		p := apiservice.GetServiceHealthCheckNodePort(service)
+		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
 			glog.Errorf("Service %q has no healthcheck nodeport", svcPortName.NamespacedName.String())
 		} else {

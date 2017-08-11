@@ -10377,17 +10377,13 @@
    },
    "io.k8s.api.core.v1.FCVolumeSource": {
     "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-    "required": [
-     "targetWWNs",
-     "lun"
-    ],
     "properties": {
      "fsType": {
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
       "type": "string"
      },
      "lun": {
-      "description": "Required: FC target lun number",
+      "description": "Optional: FC target lun number",
       "type": "integer",
       "format": "int32"
      },
@@ -10396,7 +10392,14 @@
       "type": "boolean"
      },
      "targetWWNs": {
-      "description": "Required: FC target worldwide names (WWNs)",
+      "description": "Optional: FC target worldwide names (WWNs)",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "wwids": {
+      "description": "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.",
       "type": "array",
       "items": {
        "type": "string"
@@ -11002,7 +11005,7 @@
       }
      },
      "requiredDuringSchedulingIgnoredDuringExecution": {
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+      "description": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.PodAffinityTerm"
@@ -11041,7 +11044,7 @@
       }
      },
      "requiredDuringSchedulingIgnoredDuringExecution": {
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
+      "description": "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.PodAffinityTerm"
@@ -11850,6 +11853,10 @@
       "x-kubernetes-patch-merge-key": "port",
       "x-kubernetes-patch-strategy": "merge"
      },
+     "publishNotReadyAddresses": {
+      "description": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field.",
+      "type": "boolean"
+     },
      "selector": {
       "description": "Route service traffic to pods with label keys and values matching this selector. If empty or not present, the service is assumed to have an external process managing its endpoints, which Kubernetes will not modify. Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if type is ExternalName. More info: https://kubernetes.io/docs/concepts/services-networking/service/",
       "type": "object",
@@ -12418,7 +12425,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DeploymentRollback": {
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -12487,7 +12494,7 @@
       "format": "int32"
      },
      "rollbackTo": {
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done.",
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done.",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.RollbackConfig"
      },
      "selector": {
@@ -12901,6 +12908,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RollbackConfig": {
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "description": "The revision to rollback to. If set to 0, rollback to the last revision.",
@@ -13322,6 +13330,11 @@
      {
       "group": "policy",
       "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1",
       "kind": "DeleteOptions"
      },
      {
@@ -13820,6 +13833,11 @@
      {
       "group": "policy",
       "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1",
       "kind": "WatchEvent"
      },
      {

@@ -40,16 +40,16 @@ func init() {
 }
 
 type ReplicaSetAdapter struct {
-	*schedulingAdapter
+	*replicaSchedulingAdapter
 	client federationclientset.Interface
 }
 
-func NewReplicaSetAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
-	schedulingAdapter := schedulingAdapter{
+func NewReplicaSetAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
+	replicaSchedulingAdapter := replicaSchedulingAdapter{
 		preferencesAnnotationName: FedReplicaSetPreferencesAnnotation,
-		updateStatusFunc: func(obj pkgruntime.Object, status interface{}) error {
+		updateStatusFunc: func(obj pkgruntime.Object, schedulingInfo interface{}) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
-			typedStatus := status.(ReplicaSchedulingStatus)
+			typedStatus := schedulingInfo.(*ReplicaSchedulingInfo).Status
 			if typedStatus.Replicas != rs.Status.Replicas || typedStatus.FullyLabeledReplicas != rs.Status.FullyLabeledReplicas ||
 				typedStatus.ReadyReplicas != rs.Status.ReadyReplicas || typedStatus.AvailableReplicas != rs.Status.AvailableReplicas {
 				rs.Status = extensionsv1.ReplicaSetStatus{
@@ -64,7 +64,7 @@ func NewReplicaSetAdapter(client federationclientset.Interface, config *restclie
 			return nil
 		},
 	}
-	return &ReplicaSetAdapter{&schedulingAdapter, client}
+	return &ReplicaSetAdapter{&replicaSchedulingAdapter, client}
 }
 
 func (a *ReplicaSetAdapter) Kind() string {

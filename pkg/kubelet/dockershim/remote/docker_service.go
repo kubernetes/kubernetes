@@ -147,6 +147,14 @@ func (d *dockerService) ContainerStatus(ctx context.Context, r *runtimeapi.Conta
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }
 
+func (d *dockerService) UpdateContainerResources(ctx context.Context, r *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
+	err := d.runtimeService.UpdateContainerResources(r.ContainerId, r.Linux)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
+}
+
 func (d *dockerService) ExecSync(ctx context.Context, r *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	stdout, stderr, err := d.runtimeService.ExecSync(r.ContainerId, r.Cmd, time.Duration(r.Timeout)*time.Second)
 	var exitCode int32

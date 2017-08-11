@@ -18,6 +18,7 @@ package v1beta2
 
 import (
 	"fmt"
+	"strconv"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
@@ -45,6 +46,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus,
 		Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus,
+		Convert_v1beta2_Deployment_To_extensions_Deployment,
+		Convert_extensions_Deployment_To_v1beta2_Deployment,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
@@ -234,6 +237,10 @@ func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.CurrentRevision = in.CurrentRevision
 	out.UpdateRevision = in.UpdateRevision
+	if in.CollisionCount != nil {
+		out.CollisionCount = new(int64)
+		*out.CollisionCount = *in.CollisionCount
+	}
 	return nil
 }
 
@@ -247,6 +254,10 @@ func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.Statef
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.CurrentRevision = in.CurrentRevision
 	out.UpdateRevision = in.UpdateRevision
+	if in.CollisionCount != nil {
+		out.CollisionCount = new(int64)
+		*out.CollisionCount = *in.CollisionCount
+	}
 	return nil
 }
 
@@ -310,12 +321,6 @@ func Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *appsv1beta2
 	out.RevisionHistoryLimit = in.RevisionHistoryLimit
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Paused = in.Paused
-	if in.RollbackTo != nil {
-		out.RollbackTo = new(extensions.RollbackConfig)
-		out.RollbackTo.Revision = in.RollbackTo.Revision
-	} else {
-		out.RollbackTo = nil
-	}
 	if in.ProgressDeadlineSeconds != nil {
 		out.ProgressDeadlineSeconds = new(int32)
 		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
@@ -338,12 +343,6 @@ func Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensions.
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
 	out.Paused = in.Paused
-	if in.RollbackTo != nil {
-		out.RollbackTo = new(appsv1beta2.RollbackConfig)
-		out.RollbackTo.Revision = int64(in.RollbackTo.Revision)
-	} else {
-		out.RollbackTo = nil
-	}
 	if in.ProgressDeadlineSeconds != nil {
 		out.ProgressDeadlineSeconds = new(int32)
 		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
@@ -414,6 +413,32 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *extensions.
 	return nil
 }
 
+func Convert_v1beta2_Deployment_To_extensions_Deployment(in *appsv1beta2.Deployment, out *extensions.Deployment, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+
+	// Copy annotation to deprecated rollbackTo field for roundtrip
+	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
+	if revision, _ := in.Annotations[appsv1beta2.DeprecatedRollbackTo]; revision != "" {
+		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
+			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1beta2.DeprecatedRollbackTo, revision, err)
+		} else {
+			out.Spec.RollbackTo = new(extensions.RollbackConfig)
+			out.Spec.RollbackTo.Revision = revision64
+		}
+		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
+	} else {
+		out.Spec.RollbackTo = nil
+	}
+
+	if err := Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
 func Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1beta2.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
@@ -421,6 +446,29 @@ func Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1beta2
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
 	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+
+	// Copy deprecated rollbackTo field to annotation for roundtrip
+	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
+	if in.Spec.RollbackTo != nil {
+		if out.Annotations == nil {
+			out.Annotations = make(map[string]string)
+		}
+		out.Annotations[appsv1beta2.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
+	} else {
+		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
+	}
+
+	if err := Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil

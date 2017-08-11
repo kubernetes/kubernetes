@@ -1030,6 +1030,7 @@ func TestParseEnv(t *testing.T) {
 		{
 			envArray: []string{
 				"THIS_ENV=isOK",
+				"this.dotted.env=isOKToo",
 				"HAS_COMMAS=foo,bar",
 				"HAS_EQUALS=jJnro54iUu75xNy==",
 			},
@@ -1037,6 +1038,10 @@ func TestParseEnv(t *testing.T) {
 				{
 					Name:  "THIS_ENV",
 					Value: "isOK",
+				},
+				{
+					Name:  "this.dotted.env",
+					Value: "isOKToo",
 				},
 				{
 					Name:  "HAS_COMMAS",

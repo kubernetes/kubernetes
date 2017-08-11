@@ -46,7 +46,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 		return nil
 	}
 
-	// intializing CAs is important so that aggregated API servers can come up with "normal" config.
+	// initializing CAs is important so that aggregated API servers can come up with "normal" config.
 	// We've seen lagging etcd before, so we want to retry this a few times before we decide to crashloop
 	// the API server on it.
 	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
@@ -62,7 +62,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 		return h.tryToWriteClientCAs(client)
 	})
 
-	// if we're never able to make it through intialization, kill the API server
+	// if we're never able to make it through initialization, kill the API server
 	if err != nil {
 		return fmt.Errorf("unable to initialize client CA configmap: %v", err)
 	}

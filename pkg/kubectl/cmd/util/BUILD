@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -19,7 +17,6 @@ go_library(
         "printing.go",
         "shortcut_restmapper.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
     ],
@@ -89,7 +86,6 @@ go_test(
         "//api/swagger-spec",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:COMMON_testing",
     ],

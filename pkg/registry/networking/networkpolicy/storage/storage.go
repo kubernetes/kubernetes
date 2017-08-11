@@ -35,18 +35,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against NetworkPolicies
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &networkingapi.NetworkPolicy{} },
-		NewListFunc:       func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
-		PredicateFunc:     networkpolicy.Matcher,
-		QualifiedResource: networkingapi.Resource("networkpolicies"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("networkpolicies"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &networkingapi.NetworkPolicy{} },
+		NewListFunc:              func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
+		DefaultQualifiedResource: networkingapi.Resource("networkpolicies"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("networkpolicies"),
 
 		CreateStrategy: networkpolicy.Strategy,
 		UpdateStrategy: networkpolicy.Strategy,
 		DeleteStrategy: networkpolicy.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: networkpolicy.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

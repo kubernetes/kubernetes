@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -145,7 +144,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Checking that stateful set pods are created with ControllerRef")
 			pod := pods.Items[0]
-			controllerRef := controller.GetControllerOf(&pod)
+			controllerRef := metav1.GetControllerOf(&pod)
 			Expect(controllerRef).ToNot(BeNil())
 			Expect(controllerRef.Kind).To(Equal(ss.Kind))
 			Expect(controllerRef.Name).To(Equal(ss.Name))
@@ -159,7 +158,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set readopts the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {
 						return false, nil
 					}
@@ -179,7 +178,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set releases the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "released", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef != nil {
 						return false, nil
 					}
@@ -196,7 +195,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Checking that the stateful set readopts the pod")
 			Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
-					controllerRef := controller.GetControllerOf(pod)
+					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {
 						return false, nil
 					}
@@ -842,6 +841,43 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				return nil
 			}, framework.StatefulPodTimeout, 2*time.Second).Should(BeNil())
+		})
+
+		It("should have a working scale subresource", func() {
+			By("Creating statefulset " + ssName + " in namespace " + ns)
+			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			sst := framework.NewStatefulSetTester(c)
+			sst.SetHttpProbe(ss)
+			ss, err := c.AppsV1beta1().StatefulSets(ns).Create(ss)
+			Expect(err).NotTo(HaveOccurred())
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+			ss = sst.WaitForStatus(ss)
+
+			By("getting scale subresource")
+			scale := framework.NewStatefulSetScale(ss)
+			scaleResult := &apps.Scale{}
+			err = c.AppsV1beta1().RESTClient().Get().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			if err != nil {
+				framework.Failf("Failed to get scale subresource: %v", err)
+			}
+			Expect(scale.Spec.Replicas).To(Equal(int32(1)))
+			Expect(scale.Status.Replicas).To(Equal(int32(1)))
+
+			By("updating a scale subresource")
+			scale.ResourceVersion = "" //unconditionally update to 2 replicas
+			scale.Spec.Replicas = 2
+			err = c.AppsV1beta1().RESTClient().Put().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			if err != nil {
+				framework.Failf("Failed to put scale subresource: %v", err)
+			}
+			Expect(scaleResult.Spec.Replicas).To(Equal(int32(2)))
+
+			By("verifying the statefulset Spec.Replicas was modified")
+			ss, err = c.AppsV1beta1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("Failed to get statefulset resource: %v", err)
+			}
+			Expect(*(ss.Spec.Replicas)).To(Equal(int32(2)))
 		})
 	})
 

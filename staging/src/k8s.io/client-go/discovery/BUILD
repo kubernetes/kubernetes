@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "restmapper.go",
         "unstructured.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -43,7 +40,6 @@ go_test(
         "helper_blackbox_test.go",
         "restmapper_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

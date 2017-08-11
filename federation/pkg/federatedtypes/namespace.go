@@ -50,7 +50,7 @@ type NamespaceAdapter struct {
 	deleter deletion.NamespacedResourcesDeleterInterface
 }
 
-func NewNamespaceAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewNamespaceAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	dynamicClientPool := dynamic.NewDynamicClientPool(config)
 	discoverResourcesFunc := client.Discovery().ServerPreferredNamespacedResources
 	deleter := deletion.NewNamespacedResourcesDeleter(

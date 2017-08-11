@@ -126,7 +126,7 @@ func IsDNS1123Subdomain(value string) []string {
 }
 
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
@@ -277,6 +277,22 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
+const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
+const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
+
+var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
+
+// IsEnvVarName tests if a string is a valid environment variable name.
+func IsEnvVarName(value string) []string {
+	var errs []string
+	if !envVarNameRegexp.MatchString(value) {
+		errs = append(errs, RegexError(envVarNameFmtErrMsg, envVarNameFmt, "my.env-name", "MY_ENV.NAME", "MyEnvName1"))
+	}
+
+	errs = append(errs, hasChDirPrefix(value)...)
+	return errs
+}
+
 const configMapKeyFmt = `[-._a-zA-Z0-9]+`
 const configMapKeyErrMsg string = "a valid config key must consist of alphanumeric characters, '-', '_' or '.'"
 
@@ -291,13 +307,7 @@ func IsConfigMapKey(value string) []string {
 	if !configMapKeyRegexp.MatchString(value) {
 		errs = append(errs, RegexError(configMapKeyErrMsg, configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
 	}
-	if value == "." {
-		errs = append(errs, `must not be '.'`)
-	} else if value == ".." {
-		errs = append(errs, `must not be '..'`)
-	} else if strings.HasPrefix(value, "..") {
-		errs = append(errs, `must not start with '..'`)
-	}
+	errs = append(errs, hasChDirPrefix(value)...)
 	return errs
 }
 
@@ -340,4 +350,17 @@ func prefixEach(msgs []string, prefix string) []string {
 // between" validation failure.
 func InclusiveRangeError(lo, hi int) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
+}
+
+func hasChDirPrefix(value string) []string {
+	var errs []string
+	switch {
+	case value == ".":
+		errs = append(errs, `must not be '.'`)
+	case value == "..":
+		errs = append(errs, `must not be '..'`)
+	case strings.HasPrefix(value, ".."):
+		errs = append(errs, `must not start with '..'`)
+	}
+	return errs
 }

@@ -93,10 +93,10 @@ type FederationSyncController struct {
 }
 
 // StartFederationSyncController starts a new sync controller for a type adapter
-func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool) {
+func StartFederationSyncController(kind string, adapterFactory federatedtypes.AdapterFactory, config *restclient.Config, stopChan <-chan struct{}, minimizeLatency bool, adapterSpecificArgs map[string]interface{}) {
 	restclient.AddUserAgent(config, fmt.Sprintf("federation-%s-controller", kind))
 	client := federationclientset.NewForConfigOrDie(config)
-	adapter := adapterFactory(client, config)
+	adapter := adapterFactory(client, config, adapterSpecificArgs)
 	controller := newFederationSyncController(client, adapter)
 	if minimizeLatency {
 		controller.minimizeLatency()
@@ -490,8 +490,7 @@ func syncToClusters(clustersAccessor clustersAccessorFunc, operationsAccessor op
 		if !ok {
 			glog.Fatalf("Adapter for kind %q does not properly implement SchedulingAdapter.", kind)
 		}
-		typedScheduleInfo := schedulingInfo.(*federatedtypes.ReplicaSchedulingInfo)
-		err = schedulingAdapter.UpdateFederatedStatus(obj, typedScheduleInfo.Status)
+		err = schedulingAdapter.UpdateFederatedStatus(obj, schedulingInfo)
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("adapter.UpdateFinished() failed on adapter for %s %q: %v", kind, key, err))
 			return statusError
@@ -548,7 +547,7 @@ func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClus
 			return nil, wrappedErr
 		}
 
-		shouldCreateIfNeeded := true
+		var scheduleAction federatedtypes.ScheduleAction = federatedtypes.ActionAdd
 		if adapter.IsSchedulingAdapter() {
 			schedulingAdapter, ok := adapter.(federatedtypes.SchedulingAdapter)
 			if !ok {
@@ -559,7 +558,7 @@ func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClus
 			if clusterObj != nil {
 				clusterTypedObj = clusterObj.(pkgruntime.Object)
 			}
-			desiredObj, shouldCreateIfNeeded, err = schedulingAdapter.ScheduleObject(cluster, clusterTypedObj, desiredObj, schedulingInfo)
+			desiredObj, scheduleAction, err = schedulingAdapter.ScheduleObject(cluster, clusterTypedObj, desiredObj, schedulingInfo)
 			if err != nil {
 				runtime.HandleError(err)
 				return nil, err
@@ -568,11 +567,15 @@ func clusterOperations(adapter federatedtypes.FederatedTypeAdapter, selectedClus
 
 		var operationType util.FederatedOperationType = ""
 		if found {
-			clusterObj := clusterObj.(pkgruntime.Object)
-			if !adapter.Equivalent(desiredObj, clusterObj) {
-				operationType = util.OperationTypeUpdate
+			if scheduleAction == federatedtypes.ActionDelete {
+				operationType = util.OperationTypeDelete
+			} else {
+				clusterObj := clusterObj.(pkgruntime.Object)
+				if !adapter.Equivalent(desiredObj, clusterObj) {
+					operationType = util.OperationTypeUpdate
+				}
 			}
-		} else if shouldCreateIfNeeded {
+		} else if scheduleAction == federatedtypes.ActionAdd {
 			operationType = util.OperationTypeAdd
 		}
 

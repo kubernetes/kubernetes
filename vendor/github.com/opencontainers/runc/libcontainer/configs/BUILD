@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,20 +9,29 @@ go_library(
     name = "go_default_library",
     srcs = [
         "blkio_device.go",
-        "cgroup_unix.go",
+        "cgroup_unsupported.go",
         "config.go",
-        "config_unix.go",
         "device.go",
-        "device_defaults.go",
         "hugepage_limit.go",
         "interface_priority_map.go",
         "mount.go",
         "namespaces.go",
-        "namespaces_syscall.go",
-        "namespaces_unix.go",
+        "namespaces_syscall_unsupported.go",
+        "namespaces_unsupported.go",
         "network.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "cgroup_unix.go",
+            "config_unix.go",
+            "device_defaults.go",
+            "namespaces_syscall.go",
+            "namespaces_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "cgroup_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
 )
 

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "sharded_parallel_spec_iterator.go",
         "spec_iterator.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/onsi/ginkgo/internal/spec:go_default_library"],
 )
 

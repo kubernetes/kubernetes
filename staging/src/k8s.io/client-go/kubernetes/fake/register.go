@@ -33,6 +33,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -85,6 +86,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	extensionsv1beta1.AddToScheme(scheme)
 	networkingv1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
 	rbacv1beta1.AddToScheme(scheme)
 	rbacv1alpha1.AddToScheme(scheme)
 	schedulingv1alpha1.AddToScheme(scheme)

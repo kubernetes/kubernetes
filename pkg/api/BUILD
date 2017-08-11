@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -23,7 +21,6 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
@@ -44,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["taint_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -59,9 +55,8 @@ go_test(
         "serialization_test.go",
         "unstructured_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        ":go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -108,6 +103,7 @@ filegroup(
         "//pkg/api/endpoints:all-srcs",
         "//pkg/api/errors:all-srcs",
         "//pkg/api/events:all-srcs",
+        "//pkg/api/fuzzer:all-srcs",
         "//pkg/api/helper:all-srcs",
         "//pkg/api/install:all-srcs",
         "//pkg/api/meta:all-srcs",

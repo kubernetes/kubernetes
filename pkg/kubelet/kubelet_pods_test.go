@@ -1219,14 +1219,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"1234": []byte("abc"),
-					"1z":   []byte("abc"),
-					"key":  []byte("value"),
+					"1234":  []byte("abc"),
+					"1z":    []byte("abc"),
+					"key.1": []byte("value"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
-					Name:  "key",
+					Name:  "key.1",
 					Value: "value",
 				},
 			},
@@ -1250,12 +1250,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"1234": []byte("abc"),
+					"1234.name": []byte("abc"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
-					Name:  "p_1234",
+					Name:  "p_1234.name",
 					Value: "abc",
 				},
 			},

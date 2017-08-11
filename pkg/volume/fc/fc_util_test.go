@@ -63,6 +63,11 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 			name: "dm-1",
 		}
 		return []os.FileInfo{f}, nil
+	case "/dev/disk/by-id/":
+		f := &fakeFileInfo{
+			name: "scsi-3600508b400105e210000900000490000",
+		}
+		return []os.FileInfo{f}, nil
 	}
 	return nil, nil
 }
@@ -79,12 +84,30 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 	return nil
 }
 
-func TestIoHandler(t *testing.T) {
-	io := &fakeIOHandler{}
-	wwns := []string{"500a0981891b8dc5"}
-	lun := "0"
-	disk, dm := searchDisk(wwns, lun, io)
+func TestSearchDisk(t *testing.T) {
+	fakeMounter := fcDiskMounter{
+		fcDisk: &fcDisk{
+			wwns: []string{"500a0981891b8dc5"},
+			lun:  "0",
+			io:   &fakeIOHandler{},
+		},
+	}
+	disk, dm := searchDisk(fakeMounter)
 	// if no disk matches input wwn and lun, exit
+	if disk == "" && dm == "" {
+		t.Errorf("no fc disk found")
+	}
+}
+
+func TestSearchDiskWWID(t *testing.T) {
+	fakeMounter := fcDiskMounter{
+		fcDisk: &fcDisk{
+			wwids: []string{"3600508b400105e210000900000490000"},
+			io:    &fakeIOHandler{},
+		},
+	}
+	disk, dm := searchDisk(fakeMounter)
+	// if no disk matches input wwid, exit
 	if disk == "" && dm == "" {
 		t.Errorf("no fc disk found")
 	}

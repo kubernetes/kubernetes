@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -23,7 +21,6 @@ go_library(
         "watcher.go",
         "watcher_hub.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",

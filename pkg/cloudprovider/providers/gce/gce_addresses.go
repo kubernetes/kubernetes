@@ -17,8 +17,10 @@ limitations under the License.
 package gce
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -84,4 +86,31 @@ func (gce *GCECloud) GetRegionAddress(name, region string) (*compute.Address, er
 	mc := newAddressMetricContext("get", region)
 	v, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
 	return v, mc.Observe(err)
+}
+
+// GetRegionAddressByIP returns the regional address matching the given IP
+// address.
+func (gce *GCECloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
+	mc := newAddressMetricContext("list", region)
+	addrs, err := gce.service.Addresses.List(gce.projectID, region).Filter("address eq " + ipAddress).Do()
+	// Record the metrics for the call.
+	mc.Observe(err)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(addrs.Items) > 1 {
+		// We don't expect more than one match.
+		addrsToPrint := []compute.Address{}
+		for _, addr := range addrs.Items {
+			addrsToPrint = append(addrsToPrint, *addr)
+		}
+		glog.Errorf("More than one addresses matching the IP %q: %+v", ipAddress, addrsToPrint)
+	}
+	for _, addr := range addrs.Items {
+		if addr.Address == ipAddress {
+			return addr, nil
+		}
+	}
+	return nil, makeGoogleAPINotFoundError(fmt.Sprintf("Address with IP %q was not found in region %q", ipAddress, region))
 }

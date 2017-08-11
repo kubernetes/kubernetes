@@ -402,3 +402,22 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
 }
+
+func (ds *dockerService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	updateConfig := dockercontainer.UpdateConfig{
+		Resources: dockercontainer.Resources{
+			CPUPeriod:  resources.CpuPeriod,
+			CPUQuota:   resources.CpuQuota,
+			CPUShares:  resources.CpuShares,
+			Memory:     resources.MemoryLimitInBytes,
+			CpusetCpus: resources.CpusetCpus,
+			CpusetMems: resources.CpusetMems,
+		},
+	}
+
+	err := ds.client.UpdateContainerResources(containerID, updateConfig)
+	if err != nil {
+		return fmt.Errorf("failed to update container %q: %v", containerID, err)
+	}
+	return nil
+}

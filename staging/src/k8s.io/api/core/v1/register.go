@@ -59,6 +59,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Endpoints{},
 		&EndpointsList{},
 		&Node{},
+		&NodeConfigSource{},
 		&NodeList{},
 		&NodeProxyOptions{},
 		&Binding{},

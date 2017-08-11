@@ -362,6 +362,10 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeapi.Co
 	return &status, nil
 }
 
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+	return nil
+}
+
 func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
 	r.Lock()
 	defer r.Unlock()

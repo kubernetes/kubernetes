@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -50,6 +51,14 @@ import (
 // if the hook cannot be completed. An ObjectFunc may transform the provided
 // object.
 type ObjectFunc func(obj runtime.Object) error
+
+// GenericStore interface can be used for type assertions when we need to access the underlying strategies.
+type GenericStore interface {
+	GetCreateStrategy() rest.RESTCreateStrategy
+	GetUpdateStrategy() rest.RESTUpdateStrategy
+	GetDeleteStrategy() rest.RESTDeleteStrategy
+	GetExportStrategy() rest.RESTExportStrategy
+}
 
 // Store implements pkg/api/rest.StandardStorage. It's intended to be
 // embeddable and allows the consumer to implement any non-generic functions
@@ -82,8 +91,10 @@ type Store struct {
 	// curl GET /apis/group/version/namespaces/my-ns/myresource
 	NewListFunc func() runtime.Object
 
-	// QualifiedResource is the pluralized name of the resource.
-	QualifiedResource schema.GroupResource
+	// DefaultQualifiedResource is the pluralized name of the resource.
+	// This field is used if there is no request info present in the context.
+	// See qualifiedResourceFromContext for details.
+	DefaultQualifiedResource schema.GroupResource
 
 	// KeyRootFunc returns the root etcd key for this resource; should not
 	// include trailing "/".  This is used for operations that work on the
@@ -174,6 +185,7 @@ type Store struct {
 var _ rest.StandardStorage = &Store{}
 var _ rest.Exporter = &Store{}
 var _ rest.TableConvertor = &Store{}
+var _ GenericStore = &Store{}
 
 const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
 
@@ -230,6 +242,26 @@ func (e *Store) NewList() runtime.Object {
 	return e.NewListFunc()
 }
 
+// GetCreateStrategy implements GenericStore.
+func (e *Store) GetCreateStrategy() rest.RESTCreateStrategy {
+	return e.CreateStrategy
+}
+
+// GetUpdateStrategy implements GenericStore.
+func (e *Store) GetUpdateStrategy() rest.RESTUpdateStrategy {
+	return e.UpdateStrategy
+}
+
+// GetDeleteStrategy implements GenericStore.
+func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
+	return e.DeleteStrategy
+}
+
+// GetExportStrategy implements GenericStore.
+func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
+	return e.ExportStrategy
+}
+
 // List returns a list of items matching labels and field according to the
 // store's PredicateFunc.
 func (e *Store) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -262,16 +294,17 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 	}
 	p.IncludeUninitialized = options.IncludeUninitialized
 	list := e.NewListFunc()
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			err := e.Storage.GetToList(ctx, key, options.ResourceVersion, p, list)
-			return list, storeerr.InterpretListError(err, e.QualifiedResource)
+			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
 	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
-	return list, storeerr.InterpretListError(err, e.QualifiedResource)
+	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
 // Create inserts a new item according to the unique key from the object.
@@ -287,13 +320,14 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 	if err != nil {
 		return nil, err
 	}
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	ttl, err := e.calculateTTL(obj, 0, false)
 	if err != nil {
 		return nil, err
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl); err != nil {
-		err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
+		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
 		if !kubeerr.IsAlreadyExists(err) {
 			return nil, err
@@ -327,6 +361,8 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 	return out, nil
 }
 
+// WaitForInitialized holds until the object is initialized, or returns an error if the default limit expires.
+// This method is exposed publicly for consumers of generic rest tooling.
 func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
 	// return early if we don't have initializers, or if they've completed already
 	accessor, err := meta.Accessor(obj)
@@ -345,6 +381,7 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 	if err != nil {
 		return nil, err
 	}
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	w, err := e.Storage.Watch(ctx, key, accessor.GetResourceVersion(), storage.SelectionPredicate{
 		Label: labels.Everything(),
 		Field: fields.Everything(),
@@ -363,7 +400,7 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 		case event, ok := <-ch:
 			if !ok {
 				msg := fmt.Sprintf("server has timed out waiting for the initialization of %s %s",
-					e.QualifiedResource.String(), accessor.GetName())
+					qualifiedResource.String(), accessor.GetName())
 				return nil, kubeerr.NewTimeoutError(msg, 0)
 			}
 			switch event.Type {
@@ -448,15 +485,15 @@ func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
-			_, err := e.finalizeDelete(obj, true)
+			_, err := e.finalizeDelete(ctx, obj, true)
 			// clients are expecting an updated object if a PUT succeeded,
 			// but finalizeDelete returns a metav1.Status, so return
 			// the object in the request instead.
 			return obj, false, err
 		}
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
-	_, err := e.finalizeDelete(out, true)
+	_, err := e.finalizeDelete(ctx, out, true)
 	// clients are expecting an updated object if a PUT succeeded, but
 	// finalizeDelete returns a metav1.Status, so return the object in
 	// the request instead.
@@ -477,6 +514,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		creating    = false
 	)
 
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	storagePreconditions := &storage.Preconditions{}
 	if preconditions := objInfo.Preconditions(); preconditions != nil {
 		storagePreconditions.UID = preconditions.UID
@@ -508,7 +546,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, nil, kubeerr.NewNotFound(e.QualifiedResource, name)
+				return nil, nil, kubeerr.NewNotFound(qualifiedResource, name)
 			}
 			creating = true
 			creatingObj = obj
@@ -542,12 +580,12 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
-				qualifiedKind := schema.GroupKind{Group: e.QualifiedResource.Group, Kind: e.QualifiedResource.Resource}
+				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
 				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
 			if newVersion != version {
-				return nil, nil, kubeerr.NewConflict(e.QualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
+				return nil, nil, kubeerr.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
@@ -573,10 +611,10 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions)
 		}
 		if creating {
-			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
 		} else {
-			err = storeerr.InterpretUpdateError(err, e.QualifiedResource, name)
+			err = storeerr.InterpretUpdateError(err, qualifiedResource, name)
 		}
 		return nil, false, err
 	}
@@ -614,7 +652,7 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 		return nil, err
 	}
 	if err := e.Storage.Get(ctx, key, options.ResourceVersion, obj, false); err != nil {
-		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
+		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
@@ -622,6 +660,16 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 		}
 	}
 	return obj, nil
+}
+
+// qualifiedResourceFromContext attempts to retrieve a GroupResource from the context's request info.
+// If the context has no request info, DefaultQualifiedResource is used.
+func (e *Store) qualifiedResourceFromContext(ctx genericapirequest.Context) schema.GroupResource {
+	if info, ok := request.RequestInfoFrom(ctx); ok {
+		return schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}
+	}
+	// some implementations access storage directly and thus the context has no RequestInfo
+	return e.DefaultQualifiedResource
 }
 
 var (
@@ -827,10 +875,10 @@ func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, k
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(in, true)
+		out, err = e.finalizeDelete(ctx, in, true)
 		return err, false, false, out, lastExisting
 	default:
-		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+		return storeerr.InterpretUpdateError(err, e.qualifiedResourceFromContext(ctx), name), false, false, out, lastExisting
 	}
 }
 
@@ -918,10 +966,10 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(in, true)
+		out, err = e.finalizeDelete(ctx, in, true)
 		return err, false, false, out, lastExisting
 	default:
-		return storeerr.InterpretUpdateError(err, e.QualifiedResource, name), false, false, out, lastExisting
+		return storeerr.InterpretUpdateError(err, e.qualifiedResourceFromContext(ctx), name), false, false, out, lastExisting
 	}
 }
 
@@ -931,10 +979,10 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	if err != nil {
 		return nil, false, err
 	}
-
 	obj := e.NewFunc()
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
@@ -950,7 +998,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
-		out, err := e.finalizeDelete(obj, false)
+		out, err := e.finalizeDelete(ctx, obj, false)
 		return out, false, err
 	}
 	// check if obj has pending finalizers
@@ -991,12 +1039,12 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
-			out, err := e.finalizeDelete(lastExisting, true)
+			out, err := e.finalizeDelete(ctx, lastExisting, true)
 			return out, true, err
 		}
-		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
-	out, err = e.finalizeDelete(out, true)
+	out, err = e.finalizeDelete(ctx, out, true)
 	return out, true, err
 }
 
@@ -1098,7 +1146,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
 // returns the decorated deleted object if appropriate.
-func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
+func (e *Store) finalizeDelete(ctx genericapirequest.Context, obj runtime.Object, runHooks bool) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
 			return nil, err
@@ -1118,10 +1166,11 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 	if err != nil {
 		return nil, err
 	}
+	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	details := &metav1.StatusDetails{
 		Name:  accessor.GetName(),
-		Group: e.QualifiedResource.Group,
-		Kind:  e.QualifiedResource.Resource, // Yes we set Kind field to resource.
+		Group: qualifiedResource.Group,
+		Kind:  qualifiedResource.Resource, // Yes we set Kind field to resource.
 		UID:   accessor.GetUID(),
 	}
 	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
@@ -1238,17 +1287,17 @@ func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.E
 // CompleteWithOptions updates the store with the provided options and
 // defaults common fields.
 func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
-	if e.QualifiedResource.Empty() {
+	if e.DefaultQualifiedResource.Empty() {
 		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
 	}
 	if e.NewFunc == nil {
-		return fmt.Errorf("store for %s must have NewFunc set", e.QualifiedResource.String())
+		return fmt.Errorf("store for %s must have NewFunc set", e.DefaultQualifiedResource.String())
 	}
 	if e.NewListFunc == nil {
-		return fmt.Errorf("store for %s must have NewListFunc set", e.QualifiedResource.String())
+		return fmt.Errorf("store for %s must have NewListFunc set", e.DefaultQualifiedResource.String())
 	}
 	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
-		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.QualifiedResource.String())
+		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.DefaultQualifiedResource.String())
 	}
 
 	var isNamespaced bool
@@ -1258,15 +1307,15 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	case e.UpdateStrategy != nil:
 		isNamespaced = e.UpdateStrategy.NamespaceScoped()
 	default:
-		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.QualifiedResource.String())
+		return fmt.Errorf("store for %s must have CreateStrategy or UpdateStrategy set", e.DefaultQualifiedResource.String())
 	}
 
 	if e.DeleteStrategy == nil {
-		return fmt.Errorf("store for %s must have DeleteStrategy set", e.QualifiedResource.String())
+		return fmt.Errorf("store for %s must have DeleteStrategy set", e.DefaultQualifiedResource.String())
 	}
 
 	if options.RESTOptions == nil {
-		return fmt.Errorf("options for %s must have RESTOptions set", e.QualifiedResource.String())
+		return fmt.Errorf("options for %s must have RESTOptions set", e.DefaultQualifiedResource.String())
 	}
 
 	attrFunc := options.AttrFunc
@@ -1287,7 +1336,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		}
 	}
 
-	opts, err := options.RESTOptions.GetRESTOptions(e.QualifiedResource)
+	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)
 	if err != nil {
 		return err
 	}
@@ -1298,7 +1347,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		prefix = "/" + prefix
 	}
 	if prefix == "/" {
-		return fmt.Errorf("store for %s has an invalid prefix %q", e.QualifiedResource.String(), opts.ResourcePrefix)
+		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
 	// Set the default behavior for storage key generation
@@ -1377,5 +1426,5 @@ func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Obj
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
-	return rest.NewDefaultTableConvertor(e.QualifiedResource).ConvertToTable(ctx, object, tableOptions)
+	return rest.NewDefaultTableConvertor(e.qualifiedResourceFromContext(ctx)).ConvertToTable(ctx, object, tableOptions)
 }

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,12 +12,10 @@ go_test(
         "cluster_test.go",
         "configmap_test.go",
         "delete_test.go",
-        "deployment_test.go",
         "env_file_test.go",
         "generate_test.go",
         "kubectl_test.go",
         "namespace_test.go",
-        "proxy_server_test.go",
         "quota_test.go",
         "resource_filter_test.go",
         "rolebinding_test.go",
@@ -36,7 +32,6 @@ go_test(
         "sorting_printer_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
@@ -97,7 +92,6 @@ go_library(
         "kubectl.go",
         "namespace.go",
         "pdb.go",
-        "proxy_server.go",
         "quota.go",
         "resource_filter.go",
         "rolebinding.go",
@@ -115,7 +109,6 @@ go_library(
         "sorting_printer.go",
         "versioned_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
@@ -135,7 +128,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/client/retry:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/credentialprovider:go_default_library",
@@ -195,6 +187,7 @@ filegroup(
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
         "//pkg/kubectl/plugins:all-srcs",
+        "//pkg/kubectl/proxy:all-srcs",
         "//pkg/kubectl/resource:all-srcs",
         "//pkg/kubectl/testing:all-srcs",
         "//pkg/kubectl/util:all-srcs",

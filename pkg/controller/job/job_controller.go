@@ -193,7 +193,7 @@ func (jm *JobController) addPod(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		job := jm.resolveControllerRef(pod.Namespace, controllerRef)
 		if job == nil {
 			return
@@ -238,8 +238,8 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 
-	curControllerRef := controller.GetControllerOf(curPod)
-	oldControllerRef := controller.GetControllerOf(oldPod)
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -289,7 +289,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -624,7 +624,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		for i := int32(0); i < diff; i++ {
 			go func() {
 				defer wait.Done()
-				err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, newControllerRef(job))
+				err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
 				if err != nil && errors.IsTimeout(err) {
 					// Pod is created but its initialization has timed out.
 					// If the initialization is successful eventually, the

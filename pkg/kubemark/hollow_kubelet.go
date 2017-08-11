@@ -110,6 +110,7 @@ func GetHollowKubeletConfig(
 
 	// Flags struct
 	f := &options.KubeletFlags{
+		RootDirectory:    testRootDir,
 		HostnameOverride: nodeName,
 		// Use the default runtime options.
 		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
@@ -123,7 +124,6 @@ func GetHollowKubeletConfig(
 	c := &componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(tmp, c, nil)
 
-	c.RootDirectory = testRootDir
 	c.ManifestURL = ""
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)

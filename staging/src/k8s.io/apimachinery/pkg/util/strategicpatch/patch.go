@@ -1138,7 +1138,7 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, t reflect.Ty
 				return err
 			}
 		case !foundOriginal && !foundPatch:
-			return nil
+			continue
 		}
 
 		// Split all items into patch items and server-only items and then enforce the order.

@@ -48,7 +48,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		framework.BindClusterRole(jig.Client.Rbac(), "cluster-admin", f.Namespace.Name,
+		framework.BindClusterRole(jig.Client.RbacV1beta1(), "cluster-admin", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(jig.Client.AuthorizationV1beta1(),

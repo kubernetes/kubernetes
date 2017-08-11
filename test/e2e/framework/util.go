@@ -653,7 +653,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 				notReady++
 				badPods = append(badPods, pod)
 			default:
-				if controller.GetControllerOf(&pod) == nil {
+				if metav1.GetControllerOf(&pod) == nil {
 					Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
@@ -2551,7 +2551,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
-	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, &taint, nil))
+	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
 	VerifyThatTaintIsGone(c, nodeName, &taint)
 }
 
@@ -4948,6 +4948,7 @@ func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
 				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				Logf("Writing to %s", filePath)
 				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
 					Logf("Failed to write file %v with test performance data: %v", filePath, err)
 				}

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "signatures.go",
         "types.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/google/certificate-transparency/go/x509:go_default_library"],
 )
 

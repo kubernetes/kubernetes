@@ -201,7 +201,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *extens
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
 	if ds != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds)}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
 	}
 	return pod
 }
@@ -1251,6 +1251,68 @@ func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	}
 }
 
+// DaemonSet should launch a critical pod even when the node with OutOfDisk taints.
+func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("critical")
+		ds.Spec.UpdateStrategy = *strategy
+		setDaemonSetCritical(ds)
+		manager, podControl, _ := newTestController(ds)
+
+		node := newNode("not-enough-disk", nil)
+		node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
+		node.Spec.Taints = []v1.Taint{{Key: algorithm.TaintNodeOutOfDisk, Effect: v1.TaintEffectNoSchedule}}
+		manager.nodeStore.Add(node)
+
+		// NOTE: Whether or not TaintNodesByCondition is enabled, it'll add toleration to DaemonSet pods.
+
+		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+
+		// With enabling critical pod annotation feature gate, we will create critical pod
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+		// Rollback feature gate to false.
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+	}
+}
+
+// DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure taints.
+func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("critical")
+		ds.Spec.UpdateStrategy = *strategy
+		setDaemonSetCritical(ds)
+		manager, podControl, _ := newTestController(ds)
+
+		node := newNode("resources-pressure", nil)
+		node.Status.Conditions = []v1.NodeCondition{
+			{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue},
+			{Type: v1.NodeMemoryPressure, Status: v1.ConditionTrue},
+		}
+		node.Spec.Taints = []v1.Taint{
+			{Key: algorithm.TaintNodeDiskPressure, Effect: v1.TaintEffectNoSchedule},
+			{Key: algorithm.TaintNodeMemoryPressure, Effect: v1.TaintEffectNoSchedule},
+		}
+		manager.nodeStore.Add(node)
+
+		// Enabling critical pod and taint nodes by condition feature gate should create critical pod
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+		// Rollback feature gate to false.
+		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+	}
+}
+
 // DaemonSet should launch a critical pod even when the node has insufficient free resource.
 func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
@@ -1514,7 +1576,6 @@ func TestUpdateNode(t *testing.T) {
 					{Type: v1.NodeMemoryPressure, Status: v1.ConditionFalse},
 					{Type: v1.NodeDiskPressure, Status: v1.ConditionFalse},
 					{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionFalse},
-					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
 				}
 				return node
 			}(),
@@ -1522,7 +1583,6 @@ func TestUpdateNode(t *testing.T) {
 				node := newNode("node1", nil)
 				node.Status.Conditions = []v1.NodeCondition{
 					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-					{Type: v1.NodeInodePressure, Status: v1.ConditionFalse},
 				}
 				return node
 			}(),
@@ -1546,6 +1606,179 @@ func TestUpdateNode(t *testing.T) {
 
 			enqueued = false
 			manager.updateNode(c.oldNode, c.newNode)
+			if enqueued != c.shouldEnqueue {
+				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
+			}
+		}
+	}
+}
+
+// DaemonSets should be resynced when non-daemon pods was deleted.
+func TestDeleteNoDaemonPod(t *testing.T) {
+	var enqueued bool
+
+	cases := []struct {
+		test          string
+		node          *v1.Node
+		existPods     []*v1.Pod
+		deletedPod    *v1.Pod
+		ds            *extensions.DaemonSet
+		shouldEnqueue bool
+	}{
+		{
+			test: "Deleted non-daemon pods to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_0",
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Deleted non-daemon pods (with controller) to release resources",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{Controller: func() *bool { res := true; return &res }()},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("node1", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_0",
+						OwnerReferences: []metav1.OwnerReference{
+							{Controller: func() *bool { res := true; return &res }()},
+						},
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: true,
+		},
+		{
+			test: "Deleted no scheduled pods",
+			node: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Conditions = []v1.NodeCondition{
+					{Type: v1.NodeReady, Status: v1.ConditionTrue},
+				}
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			existPods: func() []*v1.Pod {
+				pods := []*v1.Pod{}
+				for i := 0; i < 4; i++ {
+					podSpec := resourcePodSpec("node1", "50M", "50m")
+					pods = append(pods, &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("pod_%d", i),
+							OwnerReferences: []metav1.OwnerReference{
+								{Controller: func() *bool { res := true; return &res }()},
+							},
+						},
+						Spec: podSpec,
+					})
+				}
+				return pods
+			}(),
+			deletedPod: func() *v1.Pod {
+				podSpec := resourcePodSpec("", "50M", "50m")
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod_5",
+					},
+					Spec: podSpec,
+				}
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpec("", "50M", "50m")
+				return ds
+			}(),
+			shouldEnqueue: false,
+		},
+	}
+
+	for _, c := range cases {
+		for _, strategy := range updateStrategies() {
+			manager, podControl, _ := newTestController()
+			manager.nodeStore.Add(c.node)
+			c.ds.Spec.UpdateStrategy = *strategy
+			manager.dsStore.Add(c.ds)
+			for _, pod := range c.existPods {
+				manager.podStore.Add(pod)
+			}
+			switch strategy.Type {
+			case extensions.OnDeleteDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 2)
+			case extensions.RollingUpdateDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
+			default:
+				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
+			}
+
+			manager.enqueueDaemonSetRateLimited = func(ds *extensions.DaemonSet) {
+				if ds.Name == "ds" {
+					enqueued = true
+				}
+			}
+
+			enqueued = false
+			manager.deletePod(c.deletedPod)
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 			}
@@ -1808,7 +2041,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 		pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
 		prev := *pod
-		prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds2)}
+		prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds2, controllerKind)}
 		bumpResourceVersion(pod)
 		manager.updatePod(&prev, pod)
 		if got, want := manager.queue.Len(), 2; got != want {

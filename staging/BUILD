@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,13 +9,11 @@ load(
 go_binary(
     name = "staging",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["godeps-json-updater.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
@@ -50,6 +46,7 @@ filegroup(
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:all-srcs",
         "//staging/src/k8s.io/api/networking/v1:all-srcs",
         "//staging/src/k8s.io/api/policy/v1beta1:all-srcs",
+        "//staging/src/k8s.io/api/rbac/v1:all-srcs",
         "//staging/src/k8s.io/api/rbac/v1alpha1:all-srcs",
         "//staging/src/k8s.io/api/rbac/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/scheduling/v1alpha1:all-srcs",
@@ -117,7 +114,9 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/websocket:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/x509:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/union:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:all-srcs",
@@ -163,6 +162,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/imagepolicy/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/networking/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/policy/v1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/rbac/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/rbac/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/rbac/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/scheduling/v1alpha1:all-srcs",

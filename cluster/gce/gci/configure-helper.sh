@@ -524,6 +524,8 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
+apiVersion: audit.k8s.io/v1alpha1
+kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
   # so drop them.
@@ -1558,7 +1560,7 @@ function start-cluster-autoscaler {
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
     remove-salt-config-comments "${src_file}"
 
-    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:-}"
+    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
     sed -i -e "s@{{params}}@${params}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -1606,7 +1608,7 @@ function wait-for-apiserver-and-update-fluentd {
   kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} \
     --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT} \
     --requests=cpu=${FLUENTD_GCP_CPU_REQUEST},memory=${FLUENTD_GCP_MEMORY_REQUEST} \
-    -o yaml > ${fluentd_gcp_yaml}.tmp
+    --containers=fluentd-gcp -o yaml > ${fluentd_gcp_yaml}.tmp
   mv ${fluentd_gcp_yaml}.tmp ${fluentd_gcp_yaml}
 }
 

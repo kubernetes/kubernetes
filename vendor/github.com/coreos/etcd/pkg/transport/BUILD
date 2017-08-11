@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -22,7 +20,6 @@ go_library(
         "transport.go",
         "unix_listener.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library",

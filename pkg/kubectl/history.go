@@ -34,11 +34,10 @@ import (
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -139,7 +138,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 func printTemplate(template *v1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
 	internalTemplate := &api.PodTemplateSpec{}
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
 	w := printersinternal.NewPrefixWriter(buf)
@@ -274,11 +273,10 @@ func controlledHistories(extensions clientextensionsv1beta1.ExtensionsV1beta1Int
 	}
 	for i := range historyList.Items {
 		history := historyList.Items[i]
-		// Skip history that doesn't belong to the DaemonSet
-		if controllerRef := controller.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
-			continue
+		// Only add history that belongs to the DaemonSet
+		if metav1.IsControlledBy(&history, ds) {
+			result = append(result, &history)
 		}
-		result = append(result, &history)
 	}
 	return ds, result, nil
 }

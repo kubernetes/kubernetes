@@ -61,7 +61,7 @@ func PodReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) func(ol
 	}
 }
 
-// ObjectReplenenishmentDeleteFunc will replenish on every delete
+// ObjectReplenishmentDeleteFunc will replenish on every delete
 func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func(obj interface{}) {
 	return func(obj interface{}) {
 		metaObject, err := meta.Accessor(obj)

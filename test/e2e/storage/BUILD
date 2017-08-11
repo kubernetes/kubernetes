@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -31,12 +29,12 @@ go_library(
         "vsphere_volume_placement.go",
         "vsphere_volume_vsan_policy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -65,7 +63,6 @@ go_library(
         "top_pod.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_CONSUMERS",
     ],
@@ -79,7 +76,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
@@ -91,6 +87,7 @@ go_library(
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/metricsutil:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",
+        "//pkg/kubectl/proxy:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
@@ -194,9 +191,6 @@ go_test(
         "//test/fixtures",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

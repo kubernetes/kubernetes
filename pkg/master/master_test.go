@@ -30,6 +30,7 @@ import (
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +57,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	kubeversion "k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"
@@ -110,6 +114,61 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.GenericConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
 
 	return server, *config, assert.New(t)
+}
+
+// TestLegacyRestStorageStrategies ensures that all Storage objects which are using the generic registry Store have
+// their various strategies properly wired up. This surfaced as a bug where strategies defined Export functions, but
+// they were never used outside of unit tests because the export strategies were not assigned inside the Store.
+func TestLegacyRestStorageStrategies(t *testing.T) {
+	_, _, masterCfg, _ := newMaster(t)
+	storageProvider := corerest.LegacyRESTStorageProvider{
+		StorageFactory:       masterCfg.StorageFactory,
+		ProxyTransport:       masterCfg.ProxyTransport,
+		KubeletClientConfig:  masterCfg.KubeletClientConfig,
+		EventTTL:             masterCfg.EventTTL,
+		ServiceIPRange:       masterCfg.ServiceIPRange,
+		ServiceNodePortRange: masterCfg.ServiceNodePortRange,
+		LoopbackClientConfig: masterCfg.GenericConfig.LoopbackClientConfig,
+	}
+
+	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(masterCfg.GenericConfig.RESTOptionsGetter)
+	if err != nil {
+		t.Errorf("failed to create legacy REST storage: %v", err)
+	}
+
+	// Any new stores with export logic will need to be added here:
+	exceptions := registrytest.StrategyExceptions{
+		// Only these stores should have an export strategy defined:
+		HasExportStrategy: []string{
+			"secrets",
+			"limitRanges",
+			"nodes",
+			"podTemplates",
+		},
+	}
+
+	strategyErrors := registrytest.ValidateStorageStrategies(apiGroupInfo.VersionedResourcesStorageMap["v1"], exceptions)
+	for _, err := range strategyErrors {
+		t.Error(err)
+	}
+}
+
+func TestCertificatesRestStorageStrategies(t *testing.T) {
+	_, _, masterCfg, _ := newMaster(t)
+	certStorageProvider := certificatesrest.RESTStorageProvider{}
+	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+
+	exceptions := registrytest.StrategyExceptions{
+		HasExportStrategy: []string{
+			"certificatesigningrequests",
+		},
+	}
+
+	strategyErrors := registrytest.ValidateStorageStrategies(
+		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1beta1.SchemeGroupVersion.Version], exceptions)
+	for _, err := range strategyErrors {
+		t.Error(err)
+	}
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {

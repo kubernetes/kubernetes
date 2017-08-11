@@ -53,7 +53,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		bob    = &user.DefaultInfo{Name: "bob"}
 
-		mynodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode"}}
+		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
+		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
+		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
+			ConfigMapRef: &api.ObjectReference{Name: "foo", Namespace: "bar", UID: "fooUID"}}}}
+		mynodeObjConfigB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
+			ConfigMapRef: &api.ObjectReference{Name: "qux", Namespace: "bar", UID: "quxUID"}}}}
 		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)
@@ -584,6 +589,36 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "allow update of my node status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "status", admission.Update, mynode),
+			err:        "",
+		},
+		{
+			name:       "forbid create of my node with non-nil configSource",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjConfigA, nil, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Create, mynode),
+			err:        "create with non-nil configSource",
+		},
+		{
+			name:       "forbid update of my node: nil configSource to new non-nil configSource",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjConfigA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "update configSource to a new non-nil configSource",
+		},
+		{
+			name:       "forbid update of my node: non-nil configSource to new non-nil configSource",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjConfigB, mynodeObjConfigA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "update configSource to a new non-nil configSource",
+		},
+		{
+			name:       "allow update of my node: non-nil configSource unchanged",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjConfigA, mynodeObjConfigA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "",
+		},
+		{
+			name:       "allow update of my node: non-nil configSource to nil configSource",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjConfigA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
 			err:        "",
 		},
 

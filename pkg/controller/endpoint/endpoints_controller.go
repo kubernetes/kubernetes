@@ -63,6 +63,8 @@ const (
 	// receiving traffic for the Service from the moment the kubelet starts all
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
+	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
+	// subsequent releases.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -328,12 +330,6 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Need to delete endpoint with key %q, but couldn't understand the key: %v", key, err))
-			// Don't retry, as the key isn't going to magically become understandable.
-			return nil
-		}
 		err = e.client.Core().Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err

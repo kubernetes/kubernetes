@@ -446,3 +446,9 @@ func AssertHasFinalizer(t *testing.T, obj runtime.Object, finalizer string) {
 	require.Nil(t, err)
 	assert.True(t, hasFinalizer)
 }
+
+func NewInt32(val int32) *int32 {
+	p := new(int32)
+	*p = val
+	return p
+}
