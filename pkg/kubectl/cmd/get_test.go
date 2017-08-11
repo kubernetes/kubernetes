@@ -351,7 +351,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 			case p == "/api/v1/namespaces/test" && m == "GET":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ns.Items[0])}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
