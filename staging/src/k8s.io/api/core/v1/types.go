@@ -1102,10 +1102,12 @@ type ISCSIVolumeSource struct {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
-	// Required: FC target worldwide names (WWNs)
-	TargetWWNs []string `json:"targetWWNs" protobuf:"bytes,1,rep,name=targetWWNs"`
-	// Required: FC target lun number
-	Lun *int32 `json:"lun" protobuf:"varint,2,opt,name=lun"`
+	// Optional: FC target worldwide names (WWNs)
+	// +optional
+	TargetWWNs []string `json:"targetWWNs,omitempty" protobuf:"bytes,1,rep,name=targetWWNs"`
+	// Optional: FC target lun number
+	// +optional
+	Lun *int32 `json:"lun,omitempty" protobuf:"varint,2,opt,name=lun"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -1116,6 +1118,10 @@ type FCVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	// Optional: FC volume world wide identifiers (wwids)
+	// Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
+	// +optional
+	WWIDs []string `json:"wwids,omitempty" protobuf:"bytes,5,rep,name=wwids"`
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.

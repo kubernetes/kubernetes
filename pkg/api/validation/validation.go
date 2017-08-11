@@ -648,15 +648,21 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 
 func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(fc.TargetWWNs) < 1 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetWWNs"), ""))
+	if len(fc.TargetWWNs) < 1 && len(fc.WWIDs) < 1 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("targetWWNs"), "must specify either targetWWNs or wwids, but not both"))
 	}
 
-	if fc.Lun == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lun"), ""))
-	} else {
-		if *fc.Lun < 0 || *fc.Lun > 255 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
+	if len(fc.TargetWWNs) != 0 && len(fc.WWIDs) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetWWNs"), fc.TargetWWNs, "targetWWNs and wwids can not be specified simultaneously"))
+	}
+
+	if len(fc.TargetWWNs) != 0 {
+		if fc.Lun == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("lun"), "lun is required if targetWWNs is specified"))
+		} else {
+			if *fc.Lun < 0 || *fc.Lun > 255 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
+			}
 		}
 	}
 	return allErrs
