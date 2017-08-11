@@ -59,6 +59,7 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
+valid_auth_modes = ['rbac', 'none']
 
 def service_cidr():
     ''' Return the charm's service-cidr config '''
@@ -321,6 +322,11 @@ def idle_status(kube_api, kube_control):
         msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
         hookenv.status_set('active', msg)
     else:
+        mode = hookenv.config().get('authorization-mode').lower()
+        if mode not in valid_auth_modes:
+            hookenv.status_set('blocked', 'Incorrect authorization mode.')
+            return
+
         # All services should be up and running at this point. Double-check...
         failing_services = master_services_down()
         if len(failing_services) == 0:
@@ -656,11 +662,13 @@ def initial_nrpe_config(nagios=None):
     update_nrpe_config(nagios)
 
 
-@when('config.changed.enable-rbac',
+@when('config.changed.authorization-mode',
       'kubernetes-master.components.started')
-def enable_rbac_config():
+def switch_auth_mode():
     config = hookenv.config()
-    if data_changed('rbac-flag', str(config.get('enable-rbac'))):
+    mode = config.get('authorization-mode').lower()
+    if mode in valid_auth_modes and \
+            data_changed('auth-mode', mode):
         remove_state('kubernetes-master.components.started')
 
 
@@ -1015,7 +1023,7 @@ def configure_apiserver():
         'DefaultTolerationSeconds'
     ]
 
-    if hookenv.config('enable-rbac'):
+    if hookenv.config('authorization-mode').lower() == 'rbac':
         admission_control.append('NodeRestriction')
         api_opts.add('authorization-mode', 'Node,RBAC', strict=True)
     else:
