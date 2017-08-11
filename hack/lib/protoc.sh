@@ -78,3 +78,14 @@ function kube::protoc::format() {
   kube::golang::verify_go_version
   gofmt -l -s -w ${package}/api.pb.go
 }
+
+# Compares the contents of $1 and $2
+# Echo's $3 in case of error and exits 1
+function kube::protoc::diff() {
+  local ret=0
+  diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${1} ${2} || ret=$?
+  if [[ $ret -ne 0 ]]; then
+    echo ${3}
+    exit 1
+  fi
+}
