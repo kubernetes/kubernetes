@@ -172,13 +172,21 @@ func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersi
 		ignoredKinds = gmf.GroupArgs.IgnoredKinds
 	}
 
-	return meta.NewDefaultRESTMapperFromScheme(
-		externalVersions,
-		groupMeta.InterfacesFor,
-		ignoredKinds,
-		rootScoped,
-		scheme,
-	)
+	mapper := meta.NewDefaultRESTMapper(externalVersions, groupMeta.InterfacesFor)
+	for _, gv := range externalVersions {
+		for kind := range scheme.KnownTypes(gv) {
+			if ignoredKinds.Has(kind) {
+				continue
+			}
+			scope := meta.RESTScopeNamespace
+			if rootScoped.Has(kind) {
+				scope = meta.RESTScopeRoot
+			}
+			mapper.Add(gv.WithKind(kind), scope)
+		}
+	}
+
+	return mapper
 }
 
 // Enable enables group versions that are allowed, adds methods to the scheme, etc.
