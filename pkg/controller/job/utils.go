@@ -19,7 +19,6 @@ package job
 import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func IsJobFinished(j *batch.Job) bool {
@@ -29,17 +28,4 @@ func IsJobFinished(j *batch.Job) bool {
 		}
 	}
 	return false
-}
-
-func newControllerRef(j *batch.Job) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               j.Name,
-		UID:                j.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
 }

@@ -23,7 +23,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/retry:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/apps:go_default_library",

@@ -219,20 +219,6 @@ func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
 }
 
-// newControllerRef returns an ControllerRef pointing to a given StatefulSet.
-func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               set.Name,
-		UID:                set.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
-}
-
 // setPodRevision sets the revision of Pod to revision by adding the StatefulSetRevisionLabel
 func setPodRevision(pod *v1.Pod, revision string) {
 	if pod.Labels == nil {
@@ -252,7 +238,7 @@ func getPodRevision(pod *v1.Pod) string {
 
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, newControllerRef(set))
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerRef(set, controllerKind))
 	pod.Name = getPodName(set, ordinal)
 	updateIdentity(set, pod)
 	updateStorage(set, pod)

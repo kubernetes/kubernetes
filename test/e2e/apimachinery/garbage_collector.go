@@ -23,7 +23,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/testserver"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -581,7 +580,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
 		for _, replicaSet := range rs.Items {
-			if controller.GetControllerOf(&replicaSet.ObjectMeta) != nil {
+			if metav1.GetControllerOf(&replicaSet.ObjectMeta) != nil {
 				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
 			}
 		}

@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -286,7 +285,7 @@ func (o *DrainOptions) getController(namespace string, controllerRef *metav1.Own
 }
 
 func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, error) {
-	controllerRef := controller.GetControllerOf(&pod)
+	controllerRef := metav1.GetControllerOf(&pod)
 	if controllerRef == nil {
 		return nil, nil
 	}

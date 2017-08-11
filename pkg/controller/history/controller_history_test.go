@@ -992,7 +992,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 		if !test.err && err != nil {
 			t.Errorf("%s: %s", test.name, err)
 		}
-		if !test.err && controller.GetControllerOf(adopted).UID != test.parent.GetUID() {
+		if !test.err && !metav1.IsControlledBy(adopted, test.parent) {
 			t.Errorf("%s: adoption failed", test.name)
 		}
 		if test.err && err == nil {
@@ -1103,7 +1103,7 @@ func TestFakeHistory_AdoptControllerRevision(t *testing.T) {
 		if !test.err && err != nil {
 			t.Errorf("%s: %s", test.name, err)
 		}
-		if !test.err && controller.GetControllerOf(adopted).UID != test.parent.GetUID() {
+		if !test.err && !metav1.IsControlledBy(adopted, test.parent) {
 			t.Errorf("%s: adoption failed", test.name)
 		}
 		if test.err && err == nil {
@@ -1211,8 +1211,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 				if found == nil {
 					return true, nil, errors.NewNotFound(apps.Resource("controllerrevisions"), test.revision.Name)
 				}
-				if foundParent := controller.GetControllerOf(test.revision); foundParent == nil ||
-					foundParent.UID != test.parent.GetUID() {
+				if !metav1.IsControlledBy(test.revision, test.parent) {
 					return true, nil, errors.NewInvalid(
 						test.revision.GroupVersionKind().GroupKind(), test.revision.Name, nil)
 				}
@@ -1258,7 +1257,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 			if adopted == nil {
 				return
 			}
-			if owner := controller.GetControllerOf(adopted); owner != nil && owner.UID == test.parent.GetUID() {
+			if metav1.IsControlledBy(adopted, test.parent) {
 				t.Errorf("%s: release failed", test.name)
 			}
 		}
@@ -1386,7 +1385,7 @@ func TestFakeHistory_ReleaseControllerRevision(t *testing.T) {
 			if adopted == nil {
 				return
 			}
-			if owner := controller.GetControllerOf(adopted); owner != nil && owner.UID == test.parent.GetUID() {
+			if metav1.IsControlledBy(adopted, test.parent) {
 				t.Errorf("%s: release failed", test.name)
 			}
 		}
