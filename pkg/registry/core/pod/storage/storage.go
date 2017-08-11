@@ -78,7 +78,21 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      pod.Strategy,
 		ReturnDeletedObject: true,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(func(printer printers.PrintHandler) {
+			handlers, err := printersinternal.DefaultHandlers()
+			if err == nil {
+				for _, h := range handlers {
+					printer.TableHandlerFromEntry(h)
+				}
+			}
+
+			genericHandlers, err := printersinternal.GenericHandlers()
+			if err == nil {
+				for _, h := range genericHandlers {
+					printer.DefaultTableHandler(h)
+				}
+			}
+		})},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: pod.GetAttrs, TriggerFunc: pod.NodeNameTriggerFunc}
 	if err := store.CompleteWithOptions(options); err != nil {

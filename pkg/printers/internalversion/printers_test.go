@@ -64,6 +64,26 @@ var testData = kubectltesting.TestStruct{
 	IntList:    []int{1, 2, 3},
 }
 
+func addGenericHandlers(printer printers.PrintHandler) {
+	handlers, err := GenericHandlers()
+	if err == nil {
+		for _, h := range handlers {
+			printer.DefaultTableHandler(h)
+		}
+	}
+}
+
+func addHandlers(printer printers.PrintHandler) {
+	handlers, err := DefaultHandlers()
+	if err == nil {
+		for _, h := range handlers {
+			printer.TableHandlerFromEntry(h)
+		}
+	}
+
+	addGenericHandlers(printer)
+}
+
 func TestVersionedPrinter(t *testing.T) {
 	original := &kubectltesting.TestStruct{Key: "value"}
 	p := printers.NewVersionedPrinter(
@@ -197,7 +217,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 
 	for _, test := range tests {
 		out.Reset()
-		printer := printers.NewHumanReadablePrinter(nil, nil, test.options).With(AddDefaultHandlers)
+		printer := printers.NewHumanReadablePrinter(nil, nil, test.options).With(addGenericHandlers)
 		printer.PrintObj(test.object, out)
 
 		matches, err := regexp.MatchString(test.expected, out.String())
@@ -671,8 +691,8 @@ func TestPrinters(t *testing.T) {
 			Mapper:   api.Registry.RESTMapper(api.Registry.EnabledVersions()...),
 		},
 	}
-	AddHandlers((allPrinters["humanReadable"]).(*printers.HumanReadablePrinter))
-	AddHandlers((allPrinters["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
+	addHandlers((allPrinters["humanReadable"]).(*printers.HumanReadablePrinter))
+	addHandlers((allPrinters["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
 	objects := map[string]runtime.Object{
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &api.PodList{},
@@ -706,7 +726,7 @@ func TestPrinters(t *testing.T) {
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
-	AddHandlers(printer)
+	addHandlers(printer)
 
 	obj := api.EventList{
 		Items: []api.Event{
@@ -751,7 +771,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 
 func TestPrintNodeStatus(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
-	AddHandlers(printer)
+	addHandlers(printer)
 	table := []struct {
 		node   api.Node
 		status string
@@ -844,7 +864,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
-	AddHandlers(printer)
+	addHandlers(printer)
 
 	table := []struct {
 		node    api.Node
@@ -889,7 +909,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
-	AddHandlers(printer)
+	addHandlers(printer)
 
 	table := []struct {
 		node          api.Node
@@ -934,7 +954,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
-	AddHandlers(printer)
+	addHandlers(printer)
 
 	table := []struct {
 		node                    api.Node
@@ -978,7 +998,7 @@ func TestPrintNodeName(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,
 	})
-	AddHandlers(printer)
+	addHandlers(printer)
 	table := []struct {
 		node api.Node
 		Name string
@@ -1015,7 +1035,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		Wide: true,
 	})
-	AddHandlers(printer)
+	addHandlers(printer)
 	table := []struct {
 		node       api.Node
 		externalIP string
@@ -1095,7 +1115,7 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
-	table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1224,7 +1244,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
 			buff := bytes.NewBuffer([]byte{})
-			table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&svc, printers.PrintOptions{Wide: wide})
+			table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&svc, printers.PrintOptions{Wide: wide})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1417,7 +1437,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 				WithNamespace: true,
 			})
-			AddHandlers(printer)
+			addHandlers(printer)
 			buffer := &bytes.Buffer{}
 			err := printer.PrintObj(test.obj, buffer)
 			if err != nil {
@@ -1502,12 +1522,12 @@ func TestPrintPodTable(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(test.obj, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(test.obj, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		buf := &bytes.Buffer{}
-		p := printers.NewHumanReadablePrinter(nil, nil, test.opts).With(AddHandlers).AddTabWriter(false)
+		p := printers.NewHumanReadablePrinter(nil, nil, test.opts).With(addHandlers).AddTabWriter(false)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
@@ -1758,7 +1778,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1819,7 +1839,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1902,7 +1922,7 @@ func TestPrintDeployment(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.deployment, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1913,7 +1933,7 @@ func TestPrintDeployment(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTablePrinter().With(addHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
 		// print deployment with '-o wide' option
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
 			t.Fatal(err)
@@ -1955,7 +1975,7 @@ func TestPrintDaemonSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.ds, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.ds, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2009,7 +2029,7 @@ func TestPrintJob(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.job, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.job, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2385,7 +2405,7 @@ func TestPrintHPA(t *testing.T) {
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.hpa, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.hpa, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2447,7 +2467,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2613,7 +2633,7 @@ func TestPrintService(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.service, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.service, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2653,7 +2673,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pdb, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.pdb, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2770,7 +2790,7 @@ func TestPrintControllerRevision(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.history, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.history, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2830,7 +2850,7 @@ func TestPrintReplicaSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(addHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2842,7 +2862,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		}
 		buf.Reset()
 
-		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTablePrinter().With(addHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}

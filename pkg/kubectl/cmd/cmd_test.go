@@ -41,7 +41,6 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/pkg/util/strings"
 )
 
@@ -159,7 +158,7 @@ func Example_printReplicationControllerWithNamespace() {
 		WithNamespace: true,
 		ColumnLabels:  []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -212,7 +211,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -266,7 +265,7 @@ func Example_printReplicationController() {
 	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -321,7 +320,7 @@ func Example_printPodWithWideFormat() {
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -364,7 +363,7 @@ func Example_printPodWithShowLabels() {
 		ShowLabels:   true,
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -501,7 +500,7 @@ func Example_printPodHideTerminated() {
 	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -537,7 +536,7 @@ func Example_printPodShowAll() {
 		ShowAll:      true,
 		ColumnLabels: []string{},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -566,7 +565,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 		WithNamespace: true,
 		ColumnLabels:  []string{"l1"},
 	})
-	printersinternal.AddHandlers(p)
+	f.AddDefaultHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,

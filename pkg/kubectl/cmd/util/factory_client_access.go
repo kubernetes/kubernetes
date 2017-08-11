@@ -416,8 +416,46 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 
 func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
-	printersinternal.AddHandlers(p)
+	err := f.AddDefaultHandlers(p)
+	if err != nil {
+		return nil, err
+	}
+
 	return p, nil
+}
+
+func (f *ring0Factory) GetDefaultHandlers() ([]*printers.HandlerEntry, error) {
+	return printersinternal.DefaultHandlers()
+}
+
+func (f *ring0Factory) AddDefaultHandlers(p printers.PrintHandler) error {
+	handlers, err := printersinternal.DefaultHandlers()
+	if err != nil {
+		return err
+	}
+
+	for _, h := range handlers {
+		f.AddTableHandler(p, h)
+	}
+
+	genericHandlers, err := printersinternal.GenericHandlers()
+	if err != nil {
+		return err
+	}
+
+	for _, h := range genericHandlers {
+		p.DefaultTableHandler(h)
+	}
+
+	return nil
+}
+
+func (f *ring0Factory) AddTableHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.TableHandlerFromEntry(handlerEntry)
+}
+
+func (f *ring0Factory) AddHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.HandlerFromEntry(handlerEntry)
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
