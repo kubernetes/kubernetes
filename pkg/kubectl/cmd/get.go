@@ -197,7 +197,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	export := cmdutil.GetFlagBool(cmd, "export")
 
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	filterOpts.WithNamespace = allNamespaces
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")

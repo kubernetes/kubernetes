@@ -518,10 +518,6 @@ func (f *FakeFactory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.B
 	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme), nil
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	return &printers.PrintOptions{}
-}
-
 func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
 	return nil
 }

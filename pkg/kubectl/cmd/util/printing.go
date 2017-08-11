@@ -83,7 +83,7 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 // ExtractCmdPrintOptions parses printer specific commandline args and
 // returns a PrintOptions object.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags)
-func ExtractCmdPrintOptions(cmd *cobra.Command) printers.PrintOptions {
+func ExtractCmdPrintOptions(cmd *cobra.Command) *printers.PrintOptions {
 	flags := cmd.Flags()
 
 	columnLabel, err := flags.GetStringSlice("label-columns")
@@ -91,7 +91,7 @@ func ExtractCmdPrintOptions(cmd *cobra.Command) printers.PrintOptions {
 		columnLabel = []string{}
 	}
 
-	options := printers.PrintOptions{
+	options := &printers.PrintOptions{
 		NoHeaders:          GetFlagBool(cmd, "no-headers"),
 		Wide:               GetWideFlag(cmd),
 		ShowAll:            GetFlagBool(cmd, "show-all"),
@@ -141,8 +141,8 @@ func ExtractCmdPrintOptions(cmd *cobra.Command) printers.PrintOptions {
 
 // printerWithOptions returns the printer for the given options.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func printerWithOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	printer, err := printers.GetStandardPrinter(options.NoHeaders, mapper, typer, encoder, decoders, options)
+func printerWithOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options *printers.PrintOptions) (printers.ResourcePrinter, error) {
+	printer, err := printers.GetStandardPrinter(mapper, typer, encoder, decoders, options)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func printerWithOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encod
 	return maybeWrapSortingPrinter(printer, options), nil
 }
 
-func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printers.PrintOptions) printers.ResourcePrinter {
+func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts *printers.PrintOptions) printers.ResourcePrinter {
 	if len(printOpts.SortBy) != 0 {
 		return &kubectl.SortingPrinter{
 			Delegate:  printer,

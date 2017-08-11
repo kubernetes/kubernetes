@@ -142,8 +142,6 @@ type ClientAccessFactory interface {
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
 	BindExternalFlags(flags *pflag.FlagSet)
 
-	// TODO: Break the dependency on cmd here.
-	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions
 	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
 	DefaultResourceFilterFunc() kubectl.Filters
 

@@ -517,7 +517,8 @@ func Example_printPodHideTerminated() {
 	podList := newAllPhasePodList()
 	// filter pods
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	filterOpts.WithNamespace = false
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
 		fmt.Printf("Unexpected filter error: %v\n", errs)
