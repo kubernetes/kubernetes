@@ -36,6 +36,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/abac/fuzzer:all-srcs",
         "//pkg/apis/abac/latest:all-srcs",
         "//pkg/apis/abac/v0:all-srcs",
         "//pkg/apis/abac/v1beta1:all-srcs",

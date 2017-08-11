@@ -42,6 +42,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

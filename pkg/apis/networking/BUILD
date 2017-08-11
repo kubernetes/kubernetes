@@ -37,6 +37,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/networking/fuzzer:all-srcs",
         "//pkg/apis/networking/install:all-srcs",
         "//pkg/apis/networking/v1:all-srcs",
         "//pkg/apis/networking/validation:all-srcs",

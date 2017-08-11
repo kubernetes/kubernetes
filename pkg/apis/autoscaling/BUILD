@@ -38,6 +38,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/autoscaling/fuzzer:all-srcs",
         "//pkg/apis/autoscaling/install:all-srcs",
         "//pkg/apis/autoscaling/v1:all-srcs",
         "//pkg/apis/autoscaling/v2alpha1:all-srcs",
