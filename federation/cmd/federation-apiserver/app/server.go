@@ -63,9 +63,9 @@ func NewAPIServerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "federation-apiserver",
 		Long: `The Kubernetes federation API server validates and configures data
-for the api objects which include pods, services, replicationcontrollers, and
+for the API objects which include deployments, services, replicasets, and
 others. The API Server services REST operations and provides the frontend to the
-cluster's shared state through which all other components interact.`,
+clusters' shared state through which all other components interact.`,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
