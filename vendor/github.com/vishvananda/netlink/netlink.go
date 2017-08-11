@@ -9,16 +9,13 @@
 package netlink
 
 import (
+	"errors"
 	"net"
-
-	"github.com/vishvananda/netlink/nl"
 )
 
-const (
-	// Family type definitions
-	FAMILY_ALL = nl.FAMILY_ALL
-	FAMILY_V4  = nl.FAMILY_V4
-	FAMILY_V6  = nl.FAMILY_V6
+var (
+	// ErrNotImplemented is returned when a requested feature is not implemented.
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 // ParseIPNet parses a string in ip/net format and returns a net.IPNet.
@@ -33,7 +30,10 @@ func ParseIPNet(s string) (*net.IPNet, error) {
 	return &net.IPNet{IP: ip, Mask: ipNet.Mask}, nil
 }
 
-// NewIPNet generates an IPNet from an ip address using a netmask of 32.
+// NewIPNet generates an IPNet from an ip address using a netmask of 32 or 128.
 func NewIPNet(ip net.IP) *net.IPNet {
-	return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	if ip.To4() != nil {
+		return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	}
+	return &net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}
 }
