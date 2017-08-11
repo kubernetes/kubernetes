@@ -53477,6 +53477,11 @@
      "replicas"
     ],
     "properties": {
+     "collisionCount": {
+      "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+      "type": "integer",
+      "format": "int64"
+     },
      "currentReplicas": {
       "description": "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
       "type": "integer",
@@ -54273,6 +54278,11 @@
      "replicas"
     ],
     "properties": {
+     "collisionCount": {
+      "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+      "type": "integer",
+      "format": "int64"
+     },
      "currentReplicas": {
       "description": "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
       "type": "integer",

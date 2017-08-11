@@ -7791,6 +7791,11 @@
      "updateRevision": {
       "type": "string",
       "description": "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)"
+     },
+     "collisionCount": {
+      "type": "integer",
+      "format": "int64",
+      "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision."
      }
     }
    },
