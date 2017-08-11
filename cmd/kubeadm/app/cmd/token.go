@@ -85,7 +85,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster.")
 
 	var usages []string
 	var tokenDuration time.Duration
@@ -209,8 +209,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 	}
 
 	// TODO: Validate usages here so we don't allow something unsupported
-	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, description)
-	if err != nil {
+	if err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, description); err != nil {
 		return err
 	}
 

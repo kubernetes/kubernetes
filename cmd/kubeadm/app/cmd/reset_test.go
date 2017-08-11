@@ -148,8 +148,7 @@ func TestConfigDirCleaner(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		for _, createDir := range test.setupDirs {
-			err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
-			if err != nil {
+			if err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700); err != nil {
 				t.Errorf("Unable to setup test config directory: %s", err)
 			}
 		}
