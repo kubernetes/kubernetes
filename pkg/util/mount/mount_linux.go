@@ -399,7 +399,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
+// getDiskFormat uses 'lsblk' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
 	args := []string{"-n", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)

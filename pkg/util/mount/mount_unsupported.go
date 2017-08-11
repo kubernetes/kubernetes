@@ -61,7 +61,3 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	return nil
 }
-
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, nil
-}
