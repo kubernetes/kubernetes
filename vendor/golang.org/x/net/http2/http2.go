@@ -376,12 +376,16 @@ func (s *sorter) SortStrings(ss []string) {
 // validPseudoPath reports whether v is a valid :path pseudo-header
 // value. It must be either:
 //
-//     *) a non-empty string starting with '/', but not with with "//",
+//     *) a non-empty string starting with '/'
 //     *) the string '*', for OPTIONS requests.
 //
 // For now this is only used a quick check for deciding when to clean
 // up Opaque URLs before sending requests from the Transport.
 // See golang.org/issue/16847
+//
+// We used to enforce that the path also didn't start with "//", but
+// Google's GFE accepts such paths and Chrome sends them, so ignore
+// that part of the spec. See golang.org/issue/19103.
 func validPseudoPath(v string) bool {
-	return (len(v) > 0 && v[0] == '/' && (len(v) == 1 || v[1] != '/')) || v == "*"
+	return (len(v) > 0 && v[0] == '/') || v == "*"
 }
