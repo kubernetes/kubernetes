@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -221,7 +222,14 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
-		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
+		maskSize := "24"
+		if ip, _, err := net.ParseCIDR(cfg.Networking.PodSubnet); err == nil {
+			if ip.To4() == nil {
+				maskSize = "64"
+			}
+		}
+		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet,
+			"--node-cidr-mask-size="+maskSize)
 	}
 	return command
 }
