@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -274,11 +273,10 @@ func controlledHistories(extensions clientextensionsv1beta1.ExtensionsV1beta1Int
 	}
 	for i := range historyList.Items {
 		history := historyList.Items[i]
-		// Skip history that doesn't belong to the DaemonSet
-		if controllerRef := controller.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != ds.UID {
-			continue
+		// Only add history that belongs to the DaemonSet
+		if metav1.IsControlledBy(&history, ds) {
+			result = append(result, &history)
 		}
-		result = append(result, &history)
 	}
 	return ds, result, nil
 }

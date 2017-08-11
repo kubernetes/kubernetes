@@ -18,6 +18,7 @@ package banflunder
 
 import (
 	"fmt"
+	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,6 +28,13 @@ import (
 	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
 	listers "k8s.io/sample-apiserver/pkg/client/listers_generated/wardle/internalversion"
 )
+
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("BanFlunder", func(config io.Reader) (admission.Interface, error) {
+		return New()
+	})
+}
 
 type disallowFlunder struct {
 	*admission.Handler
@@ -80,5 +88,7 @@ func (d *disallowFlunder) Validate() error {
 
 // New creates a new ban flunder admission plugin
 func New() (admission.Interface, error) {
-	return &disallowFlunder{}, nil
+	return &disallowFlunder{
+		Handler: admission.NewHandler(admission.Create),
+	}, nil
 }

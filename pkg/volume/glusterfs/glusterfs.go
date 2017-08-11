@@ -374,7 +374,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// it all goes in a log file, we will read the log file
 	logErr := readGlusterLog(log, b.pod.Name)
 	if logErr != nil {
-		// return fmt.Errorf("glusterfs: mount failed: %v", logErr)
 		return fmt.Errorf("glusterfs: mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logErr)
 	}
 	return fmt.Errorf("glusterfs: mount failed: %v", errs)
@@ -390,7 +389,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a GlusterFS volume type")
+	return nil, false, fmt.Errorf("Spec does not reference a Glusterfs volume type")
 }
 
 func (plugin *glusterfsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
@@ -488,10 +487,8 @@ func (d *glusterfsVolumeDeleter) GetPath() string {
 	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
 }
 
-//
 // Traverse the PVs, fetching all the GIDs from those
 // in a given storage class, and mark them in the table.
-//
 func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAllocator) error {
 	kubeClient := plugin.host.GetKubeClient()
 	if kubeClient == nil {
@@ -535,12 +532,10 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 	return nil
 }
 
-//
 // Return the gid table for a storage class.
 // - If this is the first time, fill it with all the gids
 //   used in PVs of this storage class by traversing the PVs.
 // - Adapt the range of the table to the current range of the SC.
-//
 func (plugin *glusterfsPlugin) getGidTable(className string, min int, max int) (*MinMaxAllocator, error) {
 	plugin.gidTableLock.Lock()
 	gidTable, ok := plugin.gidTable[className]

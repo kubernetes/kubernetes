@@ -42,6 +42,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,
 		DeleteStrategy: secret.Strategy,
+		ExportStrategy: secret.Strategy,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {

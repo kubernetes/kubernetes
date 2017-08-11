@@ -201,7 +201,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *extens
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
 	if ds != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds)}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
 	}
 	return pod
 }
@@ -1806,7 +1806,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 		pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
 		prev := *pod
-		prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(ds2)}
+		prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds2, controllerKind)}
 		bumpResourceVersion(pod)
 		manager.updatePod(&prev, pod)
 		if got, want := manager.queue.Len(), 2; got != want {

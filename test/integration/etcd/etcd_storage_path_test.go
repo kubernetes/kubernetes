@@ -312,6 +312,29 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/rbac/v1
+	gvr("rbac.authorization.k8s.io", "v1", "roles"): {
+		stub:             `{"metadata": {"name": "role3"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
+		expectedEtcdPath: "/registry/roles/etcdstoragepathtestnamespace/role3",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "Role"),
+	},
+	gvr("rbac.authorization.k8s.io", "v1", "clusterroles"): {
+		stub:             `{"metadata": {"name": "crole3"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
+		expectedEtcdPath: "/registry/clusterroles/crole3",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRole"),
+	},
+	gvr("rbac.authorization.k8s.io", "v1", "rolebindings"): {
+		stub:             `{"metadata": {"name": "roleb3"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
+		expectedEtcdPath: "/registry/rolebindings/etcdstoragepathtestnamespace/roleb3",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "RoleBinding"),
+	},
+	gvr("rbac.authorization.k8s.io", "v1", "clusterrolebindings"): {
+		stub:             `{"metadata": {"name": "croleb3"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
+		expectedEtcdPath: "/registry/clusterrolebindings/croleb3",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRoleBinding"),
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
 	gvr("admissionregistration.k8s.io", "v1alpha1", "initializerconfigurations"): {
 		stub:             `{"metadata":{"name":"ic1"},"initializers":[{"name":"initializer.k8s.io","rules":[{"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore"}]}`,

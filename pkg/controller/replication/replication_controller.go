@@ -231,7 +231,7 @@ func (rm *ReplicationManager) addPod(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		rc := rm.resolveControllerRef(pod.Namespace, controllerRef)
 		if rc == nil {
 			return
@@ -287,8 +287,8 @@ func (rm *ReplicationManager) updatePod(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := controller.GetControllerOf(curPod)
-	oldControllerRef := controller.GetControllerOf(oldPod)
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -357,7 +357,7 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return

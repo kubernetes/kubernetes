@@ -38,6 +38,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/rbac/install:all-srcs",
+        "//pkg/apis/rbac/v1:all-srcs",
         "//pkg/apis/rbac/v1alpha1:all-srcs",
         "//pkg/apis/rbac/v1beta1:all-srcs",
         "//pkg/apis/rbac/validation:all-srcs",

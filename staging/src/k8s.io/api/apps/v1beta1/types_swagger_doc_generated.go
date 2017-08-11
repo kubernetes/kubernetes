@@ -239,6 +239,7 @@ var map_StatefulSetStatus = map[string]string{
 	"updatedReplicas":    "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision.",
 	"currentRevision":    "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
 	"updateRevision":     "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
+	"collisionCount":     "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
 }
 
 func (StatefulSetStatus) SwaggerDoc() map[string]string {

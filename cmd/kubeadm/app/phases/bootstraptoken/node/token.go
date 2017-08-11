@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package token
+package node
 
 import (
 	"fmt"
@@ -24,13 +24,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 
 const tokenCreateRetries = 5
+
+// TODO(mattmoyer): Move CreateNewToken, UpdateOrCreateToken and encodeTokenSecretData out of this package to client-go for a generic abstraction and client for a Bootstrap Token
 
 // CreateNewToken tries to create a token and fails if one with the same ID already exists
 func CreateNewToken(client clientset.Interface, token string, tokenDuration time.Duration, usages []string, description string) error {
@@ -55,9 +55,8 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 			secret.Data = encodeTokenSecretData(tokenID, tokenSecret, tokenDuration, usages, description)
 			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Update(secret); err == nil {
 				return nil
-			} else {
-				lastErr = err
 			}
+			lastErr = err
 			continue
 		}
 
@@ -72,9 +71,8 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 			}
 			if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err == nil {
 				return nil
-			} else {
-				lastErr = err
 			}
+			lastErr = err
 			continue
 		}
 
@@ -86,45 +84,10 @@ func UpdateOrCreateToken(client clientset.Interface, token string, failIfExists 
 	)
 }
 
-// CreateBootstrapConfigMapIfNotExists creates the public cluster-info ConfigMap (if it doesn't already exist)
-func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
-	adminConfig, err := clientcmd.LoadFromFile(file)
-	if err != nil {
-		return fmt.Errorf("failed to load admin kubeconfig [%v]", err)
-	}
-
-	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
-	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
-	bootstrapConfig := &clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"": adminConfig.Clusters[adminCluster],
-		},
-	}
-	bootstrapBytes, err := clientcmd.Write(*bootstrapConfig)
-	if err != nil {
-		return err
-	}
-
-	bootstrapConfigMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: bootstrapapi.ConfigMapClusterInfo},
-		Data: map[string]string{
-			bootstrapapi.KubeConfigKey: string(bootstrapBytes),
-		},
-	}
-
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespacePublic).Create(&bootstrapConfigMap); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
 // encodeTokenSecretData takes the token discovery object and an optional duration and returns the .Data for the Secret
-func encodeTokenSecretData(tokenId, tokenSecret string, duration time.Duration, usages []string, description string) map[string][]byte {
+func encodeTokenSecretData(tokenID, tokenSecret string, duration time.Duration, usages []string, description string) map[string][]byte {
 	data := map[string][]byte{
-		bootstrapapi.BootstrapTokenIDKey:     []byte(tokenId),
+		bootstrapapi.BootstrapTokenIDKey:     []byte(tokenID),
 		bootstrapapi.BootstrapTokenSecretKey: []byte(tokenSecret),
 	}
 

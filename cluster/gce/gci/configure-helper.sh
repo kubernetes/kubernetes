@@ -524,6 +524,8 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
+apiVersion: audit.k8s.io/v1alpha1
+kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
   # so drop them.

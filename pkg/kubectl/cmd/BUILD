@@ -79,7 +79,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",

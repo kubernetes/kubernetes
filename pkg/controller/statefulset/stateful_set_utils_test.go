@@ -31,7 +31,6 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -252,7 +251,7 @@ func TestOverlappingStatefulSets(t *testing.T) {
 func TestNewPodControllerRef(t *testing.T) {
 	set := newStatefulSet(1)
 	pod := newStatefulSetPod(set, 0)
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		t.Fatalf("No ControllerRef found on new pod")
 	}

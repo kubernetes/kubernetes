@@ -109,7 +109,7 @@ func newPodList(count int32, status v1.PodPhase, job *batch.Job) []v1.Pod {
 				Name:            fmt.Sprintf("pod-%v", rand.String(10)),
 				Labels:          job.Spec.Selector.MatchLabels,
 				Namespace:       job.Namespace,
-				OwnerReferences: []metav1.OwnerReference{*newControllerRef(job)},
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
 			Status: v1.PodStatus{Phase: status},
 		}
@@ -634,7 +634,7 @@ func newPod(name string, job *batch.Job) *v1.Pod {
 			Name:            name,
 			Labels:          job.Spec.Selector.MatchLabels,
 			Namespace:       job.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(job)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 		},
 	}
 }
@@ -971,7 +971,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 	// Changed ControllerRef. Expect both old and new to queue.
 	prev := *pod1
-	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(job2)}
+	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(job2, controllerKind)}
 	bumpResourceVersion(pod1)
 	jm.updatePod(&prev, pod1)
 	if got, want := jm.queue.Len(), 2; got != want {

@@ -25,29 +25,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
 	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
 	KubeProxyClusterRoleName = "system:node-proxier"
-	// NodeBootstrapperClusterRoleName sets the name for the TLS Node Bootstrapper ClusterRole
-	NodeBootstrapperClusterRoleName = "system:node-bootstrapper"
-	// BootstrapSignerClusterRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-public ns
-	BootstrapSignerClusterRoleName = "system:bootstrap-signer-clusterinfo"
-
-	clusterRoleKind          = "ClusterRole"
-	roleKind                 = "Role"
-	serviceAccountKind       = "ServiceAccount"
-	rbacAPIGroup             = "rbac.authorization.k8s.io"
-	anonymousUser            = "system:anonymous"
-	nodeAutoApproveBootstrap = "kubeadm:node-autoapprove-bootstrap"
 )
 
 // CreateServiceAccounts creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
-func CreateServiceAccounts(clientset clientset.Interface) error {
+func CreateServiceAccounts(client clientset.Interface) error {
+	// TODO: Each ServiceAccount should be created per-addon (decentralized) vs here
 	serviceAccounts := []v1.ServiceAccount{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +53,7 @@ func CreateServiceAccounts(clientset clientset.Interface) error {
 	}
 
 	for _, sa := range serviceAccounts {
-		if _, err := clientset.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
+		if _, err := client.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				return err
 			}
@@ -74,20 +63,11 @@ func CreateServiceAccounts(clientset clientset.Interface) error {
 }
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
-func CreateRBACRules(clientset clientset.Interface, k8sVersion *version.Version) error {
-	if err := createRoles(clientset); err != nil {
+func CreateRBACRules(client clientset.Interface, k8sVersion *version.Version) error {
+	if err := createClusterRoleBindings(client); err != nil {
 		return err
 	}
-	if err := createRoleBindings(clientset); err != nil {
-		return err
-	}
-	if err := createClusterRoles(clientset); err != nil {
-		return err
-	}
-	if err := createClusterRoleBindings(clientset); err != nil {
-		return err
-	}
-	if err := deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset, k8sVersion); err != nil {
+	if err := deletePermissiveNodesBindingWhenUsingNodeAuthorization(client, k8sVersion); err != nil {
 		return fmt.Errorf("failed to remove the permissive 'system:nodes' Group Subject in the 'system:node' ClusterRoleBinding: %v", err)
 	}
 
@@ -95,163 +75,32 @@ func CreateRBACRules(clientset clientset.Interface, k8sVersion *version.Version)
 	return nil
 }
 
-func createRoles(clientset clientset.Interface) error {
-	roles := []rbac.Role{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      BootstrapSignerClusterRoleName,
-				Namespace: metav1.NamespacePublic,
-			},
-			Rules: []rbac.PolicyRule{
-				rbachelper.NewRule("get").Groups("").Resources("configmaps").Names("cluster-info").RuleOrDie(),
+func createClusterRoleBindings(client clientset.Interface) error {
+	// TODO: This ClusterRoleBinding should be created by the kube-proxy phase, not here
+	return apiclientutil.CreateClusterRoleBindingIfNotExists(client, &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kubeadm:node-proxier",
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     KubeProxyClusterRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind:      rbac.ServiceAccountKind,
+				Name:      kubeadmconstants.KubeProxyServiceAccountName,
+				Namespace: metav1.NamespaceSystem,
 			},
 		},
-	}
-	for _, role := range roles {
-		if _, err := clientset.RbacV1beta1().Roles(role.ObjectMeta.Namespace).Create(&role); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("unable to create RBAC role: %v", err)
-			}
-
-			if _, err := clientset.RbacV1beta1().Roles(role.ObjectMeta.Namespace).Update(&role); err != nil {
-				return fmt.Errorf("unable to update RBAC role: %v", err)
-			}
-		}
-	}
-	return nil
+	})
 }
 
-func createRoleBindings(clientset clientset.Interface) error {
-	roleBindings := []rbac.RoleBinding{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "kubeadm:bootstrap-signer-clusterinfo",
-				Namespace: metav1.NamespacePublic,
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
-				Kind:     roleKind,
-				Name:     BootstrapSignerClusterRoleName,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind: "User",
-					Name: anonymousUser,
-				},
-			},
-		},
-	}
+func deletePermissiveNodesBindingWhenUsingNodeAuthorization(client clientset.Interface, k8sVersion *version.Version) error {
 
-	for _, roleBinding := range roleBindings {
-		if _, err := clientset.RbacV1beta1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(&roleBinding); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("unable to create RBAC rolebinding: %v", err)
-			}
-
-			if _, err := clientset.RbacV1beta1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(&roleBinding); err != nil {
-				return fmt.Errorf("unable to update RBAC rolebinding: %v", err)
-			}
-		}
-	}
-	return nil
-}
-
-func createClusterRoles(clientset clientset.Interface) error {
-	clusterRoles := []rbac.ClusterRole{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeAutoApproveBootstrap,
-			},
-			Rules: []rbac.PolicyRule{
-				rbachelper.NewRule("create").Groups("certificates.k8s.io").Resources("certificatesigningrequests/nodeclient").RuleOrDie(),
-			},
-		},
-	}
-
-	for _, roleBinding := range clusterRoles {
-		if _, err := clientset.RbacV1beta1().ClusterRoles().Create(&roleBinding); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("unable to create RBAC clusterrole: %v", err)
-			}
-
-			if _, err := clientset.RbacV1beta1().ClusterRoles().Update(&roleBinding); err != nil {
-				return fmt.Errorf("unable to update RBAC clusterrole: %v", err)
-			}
-		}
-	}
-	return nil
-}
-
-func createClusterRoleBindings(clientset clientset.Interface) error {
-	clusterRoleBindings := []rbac.ClusterRoleBinding{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kubeadm:kubelet-bootstrap",
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
-				Kind:     clusterRoleKind,
-				Name:     NodeBootstrapperClusterRoleName,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind: "Group",
-					Name: bootstrapapi.BootstrapGroup,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeAutoApproveBootstrap,
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
-				Kind:     clusterRoleKind,
-				Name:     nodeAutoApproveBootstrap,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind: "Group",
-					Name: bootstrapapi.BootstrapGroup,
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kubeadm:node-proxier",
-			},
-			RoleRef: rbac.RoleRef{
-				APIGroup: rbacAPIGroup,
-				Kind:     clusterRoleKind,
-				Name:     KubeProxyClusterRoleName,
-			},
-			Subjects: []rbac.Subject{
-				{
-					Kind:      serviceAccountKind,
-					Name:      kubeadmconstants.KubeProxyServiceAccountName,
-					Namespace: metav1.NamespaceSystem,
-				},
-			},
-		},
-	}
-
-	for _, clusterRoleBinding := range clusterRoleBindings {
-		if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("unable to create RBAC clusterrolebinding: %v", err)
-			}
-
-			if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(&clusterRoleBinding); err != nil {
-				return fmt.Errorf("unable to update RBAC clusterrolebinding: %v", err)
-			}
-		}
-	}
-	return nil
-}
-
-func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset clientset.Interface, k8sVersion *version.Version) error {
-
-	nodesRoleBinding, err := clientset.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
+	// TODO: When the v1.9 cycle starts (targeting v1.9 at HEAD) and v1.8.0 is the minimum supported version, we can remove this function as the ClusterRoleBinding won't exist
+	// or already have no such permissive subject
+	nodesRoleBinding, err := client.RbacV1beta1().ClusterRoleBindings().Get(kubeadmconstants.NodesClusterRoleBinding, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Nothing to do; the RoleBinding doesn't exist
@@ -271,7 +120,7 @@ func deletePermissiveNodesBindingWhenUsingNodeAuthorization(clientset clientset.
 
 	nodesRoleBinding.Subjects = newSubjects
 
-	if _, err := clientset.RbacV1beta1().ClusterRoleBindings().Update(nodesRoleBinding); err != nil {
+	if _, err := client.RbacV1beta1().ClusterRoleBindings().Update(nodesRoleBinding); err != nil {
 		return err
 	}
 

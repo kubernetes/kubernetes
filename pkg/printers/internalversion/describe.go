@@ -68,7 +68,6 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/printers"
@@ -673,7 +672,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 }
 
 func printController(controllee metav1.Object) string {
-	if controllerRef := controller.GetControllerOf(controllee); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(controllee); controllerRef != nil {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
 	}
 	return ""
@@ -2921,7 +2920,7 @@ func getPodStatusForController(c coreclient.PodInterface, selector labels.Select
 		return
 	}
 	for _, pod := range rcPods.Items {
-		controllerRef := controller.GetControllerOf(&pod)
+		controllerRef := metav1.GetControllerOf(&pod)
 		// Skip pods that are orphans or owned by other controllers.
 		if controllerRef == nil || controllerRef.UID != uid {
 			continue

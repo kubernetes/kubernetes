@@ -339,7 +339,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			Namespace:       ds.Namespace,
 			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, extensions.DefaultDaemonSetUniqueLabelKey, hash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(ds)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)},
 		},
 		Data:     runtime.RawExtension{Raw: patch},
 		Revision: revision,

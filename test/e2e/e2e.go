@@ -308,8 +308,8 @@ func gatherTestSuiteMetrics() error {
 		return fmt.Errorf("error loading client: %v", err)
 	}
 
-	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case).
-	grabber, err := metrics.NewMetricsGrabber(c, !framework.ProviderIs("kubemark"), true, true, true)
+	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
+	grabber, err := metrics.NewMetricsGrabber(c, nil, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}

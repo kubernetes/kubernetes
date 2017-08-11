@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -135,7 +134,7 @@ var _ = SIGDescribe("Job", func() {
 		By("Checking that the Job readopts the Pod")
 		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", framework.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
-				controllerRef := controller.GetControllerOf(pod)
+				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef == nil {
 					return false, nil
 				}
@@ -154,7 +153,7 @@ var _ = SIGDescribe("Job", func() {
 		By("Checking that the Job releases the Pod")
 		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", framework.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
-				controllerRef := controller.GetControllerOf(pod)
+				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef != nil {
 					return false, nil
 				}

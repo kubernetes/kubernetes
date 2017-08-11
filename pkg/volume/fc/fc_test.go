@@ -193,13 +193,39 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 }
 
+func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	fakeManager := NewFakeDiskManager()
+	defer fakeManager.Cleanup()
+	fakeMounter := &mount.FakeMounter{}
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	if err == nil {
+		t.Errorf("Error failed to make a new Mounter is expected: %v", err)
+	}
+	if mounter != nil {
+		t.Errorf("A nil Mounter is expected: %v", err)
+	}
+}
+
 func TestPluginVolume(t *testing.T) {
 	lun := int32(0)
 	vol := &v1.Volume{
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			FC: &v1.FCVolumeSource{
-				TargetWWNs: []string{"some_wwn"},
+				TargetWWNs: []string{"500a0981891b8dc5"},
 				FSType:     "ext4",
 				Lun:        &lun,
 			},
@@ -217,7 +243,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FC: &v1.FCVolumeSource{
-					TargetWWNs: []string{"some_wwn"},
+					TargetWWNs: []string{"500a0981891b8dc5"},
 					FSType:     "ext4",
 					Lun:        &lun,
 				},
@@ -225,6 +251,64 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPluginVolumeWWIDs(t *testing.T) {
+	vol := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{
+				WWIDs:  []string{"3600508b400105e210000900000490000"},
+				FSType: "ext4",
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolumeWWIDs(t *testing.T) {
+	vol := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				FC: &v1.FCVolumeSource{
+					WWIDs:  []string{"3600508b400105e21 000900000490000"},
+					FSType: "ext4",
+				},
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPluginVolumeNoDiskInfo(t *testing.T) {
+	vol := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{
+				FSType: "ext4",
+			},
+		},
+	}
+	doTestPluginNilMounter(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolumeNoDiskInfo(t *testing.T) {
+	vol := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				FC: &v1.FCVolumeSource{
+					FSType: "ext4",
+				},
+			},
+		},
+	}
+	doTestPluginNilMounter(t, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {

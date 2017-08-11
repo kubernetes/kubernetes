@@ -469,6 +469,11 @@ func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, srchOut
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (gce *GCECloud) HasClusterID() bool {
+	return true
+}
+
 // GCECloud implements cloudprovider.Interface.
 var _ cloudprovider.Interface = (*GCECloud)(nil)
 

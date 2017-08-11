@@ -746,12 +746,12 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 		{
 			name:     "all-replacement",
 			arg:      "all",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,deployments.extensions,replicasets.extensions",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions",
 		},
 		{
 			name:     "alias-in-comma-separated-arg",
 			arg:      "all,secrets",
-			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,deployments.extensions,replicasets.extensions,secrets",
+			expected: "pods,replicationcontrollers,services,statefulsets.apps,horizontalpodautoscalers.autoscaling,jobs.batch,cronjobs.batch,daemonsets.extensions,deployments.extensions,replicasets.extensions,secrets",
 		},
 	}
 

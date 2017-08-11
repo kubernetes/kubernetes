@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -167,18 +168,27 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 	if err != nil {
 		return nil, err
 	}
-	if fc.Lun == nil {
-		return nil, fmt.Errorf("empty lun")
+	var lun string
+	var wwids []string
+	if fc.Lun != nil && len(fc.TargetWWNs) != 0 {
+		lun = strconv.Itoa(int(*fc.Lun))
+	} else if len(fc.WWIDs) != 0 {
+		for _, wwid := range fc.WWIDs {
+			wwids = append(wwids, strings.Replace(wwid, " ", "_", -1))
+		}
+	} else {
+		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")
 	}
-	lun := strconv.Itoa(int(*fc.Lun))
+
 	return &fcDiskMounter{
 		fcDisk: &fcDisk{
 			plugin: &fcPlugin{
 				host: host,
 			},
-			wwns: fc.TargetWWNs,
-			lun:  lun,
-			io:   &osIOHandler{},
+			wwns:  fc.TargetWWNs,
+			lun:   lun,
+			wwids: wwids,
+			io:    &osIOHandler{},
 		},
 		fsType:   fc.FSType,
 		readOnly: readOnly,

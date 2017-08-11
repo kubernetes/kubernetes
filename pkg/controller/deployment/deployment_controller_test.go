@@ -126,7 +126,7 @@ func newReplicaSet(d *extensions.Deployment, name string, replicas int) *extensi
 			UID:             uuid.NewUUID(),
 			Namespace:       metav1.NamespaceDefault,
 			Labels:          d.Spec.Selector.MatchLabels,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(d)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
@@ -810,7 +810,7 @@ func TestUpdateReplicaSetChangeControllerRef(t *testing.T) {
 
 	// Change ControllerRef and expect both old and new to queue.
 	prev := *rs
-	prev.OwnerReferences = []metav1.OwnerReference{*newControllerRef(d2)}
+	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(d2, controllerKind)}
 	next := *rs
 	bumpResourceVersion(&next)
 	dc.updateReplicaSet(&prev, &next)

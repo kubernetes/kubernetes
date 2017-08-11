@@ -25,8 +25,12 @@ import (
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
+	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
+	clientset "k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
@@ -88,6 +92,9 @@ func (o *WardleServerOptions) Complete() error {
 }
 
 func (o WardleServerOptions) Config() (*apiserver.Config, error) {
+	// register admission plugins
+	banflunder.Register(o.Admission.Plugins)
+
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -98,12 +105,23 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	if err := o.Admission.ApplyTo(serverConfig); err != nil {
+	client, err := clientset.NewForConfig(serverConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	informerFactory := informers.NewSharedInformerFactory(client, serverConfig.LoopbackClientConfig.Timeout)
+	admissionInitializer, err := wardleinitializer.New(informerFactory)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := o.Admission.ApplyTo(serverConfig, admissionInitializer); err != nil {
 		return nil, err
 	}
 
 	config := &apiserver.Config{
-		GenericConfig: serverConfig,
+		GenericConfig:         serverConfig,
+		SharedInformerFactory: informerFactory,
 	}
 	return config, nil
 }
@@ -118,5 +136,11 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
+		config.SharedInformerFactory.Start(context.StopCh)
+		return nil
+	})
+
 	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

@@ -36,20 +36,6 @@ var (
 	controllerUID           = "123"
 )
 
-func newControllerRef(controller metav1.Object) *metav1.OwnerReference {
-	var controllerKind = v1beta1.SchemeGroupVersion.WithKind("Fake")
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               "Fake",
-		UID:                controller.GetUID(),
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
-}
-
 func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,7 +52,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*newControllerRef(owner)}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, v1beta1.SchemeGroupVersion.WithKind("Fake"))}
 	}
 	return pod
 }

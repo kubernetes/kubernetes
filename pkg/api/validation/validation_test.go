@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
@@ -2099,7 +2100,7 @@ func TestValidateVolumes(t *testing.T) {
 		},
 		// FC
 		{
-			name: "valid FC",
+			name: "FC valid targetWWNs and lun",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
@@ -2113,23 +2114,56 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "fc empty wwn",
+			name: "FC valid wwids",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						WWIDs:    []string{"some_wwid"},
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
+		{
+			name: "FC empty targetWWNs and wwids",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
 					FC: &api.FCVolumeSource{
 						TargetWWNs: []string{},
 						Lun:        newInt32(1),
+						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "fc.targetWWNs",
+			errtype:   field.ErrorTypeRequired,
+			errfield:  "fc.targetWWNs",
+			errdetail: "must specify either targetWWNs or wwids",
 		},
 		{
-			name: "fc empty lun",
+			name: "FC invalid: both targetWWNs and wwids simultaneously",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"some_wwn"},
+						Lun:        newInt32(1),
+						WWIDs:      []string{"some_wwid"},
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "fc.targetWWNs",
+			errdetail: "targetWWNs and wwids can not be specified simultaneously",
+		},
+		{
+			name: "FC valid targetWWNs and empty lun",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
@@ -2141,8 +2175,26 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "fc.lun",
+			errtype:   field.ErrorTypeRequired,
+			errfield:  "fc.lun",
+			errdetail: "lun is required if targetWWNs is specified",
+		},
+		{
+			name: "FC valid targetWWNs and invalid lun",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"wwn"},
+						Lun:        newInt32(256),
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "fc.lun",
+			errdetail: validation.InclusiveRangeError(0, 255),
 		},
 		// FlexVolume
 		{

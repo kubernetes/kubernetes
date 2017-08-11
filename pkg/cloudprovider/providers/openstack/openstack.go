@@ -458,6 +458,11 @@ func (os *OpenStack) ScrubDNS(nameServers, searches []string) ([]string, []strin
 	return nameServers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (os *OpenStack) HasClusterID() bool {
+	return true
+}
+
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
 

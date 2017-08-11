@@ -87,7 +87,8 @@ var _ = SIGDescribe("Networking", func() {
 		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "200 OK")
 		// Verify /healthz returns the proper content.
 		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "lastUpdated")
-		config.GetSelfURL(ports.ProxyStatusPort, "/proxyMode", "iptables") // the default
+		// Verify /proxyMode returns http status code 200.
+		config.GetSelfURLStatusCode(ports.ProxyStatusPort, "/proxyMode", "200")
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.

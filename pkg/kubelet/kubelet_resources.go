@@ -43,7 +43,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-	glog.Errorf("allocatable: %v", allocatable)
+	glog.Infof("allocatable: %v", allocatable)
 	podCopy, err := scheme.Scheme.Copy(pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)

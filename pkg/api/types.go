@@ -715,9 +715,11 @@ type ISCSIVolumeSource struct {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
-	// Required: FC target worldwide names (WWNs)
+	// Optional: FC target worldwide names (WWNs)
+	// +optional
 	TargetWWNs []string
-	// Required: FC target lun number
+	// Optional: FC target lun number
+	// +optional
 	Lun *int32
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -729,6 +731,10 @@ type FCVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: FC volume World Wide Identifiers (WWIDs)
+	// Either WWIDs or TargetWWNs and Lun must be set, but not both simultaneously.
+	// +optional
+	WWIDs []string
 }
 
 // FlexVolume represents a generic volume resource that is
@@ -1944,6 +1950,7 @@ type PodAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
@@ -1978,6 +1985,7 @@ type PodAntiAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm
+
 	// If the anti-affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the anti-affinity requirements specified by this field cease to be met

@@ -38,6 +38,8 @@ filegroup(
         "//cmd/kubeadm/app/node:all-srcs",
         "//cmd/kubeadm/app/phases/addons:all-srcs",
         "//cmd/kubeadm/app/phases/apiconfig:all-srcs",
+        "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:all-srcs",
+        "//cmd/kubeadm/app/phases/bootstraptoken/node:all-srcs",
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/controlplane:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",

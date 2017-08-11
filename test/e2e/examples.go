@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		framework.BindClusterRoleInNamespace(c.Rbac(), "edit", f.Namespace.Name,
+		framework.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),

@@ -23,7 +23,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/testserver"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -251,7 +250,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 func gatherMetrics(f *framework.Framework) {
 	By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, false, false, true, false)
+	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
@@ -283,7 +282,8 @@ func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
 					Completions: &completions,
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							RestartPolicy: v1.RestartPolicyOnFailure,
+							RestartPolicy:                 v1.RestartPolicyOnFailure,
+							TerminationGracePeriodSeconds: &zero,
 							Containers: []v1.Container{
 								{
 									Name:    "c",
@@ -580,7 +580,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
 		for _, replicaSet := range rs.Items {
-			if controller.GetControllerOf(&replicaSet.ObjectMeta) != nil {
+			if metav1.GetControllerOf(&replicaSet.ObjectMeta) != nil {
 				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
 			}
 		}

@@ -734,6 +734,9 @@ func appsFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if s.Status.ObservedGeneration == nil {
 				s.Status.ObservedGeneration = new(int64)
 			}
+			if s.Status.CollisionCount == nil {
+				s.Status.CollisionCount = new(int64)
+			}
 		},
 	}
 }

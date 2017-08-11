@@ -116,6 +116,10 @@ const (
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"
+
+	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
+	// TODO: This should be changed in the v1.8 dev cycle to a node-BT-specific group instead of the generic Bootstrap Token group that is used now
+	NodeBootstrapTokenAuthGroup = "system:bootstrappers"
 )
 
 var (
@@ -143,6 +147,10 @@ var (
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
+
+	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
+	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
+	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
 )
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

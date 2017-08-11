@@ -35,6 +35,7 @@ import (
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
@@ -85,9 +86,10 @@ type Interface interface {
 	PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Policy() policyv1beta1.PolicyV1beta1Interface
-	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
+	RbacV1() rbacv1.RbacV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Rbac() rbacv1beta1.RbacV1beta1Interface
+	Rbac() rbacv1.RbacV1Interface
+	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
@@ -121,6 +123,7 @@ type Clientset struct {
 	extensionsV1beta1             *extensionsv1beta1.ExtensionsV1beta1Client
 	networkingV1                  *networkingv1.NetworkingV1Client
 	policyV1beta1                 *policyv1beta1.PolicyV1beta1Client
+	rbacV1                        *rbacv1.RbacV1Client
 	rbacV1beta1                   *rbacv1beta1.RbacV1beta1Client
 	rbacV1alpha1                  *rbacv1alpha1.RbacV1alpha1Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
@@ -275,14 +278,19 @@ func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
 	return c.policyV1beta1
 }
 
-// RbacV1beta1 retrieves the RbacV1beta1Client
-func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	return c.rbacV1beta1
+// RbacV1 retrieves the RbacV1Client
+func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
+	return c.rbacV1
 }
 
 // Deprecated: Rbac retrieves the default version of RbacClient.
 // Please explicitly pick a version.
-func (c *Clientset) Rbac() rbacv1beta1.RbacV1beta1Interface {
+func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
+	return c.rbacV1
+}
+
+// RbacV1beta1 retrieves the RbacV1beta1Client
+func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
 	return c.rbacV1beta1
 }
 
@@ -409,6 +417,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.rbacV1, err = rbacv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.rbacV1beta1, err = rbacv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -462,6 +474,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.policyV1beta1 = policyv1beta1.NewForConfigOrDie(c)
+	cs.rbacV1 = rbacv1.NewForConfigOrDie(c)
 	cs.rbacV1beta1 = rbacv1beta1.NewForConfigOrDie(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.NewForConfigOrDie(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
@@ -492,6 +505,7 @@ func New(c rest.Interface) *Clientset {
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.policyV1beta1 = policyv1beta1.New(c)
+	cs.rbacV1 = rbacv1.New(c)
 	cs.rbacV1beta1 = rbacv1beta1.New(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
