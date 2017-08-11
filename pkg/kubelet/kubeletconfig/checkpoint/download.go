@@ -48,16 +48,15 @@ type RemoteConfigSource interface {
 // a sanitized failure reason and an error if the `source` is blatantly invalid.
 // You should only call this with a non-nil config source.
 func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, string, error) {
-	// exactly one subfield of the config source must be non-nil, toady ConfigMapRef is the only reference
-	if source.ConfigMapRef == nil {
-		reason := "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
-		return nil, reason, fmt.Errorf("%s, NodeConfigSource was: %#v", reason, source)
-	}
-
 	// validate the NodeConfigSource:
 
 	// at this point we know we're using the ConfigMapRef subfield
 	ref := source.ConfigMapRef
+	// exactly one subfield of the config source must be non-nil, toady ConfigMapRef is the only reference
+	if ref == nil {
+		reason := "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
+		return nil, reason, fmt.Errorf("%s, NodeConfigSource was: %#v", reason, source)
+	}
 
 	// name, namespace, and UID must all be non-empty for ConfigMapRef
 	if ref.Name == "" || ref.Namespace == "" || string(ref.UID) == "" {
