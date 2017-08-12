@@ -44,6 +44,7 @@ var cloudproviders = []string{
 	"aws",
 	"azure",
 	"cloudstack",
+	"external",
 	"gce",
 	"openstack",
 	"ovirt",
