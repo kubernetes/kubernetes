@@ -50,6 +50,9 @@ type ListOpts struct {
 
 	// Bool to show all tenants
 	AllTenants bool `q:"all_tenants"`
+
+	// List servers for a particular tenant. Setting "AllTenants = true" is required.
+	TenantID string `q:"tenant_id"`
 }
 
 // ToServerListQuery formats a ListOpts into a query string.

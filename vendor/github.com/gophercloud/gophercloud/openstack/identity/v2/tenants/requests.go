@@ -27,3 +27,81 @@ func List(client *gophercloud.ServiceClient, opts *ListOpts) pagination.Pager {
 		return TenantPage{pagination.LinkedPageBase{PageResult: r}}
 	})
 }
+
+// CreateOpts represents the options needed when creating new tenant.
+type CreateOpts struct {
+	// Name is the name of the tenant.
+	Name string `json:"name" required:"true"`
+	// Description is the description of the tenant.
+	Description string `json:"description,omitempty"`
+	// Enabled sets the tenant status to enabled or disabled.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// CreateOptsBuilder describes struct types that can be accepted by the Create call.
+type CreateOptsBuilder interface {
+	ToTenantCreateMap() (map[string]interface{}, error)
+}
+
+// ToTenantCreateMap assembles a request body based on the contents of a CreateOpts.
+func (opts CreateOpts) ToTenantCreateMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "tenant")
+}
+
+// Create is the operation responsible for creating new tenant.
+func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r CreateResult) {
+	b, err := opts.ToTenantCreateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(createURL(client), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 201},
+	})
+	return
+}
+
+// Get requests details on a single tenant by ID.
+func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
+	_, r.Err = client.Get(getURL(client, id), &r.Body, nil)
+	return
+}
+
+// UpdateOptsBuilder allows extensions to add additional attributes to the Update request.
+type UpdateOptsBuilder interface {
+	ToTenantUpdateMap() (map[string]interface{}, error)
+}
+
+// UpdateOpts specifies the base attributes that may be updated on an existing server.
+type UpdateOpts struct {
+	// Name is the name of the tenant.
+	Name string `json:"name,omitempty"`
+	// Description is the description of the tenant.
+	Description string `json:"description,omitempty"`
+	// Enabled sets the tenant status to enabled or disabled.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// ToTenantUpdateMap formats an UpdateOpts structure into a request body.
+func (opts UpdateOpts) ToTenantUpdateMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "tenant")
+}
+
+// Update is the operation responsible for updating exist tenants by their TenantID.
+func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) (r UpdateResult) {
+	b, err := opts.ToTenantUpdateMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Put(updateURL(client, id), &b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}
+
+// Delete is the operation responsible for permanently deleting an API tenant.
+func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
+	_, r.Err = client.Delete(deleteURL(client, id), nil)
+	return
+}
