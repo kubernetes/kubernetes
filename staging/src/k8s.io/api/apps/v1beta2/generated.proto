@@ -93,12 +93,6 @@ message DaemonSetSpec {
   // +optional
   optional int32 minReadySeconds = 4;
 
-  // DEPRECATED.
-  // A sequence number representing a specific generation of the template.
-  // Populated by the system. It can be set only during the creation.
-  // +optional
-  optional int64 templateGeneration = 5;
-
   // The number of old history to retain to allow rollback.
   // This is a pointer to distinguish between explicit zero and not specified.
   // Defaults to 10.

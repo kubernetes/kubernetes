@@ -4962,11 +4962,6 @@
       "format": "int32",
       "description": "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)."
      },
-     "templateGeneration": {
-      "type": "integer",
-      "format": "int64",
-      "description": "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation."
-     },
      "revisionHistoryLimit": {
       "type": "integer",
       "format": "int32",
