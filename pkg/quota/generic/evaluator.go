@@ -41,6 +41,13 @@ func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource s
 		if err != nil {
 			return nil, err
 		}
+
+		// when the informer has not synced, should return error
+		// otherwise, the quota will be exceeded.
+		if !informer.Informer().HasSynced() {
+			return nil, fmt.Errorf("%s hasn't been synced", resource.String())
+		}
+
 		return informer.Lister().ByNamespace(namespace).List(labelSelector)
 	}
 }
