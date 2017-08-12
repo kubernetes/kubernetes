@@ -40,6 +40,7 @@ go_test(
     data = ["//api/openapi-spec:swagger-spec"],
     deps = [
         ":go_default_library",
+        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -60,7 +61,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/util/openapi/testing:all-srcs",
+        "//pkg/kubectl/cmd/util/openapi/validation:all-srcs",
+    ],
     tags = ["automanaged"],
 )
 
