@@ -521,69 +521,6 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	return pod.Spec.NodeName
 }
 
-func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
-	return createPausePod(f, pausePodConfig{
-		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
-		Affinity: &v1.Affinity{
-			NodeAffinity: &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "kubernetes.io/e2e-az-name",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"e2e-az1", "e2e-az2"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-}
-
-func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Pod {
-	return createPausePod(f, pausePodConfig{
-		Name: "with-podantiaffinity-" + string(uuid.NewUUID()),
-		Affinity: &v1.Affinity{
-			PodAffinity: &v1.PodAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "security",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{"S1"},
-								},
-							},
-						},
-						TopologyKey: topologyKey,
-					},
-				},
-			},
-			PodAntiAffinity: &v1.PodAntiAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "security",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{"S2"},
-								},
-							},
-						},
-						TopologyKey: topologyKey,
-					},
-				},
-			},
-		},
-	})
-}
-
 func getRequestedCPU(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
