@@ -387,6 +387,10 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
+	if spec == nil {
+		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
+	}
+
 	matches := []string{}
 	for k, v := range pm.plugins {
 		if v.CanSupport(spec) {
