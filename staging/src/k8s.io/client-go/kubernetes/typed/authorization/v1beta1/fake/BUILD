@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -20,7 +18,6 @@ go_library(
         "fake_subjectaccessreview.go",
         "fake_subjectaccessreview_expansion.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",

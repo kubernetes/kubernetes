@@ -89,3 +89,8 @@ func (a *AdmissionOptions) ApplyTo(serverCfg *server.Config, pluginInitializers 
 	serverCfg.AdmissionControl = admissionChain
 	return nil
 }
+
+func (a *AdmissionOptions) Validate() []error {
+	errs := []error{}
+	return errs
+}

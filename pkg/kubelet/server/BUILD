@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,7 +13,6 @@ go_library(
         "doc.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
@@ -61,7 +58,6 @@ go_test(
         "server_websocket_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

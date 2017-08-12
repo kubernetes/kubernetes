@@ -132,7 +132,8 @@ func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 
 	// Now, parse each model. We can validate that references exists.
 	for _, namedSchema := range doc.GetDefinitions().GetAdditionalProperties() {
-		schema, err := definitions.ParseSchema(namedSchema.GetValue(), &Path{key: namedSchema.GetName()})
+		path := NewPath(namedSchema.GetName())
+		schema, err := definitions.ParseSchema(namedSchema.GetValue(), &path)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +253,8 @@ func (d *Definitions) parseKind(s *openapi_v2.Schema, path *Path) (Schema, error
 
 	for _, namedSchema := range s.GetProperties().GetAdditionalProperties() {
 		var err error
-		fields[namedSchema.GetName()], err = d.ParseSchema(namedSchema.GetValue(), &Path{parent: path, key: namedSchema.GetName()})
+		path := path.FieldPath(namedSchema.GetName())
+		fields[namedSchema.GetName()], err = d.ParseSchema(namedSchema.GetValue(), &path)
 		if err != nil {
 			return nil, err
 		}

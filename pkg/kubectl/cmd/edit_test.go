@@ -280,6 +280,9 @@ func TestEdit(t *testing.T) {
 				t.Errorf("%s: expected to see '%s' in stderr\n\nstdout:\n%s\n\nstderr:\n%s", name, s, stdout, stderr)
 			}
 		}
+		if i < len(testcase.Steps) {
+			t.Errorf("%s: saw %d steps, testcase included %d additional steps that were not exercised", name, i, len(testcase.Steps)-i)
+		}
 	}
 }
 

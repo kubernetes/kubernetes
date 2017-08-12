@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -20,9 +18,13 @@ go_library(
         "plugins.go",
         "util.go",
         "volume.go",
-        "volume_linux.go",
-    ],
-    tags = ["automanaged"],
+        "volume_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "volume_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -51,7 +53,6 @@ go_test(
         "util_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -68,16 +69,23 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = [
-        "metrics_du_test.go",
         "metrics_statfs_test.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "metrics_du_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
-        "//pkg/volume:go_default_library",
+        ":go_default_library",
         "//pkg/volume/testing:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

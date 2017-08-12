@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,13 +9,11 @@ load(
 go_binary(
     name = "staging",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["godeps-json-updater.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
@@ -118,7 +114,9 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/websocket:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/x509:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/cache:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/token/union:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory:all-srcs",

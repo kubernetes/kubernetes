@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -18,7 +16,6 @@ go_library(
         "openapi_cache.go",
         "openapi_getter.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/version:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
@@ -41,9 +38,9 @@ go_test(
         "openapi_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        ":go_default_library",
+        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -64,7 +61,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubectl/cmd/util/openapi/testing:all-srcs",
+        "//pkg/kubectl/cmd/util/openapi/validation:all-srcs",
+    ],
     tags = ["automanaged"],
 )
 

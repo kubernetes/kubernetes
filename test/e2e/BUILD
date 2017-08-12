@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,7 +13,6 @@ go_test(
         "taints_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/apimachinery:go_default_library",
         "//test/e2e/apps:go_default_library",
@@ -68,7 +65,6 @@ go_library(
         "ssh.go",
         "ubernetes_lite.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -76,9 +72,9 @@ go_library(
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller/node:go_default_library",
+        "//pkg/kubectl/util/logs:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
-        "//pkg/util/logs:go_default_library",
         "//pkg/util/version:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//test/e2e/common:go_default_library",

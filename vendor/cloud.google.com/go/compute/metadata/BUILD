@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["metadata.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/cloud.google.com/go/internal:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",

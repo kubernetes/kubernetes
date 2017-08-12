@@ -41,6 +41,9 @@ type BuiltInAuthenticationOptions struct {
 	ServiceAccounts *ServiceAccountAuthenticationOptions
 	TokenFile       *TokenFileAuthenticationOptions
 	WebHook         *WebHookAuthenticationOptions
+
+	TokenSuccessCacheTTL time.Duration
+	TokenFailureCacheTTL time.Duration
 }
 
 type AnonymousAuthenticationOptions struct {
@@ -83,7 +86,10 @@ type WebHookAuthenticationOptions struct {
 }
 
 func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
-	return &BuiltInAuthenticationOptions{}
+	return &BuiltInAuthenticationOptions{
+		TokenSuccessCacheTTL: 10 * time.Second,
+		TokenFailureCacheTTL: 0 * time.Second,
+	}
 }
 
 func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
@@ -250,7 +256,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{}
+	ret := authenticator.AuthenticatorConfig{
+		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
+		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
+	}
 
 	if s.Anonymous != nil {
 		ret.Anonymous = s.Anonymous.Allow
@@ -297,6 +306,15 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	if s.WebHook != nil {
 		ret.WebhookTokenAuthnConfigFile = s.WebHook.ConfigFile
 		ret.WebhookTokenAuthnCacheTTL = s.WebHook.CacheTTL
+
+		if len(s.WebHook.ConfigFile) > 0 && s.WebHook.CacheTTL > 0 {
+			if s.TokenSuccessCacheTTL > 0 && s.WebHook.CacheTTL < s.TokenSuccessCacheTTL {
+				glog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for successful token authentication attempts.", s.WebHook.CacheTTL, s.TokenSuccessCacheTTL)
+			}
+			if s.TokenFailureCacheTTL > 0 && s.WebHook.CacheTTL < s.TokenFailureCacheTTL {
+				glog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for failed token authentication attempts.", s.WebHook.CacheTTL, s.TokenFailureCacheTTL)
+			}
+		}
 	}
 
 	return ret

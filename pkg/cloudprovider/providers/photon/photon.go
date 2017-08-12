@@ -31,7 +31,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/golang/glog"
@@ -268,18 +267,11 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 	vmID := cfg.Global.VMID
 
 	// Get local hostname
-	cmd := exec.Command("bash", "-c", `echo $HOSTNAME`)
-	out, err := cmd.CombinedOutput()
+	hostname, err := os.Hostname()
 	if err != nil {
-		glog.Errorf("Photon Cloud Provider: get local hostname bash command failed. Error[%v]", err)
+		glog.Errorf("Photon Cloud Provider: get hostname failed. Error[%v]", err)
 		return nil, err
 	}
-	if len(out) == 0 {
-		glog.Errorf("unable to retrieve hostname for Instance ID")
-		return nil, fmt.Errorf("unable to retrieve hostname for Instance ID")
-	}
-	hostname := strings.TrimRight(string(out), "\n")
-
 	pc := PCCloud{
 		cfg:              &cfg,
 		localInstanceID:  vmID,

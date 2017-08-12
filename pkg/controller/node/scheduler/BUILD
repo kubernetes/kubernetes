@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_test(
         "timed_workers_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller/testutil:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -35,7 +32,6 @@ go_library(
         "taint_controller.go",
         "timed_workers.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/helper:go_default_library",
         "//pkg/api/v1/helper:go_default_library",

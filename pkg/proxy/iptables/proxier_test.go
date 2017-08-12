@@ -867,7 +867,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
+			svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
 		}),
 	)
 
@@ -958,7 +958,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				Protocol: api.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Annotations[api.BetaAnnotationExternalTraffic] = api.AnnotationValueExternalTrafficLocal
+			svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
 		}),
 	)
 
@@ -1069,10 +1069,6 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			}
 		}),
 		makeTestService("somewhere", "only-local-load-balancer", func(svc *api.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{
-				api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
-				api.BetaAnnotationHealthCheckNodePort: "345",
-			}
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
 			svc.Spec.ClusterIP = "172.16.55.12"
 			svc.Spec.LoadBalancerIP = "5.6.7.8"
@@ -1083,6 +1079,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "10.1.2.3"},
 				},
 			}
+			svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.HealthCheckNodePort = 345
 		}),
 	}
 
@@ -1214,10 +1212,6 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "TCP", 1235, 5321, 0)
 	})
 	servicev2 := makeTestService("somewhere", "some-service", func(svc *api.Service) {
-		svc.ObjectMeta.Annotations = map[string]string{
-			api.BetaAnnotationExternalTraffic:     api.AnnotationValueExternalTrafficLocal,
-			api.BetaAnnotationHealthCheckNodePort: "345",
-		}
 		svc.Spec.Type = api.ServiceTypeLoadBalancer
 		svc.Spec.ClusterIP = "172.16.55.4"
 		svc.Spec.LoadBalancerIP = "5.6.7.8"
@@ -1228,6 +1222,8 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				{IP: "10.1.2.3"},
 			},
 		}
+		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.HealthCheckNodePort = 345
 	})
 
 	fp.OnServiceAdd(servicev1)

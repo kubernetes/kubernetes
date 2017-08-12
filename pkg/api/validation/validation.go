@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -2970,7 +2969,6 @@ func ValidateService(service *api.Service) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
-	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
 
 	return allErrs
 }
@@ -3018,25 +3016,6 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 func validateServiceExternalTrafficFieldsValue(service *api.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// Check beta annotations.
-	if l, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		if l != api.AnnotationValueExternalTrafficLocal &&
-			l != api.AnnotationValueExternalTrafficGlobal {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic), l,
-				fmt.Sprintf("ExternalTraffic must be %v or %v", api.AnnotationValueExternalTrafficLocal, api.AnnotationValueExternalTrafficGlobal)))
-		}
-	}
-	if l, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
-		p, err := strconv.Atoi(l)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
-				"HealthCheckNodePort must be a valid port number"))
-		} else if p <= 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
-				"HealthCheckNodePort must be greater than 0"))
-		}
-	}
-
 	// Check first class fields.
 	if service.Spec.ExternalTrafficPolicy != "" &&
 		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeCluster &&
@@ -3047,54 +3026,6 @@ func validateServiceExternalTrafficFieldsValue(service *api.Service) field.Error
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort must be not less than 0"))
-	}
-
-	return allErrs
-}
-
-// serviceExternalTrafficStatus stores flags indicating whether ExternalTraffic
-// related beta annotations and GA fields are set on service.
-type serviceExternalTrafficStatus struct {
-	betaExternalTrafficIsSet bool
-	betaHealthCheckIsSet     bool
-	gaExternalTrafficIsSet   bool
-	gaHealthCheckIsSet       bool
-}
-
-func (s *serviceExternalTrafficStatus) useBetaExternalTrafficWithGA() bool {
-	return s.betaExternalTrafficIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
-}
-
-func (s *serviceExternalTrafficStatus) useBetaHealthCheckWithGA() bool {
-	return s.betaHealthCheckIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
-}
-
-func getServiceExternalTrafficStatus(service *api.Service) *serviceExternalTrafficStatus {
-	s := serviceExternalTrafficStatus{}
-	_, s.betaExternalTrafficIsSet = service.Annotations[api.BetaAnnotationExternalTraffic]
-	_, s.betaHealthCheckIsSet = service.Annotations[api.BetaAnnotationHealthCheckNodePort]
-	s.gaExternalTrafficIsSet = service.Spec.ExternalTrafficPolicy != ""
-	s.gaHealthCheckIsSet = service.Spec.HealthCheckNodePort != 0
-	return &s
-}
-
-// validateServiceExternalTrafficAPIVersion checks if user mixes ExternalTraffic
-// API versions.
-func validateServiceExternalTrafficAPIVersion(service *api.Service) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	status := getServiceExternalTrafficStatus(service)
-
-	if status.useBetaExternalTrafficWithGA() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic)
-		msg := fmt.Sprintf("please replace the beta annotation with 'ExternalTrafficPolicy' field")
-		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationExternalTraffic, msg))
-	}
-
-	if status.useBetaHealthCheckWithGA() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort)
-		msg := fmt.Sprintf("please replace the beta annotation with 'HealthCheckNodePort' field")
-		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationHealthCheckNodePort, msg))
 	}
 
 	return allErrs

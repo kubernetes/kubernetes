@@ -182,7 +182,7 @@ func Get(c *gophercloud.ServiceClient, token string) (r GetResult) {
 func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
 	resp, err := c.Request("HEAD", tokenURL(c), &gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
-		OkCodes:     []int{200, 204, 400, 401, 403, 404},
+		OkCodes:     []int{200, 204, 404},
 	})
 	if err != nil {
 		return false, err

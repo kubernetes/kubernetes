@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -28,12 +26,20 @@ go_library(
         "sig.go",
         "transport_generic.go",
         "transport_unix.go",
-        "transport_unixcred_linux.go",
         "variant.go",
         "variant_lexer.go",
         "variant_parser.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "conn_darwin.go",
+            "transport_darwin.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "transport_unixcred_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
 )
 
 filegroup(

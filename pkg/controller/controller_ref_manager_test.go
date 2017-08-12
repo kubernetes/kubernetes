@@ -60,13 +60,12 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 func TestClaimPods(t *testing.T) {
 	controllerKind := schema.GroupVersionKind{}
 	type test struct {
-		name        string
-		manager     *PodControllerRefManager
-		pods        []*v1.Pod
-		filters     []func(*v1.Pod) bool
-		claimed     []*v1.Pod
-		released    []*v1.Pod
-		expectError bool
+		name     string
+		manager  *PodControllerRefManager
+		pods     []*v1.Pod
+		filters  []func(*v1.Pod) bool
+		claimed  []*v1.Pod
+		released []*v1.Pod
 	}
 	var tests = []test{
 		{
@@ -164,8 +163,8 @@ func TestClaimPods(t *testing.T) {
 	}
 	for _, test := range tests {
 		claimed, err := test.manager.ClaimPods(test.pods)
-		if test.expectError && err == nil {
-			t.Errorf("Test case `%s`, expected error but got nil", test.name)
+		if err != nil {
+			t.Errorf("Test case `%s`, unexpected error: %v", test.name, err)
 		} else if !reflect.DeepEqual(test.claimed, claimed) {
 			t.Errorf("Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
 		}

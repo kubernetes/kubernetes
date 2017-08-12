@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "hostport_manager.go",
         "hostport_syncer.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/iptables:go_default_library",
@@ -34,7 +31,6 @@ go_test(
         "hostport_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/iptables:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

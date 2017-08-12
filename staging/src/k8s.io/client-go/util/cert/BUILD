@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,8 +12,8 @@ go_test(
         "csr_test.go",
         "pem_test.go",
     ],
+    data = glob(["testdata/**"]),
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -29,7 +27,6 @@ go_library(
     data = [
         "testdata/dontUseThisKey.pem",
     ],
-    tags = ["automanaged"],
 )
 
 filegroup(

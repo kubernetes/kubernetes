@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -20,7 +18,6 @@ go_library(
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/service:go_default_library",
@@ -34,6 +31,7 @@ go_library(
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes:go_default_library",
+        "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/compute/v2/servers:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts:go_default_library",
@@ -73,7 +71,6 @@ go_test(
         "openstack_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

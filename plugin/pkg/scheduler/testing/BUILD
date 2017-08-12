@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "fake_lister.go",
         "pods_to_cache.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",

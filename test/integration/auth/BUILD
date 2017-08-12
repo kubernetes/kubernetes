@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_test",
@@ -18,10 +16,7 @@ go_test(
         "node_test.go",
         "rbac_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

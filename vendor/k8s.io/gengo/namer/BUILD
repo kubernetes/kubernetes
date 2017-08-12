@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "order.go",
         "plural_namer.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],
 )
 

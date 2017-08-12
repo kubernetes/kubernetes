@@ -36,7 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"

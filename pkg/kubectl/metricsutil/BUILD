@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,6 @@ go_library(
         "metrics_client.go",
         "metrics_printer.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_metricsutil_CONSUMERS",
     ],

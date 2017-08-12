@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -65,7 +63,6 @@ go_library(
         "top_pod.go",
         "version.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_CONSUMERS",
     ],
@@ -194,9 +191,6 @@ go_test(
         "//test/fixtures",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

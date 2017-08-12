@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -22,7 +20,6 @@ go_library(
         "sysctl.go",
         "upgrade.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",

@@ -455,42 +455,44 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
-	ctrName, err := opts.GetContainerName(pod)
-	if err != nil {
-		return err
-	}
+
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
-		return err
+		return logOpts(f, pod, opts)
 	}
 
 	opts.PodClient = podClient
-
 	opts.PodName = name
 	opts.Namespace = ns
+
 	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
 	stderr := opts.Err
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
+		return logOpts(f, pod, opts)
+	}
+	return nil
+}
+
+// logOpts logs output from opts to the pods log.
+func logOpts(f cmdutil.Factory, pod *api.Pod, opts *AttachOptions) error {
+	ctrName, err := opts.GetContainerName(pod)
+	if err != nil {
+		return err
+	}
+
+	req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	if err != nil {
+		return err
+	}
+
+	readCloser, err := req.Stream()
+	if err != nil {
+		return err
+	}
+	defer readCloser.Close()
+
+	_, err = io.Copy(opts.Out, readCloser)
+	if err != nil {
 		return err
 	}
 	return nil

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 filegroup(

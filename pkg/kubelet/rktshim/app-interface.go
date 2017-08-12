@@ -65,6 +65,11 @@ func (*Runtime) ContainerStatus(string) (*runtimeapi.ContainerStatus, error) {
 	panic("not implemented")
 }
 
+// UpdateContainerResources updates the resource constraints for the container.
+func (*Runtime) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+	panic("not implemented")
+}
+
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (*Runtime) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {

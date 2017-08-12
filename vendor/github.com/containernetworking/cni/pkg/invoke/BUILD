@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,10 +12,19 @@ go_library(
         "delegate.go",
         "exec.go",
         "find.go",
-        "os_unix.go",
         "raw_exec.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "os_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "os_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
         "//vendor/github.com/containernetworking/cni/pkg/version:go_default_library",

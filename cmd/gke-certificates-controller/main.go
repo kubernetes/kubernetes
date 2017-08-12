@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/gke-certificates-controller/app"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"

@@ -166,7 +166,9 @@ func TestAddFlagsFlag(t *testing.T) {
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 				Lookup: true,
 			},
-			TokenFile: &kubeoptions.TokenFileAuthenticationOptions{},
+			TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
+			TokenSuccessCacheTTL: 10 * time.Second,
+			TokenFailureCacheTTL: 0,
 		},
 		Authorization: &kubeoptions.BuiltInAuthorizationOptions{
 			Mode:                        "AlwaysDeny",

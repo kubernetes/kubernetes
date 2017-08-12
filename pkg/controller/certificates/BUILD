@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,7 +10,6 @@ go_library(
         "certificate_controller.go",
         "certificate_controller_utils.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         ":__subpackages__",
         "//cmd/gke-certificates-controller:__subpackages__",
@@ -59,7 +56,6 @@ go_test(
     name = "go_default_test",
     srcs = ["certificate_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

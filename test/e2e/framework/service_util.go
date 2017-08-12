@@ -309,6 +309,10 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
+	if len(ips) == 0 {
+		// If ExternalIP isn't set, assume the test programs can reach the InternalIP
+		ips = CollectAddresses(nodes, v1.NodeInternalIP)
+	}
 	return ips, nil
 }
 

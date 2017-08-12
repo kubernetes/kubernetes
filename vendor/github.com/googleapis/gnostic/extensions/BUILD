@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,7 +11,6 @@ go_library(
         "extension.pb.go",
         "extensions.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes:go_default_library",
@@ -32,4 +29,10 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["extension.proto"],
+    visibility = ["//visibility:public"],
 )

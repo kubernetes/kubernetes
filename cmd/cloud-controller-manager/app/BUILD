@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["controllermanager.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",

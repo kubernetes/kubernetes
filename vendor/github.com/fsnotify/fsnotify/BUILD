@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,11 +9,29 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fsnotify.go",
-        "inotify.go",
-        "inotify_poller.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "kqueue.go",
+            "open_mode_darwin.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "inotify.go",
+            "inotify_poller.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

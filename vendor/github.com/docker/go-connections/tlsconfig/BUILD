@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,8 +10,8 @@ go_library(
     srcs = [
         "config.go",
         "config_client_ciphers.go",
+        "config_legacy_client_ciphers.go",
     ],
-    tags = ["automanaged"],
     deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
 )
 

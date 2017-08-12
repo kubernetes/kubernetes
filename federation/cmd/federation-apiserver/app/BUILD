@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -19,7 +17,6 @@ go_library(
         "plugins.go",
         "server.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/core:go_default_library",
         "//federation/apis/core/install:go_default_library",

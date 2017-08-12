@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -24,6 +22,7 @@ filegroup(
         "//cmd/genyaml:all-srcs",
         "//cmd/gke-certificates-controller:all-srcs",
         "//cmd/hyperkube:all-srcs",
+        "//cmd/importverifier:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",
         "//cmd/kube-proxy:all-srcs",

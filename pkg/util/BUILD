@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -33,7 +31,6 @@ filegroup(
         "//pkg/util/keymutex:all-srcs",
         "//pkg/util/labels:all-srcs",
         "//pkg/util/limitwriter:all-srcs",
-        "//pkg/util/logs:all-srcs",
         "//pkg/util/maps:all-srcs",
         "//pkg/util/metrics:all-srcs",
         "//pkg/util/mount:all-srcs",

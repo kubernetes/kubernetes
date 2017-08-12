@@ -753,7 +753,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 				{Key: "key1", Value: "value1", Effect: "NoSchedule"},
 				{Key: "key2", Value: "value2", Effect: "NoExecute"},
 			},
-			requestCount: 3,
+			requestCount: 2,
 		},
 		{
 			name: "add taint to node without taints",

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,11 +11,20 @@ go_library(
         "aggregator.go",
         "forwarding_reporter.go",
         "output_interceptor.go",
-        "output_interceptor_unix.go",
         "server.go",
         "syscall_dup_unix.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "output_interceptor_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "output_interceptor_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "output_interceptor_win.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/spec_iterator:go_default_library",

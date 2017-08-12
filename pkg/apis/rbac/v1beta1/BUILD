@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -17,7 +15,6 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",

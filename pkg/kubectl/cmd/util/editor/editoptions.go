@@ -336,6 +336,9 @@ func (o *EditOptions) Run() error {
 		if err != nil {
 			return err
 		}
+		if len(infos) == 0 {
+			return errors.New("edit cancelled, no objects found.")
+		}
 		return editFn(infos)
 	case ApplyEditMode:
 		infos, err := o.OriginalResult.Infos()
@@ -500,11 +503,7 @@ func getPrinter(format string) *editPrinterOptions {
 	}
 }
 
-func (o *EditOptions) visitToPatch(
-	originalInfos []*resource.Info,
-	patchVisitor resource.Visitor,
-	results *editResults,
-) error {
+func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor, results *editResults) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		editObjUID, err := meta.NewAccessor().UID(info.Object)
 		if err != nil {

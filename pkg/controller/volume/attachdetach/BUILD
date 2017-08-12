@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["attach_detach_controller.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
@@ -44,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["attach_detach_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/cache:go_default_library",

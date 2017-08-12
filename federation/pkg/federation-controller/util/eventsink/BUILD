@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["eventsink.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -28,7 +25,6 @@ go_test(
     name = "go_default_test",
     srcs = ["eventsink_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",

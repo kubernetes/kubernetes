@@ -22,6 +22,7 @@ type ListOpts struct {
 	SortKey           string `q:"sort_key"`
 	SortDir           string `q:"sort_dir"`
 	RouterID          string `q:"router_id"`
+	Status            string `q:"status"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of

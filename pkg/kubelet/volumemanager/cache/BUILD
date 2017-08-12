@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "actual_state_of_world.go",
         "desired_state_of_world.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
@@ -33,7 +30,6 @@ go_test(
         "desired_state_of_world_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

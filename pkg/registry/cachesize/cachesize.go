@@ -105,6 +105,10 @@ func SetWatchCacheSizes(cacheSizes []string) {
 			glog.Errorf("invalid size of watch cache capabilities: %s", c)
 			continue
 		}
+		if size < 0 {
+			glog.Errorf("watch cache size cannot be negative: %s", c)
+			continue
+		}
 
 		watchCacheSizes[Resource(strings.ToLower(tokens[0]))] = size
 	}
