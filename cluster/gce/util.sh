@@ -1033,7 +1033,13 @@ function create-master() {
   # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
   get-master-root-disk-size
 
-  create-master-instance "${MASTER_RESERVED_IP}" &
+  if [[ "${NUM_NODES}" -ge "50" ]]; then
+    # We block on master creation for large clusters to avoid doing too much
+    # unnecessary work in case master start-up fails (like creation of nodes).
+    create-master-instance "${MASTER_RESERVED_IP}"
+  else
+    create-master-instance "${MASTER_RESERVED_IP}" &
+  fi
 }
 
 # Adds master replica to etcd cluster.
