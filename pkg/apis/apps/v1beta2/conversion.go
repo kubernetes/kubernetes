@@ -137,7 +137,7 @@ func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2.Sta
 	} else {
 		out.Selector = nil
 	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {
@@ -177,7 +177,7 @@ func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSe
 	} else {
 		out.Selector = nil
 	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {
