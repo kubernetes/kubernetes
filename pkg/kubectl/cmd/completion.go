@@ -87,7 +87,7 @@ source '$HOME/.kube/completion.bash.inc'
 )
 
 var (
-	completion_shells = map[string]func(out io.Writer, cmd *cobra.Command) error{
+	completion_shells = map[string]func(out io.Writer, boilerPlate string, cmd *cobra.Command) error{
 		"bash": runCompletionBash,
 		"zsh":  runCompletionZsh,
 	}
@@ -126,20 +126,32 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 		return cmdutil.UsageErrorf(cmd, "Unsupported shell type %q.", args[0])
 	}
 
+	return run(out, boilerPlate, cmd.Parent())
+}
+
+func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
 	if len(boilerPlate) == 0 {
 		boilerPlate = defaultBoilerPlate
 	}
 	if _, err := out.Write([]byte(boilerPlate)); err != nil {
 		return err
 	}
-	return run(out, cmd.Parent())
-}
 
-func runCompletionBash(out io.Writer, kubectl *cobra.Command) error {
 	return kubectl.GenBashCompletion(out)
 }
 
-func runCompletionZsh(out io.Writer, kubectl *cobra.Command) error {
+func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
+	zsh_head := `#compdef kubectl
+`
+	out.Write([]byte(zsh_head))
+
+	if len(boilerPlate) == 0 {
+		boilerPlate = defaultBoilerPlate
+	}
+	if _, err := out.Write([]byte(boilerPlate)); err != nil {
+		return err
+	}
+
 	zsh_initialization := `
 __kubectl_bash_source() {
 	alias shopt=':'
@@ -293,6 +305,7 @@ BASH_COMPLETION_EOF
 }
 
 __kubectl_bash_source <(__kubectl_convert_bash_to_zsh)
+_complete kubectl 2>/dev/null
 `
 	out.Write([]byte(zsh_tail))
 	return nil
