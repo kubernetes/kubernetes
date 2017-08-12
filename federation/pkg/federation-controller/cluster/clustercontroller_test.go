@@ -134,7 +134,7 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	}
 
 	manager := newClusterController(federationClientSet, 5)
-	err = manager.UpdateClusterStatus()
+	err = manager.updateClusterStatus()
 	if err != nil {
 		t.Errorf("Failed to Update Cluster Status: %v", err)
 	}
@@ -188,7 +188,6 @@ func TestUpdateClusterRace(t *testing.T) {
 
 	// try to trigger the race in UpdateClusterStatus
 	for i := 0; i < 10; i++ {
-		manager.GetClusterClient(federationCluster)
 		manager.addToClusterSet(federationCluster)
 		manager.delFromClusterSet(federationCluster)
 	}

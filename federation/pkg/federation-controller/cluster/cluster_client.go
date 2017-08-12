@@ -107,6 +107,15 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterS
 			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterReadyCondition)
 		}
 	}
+
+	zones, region, err := self.GetClusterZones()
+	if err != nil {
+		glog.Warningf("Failed to get zones and region for cluster with client %v: %v", self, err)
+	} else {
+		clusterStatus.Zones = zones
+		clusterStatus.Region = region
+	}
+
 	return &clusterStatus
 }
 
