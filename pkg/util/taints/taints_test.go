@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
 
 	"github.com/spf13/pflag"
@@ -73,4 +74,40 @@ func TestTaintsVar(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAddOrUpdateTaint(t *testing.T) {
+	node := &v1.Node{}
+
+	taint := &v1.Taint{
+		Key:    "foo",
+		Value:  "bar",
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	checkResult := func(testCaseName string, newNode *v1.Node, expectedTaint *v1.Taint, result, expectedResult bool, err error) {
+		if err != nil {
+			t.Errorf("[%s] should not raise error but got %v", testCaseName, err)
+		}
+		if result != expectedResult {
+			t.Errorf("[%s] should return %t, but got: %t", testCaseName, expectedResult, result)
+		}
+		if len(newNode.Spec.Taints) != 1 || !reflect.DeepEqual(newNode.Spec.Taints[0], *expectedTaint) {
+			t.Errorf("[%s] node should only have one taint: %v, but got: %v", testCaseName, *expectedTaint, newNode.Spec.Taints)
+		}
+	}
+
+	// Add a new Taint.
+	newNode, result, err := AddOrUpdateTaint(node, taint)
+	checkResult("Add New Taint", newNode, taint, result, true, err)
+
+	// Update a Taint.
+	taint.Value = "bar_1"
+	newNode, result, err = AddOrUpdateTaint(node, taint)
+	checkResult("Update Taint", newNode, taint, result, true, err)
+
+	// Add a duplicate Taint.
+	node = newNode
+	newNode, result, err = AddOrUpdateTaint(node, taint)
+	checkResult("Add Duplicate Taint", newNode, taint, result, false, err)
 }
