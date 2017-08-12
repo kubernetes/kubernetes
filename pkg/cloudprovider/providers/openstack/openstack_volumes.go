@@ -230,11 +230,9 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
-		glog.V(2).Infof("Disk %s is attached to a different instance (%s), detaching", volumeID, volume.AttachedServerId)
-		err = os.DetachDisk(volume.AttachedServerId, volumeID)
-		if err != nil {
-			return "", err
-		}
+		errmsg := fmt.Sprintf("Disk %s is attached to a different instance (%s)", volumeID, volume.AttachedServerId)
+		glog.V(2).Infof(errmsg)
+		return "", errors.New(errmsg)
 	}
 
 	startTime := time.Now()
