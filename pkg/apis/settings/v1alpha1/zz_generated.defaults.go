@@ -56,6 +56,9 @@ func SetObjectDefaults_PodPreset(in *v1alpha1.PodPreset) {
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
+		if a.VolumeSource.FlexVolume != nil {
+			v1.SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
+		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {

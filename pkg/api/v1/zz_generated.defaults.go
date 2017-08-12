@@ -139,6 +139,9 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
 	}
+	if in.Spec.PersistentVolumeSource.FlexVolume != nil {
+		SetDefaults_FlexVolumeSource(in.Spec.PersistentVolumeSource.FlexVolume)
+	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
@@ -182,6 +185,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.VolumeSource.RBD != nil {
 			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+		}
+		if a.VolumeSource.FlexVolume != nil {
+			SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -331,6 +337,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		if a.VolumeSource.RBD != nil {
 			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
+		if a.VolumeSource.FlexVolume != nil {
+			SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
+		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
@@ -472,6 +481,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.VolumeSource.RBD != nil {
 				SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			}
+			if a.VolumeSource.FlexVolume != nil {
+				SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
 			}
 			if a.VolumeSource.DownwardAPI != nil {
 				SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)

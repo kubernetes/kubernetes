@@ -50,6 +50,9 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		if a.VolumeSource.RBD != nil {
 			api_v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
+		if a.VolumeSource.FlexVolume != nil {
+			api_v1.SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
+		}
 		if a.VolumeSource.DownwardAPI != nil {
 			api_v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
