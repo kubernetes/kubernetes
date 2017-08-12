@@ -31,6 +31,8 @@ import (
 	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -284,6 +286,15 @@ func getRBACVersion(discoveryclient discovery.CachedDiscoveryInterface) (*schema
 		return nil, fmt.Errorf("Couldn't get clientset to create RBAC roles in the host cluster: %v", err)
 	}
 
+	// These are the RBAC versions we can speak
+	knownVersions := map[schema.GroupVersion]bool{
+		rbacv1alpha1.SchemeGroupVersion: true,
+		rbacv1beta1.SchemeGroupVersion:  true,
+	}
+
+	// This holds any RBAC versions listed in discovery we do not know how to speak
+	unknownVersions := []schema.GroupVersion{}
+
 	for _, g := range groupList.Groups {
 		if g.Name == rbac.GroupName {
 			if g.PreferredVersion.GroupVersion != "" {
@@ -291,7 +302,9 @@ func getRBACVersion(discoveryclient discovery.CachedDiscoveryInterface) (*schema
 				if err != nil {
 					return nil, err
 				}
-				return &gv, nil
+				if knownVersions[gv] {
+					return &gv, nil
+				}
 			}
 			for _, version := range g.Versions {
 				if version.GroupVersion != "" {
@@ -299,10 +312,18 @@ func getRBACVersion(discoveryclient discovery.CachedDiscoveryInterface) (*schema
 					if err != nil {
 						return nil, err
 					}
-					return &gv, nil
+					if knownVersions[gv] {
+						return &gv, nil
+					} else {
+						unknownVersions = append(unknownVersions, gv)
+					}
 				}
 			}
 		}
+	}
+
+	if len(unknownVersions) > 0 {
+		return nil, &NoRBACAPIError{fmt.Sprintf("%s\nUnknown RBAC API versions: %v", rbacAPINotAvailable, unknownVersions)}
 	}
 
 	return nil, &NoRBACAPIError{rbacAPINotAvailable}
