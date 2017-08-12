@@ -169,8 +169,6 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 	return starts, nil
 }
 
-// XXX unit test this
-
 // getJobFromTemplate makes a Job from a CronJob
 func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	// TODO: consider adding the following labels:
@@ -200,7 +198,7 @@ func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*ba
 	return job, nil
 }
 
-// Return Unix Epoch Time
+// getTimeHash returns Unix Epoch Time
 func getTimeHash(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix()
 }
