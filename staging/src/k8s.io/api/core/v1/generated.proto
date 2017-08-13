@@ -667,6 +667,24 @@ message ContainerStatus {
   optional string containerID = 8;
 }
 
+// Represents a Persistent Disk resource at Digital Ocean.
+// The resource must reside in the same region as the node
+message DOVolumeSource {
+  // Unique ID for the resource at Digital Ocean
+  optional string volumeID = 1;
+
+  // FSType represents the filesystem type to mount
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 2;
+
+  // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
+  // If omitted, the default is "false".
+  // +optional
+  optional bool readOnly = 3;
+}
+
 // DaemonEndpoint contains information about a single Daemon endpoint.
 message DaemonEndpoint {
   // Port number of the given endpoint.
@@ -2227,6 +2245,10 @@ message PersistentVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
+
+  // DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional DOVolumeSource doVolume = 22;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -4109,6 +4131,10 @@ message VolumeSource {
   // StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
   // +optional
   optional StorageOSVolumeSource storageos = 27;
+
+  // DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.
+  // +optional
+  optional DOVolumeSource doVolume = 28;
 }
 
 // Represents a vSphere volume resource.

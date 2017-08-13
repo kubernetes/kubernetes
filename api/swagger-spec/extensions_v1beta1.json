@@ -6815,6 +6815,10 @@
      "storageos": {
       "$ref": "v1.StorageOSVolumeSource",
       "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes."
+     },
+     "doVolume": {
+      "$ref": "v1.DOVolumeSource",
+      "description": "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes."
      }
     }
    },
@@ -7701,6 +7705,27 @@
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
       "description": "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted."
+     }
+    }
+   },
+   "v1.DOVolumeSource": {
+    "id": "v1.DOVolumeSource",
+    "description": "Represents a Persistent Disk resource at Digital Ocean. The resource must reside in the same region as the node",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "Unique ID for the resource at Digital Ocean"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\"."
      }
     }
    },

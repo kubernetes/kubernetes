@@ -1,0 +1,6 @@
+language: go
+go:
+  - 1.1
+  - tip
+before_install:
+  - go get launchpad.net/gocheck

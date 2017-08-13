@@ -343,6 +343,17 @@ func (ContainerStatus) SwaggerDoc() map[string]string {
 	return map_ContainerStatus
 }
 
+var map_DOVolumeSource = map[string]string{
+	"":         "Represents a Persistent Disk resource at Digital Ocean. The resource must reside in the same region as the node",
+	"volumeID": "Unique ID for the resource at Digital Ocean",
+	"fsType":   "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\".",
+}
+
+func (DOVolumeSource) SwaggerDoc() map[string]string {
+	return map_DOVolumeSource
+}
+
 var map_DaemonEndpoint = map[string]string{
 	"":     "DaemonEndpoint contains information about a single Daemon endpoint.",
 	"Port": "Port number of the given endpoint.",
@@ -1162,6 +1173,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"local":                "Local represents directly-attached storage with node affinity",
 	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
+	"doVolume":             "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -2011,6 +2023,7 @@ var map_VolumeSource = map[string]string{
 	"portworxVolume":       "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"storageos":            "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+	"doVolume":             "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

@@ -54590,6 +54590,26 @@
      }
     }
    },
+   "io.k8s.api.core.v1.DOVolumeSource": {
+    "description": "Represents a Persistent Disk resource at Digital Ocean. The resource must reside in the same region as the node",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\".",
+      "type": "boolean"
+     },
+     "volumeID": {
+      "description": "Unique ID for the resource at Digital Ocean",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.DaemonEndpoint": {
     "description": "DaemonEndpoint contains information about a single Daemon endpoint.",
     "required": [
@@ -56223,6 +56243,10 @@
      "claimRef": {
       "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
       "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "doVolume": {
+      "description": "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.DOVolumeSource"
      },
      "fc": {
       "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
@@ -57928,6 +57952,10 @@
      "configMap": {
       "description": "ConfigMap represents a configMap that should populate this volume",
       "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMapVolumeSource"
+     },
+     "doVolume": {
+      "description": "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.DOVolumeSource"
      },
      "downwardAPI": {
       "description": "DownwardAPI represents downward API about the pod that should populate this volume",

@@ -351,6 +351,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// +optional
 	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
+	// DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.
+	// +optional
+	DOVolume *DOVolumeSource `json:"doVolume,omitempty" protobuf:"bytes,28,opt,name=doVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -449,6 +452,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
+	// DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes.
+	// +optional
+	DOVolume *DOVolumeSource `json:"doVolume,omitempty" protobuf:"bytes,22,opt,name=doVolume"`
 }
 
 const (
@@ -1295,6 +1301,22 @@ type StorageOSPersistentVolumeSource struct {
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
 	SecretRef *ObjectReference `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
+}
+
+// Represents a Persistent Disk resource at Digital Ocean.
+// The resource must reside in the same region as the node
+type DOVolumeSource struct {
+	// Unique ID for the resource at Digital Ocean
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// FSType represents the filesystem type to mount
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
+	// If omitted, the default is "false".
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

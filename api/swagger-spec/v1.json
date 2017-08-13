@@ -18895,6 +18895,10 @@
       "$ref": "v1.StorageOSPersistentVolumeSource",
       "description": "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md"
      },
+     "doVolume": {
+      "$ref": "v1.DOVolumeSource",
+      "description": "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -19512,6 +19516,27 @@
      }
     }
    },
+   "v1.DOVolumeSource": {
+    "id": "v1.DOVolumeSource",
+    "description": "Represents a Persistent Disk resource at Digital Ocean. The resource must reside in the same region as the node",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "volumeID": {
+      "type": "string",
+      "description": "Unique ID for the resource at Digital Ocean"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "FSType represents the filesystem type to mount Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Specify \"true\" to force and set the ReadOnly property in VolumeMounts to \"true\". If omitted, the default is \"false\"."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -19832,6 +19857,10 @@
      "storageos": {
       "$ref": "v1.StorageOSVolumeSource",
       "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes."
+     },
+     "doVolume": {
+      "$ref": "v1.DOVolumeSource",
+      "description": "DOVolume represents a Digital Ocean volume attached and mounted on Kubernetes nodes."
      }
     }
    },
