@@ -136,8 +136,9 @@ func TestClaimPods(t *testing.T) {
 					productionLabelSelector,
 					controllerKind,
 					func() error { return nil }),
-				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
-				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller)},
+				pods:     []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
+				claimed:  []*v1.Pod{newPod("pod1", productionLabel, &controller)},
+				released: []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
 			}
 		}(),
 		func() test {
