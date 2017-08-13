@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/golang/glog"
@@ -36,12 +37,14 @@ type diskManager interface {
 // utility to mount a disk based filesystem
 func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.fcDisk)
-	// TODO: handle failed mounts here.
 	noMnt, err := mounter.IsLikelyNotMountPoint(volPath)
-
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mountpoint: %s", volPath)
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Errorf("cannot validate mount point: %s %v", volPath, err)
+			return err
+		} else {
+			return fmt.Errorf("the mount point %q does not exist", volPath)
+		}
 	}
 	if !noMnt {
 		return nil

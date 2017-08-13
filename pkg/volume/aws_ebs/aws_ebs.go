@@ -300,12 +300,15 @@ func (b *awsElasticBlockStoreMounter) SetUp(fsGroup *int64) error {
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error {
-	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, !notMnt, err)
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Errorf("cannot validate mount point: %s %v", dir, err)
+			return err
+		} else {
+			return fmt.Errorf("the mount point %q does not exist", dir)
+		}
 	}
 	if !notMnt {
 		return nil

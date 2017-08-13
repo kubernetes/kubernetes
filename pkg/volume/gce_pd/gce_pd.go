@@ -263,12 +263,15 @@ func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 
 // SetUp bind mounts the disk global mount to the give volume path.
 func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
-	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	glog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Errorf("cannot validate mount point: %s %v", dir, err)
+			return err
+		} else {
+			return fmt.Errorf("the mount point %q does not exist", dir)
+		}
 	}
 	if !notMnt {
 		return nil

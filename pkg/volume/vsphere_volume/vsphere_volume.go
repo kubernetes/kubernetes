@@ -208,12 +208,14 @@ func (b *vsphereVolumeMounter) CanMount() error {
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)
-
-	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil && !os.IsNotExist(err) {
-		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Errorf("cannot validate mount point: %s %v", dir, err)
+			return err
+		} else {
+			return fmt.Errorf("the mount point %q does not exist", dir)
+		}
 	}
 	if !notmnt {
 		glog.V(4).Infof("Something is already mounted to target %s", dir)
