@@ -222,9 +222,9 @@ func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Wr
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(w, string(jsonBuffer.Bytes()))
+		fmt.Fprintf(w, "%s\n", jsonBuffer.String())
 	case "yaml":
-		fmt.Fprintf(w, string(yamlOutput))
+		fmt.Fprintf(w, "%s\n", string(yamlOutput))
 	}
 	return nil
 }
