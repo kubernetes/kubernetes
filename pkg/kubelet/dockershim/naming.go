@@ -71,7 +71,7 @@ func makeContainerName(s *runtimeapi.PodSandboxConfig, c *runtimeapi.ContainerCo
 		kubePrefix,                            // 0
 		c.Metadata.Name,                       // 1:
 		s.Metadata.Name,                       // 2: sandbox name
-		s.Metadata.Namespace,                  // 3: sandbox namesapce
+		s.Metadata.Namespace,                  // 3: sandbox namespace
 		s.Metadata.Uid,                        // 4  sandbox uid
 		fmt.Sprintf("%d", c.Metadata.Attempt), // 5
 	}, nameDelimiter)

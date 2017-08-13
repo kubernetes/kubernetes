@@ -135,7 +135,7 @@ func (p *portMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.
 }
 
 // dockerNetworkHost implements network.Host by wrapping the legacy host passed in by the kubelet
-// and dockerServices which implementes the rest of the network host interfaces.
+// and dockerServices which implements the rest of the network host interfaces.
 // The legacy host methods are slated for deletion.
 type dockerNetworkHost struct {
 	network.LegacyHost
@@ -530,7 +530,7 @@ func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecont
 var criSupportedLogDrivers = []string{"json-file"}
 
 // IsCRISupportedLogDriver checks whether the logging driver used by docker is
-// suppoted by native CRI integration.
+// supported by native CRI integration.
 func IsCRISupportedLogDriver(client libdocker.Interface) (bool, error) {
 	info, err := client.Info()
 	if err != nil {
