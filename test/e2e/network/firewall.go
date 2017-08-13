@@ -78,7 +78,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
-			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
+			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 			By("Waiting for the local traffic health check firewall rule to be deleted")
 			localHCFwName := framework.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), false)
 			_, err := framework.WaitForFirewallRule(gceCloud, localHCFwName, false, framework.LoadBalancerCleanupTimeout)
@@ -120,7 +120,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			jig.LaunchNetexecPodOnNode(f, nodeName, podName, framework.FirewallTestHttpPort, framework.FirewallTestUdpPort, true)
 			defer func() {
 				framework.Logf("Cleaning up the netexec pod: %v", podName)
-				Expect(cs.Core().Pods(ns).Delete(podName, nil)).NotTo(HaveOccurred())
+				Expect(cs.CoreV1().Pods(ns).Delete(podName, nil)).NotTo(HaveOccurred())
 			}()
 		}
 
