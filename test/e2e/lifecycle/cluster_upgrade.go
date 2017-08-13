@@ -59,13 +59,13 @@ var statefulsetUpgradeTests = []upgrades.Test{
 	&upgrades.CassandraUpgradeTest{},
 }
 
-var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
+var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks(upgradeTests)
-	SIGDescribe("master upgrade", func() {
+	Describe("master upgrade", func() {
 		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -88,7 +88,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	SIGDescribe("node upgrade", func() {
+	Describe("node upgrade", func() {
 		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 		})
 	})
 
-	SIGDescribe("cluster upgrade", func() {
+	Describe("cluster upgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -139,7 +139,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks(upgradeTests)
 
-	SIGDescribe("cluster downgrade", func() {
+	Describe("cluster downgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -169,7 +169,7 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
 	testFrameworks := createUpgradeFrameworks(upgradeTests)
-	SIGDescribe("etcd upgrade", func() {
+	Describe("etcd upgrade", func() {
 		It("should maintain a functioning cluster", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), "")
 			framework.ExpectNoError(err)
