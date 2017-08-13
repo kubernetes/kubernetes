@@ -203,11 +203,14 @@ func (b *photonPersistentDiskMounter) SetUp(fsGroup *int64) error {
 func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
 
-	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			glog.Errorf("cannot validate mount point: %s %v", dir, err)
+			return err
+		} else {
+			return fmt.Errorf("the mount point %q does not exist", dir)
+		}
 	}
 	if !notmnt {
 		return nil
