@@ -48,7 +48,8 @@ var (
 // Implementations are expected to abstract the underlying runtimes.
 // Implementations are expected to be thread safe.
 type ImageManager interface {
-	// EnsureImageExists ensures that image specified in `container` exists.
+	// EnsureImageExists ensures that image specified in `container` exists, and returns
+	// (imageRef, error message, error).
 	EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret) (string, string, error)
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface

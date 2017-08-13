@@ -267,3 +267,43 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 	}
 	return url.Parse(resp.Url)
 }
+
+// killPodSandbox stops the pod sandbox.
+func (m *kubeGenericRuntimeManager) killPodSandbox(sandboxID, sandboxName, reason string) error {
+	glog.V(4).Infof("Stopping pod sandbox %s:%s, reason: %s", sandboxName, sandboxID, reason)
+	err := m.runtimeService.StopPodSandbox(sandboxID)
+	if err != nil {
+		glog.Errorf("Failed to stop pod sandbox %s:%s, %v", sandboxName, sandboxID, err)
+	}
+	return err
+}
+
+// runPodSandbox launches the pod sandbox.
+// On success, it returns the sandbox ID.
+func (m *kubeGenericRuntimeManager) runPodSandbox(pod *v1.Pod, attempt int, reason string) (string, error) {
+	glog.V(4).Infof("Launching pod sandbox for pod %q, attempt %d, reason %q", format.Pod(pod), attempt, reason)
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, uint32(attempt))
+	if err != nil {
+		err := fmt.Errorf("GeneratePodSandboxConfig for pod %q failed, %v", format.Pod(pod), err)
+		glog.Error(err)
+		return "", err
+	}
+
+	// Create pod logs directory
+	err = m.osInterface.MkdirAll(podSandboxConfig.GetLogDirectory(), 0755)
+	if err != nil {
+		err := fmt.Errorf("Create pod log directory for pod %q failed: %v", format.Pod(pod), err)
+		glog.Error(err)
+		return "", err
+	}
+
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
+	if err != nil {
+		err := fmt.Errorf("RreatePodSandbox for pod %q failed, %v", format.Pod(pod), err)
+		glog.Error(err)
+		return "", err
+	}
+
+	return podSandBoxID, nil
+}

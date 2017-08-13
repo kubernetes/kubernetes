@@ -22,6 +22,7 @@ go_library(
         "labels.go",
         "legacy.go",
         "security_context.go",
+        "sync_action.go",
     ],
     deps = [
         "//pkg/api:go_default_library",
@@ -41,7 +42,9 @@ go_library(
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
+        "//pkg/util/errors:go_default_library",
         "//pkg/util/parsers:go_default_library",
+        "//pkg/util/runtime:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/tail:go_default_library",
         "//pkg/util/version:go_default_library",
