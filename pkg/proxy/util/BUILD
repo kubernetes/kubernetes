@@ -1,18 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["conntrack.go"],
-    deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
+    deps = ["//vendor/k8s.io/utils/exec:go_default_library"],
 )
 
 go_test(
@@ -36,4 +28,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
