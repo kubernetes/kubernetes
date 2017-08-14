@@ -19,6 +19,7 @@ package transport
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -97,7 +98,10 @@ type authProxyRoundTripper struct {
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
 func NewCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
-	d := diskv.New(diskv.Options{BasePath: cacheDir})
+	d := diskv.New(diskv.Options{
+		BasePath: cacheDir,
+		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
+	})
 	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
 	t.Transport = rt
 
