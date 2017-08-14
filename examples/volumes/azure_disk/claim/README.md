@@ -20,16 +20,16 @@ The sequence of events is generally
 
 ```
 # you can use the following command to create a storage class first
-kubectl create -f storageclass-managed-hdd.json
+kubectl create -f storageclass-managed-hdd.yaml
 
 # you can use the following command to create a pvc, which will create an azure disk
-kubectl create -f pvc-on-managed-hdd.json
+kubectl create -f pvc-on-managed-hdd.yaml
 
 # You can get more details about the created PVC by
 kubectl describe pvc {pvc-name}
 
 # you can use the following command to create a pod with specified pvc
-kubectl create -f pod-uses-managed-hdd.json
+kubectl create -f pod-uses-managed-hdd.yaml
    
 ```
 
