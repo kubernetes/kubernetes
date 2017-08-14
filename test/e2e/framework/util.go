@@ -3219,7 +3219,17 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	}
 
 	if host == "" {
-		return nil, fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+		// No external IPs were found, let's try to use internal as plan B
+		for _, a := range node.Status.Addresses {
+			if a.Type == v1.NodeInternalIP {
+				host = net.JoinHostPort(a.Address, sshPort)
+				break
+			}
+		}
+	}
+
+	if host == "" {
+		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
 	}
 
 	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
