@@ -498,6 +498,12 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		}
 		vm, err := vs.getVMByName(ctx, nodeName)
 		if err != nil {
+			// If node doesn't exist, disk is already detached from node.
+			if vclib.IsNotFound(err) {
+				glog.Infof("Node %q does not exist, disk %s is already detached from node.", nodeNameToVMName(nodeName), volPath)
+				return nil
+			}
+
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeNameToVMName(nodeName), err)
 			return err
 		}
