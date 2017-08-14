@@ -45,7 +45,7 @@ func TestValidVersion(t *testing.T) {
 		"v1.6.0-alpha.0.536+d60d9f3269288f",
 		"v1.5.0-alpha.0.1078+1044b6822497da-pull",
 		"v1.5.0-alpha.1.822+49b9e32fad9f32-pull-gke-gci",
-		"v1.6.1_coreos.0",
+		"v1.6.1+coreos.0",
 	}
 	for _, s := range validVersions {
 		ver, err := KubernetesReleaseVersion(s)
@@ -164,4 +164,71 @@ func TestVersionToTag(t *testing.T) {
 			t.Errorf("failed KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
 		}
 	}
+}
+
+func TestSplitVersion(t *testing.T) {
+	type T struct {
+		input  string
+		bucket string
+		label  string
+		valid  bool
+	}
+	cases := []T{
+		// Release area
+		{"v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
+		{"v1.8.0-alpha.2.1231+afabd012389d53a", "https://dl.k8s.io/release", "v1.8.0-alpha.2.1231+afabd012389d53a", true},
+		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
+		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
+		// CI builds area, lookup actual builds at ci-cross/*.txt
+		{"ci-cross/latest", "https://dl.k8s.io/ci-cross", "latest", true},
+		{"ci/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
+		// unknown label in default (release) area: splitVersion validate only areas.
+		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
+		// unknown area, not valid input.
+		{"unknown/latest-1", "", "", false},
+	}
+
+	// kubeReleaseBucketURL can be overriden during network tests, thus ensure
+	// it will contain value corresponding to expected outcome for this unit test
+	kubeReleaseBucketURL = "https://dl.k8s.io"
+
+	for _, tc := range cases {
+		bucket, label, err := splitVersion(tc.input)
+		switch {
+		case err != nil && tc.valid:
+			t.Errorf("splitVersion: unexpected error for %q. Error: %v", tc.input, err)
+		case err == nil && !tc.valid:
+			t.Errorf("splitVersion: error expected for key %q, but result is %q, %q", tc.input, bucket, label)
+		case bucket != tc.bucket:
+			t.Errorf("splitVersion: unexpected bucket result for key %q. Expected: %q Actual: %q", tc.input, tc.bucket, bucket)
+		case label != tc.label:
+			t.Errorf("splitVersion: unexpected label result for key %q. Expected: %q Actual: %q", tc.input, tc.label, label)
+		}
+
+	}
+}
+
+func TestKubernetesIsCIVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected bool
+	}
+	cases := []T{
+		{"", false},
+		// Official releases
+		{"v1.0.0", false},
+		{"release/v1.0.0", false},
+		// CI builds
+		{"ci/latest-1", true},
+		{"ci-cross/latest", true},
+	}
+
+	for _, tc := range cases {
+		result := KubernetesIsCIVersion(tc.input)
+		t.Logf("KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
+		if result != tc.expected {
+			t.Errorf("failed KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
+		}
+	}
+
 }
