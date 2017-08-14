@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package auth
 
 import (
 	"crypto/x509"
@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Certificates API", func() {
+var _ = SIGDescribe("Certificates API", func() {
 	f := framework.NewDefaultFramework("certificates")
 
 	It("should support building a client with a CSR", func() {
