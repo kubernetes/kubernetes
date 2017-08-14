@@ -21,9 +21,10 @@ package mount
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
@@ -38,22 +39,21 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	}
 
 	if source == "tmpfs" {
-		glog.Infof("azureMount: mounting source (%q), target (%q)\n, with options (%q)", source, target, options)
-		os.MkdirAll(target, 0755)
-		return nil
+		glog.Infof("windowsMount: mounting source (%q), target (%q)\n, with options (%q)", source, target, options)
+		return os.MkdirAll(target, 0755)
 	}
 
 	parentDir := filepath.Dir(target)
-	err := os.MkdirAll(parentDir, 0755)
-	if err != nil {
-		return fmt.Errorf("mkdir(%q) failed: %v", parentDir, err)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return err
 	}
 
-	if len(options) != 1 {
-		glog.Warningf("azureMount: mount options(%q) command(%n) not equal to 1, skip mounting.", options, len(options))
-		return nil
+	if len(options) < 2 {
+		return fmt.Errorf("windowsMount: mount options(%q) command number(%d) less than 2, skip mounting", options, len(options))
 	}
-	cmd := options[0]
+	cmd := fmt.Sprintf(`$User = "AZURE\%s";$PWord = ConvertTo-SecureString -String "%s" -AsPlainText -Force;`+
+		`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
+		options[0], options[1])
 
 	driverLetter, err := getAvailableDriveLetter()
 	if err != nil {
@@ -62,30 +62,27 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	driverPath := driverLetter + ":"
 	cmd += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", driverPath, source)
 
-	_, err = exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil {
+	ex := exec.New()
+	if output, err := ex.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
 		// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
 		// will return error when Windows 2016 RS3 is ready on azure
-		glog.Errorf("azureMount: SmbGlobalMapping failed: %v", err)
-		os.MkdirAll(target, 0755)
-		return nil
+		glog.Errorf("windowsMount: SmbGlobalMapping failed: %v, output: %q", err, string(output))
+		return os.MkdirAll(target, 0755)
 	}
 
-	_, err = exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("mklink failed: %v", err)
+	if output, err := ex.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput(); err != nil {
+		return fmt.Errorf("mklink failed: %v, output: %q", err, string(output))
 	}
 
 	return nil
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	glog.Infof("azureMount: Unmount target (%q)", target)
-	output, err := exec.Command("cmd", "/c", "rmdir", target).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Unmount failed: %v", err)
+	glog.Infof("windowsMount: Unmount target (%q)", target)
+	ex := exec.New()
+	if output, err := ex.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
+		return fmt.Errorf("rmdir failed: %v, output: %q", err, string(output))
 	}
-	glog.Infof("azureMount: Unmount succeeded, output: %q", output)
 	return nil
 }
 
@@ -124,9 +121,14 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func getAvailableDriveLetter() (string, error) {
 	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
 	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil || len(output) == 0 {
-		return "", fmt.Errorf("getAvailableDriveLetter failed: %v", err)
+	ex := exec.New()
+	output, err := ex.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("getAvailableDriveLetter failed: %v, output: %q", err, string(output))
+	}
+
+	if len(output) == 0 {
+		return "", fmt.Errorf("windowsMount: there is no available drive letter now")
 	}
 	return string(output)[:1], nil
 }
