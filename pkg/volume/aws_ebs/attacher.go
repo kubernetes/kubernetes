@@ -54,7 +54,7 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
@@ -199,7 +199,7 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 
 // FIXME: this method can be further pruned.
 func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.host.GetMounter()
+	mounter := attacher.host.GetMounter(awsElasticBlockStorePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -247,7 +247,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 	}
 
 	return &awsElasticBlockStoreDetacher{
-		mounter:    plugin.host.GetMounter(),
+		mounter:    plugin.host.GetMounter(plugin.GetPluginName()),
 		awsVolumes: awsCloud,
 	}, nil
 }

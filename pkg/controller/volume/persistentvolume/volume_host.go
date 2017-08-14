@@ -61,7 +61,7 @@ func (ctrl *PersistentVolumeController) GetCloudProvider() cloudprovider.Interfa
 	return ctrl.cloud
 }
 
-func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
+func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
 

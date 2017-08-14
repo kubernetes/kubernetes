@@ -117,7 +117,7 @@ func (kvh *kubeletVolumeHost) GetCloudProvider() cloudprovider.Interface {
 	return kvh.kubelet.cloud
 }
 
-func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
+func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return kvh.kubelet.mounter
 }
 

@@ -180,13 +180,13 @@ func (attacher *photonPersistentDiskAttacher) GetDeviceMountPath(spec *volume.Sp
 // GetMountDeviceRefs finds all other references to the device referenced
 // by deviceMountPath; returns a list of paths.
 func (plugin *photonPersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.
 func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.host.GetMounter()
+	mounter := attacher.host.GetMounter(photonPersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -236,7 +236,7 @@ func (plugin *photonPersistentDiskPlugin) NewDetacher() (volume.Detacher, error)
 	}
 
 	return &photonPersistentDiskDetacher{
-		mounter:     plugin.host.GetMounter(),
+		mounter:     plugin.host.GetMounter(plugin.GetPluginName()),
 		photonDisks: photonCloud,
 	}, nil
 }

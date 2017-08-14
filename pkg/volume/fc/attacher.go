@@ -50,7 +50,7 @@ func (plugin *fcPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
@@ -88,7 +88,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 }
 
 func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.host.GetMounter()
+	mounter := attacher.host.GetMounter(fcPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -132,7 +132,7 @@ var _ volume.Detacher = &fcDetacher{}
 
 func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
-		mounter: plugin.host.GetMounter(),
+		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 		manager: &FCUtil{},
 		exe:     exec.New(),
 	}, nil
@@ -192,7 +192,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{Interface: host.GetMounter(), Runner: exec.New()},
+		mounter:  &mount.SafeFormatAndMount{Interface: host.GetMounter(fcPluginName), Runner: exec.New()},
 	}, nil
 }
 

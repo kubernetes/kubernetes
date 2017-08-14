@@ -224,7 +224,7 @@ type VolumeHost interface {
 	GetCloudProvider() cloudprovider.Interface
 
 	// Get mounter interface.
-	GetMounter() mount.Interface
+	GetMounter(pluginName string) mount.Interface
 
 	// Get writer interface for writing data to disk.
 	GetWriter() io.Writer

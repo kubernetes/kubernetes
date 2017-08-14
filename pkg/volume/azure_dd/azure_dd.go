@@ -190,7 +190,7 @@ func (plugin *azureDataDiskPlugin) NewUnmounter(volName string, podUID types.UID
 }
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 
@@ -210,6 +210,6 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath str
 }
 
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	m := plugin.host.GetMounter()
+	m := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(m, deviceMountPath)
 }
