@@ -38,7 +38,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  admission.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/api/admission",
 			RootScopedKinds:            sets.NewString("AdmissionReview"),
 			AddInternalObjectsToScheme: admission.AddToScheme,
 		},

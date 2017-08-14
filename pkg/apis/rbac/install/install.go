@@ -50,7 +50,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			// 1.10 (once all stored objects are at v1):
 			// * remove v1alpha1
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/api/rbac",
 			RootScopedKinds:            sets.NewString("ClusterRole", "ClusterRoleBinding"),
 			AddInternalObjectsToScheme: rbac.AddToScheme,
 		},

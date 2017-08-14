@@ -35,7 +35,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  core.GroupName,
 			VersionPreferenceOrder:     []string{corev1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/federation/apis/core",
 			AddInternalObjectsToScheme: core.AddToScheme,
 			RootScopedKinds: sets.NewString(
 				"Namespace",

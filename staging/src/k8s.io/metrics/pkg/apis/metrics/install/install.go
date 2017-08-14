@@ -33,7 +33,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  metrics.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/metrics/pkg/apis/metrics",
 			RootScopedKinds:            sets.NewString("NodeMetrics"),
 			AddInternalObjectsToScheme: metrics.AddToScheme,
 		},

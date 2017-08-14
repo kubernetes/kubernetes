@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  testapigroup.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/apimachinery/pkg/apis/testapigroup",
 			AddInternalObjectsToScheme: testapigroup.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
