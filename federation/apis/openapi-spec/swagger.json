@@ -14099,7 +14099,7 @@
      },
      {
       "group": "autoscaling",
-      "version": "v2alpha1",
+      "version": "v2beta1",
       "kind": "DeleteOptions"
      },
      {
@@ -14613,7 +14613,7 @@
      },
      {
       "group": "autoscaling",
-      "version": "v2alpha1",
+      "version": "v2beta1",
       "kind": "WatchEvent"
      },
      {

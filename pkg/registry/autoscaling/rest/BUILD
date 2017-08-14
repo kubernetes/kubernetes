@@ -13,7 +13,7 @@ go_library(
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/storage:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
-        "//vendor/k8s.io/api/autoscaling/v2alpha1:go_default_library",
+        "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

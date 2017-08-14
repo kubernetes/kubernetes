@@ -512,7 +512,7 @@ staging/src/k8s.io/api/authentication/v1beta1
 staging/src/k8s.io/api/authorization/v1
 staging/src/k8s.io/api/authorization/v1beta1
 staging/src/k8s.io/api/autoscaling/v1
-staging/src/k8s.io/api/autoscaling/v2alpha1
+staging/src/k8s.io/api/autoscaling/v2beta1
 staging/src/k8s.io/api/batch/v1
 staging/src/k8s.io/api/batch/v1beta1
 staging/src/k8s.io/api/batch/v2alpha1
@@ -697,8 +697,8 @@ staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1
 staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1/fake
-staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2alpha1
-staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2alpha1/fake
+staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1
+staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/batch/v1
 staging/src/k8s.io/client-go/kubernetes/typed/batch/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/batch/v1beta1

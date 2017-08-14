@@ -156,7 +156,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		delete(out.Annotations, autoscaling.MetricStatusesAnnotation)
 	}
 
-	// autoscaling/v1 formerly had an implicit default applied in the controller.  In v2alpha1, we apply it explicitly.
+	// autoscaling/v1 formerly had an implicit default applied in the controller.  In v2beta1, we apply it explicitly.
 	// We apply it here, explicitly, since we have access to the full set of metrics from the annotation.
 	if len(out.Spec.Metrics) == 0 {
 		// no other metrics, no explicit CPU value set
