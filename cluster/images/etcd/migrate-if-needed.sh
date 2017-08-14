@@ -214,6 +214,25 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_STORAGE="etcd3"
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" = "3.1." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd3" ]; then
+    # If we are upgrading to 3.1.* release, if the cluster was migrated
+    # from v2 version, the v2 data may still be around. So now is the
+    # time to actually remove them.
+    echo "Remove stale v2 data"
+    START_VERSION="${step}"
+    START_STORAGE="etcd3"
+    ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
+    if ! start_etcd; then
+      echo "Starting etcd ${step} in v3 mode failed"
+      exit 1
+    fi
+    ${ETCDCTL_CMD} rm --recursive "/registry"
+    # Kill etcd and wait until this is down.
+    stop_etcd
+    echo "Successfully remove v2 data"
+    # Also remove backup from v2->v3 migration.
+    rm -rf "${BACKUP_DIR}"
+  fi
   if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" -a "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
     break
   fi
