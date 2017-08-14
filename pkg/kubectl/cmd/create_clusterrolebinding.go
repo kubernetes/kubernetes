@@ -59,7 +59,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.
 	return cmd
 }
 
-// CreateClusterRoleBinding is the implementation of the create configmap command.
+// CreateClusterRoleBinding is the implementation of the create clusterrolebinding command.
 func CreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
