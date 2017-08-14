@@ -356,7 +356,7 @@ func (f *FakeFactory) PrinterWithOptions(options *printers.PrintOptions, isLocal
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *FakeFactory) DecoratedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -677,7 +677,7 @@ func (f *fakeAPIFactory) PrinterWithOptions(options *printers.PrintOptions, isLo
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) DecoratedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -782,7 +782,7 @@ func (f *fakeAPIFactory) PrintObject(printOpts *printers.PrintOptions, isLocal b
 		return err
 	}
 
-	printer, err := f.DecoratedPrinterWithOptions(printOpts, isLocal, mapping)
+	printer, err := f.VersionedPrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err
 	}

@@ -236,7 +236,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
 		printOpts.WithNamespace = allNamespaces
 
-		printer, err := f.DecoratedPrinterWithOptions(printOpts, false, mapping)
+		printer, err := f.VersionedPrinterWithOptions(printOpts, false, mapping)
 		if err != nil {
 			return err
 		}
@@ -452,7 +452,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			mapping = infos[ix].Mapping
 			original = infos[ix].Object
 		}
-		if shouldGetNewDecoratedPrinter(printer, lastMapping, mapping) {
+		if shouldGetNewVersionedPrinter(printer, lastMapping, mapping) {
 			if printer != nil {
 				w.Flush()
 			}
@@ -465,7 +465,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping, printOpts)
 			}
 
-			printer, err = f.DecoratedPrinterWithOptions(printOpts, false, mapping)
+			printer, err = f.VersionedPrinterWithOptions(printOpts, false, mapping)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -551,7 +551,7 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "its an experimental feature.")
 }
 
-func shouldGetNewDecoratedPrinter(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
+func shouldGetNewVersionedPrinter(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
 }
 
