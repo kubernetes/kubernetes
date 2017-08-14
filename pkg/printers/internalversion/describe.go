@@ -749,6 +749,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printStorageOSVolumeSource(volume.VolumeSource.StorageOS, w)
 		case volume.VolumeSource.FC != nil:
 			printFCVolumeSource(volume.VolumeSource.FC, w)
+		case volume.VolumeSource.DOVolume != nil:
+			printDOVolumeSource(volume.VolumeSource.DOVolume, w)
 		case volume.VolumeSource.AzureFile != nil:
 			printAzureFileVolumeSource(volume.VolumeSource.AzureFile, w)
 		case volume.VolumeSource.FlexVolume != nil:
@@ -984,6 +986,14 @@ func printFCVolumeSource(fc *api.FCVolumeSource, w PrefixWriter) {
 		strings.Join(fc.TargetWWNs, ", "), lun, fc.FSType, fc.ReadOnly)
 }
 
+func printDOVolumeSource(dovolume *api.DOVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tDOVolume (a Digital Ocean on the host that shares a pod's lifetime)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		dovolume.VolumeID, dovolume.FSType, dovolume.ReadOnly)
+}
+
 func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tAzureFile (an Azure File Service mount on the host and bind mount to the pod)\n"+
 		"    SecretName:\t%v\n"+
@@ -1086,6 +1096,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
 		case pv.Spec.FC != nil:
 			printFCVolumeSource(pv.Spec.FC, w)
+		case pv.Spec.DOVolume != nil:
+			printDOVolumeSource(pv.Spec.DOVolume, w)
 		case pv.Spec.AzureFile != nil:
 			printAzureFileVolumeSource(pv.Spec.AzureFile, w)
 		case pv.Spec.FlexVolume != nil:

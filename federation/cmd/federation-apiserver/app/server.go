@@ -327,6 +327,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		"v1.CrossVersionObjectReference":   "io.k8s.kubernetes.pkg.apis.autoscaling.v1.CrossVersionObjectReference",
 		"v1.ConfigMapVolumeSource":         "io.k8s.kubernetes.pkg.api.v1.ConfigMapVolumeSource",
 		"v1.FCVolumeSource":                "io.k8s.kubernetes.pkg.api.v1.FCVolumeSource",
+		"v1.DOVolumeSource":                "io.k8s.kubernetes.pkg.api.v1.DOVolumeSource",
 		"v1.GroupVersionForDiscovery":      "io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery",
 		"v1beta1.ClusterStatus":            "io.k8s.kubernetes.federation.apis.federation.v1beta1.ClusterStatus",
 		"v1.Job":                           "io.k8s.kubernetes.pkg.apis.batch.v1.Job",
