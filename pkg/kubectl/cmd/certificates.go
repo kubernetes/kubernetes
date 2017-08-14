@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -163,7 +163,7 @@ func (options *CertificateOptions) RunCertificateDeny(f cmdutil.Factory, out io.
 func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory, out io.Writer, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, string)) error {
 	var found int
 	mapper, _ := f.Object()
-	c, err := f.ClientSet()
+	c, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 		}
 		csr := info.Object.(*certificates.CertificateSigningRequest)
 		csr, verb := modify(csr)
-		csr, err = c.Certificates().
+		csr, err = c.CertificatesV1beta1().
 			CertificateSigningRequests().
 			UpdateApproval(csr)
 		if err != nil {
