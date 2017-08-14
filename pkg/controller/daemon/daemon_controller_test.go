@@ -1394,6 +1394,7 @@ func setDaemonSetCritical(ds *extensions.DaemonSet) {
 func TestNodeShouldRunDaemonPod(t *testing.T) {
 	cases := []struct {
 		podsOnNode                                       []*v1.Pod
+		nodeCondition                                    []v1.NodeCondition
 		ds                                               *extensions.DaemonSet
 		wantToRun, shouldSchedule, shouldContinueRunning bool
 		err                                              error
@@ -1412,6 +1413,23 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			},
 			wantToRun:             true,
 			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
+		{
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "50M", "0.5"),
+					},
+				},
+			},
+			nodeCondition:         []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			wantToRun:             true,
+			shouldSchedule:        false,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1484,6 +1502,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 	for i, c := range cases {
 		for _, strategy := range updateStrategies() {
 			node := newNode("test-node", nil)
+			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
 			manager, _, _ := newTestController()
 			manager.nodeStore.Add(node)
