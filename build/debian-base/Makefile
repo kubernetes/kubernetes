@@ -33,7 +33,7 @@ ifeq ($(ARCH),arm)
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/debian:jessie
+	BASEIMAGE?=arm64v8/debian:jessie
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)

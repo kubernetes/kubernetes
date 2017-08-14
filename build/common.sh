@@ -109,11 +109,11 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm64")
         local targets=(
-          cloud-controller-manager,aarch64/busybox
-          kube-apiserver,aarch64/busybox
-          kube-controller-manager,aarch64/busybox
-          kube-scheduler,aarch64/busybox
-          kube-aggregator,aarch64/busybox
+          cloud-controller-manager,arm64v8/busybox
+          kube-apiserver,arm64v8/busybox
+          kube-controller-manager,arm64v8/busybox
+          kube-scheduler,arm64v8/busybox
+          kube-aggregator,arm64v8/busybox
           kube-proxy,gcr.io/google-containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")

@@ -41,7 +41,7 @@ ifeq ($(ARCH),arm)
 	BASEIMAGE?=arm32v7/busybox
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/busybox
+	BASEIMAGE?=arm64v8/busybox
 endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/busybox

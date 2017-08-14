@@ -25,7 +25,7 @@ ifeq ($(ARCH),arm)
 	BASEIMAGE?=arm32v7/debian
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/debian
+	BASEIMAGE?=arm64v8/debian
 endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian
