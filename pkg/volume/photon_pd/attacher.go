@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type photonPersistentDiskAttacher struct {
@@ -209,7 +209,7 @@ func (attacher *photonPersistentDiskAttacher) MountDevice(spec *volume.Spec, dev
 	options := []string{}
 
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(photonPersistentDiskPluginName, attacher.host)
 		mountOptions := volume.MountOptionFromSpec(spec)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {

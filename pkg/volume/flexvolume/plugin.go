@@ -176,10 +176,9 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 			podServiceAccountName: pod.Spec.ServiceAccountName,
 			volName:               spec.Name(),
 		},
-		runner:             runner,
-		spec:               spec,
-		readOnly:           readOnly,
-		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: runner},
+		runner:   runner,
+		spec:     spec,
+		readOnly: readOnly,
 	}, nil
 }
 

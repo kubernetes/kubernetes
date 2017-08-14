@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 type sioVolume struct {
@@ -143,10 +142,7 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	glog.V(4).Info(log("setup created mount point directory %s", dir))
 
-	diskMounter := &mount.SafeFormatAndMount{
-		Interface: v.plugin.mounter,
-		Runner:    exec.New(),
-	}
+	diskMounter := volumehelper.NewSafeFormatAndMountFromHost(v.plugin.GetPluginName(), v.plugin.host)
 	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options)
 
 	if err != nil {

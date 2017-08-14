@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -137,7 +136,7 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, volNamespace, volName, spec.Name(), plugin.host)),
 		},
 		devicePath:  storageosDevicePath,
-		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Exec: plugin.host.GetExec(plugin.GetPluginName())},
 	}, nil
 }
 
