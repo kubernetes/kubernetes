@@ -71,8 +71,8 @@ type PrintOptions struct {
 
 	// output format options used to generate a resource printer.
 	// supported format types can be found in pkg/printers/printers.go
-	OutputFmt        string
-	OutputFmtArg     string
+	OutputFmt    string
+	OutputFmtArg string
 
 	// indicates if it is OK to ignore missing keys for rendering an output template.
 	AllowMissingKeys bool
