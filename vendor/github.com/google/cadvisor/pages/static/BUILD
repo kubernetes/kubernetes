@@ -7,6 +7,7 @@ go_library(
         "static.go",
     ],
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 filegroup(

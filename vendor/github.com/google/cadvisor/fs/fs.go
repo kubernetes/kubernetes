@@ -79,6 +79,8 @@ type RealFsInfo struct {
 	// Map from label to block device path.
 	// Labels are intent-specific tags that are auto-detected.
 	labels map[string]string
+	// Map from mountpoint to mount information.
+	mounts map[string]*mount.Info
 	// devicemapper client
 	dmsetup devicemapper.DmsetupClient
 }
@@ -106,7 +108,12 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	fsInfo := &RealFsInfo{
 		partitions: processMounts(mounts, excluded),
 		labels:     make(map[string]string, 0),
+		mounts:     make(map[string]*mount.Info, 0),
 		dmsetup:    devicemapper.NewDmsetupClient(),
+	}
+
+	for _, mount := range mounts {
+		fsInfo.mounts[mount.Mountpoint] = mount
 	}
 
 	fsInfo.addRktImagesLabel(context, mounts)
@@ -125,6 +132,7 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 	supportedFsType := map[string]bool{
 		// all ext systems are checked through prefix.
 		"btrfs": true,
+		"tmpfs": true,
 		"xfs":   true,
 		"zfs":   true,
 	}
@@ -152,25 +160,12 @@ func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) ma
 		// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
 		// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
 		if mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
-
-			buf := new(syscall.Stat_t)
-			err := syscall.Stat(mount.Source, buf)
+			major, minor, err := getBtrfsMajorMinorIds(mount)
 			if err != nil {
-				glog.Warningf("stat failed on %s with error: %s", mount.Source, err)
+				glog.Warningf("%s", err)
 			} else {
-				glog.Infof("btrfs mount %#v", mount)
-				if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
-					err := syscall.Stat(mount.Mountpoint, buf)
-					if err != nil {
-						glog.Warningf("stat failed on %s with error: %s", mount.Mountpoint, err)
-					} else {
-						glog.Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
-						glog.Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
-
-						mount.Major = int(major(buf.Dev))
-						mount.Minor = int(minor(buf.Dev))
-					}
-				}
+				mount.Major = major
+				mount.Minor = minor
 			}
 		}
 
@@ -444,11 +439,22 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stat failed on %s with error: %s", dir, err)
 	}
+
 	major := major(buf.Dev)
 	minor := minor(buf.Dev)
 	for device, partition := range self.partitions {
 		if partition.major == major && partition.minor == minor {
 			return &DeviceInfo{device, major, minor}, nil
+		}
+	}
+
+	mount, found := self.mounts[dir]
+	if found && mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
+		major, minor, err := getBtrfsMajorMinorIds(mount)
+		if err != nil {
+			glog.Warningf("%s", err)
+		} else {
+			return &DeviceInfo{mount.Source, uint(major), uint(minor)}, nil
 		}
 	}
 	return nil, fmt.Errorf("could not find device with major: %d, minor: %d in cached partitions map", major, minor)
@@ -643,4 +649,33 @@ type byteCounter struct{ bytesWritten uint64 }
 func (b *byteCounter) Write(p []byte) (int, error) {
 	b.bytesWritten += uint64(len(p))
 	return len(p), nil
+}
+
+// Get major and minor Ids for a mount point using btrfs as filesystem.
+func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
+	// btrfs fix: following workaround fixes wrong btrfs Major and Minor Ids reported in /proc/self/mountinfo.
+	// instead of using values from /proc/self/mountinfo we use stat to get Ids from btrfs mount point
+
+	buf := new(syscall.Stat_t)
+	err := syscall.Stat(mount.Source, buf)
+	if err != nil {
+		err = fmt.Errorf("stat failed on %s with error: %s", mount.Source, err)
+		return 0, 0, err
+	}
+
+	glog.Infof("btrfs mount %#v", mount)
+	if buf.Mode&syscall.S_IFMT == syscall.S_IFBLK {
+		err := syscall.Stat(mount.Mountpoint, buf)
+		if err != nil {
+			err = fmt.Errorf("stat failed on %s with error: %s", mount.Mountpoint, err)
+			return 0, 0, err
+		}
+
+		glog.Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
+		glog.Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+
+		return int(major(buf.Dev)), int(minor(buf.Dev)), nil
+	} else {
+		return 0, 0, fmt.Errorf("%s is not a block device", mount.Source)
+	}
 }
