@@ -41,6 +41,11 @@ func setInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.API.AdvertiseAddress = ip.String()
 
+	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
+	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
+		cfg.CIImageRepository = kubeadmconstants.DefaultCIImageRepository
+	}
+
 	// Validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
 	if err != nil {

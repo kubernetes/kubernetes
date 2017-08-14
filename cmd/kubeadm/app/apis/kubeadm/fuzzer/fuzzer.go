@@ -39,6 +39,7 @@ func KubeadmFuzzerFuncs(t apitesting.TestingCommon) []interface{} {
 			obj.Etcd.Image = "foo"
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"
+			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {

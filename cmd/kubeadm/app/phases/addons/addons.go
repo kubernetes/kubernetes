@@ -55,7 +55,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	}
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
-		ImageRepository: cfg.ImageRepository,
+		ImageRepository: cfg.GetControlPlaneImageRepository(),
 		Arch:            runtime.GOARCH,
 		Version:         KubeDNSVersion,
 		DNSDomain:       cfg.Networking.DNSDomain,
