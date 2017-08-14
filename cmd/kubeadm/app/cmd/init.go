@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
 	"strconv"
 	"text/template"
 
@@ -40,6 +39,7 @@ import (
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
@@ -241,8 +241,15 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 3: Bootstrap the control plane
-	if err := controlplanephase.WriteStaticPodManifests(i.cfg, k8sVersion, kubeadmconstants.GetStaticPodDirectory()); err != nil {
+	manifestPath := kubeadmconstants.GetStaticPodDirectory()
+	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestPath, i.cfg); err != nil {
 		return err
+	}
+	// Add etcd static pod spec only if external etcd is not configured
+	if len(i.cfg.Etcd.Endpoints) == 0 {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestPath, i.cfg); err != nil {
+			return err
+		}
 	}
 
 	client, err := kubeadmutil.CreateClientAndWaitForAPI(kubeadmconstants.GetAdminKubeConfigPath())
@@ -319,7 +326,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	ctx := map[string]string{
-		"KubeConfigPath": filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName),
+		"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
 		"Token":          i.cfg.Token,
 		"CAPubKeyPin":    pubkeypin.Hash(caCert),
