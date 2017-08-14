@@ -14,94 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package addons
+package dns
 
 const (
-	KubeProxyConfigMap = `
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: kube-proxy
-  namespace: kube-system
-  labels:
-    app: kube-proxy
-data:
-  kubeconfig.conf: |
-    apiVersion: v1
-    kind: Config
-    clusters:
-    - cluster:
-        certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: {{ .MasterEndpoint }}
-      name: default
-    contexts:
-    - context:
-        cluster: default
-        namespace: default
-        user: default
-      name: default
-    current-context: default
-    users:
-    - name: default
-      user:
-        tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`
-
-	KubeProxyDaemonSet = `
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  labels:
-    k8s-app: kube-proxy
-  name: kube-proxy
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      k8s-app: kube-proxy
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        k8s-app: kube-proxy
-    spec:
-      containers:
-      - name: kube-proxy
-        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
-        imagePullPolicy: IfNotPresent
-        command:
-        - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
-        {{ .ClusterCIDR }}
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var/lib/kube-proxy
-          name: kube-proxy
-        # TODO: Make this a file hostpath mount
-        - mountPath: /run/xtables.lock
-          name: xtables-lock
-          readOnly: false
-      hostNetwork: true
-      serviceAccountName: kube-proxy
-      tolerations:
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      - key: {{ .CloudTaintKey }}
-        value: "true"
-        effect: NoSchedule
-      volumes:
-      - name: kube-proxy
-        configMap:
-          name: kube-proxy
-      - name: xtables-lock
-        hostPath:
-          path: /run/xtables.lock
-`
-
+	// KubeDNSVersion is the version of kube-dns to run
 	KubeDNSVersion = "1.14.4"
 
+	// KubeDNSDeployment is the kube-dns Deployemnt manifest
 	KubeDNSDeployment = `
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -268,6 +187,7 @@ spec:
                 - {{ .Arch }}
 `
 
+	// KubeDNSService is the kube-dns Service manifest
 	KubeDNSService = `
 apiVersion: v1
 kind: Service
