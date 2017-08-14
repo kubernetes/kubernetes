@@ -31,7 +31,7 @@ BIN_DIR?=../../../../_output/dockerized/bin/linux/${ARCH}
 TEMP_DIR:=$(shell mktemp -d)
 
 BASEIMAGE_amd64=debian:jessie
-BASEIMAGE_arm=armhf/debian:jessie
+BASEIMAGE_arm=arm32v7/debian:jessie
 BASEIMAGE_arm64=aarch64/debian:jessie
 BASEIMAGE_ppc64le=ppc64le/debian:jessie
 
