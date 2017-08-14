@@ -27,8 +27,10 @@ go_library(
         "//pkg/registry/rbac/reconciliation:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/api/authorization/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1:go_default_library",
     ],
 )
 
