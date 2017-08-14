@@ -18,7 +18,6 @@ cmd/kubeadm/app/discovery
 cmd/kubeadm/app/discovery/file
 cmd/kubeadm/app/discovery/token
 cmd/kubeadm/app/images
-cmd/kubeadm/app/phases/addons
 cmd/kubeadm/app/phases/certs/pkiutil
 cmd/kubeadm/app/preflight
 cmd/kubeadm/app/util
