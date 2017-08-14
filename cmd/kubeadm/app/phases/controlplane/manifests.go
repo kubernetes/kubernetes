@@ -17,26 +17,19 @@ limitations under the License.
 package controlplane
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/ghodss/yaml"
-
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -47,123 +40,94 @@ const (
 	defaultv17AdmissionControl = "Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota"
 )
 
-// WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
-// where kubelet will pick and schedule them.
-func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version, manifestsDir string) error {
+// CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
+func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+}
+
+// CreateAPIServerStaticPodManifestFile will write APIserver static pod manifest file.
+func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer)
+}
+
+// CreateControllerManagerStaticPodManifestFile will write  controller manager static pod manifest file.
+func CreateControllerManagerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeControllerManager)
+}
+
+// CreateSchedulerStaticPodManifestFile will write scheduler static pod manifest file.
+func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeScheduler)
+}
+
+// GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current MasterConfiguration
+// NB. this methods holds the information about how kubeadm creates static pod mainfests.
+func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
 
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
 	// Prepare static pod specs
 	staticPodSpecs := map[string]v1.Pod{
-		kubeadmconstants.KubeAPIServer: componentPod(v1.Container{
+		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeAPIServer,
 			Image:         images.GetCoreImage(kubeadmconstants.KubeAPIServer, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getAPIServerCommand(cfg, k8sVersion),
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer),
-			LivenessProbe: componentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
-			Resources:     componentResources("250m"),
+			LivenessProbe: staticpodutil.ComponentProbe(int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
+			Resources:     staticpodutil.ComponentResources("250m"),
 			Env:           getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
-		kubeadmconstants.KubeControllerManager: componentPod(v1.Container{
+		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeControllerManager,
 			Image:         images.GetCoreImage(kubeadmconstants.KubeControllerManager, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getControllerManagerCommand(cfg, k8sVersion),
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager),
-			LivenessProbe: componentProbe(10252, "/healthz", v1.URISchemeHTTP),
-			Resources:     componentResources("200m"),
+			LivenessProbe: staticpodutil.ComponentProbe(10252, "/healthz", v1.URISchemeHTTP),
+			Resources:     staticpodutil.ComponentResources("200m"),
 			Env:           getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
-		kubeadmconstants.KubeScheduler: componentPod(v1.Container{
+		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:          kubeadmconstants.KubeScheduler,
 			Image:         images.GetCoreImage(kubeadmconstants.KubeScheduler, cfg.ImageRepository, cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			Command:       getSchedulerCommand(cfg),
 			VolumeMounts:  mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler),
-			LivenessProbe: componentProbe(10251, "/healthz", v1.URISchemeHTTP),
-			Resources:     componentResources("100m"),
+			LivenessProbe: staticpodutil.ComponentProbe(10251, "/healthz", v1.URISchemeHTTP),
+			Resources:     staticpodutil.ComponentResources("100m"),
 			Env:           getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 
-	// Add etcd static pod spec only if external etcd is not configured
-	if len(cfg.Etcd.Endpoints) == 0 {
+	return staticPodSpecs
+}
 
-		etcdPod := componentPod(v1.Container{
-			Name:    kubeadmconstants.Etcd,
-			Command: getEtcdCommand(cfg),
-			Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, "", cfg.Etcd.Image),
-			// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
-			VolumeMounts:  []v1.VolumeMount{newVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
-			LivenessProbe: componentProbe(2379, "/health", v1.URISchemeHTTP),
-		}, []v1.Volume{newVolume(etcdVolumeName, cfg.Etcd.DataDir)})
+// createStaticPodFiles creates all the requested static pod files.
+func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, componentNames ...string) error {
 
-		staticPodSpecs[kubeadmconstants.Etcd] = etcdPod
+	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return err
 	}
 
-	if err := os.MkdirAll(manifestsDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q [%v]", manifestsDir, err)
-	}
-	for name, spec := range staticPodSpecs {
-		filename := kubeadmconstants.GetStaticPodFilepath(name, manifestsDir)
-		serialized, err := yaml.Marshal(spec)
-		if err != nil {
-			return fmt.Errorf("failed to marshal manifest for %q to YAML [%v]", name, err)
+	// gets the StaticPodSpecs, actualized for the current MasterConfiguration
+	specs := GetStaticPodSpecs(cfg, k8sVersion)
+
+	// creates required static pod specs
+	for _, componentName := range componentNames {
+		// retrives the StaticPodSpec for given component
+		spec, exists := specs[componentName]
+		if !exists {
+			return fmt.Errorf("couldn't retrive StaticPodSpec for %s", componentName)
 		}
-		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), filename); err != nil {
-			return fmt.Errorf("failed to create static pod manifest file for %q (%q) [%v]", name, filename, err)
+
+		// writes the StaticPodSpec to disk
+		if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
+			return fmt.Errorf("failed to create static pod manifest file for %q: %v", componentName, err)
 		}
 	}
+
 	return nil
-}
-
-// componentResources returns the v1.ResourceRequirements object needed for allocating a specified amount of the CPU
-func componentResources(cpu string) v1.ResourceRequirements {
-	return v1.ResourceRequirements{
-		Requests: v1.ResourceList{
-			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
-		},
-	}
-}
-
-// componentProbe is a helper function building a ready v1.Probe object from some simple parameters
-func componentProbe(port int, path string, scheme v1.URIScheme) *v1.Probe {
-	return &v1.Probe{
-		Handler: v1.Handler{
-			HTTPGet: &v1.HTTPGetAction{
-				// Host has to be set to "127.0.0.1" here due to that our static Pods are on the host's network
-				Host:   "127.0.0.1",
-				Path:   path,
-				Port:   intstr.FromInt(port),
-				Scheme: scheme,
-			},
-		},
-		InitialDelaySeconds: 15,
-		TimeoutSeconds:      15,
-		FailureThreshold:    8,
-	}
-}
-
-// componentPod returns a Pod object from the container and volume specifications
-func componentPod(container v1.Container, volumes []v1.Volume) v1.Pod {
-	return v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        container.Name,
-			Namespace:   metav1.NamespaceSystem,
-			Annotations: map[string]string{kubetypes.CriticalPodAnnotationKey: ""},
-			// The component and tier labels are useful for quickly identifying the control plane Pods when doing a .List()
-			// against Pods in the kube-system namespace. Can for example be used together with the WaitForPodsWithLabel function
-			Labels: map[string]string{"component": container.Name, "tier": "control-plane"},
-		},
-		Spec: v1.PodSpec{
-			Containers:  []v1.Container{container},
-			HostNetwork: true,
-			Volumes:     volumes,
-		},
-	}
 }
 
 // getAPIServerCommand builds the right API server command from the given config object and version
@@ -195,7 +159,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	}
 
 	command := []string{"kube-apiserver"}
-	command = append(command, getExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
+	command = append(command, staticpodutil.GetExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
 	// Check if the user decided to use an external etcd cluster
@@ -227,19 +191,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	return command
 }
 
-// getEtcdCommand builds the right etcd command from the given config object
-func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	defaultArguments := map[string]string{
-		"listen-client-urls":    "http://127.0.0.1:2379",
-		"advertise-client-urls": "http://127.0.0.1:2379",
-		"data-dir":              cfg.Etcd.DataDir,
-	}
-
-	command := []string{"etcd"}
-	command = append(command, getExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
-	return command
-}
-
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
 	defaultArguments := map[string]string{
@@ -255,7 +206,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	}
 
 	command := []string{"kube-controller-manager"}
-	command = append(command, getExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
+	command = append(command, staticpodutil.GetExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -283,7 +234,7 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	}
 
 	command := []string{"kube-scheduler"}
-	command = append(command, getExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
+	command = append(command, staticpodutil.GetExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
 	return command
 }
 
@@ -325,21 +276,5 @@ func getAuthzParameters(modes []string) []string {
 	}
 
 	command = append(command, "--authorization-mode="+strings.Join(modes, ","))
-	return command
-}
-
-// getExtraParameters builds a list of flag arguments two string-string maps, one with default, base commands and one with overrides
-func getExtraParameters(overrides map[string]string, defaults map[string]string) []string {
-	var command []string
-	for k, v := range overrides {
-		if len(v) > 0 {
-			command = append(command, fmt.Sprintf("--%s=%s", k, v))
-		}
-	}
-	for k, v := range defaults {
-		if _, overrideExists := overrides[k]; !overrideExists {
-			command = append(command, fmt.Sprintf("--%s=%s", k, v))
-		}
-	}
 	return command
 }
