@@ -23,6 +23,7 @@ cmd/kubeadm/app/discovery/https
 cmd/kubeadm/app/phases/apiconfig
 cmd/kubeadm/app/phases/certs
 cmd/kubeadm/app/phases/kubeconfig
+cmd/kubeadm/app/phases/uploadconfig
 cmd/kubectl
 cmd/kubelet
 cmd/libs/go2idl/client-gen
