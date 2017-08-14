@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/on-call-rotations.md](https://github.com/kubernetes/community/blob/master/contributors/devel/on-call-rotations.md)

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["mt.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(
@@ -30,5 +27,4 @@ filegroup(
 go_binary(
     name = "mounttest",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )

@@ -36,12 +36,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
-	"k8s.io/kubernetes/test/e2e/metrics"
 	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -77,12 +77,33 @@ func setupProviderConfig() error {
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
 		}
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ApiEndpoint,
-			framework.TestContext.CloudConfig.ProjectID,
-			region, zone, managedZones, "" /* networkUrl */, "" /* subnetworkUrl */, nil, /* nodeTags */
-			"" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
+
+		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
+			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
+			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
+			Region:             region,
+			Zone:               zone,
+			ManagedZones:       managedZones,
+			NetworkURL:         "",
+			SubnetworkURL:      "",
+			NodeTags:           nil,
+			NodeInstancePrefix: "",
+			TokenSource:        nil,
+			UseMetadataServer:  false})
+
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
+		}
+
+		cloudConfig.Provider = gceCloud
+
+		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZones()
+			if err != nil {
+				return err
+			}
+
+			cloudConfig.Zone, _ = zones.PopAny()
 		}
 
 	case "aws":
@@ -287,8 +308,8 @@ func gatherTestSuiteMetrics() error {
 		return fmt.Errorf("error loading client: %v", err)
 	}
 
-	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case).
-	grabber, err := metrics.NewMetricsGrabber(c, !framework.ProviderIs("kubemark"), true, true, true)
+	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
+	grabber, err := metrics.NewMetricsGrabber(c, nil, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}

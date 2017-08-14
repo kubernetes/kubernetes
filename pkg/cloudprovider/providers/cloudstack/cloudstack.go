@@ -120,6 +120,11 @@ func (cs *CSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (cs *CSCloud) HasClusterID() bool {
+	return true
+}
+
 // GetZone returns the Zone containing the region that the program is running in.
 func (cs *CSCloud) GetZone() (cloudprovider.Zone, error) {
 	glog.V(2).Infof("Current zone is %v", cs.zone)

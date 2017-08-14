@@ -285,7 +285,7 @@ func runPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, error) 
 // podDeleted returns true if a pod is not found in the given namespace.
 func podDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := c.Core().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		_, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return true, nil
 		}

@@ -83,9 +83,9 @@ func computePercentiles(timeSeries []ResourceUsagePerContainer, percentilesToCom
 		for name, data := range timeSeries[i] {
 			if dataMap[name] == nil {
 				dataMap[name] = &usageDataPerContainer{
-					cpuData:        make([]float64, len(timeSeries)),
-					memUseData:     make([]uint64, len(timeSeries)),
-					memWorkSetData: make([]uint64, len(timeSeries)),
+					cpuData:        make([]float64, 0, len(timeSeries)),
+					memUseData:     make([]uint64, 0, len(timeSeries)),
+					memWorkSetData: make([]uint64, 0, len(timeSeries)),
 				}
 			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)

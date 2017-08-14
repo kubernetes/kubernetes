@@ -68,6 +68,8 @@ type Config struct {
 	Location string `json:"location" yaml:"location"`
 	// The name of the VNet that the cluster is deployed in
 	VnetName string `json:"vnetName" yaml:"vnetName"`
+	// The name of the resource group that the Vnet is deployed in
+	VnetResourceGroup string `json:"vnetResourceGroup" yaml:"vnetResourceGroup"`
 	// The name of the subnet that the cluster is deployed in
 	SubnetName string `json:"subnetName" yaml:"subnetName"`
 	// The name of the security group attached to the cluster's subnet
@@ -330,6 +332,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 // ParseConfig returns a parsed configuration and azure.Environment for an Azure cloudprovider config file
 func ParseConfig(configReader io.Reader) (*Config, *azure.Environment, error) {
 	var config Config
+	var env azure.Environment
+
+	if configReader == nil {
+		return &config, &env, nil
+	}
 
 	configContents, err := ioutil.ReadAll(configReader)
 	if err != nil {
@@ -340,7 +347,6 @@ func ParseConfig(configReader io.Reader) (*Config, *azure.Environment, error) {
 		return nil, nil, err
 	}
 
-	var env azure.Environment
 	if config.Cloud == "" {
 		env = azure.PublicCloud
 	} else {
@@ -383,6 +389,11 @@ func (az *Cloud) Routes() (cloudprovider.Routes, bool) {
 // ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
 func (az *Cloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
 	return nameservers, searches
+}
+
+// HasClusterID returns true if the cluster has a clusterID
+func (az *Cloud) HasClusterID() bool {
+	return true
 }
 
 // ProviderName returns the cloud provider ID.

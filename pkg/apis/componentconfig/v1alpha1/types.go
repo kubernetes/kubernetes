@@ -256,6 +256,18 @@ type LeaderElectionConfiguration struct {
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Only used for dynamic configuration.
+	// The length of the trial period for this configuration. If the Kubelet records CrashLoopThreshold or
+	// more startups during this period, the current configuration will be marked bad and the
+	// Kubelet will roll-back to the last-known-good. Default 10 minutes.
+	ConfigTrialDuration *metav1.Duration `json:"configTrialDuration"`
+	// Only used for dynamic configuration.
+	// If this number of Kubelet "crashes" during ConfigTrialDuration meets this threshold,
+	// the configuration fails the trial and the Kubelet rolls back to its last-known-good config.
+	// Crash-loops are detected by counting Kubelet startups, so one startup is implicitly added
+	// to this threshold to always allow a single restart per config change.
+	// Default 10, mimimum allowed is 0, maximum allowed is 10.
+	CrashLoopThreshold *int32 `json:"crashLoopThreshold"`
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string `json:"podManifestPath"`
@@ -291,17 +303,10 @@ type KubeletConfiguration struct {
 	// tlsPrivateKeyFile is the ile containing x509 private key matching
 	// tlsCertFile.
 	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
-	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
-	// are provided, this flag will be ignored.
-	CertDirectory string `json:"certDirectory"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization `json:"authorization"`
-	// rootDirectory is the directory path to place kubelet files (volume
-	// mounts,etc).
-	RootDirectory string `json:"rootDirectory"`
 	// seccompProfileRoot is the directory path for seccomp profiles.
 	SeccompProfileRoot string `json:"seccompProfileRoot"`
 	// allowPrivileged enables containers to request privileged mode.
@@ -391,10 +396,6 @@ type KubeletConfiguration struct {
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
-	// cloudProvider is the provider for cloud services.
-	CloudProvider string `json:"cloudProvider"`
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	CloudConfigFile string `json:"cloudConfigFile"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups"`
 	// runtimeCgroups are cgroups that container runtime is expected to be isolated in.
@@ -530,9 +531,8 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string `json:"featureGates,omitempty"`
-	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
-	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
+	FailSwapOn bool `json:"failSwapOn,omitempty"`
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.

@@ -17,6 +17,7 @@ limitations under the License.
 package constants
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -95,8 +96,30 @@ const (
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
+	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
+	MasterConfigurationConfigMap = "kubeadm-config"
+
+	// MasterConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
+	MasterConfigurationConfigMapKey = "MasterConfiguration"
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
 	MinExternalEtcdVersion = "3.0.14"
+
+	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
+	DefaultEtcdVersion = "3.0.17"
+
+	Etcd                  = "etcd"
+	KubeAPIServer         = "kube-apiserver"
+	KubeControllerManager = "kube-controller-manager"
+	KubeScheduler         = "kube-scheduler"
+	KubeProxy             = "kube-proxy"
+
+	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
+	SelfHostingPrefix = "self-hosted-"
+
+	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
+	// TODO: This should be changed in the v1.8 dev cycle to a node-BT-specific group instead of the generic Bootstrap Token group that is used now
+	NodeBootstrapTokenAuthGroup = "system:bootstrappers"
 )
 
 var (
@@ -119,11 +142,33 @@ var (
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = []string{"signing", "authentication"}
 
+	// MasterComponents defines the master component names
+	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
+
+	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
+	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
+	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
 )
 
-// BuildStaticManifestFilepath returns the location on the disk where the Static Pod should be present
-func BuildStaticManifestFilepath(componentName string) string {
-	return filepath.Join(KubernetesDir, ManifestsSubDirName, componentName+".yaml")
+// GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
+func GetStaticPodDirectory() string {
+	return filepath.Join(KubernetesDir, ManifestsSubDirName)
+}
+
+// GetStaticPodFilepath returns the location on the disk where the Static Pod should be present
+func GetStaticPodFilepath(componentName, manifestsDir string) string {
+	return filepath.Join(manifestsDir, componentName+".yaml")
+}
+
+// GetAdminKubeConfigPath returns the location on the disk where admin kubeconfig is located by default
+func GetAdminKubeConfigPath() string {
+	return filepath.Join(KubernetesDir, AdminKubeConfigFileName)
+}
+
+// AddSelfHostedPrefix adds the self-hosted- prefix to the component name
+func AddSelfHostedPrefix(componentName string) string {
+	return fmt.Sprintf("%s%s", SelfHostingPrefix, componentName)
 }

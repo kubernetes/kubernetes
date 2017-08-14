@@ -587,17 +587,17 @@ func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
 	// version.
 	fakeClient := f.tf.Client.(*fake.RESTClient)
 	clientset := internalclientset.NewForConfigOrDie(f.tf.ClientConfig)
-	clientset.CoreClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthenticationClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.BatchClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.CertificatesClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.ExtensionsClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.RbacClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.StorageClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AppsClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.PolicyClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Autoscaling().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Batch().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Certificates().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Extensions().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Rbac().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Storage().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	return clientset, f.tf.Err
 }

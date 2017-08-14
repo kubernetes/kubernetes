@@ -14,29 +14,31 @@
 
 package compiler
 
-// basic error type
+// Error represents compiler errors and their location in the document.
 type Error struct {
 	Context *Context
 	Message string
 }
 
+// NewError creates an Error.
 func NewError(context *Context, message string) *Error {
 	return &Error{Context: context, Message: message}
 }
 
+// Error returns the string value of an Error.
 func (err *Error) Error() string {
-	if err.Context != nil {
-		return "ERROR " + err.Context.Description() + " " + err.Message
-	} else {
+	if err.Context == nil {
 		return "ERROR " + err.Message
 	}
+	return "ERROR " + err.Context.Description() + " " + err.Message
 }
 
-// container for groups of errors
+// ErrorGroup is a container for groups of Error values.
 type ErrorGroup struct {
 	Errors []error
 }
 
+// NewErrorGroupOrNil returns a new ErrorGroup for a slice of errors or nil if the slice is empty.
 func NewErrorGroupOrNil(errors []error) error {
 	if len(errors) == 0 {
 		return nil

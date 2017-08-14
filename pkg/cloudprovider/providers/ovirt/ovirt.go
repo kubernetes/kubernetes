@@ -134,6 +134,11 @@ func (v *OVirtCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (v *OVirtCloud) HasClusterID() bool {
+	return true
+}
+
 // LoadBalancer returns an implementation of LoadBalancer for oVirt cloud
 func (v *OVirtCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false

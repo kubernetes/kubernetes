@@ -580,7 +580,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	}
 	if newPod, err := r.KubeClient.Core().Pods(namespace).Create(pod); err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
-		return fmt.Errorf("unable to create pods: %v", err)
+		return err
 	} else {
 		accessor, err := meta.Accessor(object)
 		if err != nil {
@@ -885,50 +885,11 @@ func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
 	return *(o[i].Spec.Replicas) > *(o[j].Spec.Replicas)
 }
 
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint *v1.Taint) error {
-	firstTry := true
-	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
-		var err error
-		var oldNode *v1.Node
-		// First we try getting node from the API server cache, as it's cheaper. If it fails
-		// we get it from etcd to be sure to have fresh data.
-		if firstTry {
-			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
-			firstTry = false
-		} else {
-			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
-		}
-		if err != nil {
-			return err
-		}
-		newNode, ok, err := taintutils.AddOrUpdateTaint(oldNode, taint)
-		if err != nil {
-			return fmt.Errorf("Failed to update taint annotation!")
-		}
-		if !ok {
-			return nil
-		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
-	})
-}
-
-// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
-// won't fail if target taint doesn't exist or has been removed.
-// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
-// any API calls.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint, node *v1.Node) error {
-	// Short circuit for limiting amount of API calls.
-	if node != nil {
-		match := false
-		for i := range node.Spec.Taints {
-			if node.Spec.Taints[i].MatchTaint(taint) {
-				match = true
-				break
-			}
-		}
-		if !match {
-			return nil
-		}
+// AddOrUpdateTaintOnNode add taints to the node. If taint was added into node, it'll issue API calls
+// to update nodes; otherwise, no API calls. Return error if any.
+func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
+	if len(taints) == 0 {
+		return nil
 	}
 	firstTry := true
 	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
@@ -945,11 +906,77 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint *v1.Taint,
 		if err != nil {
 			return err
 		}
-		newNode, ok, err := taintutils.RemoveTaint(oldNode, taint)
-		if err != nil {
-			return fmt.Errorf("Failed to update taint annotation!")
+
+		var newNode *v1.Node
+		oldNodeCopy := oldNode
+		updated := false
+		for _, taint := range taints {
+			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
+			if err != nil {
+				return fmt.Errorf("Failed to update taint of node!")
+			}
+			updated = updated || ok
+			newNode = curNewNode
+			oldNodeCopy = curNewNode
 		}
-		if !ok {
+		if !updated {
+			return nil
+		}
+		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+	})
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+// If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
+// any API calls.
+func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+	if len(taints) == 0 {
+		return nil
+	}
+	// Short circuit for limiting amount of API calls.
+	if node != nil {
+		match := false
+		for _, taint := range taints {
+			if taintutils.TaintExists(node.Spec.Taints, taint) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return nil
+		}
+	}
+
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateTaintBackoff, func() error {
+		var err error
+		var oldNode *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			oldNode, err = c.Core().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		var newNode *v1.Node
+		oldNodeCopy := oldNode
+		updated := false
+		for _, taint := range taints {
+			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
+			if err != nil {
+				return fmt.Errorf("Failed to remove taint of node!")
+			}
+			updated = updated || ok
+			newNode = curNewNode
+			oldNodeCopy = curNewNode
+		}
+		if !updated {
 			return nil
 		}
 		return PatchNodeTaints(c, nodeName, oldNode, newNode)

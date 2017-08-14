@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "results.go",
         "urls.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/mitchellh/mapstructure:go_default_library",
         "//vendor/github.com/rackspace/gophercloud:go_default_library",

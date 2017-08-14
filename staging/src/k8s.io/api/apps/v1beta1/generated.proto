@@ -109,6 +109,7 @@ message DeploymentList {
   repeated Deployment items = 2;
 }
 
+// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 message DeploymentRollback {
   // Required: This must match the Name of a deployment.
@@ -157,6 +158,7 @@ message DeploymentSpec {
   // +optional
   optional bool paused = 7;
 
+  // DEPRECATED.
   // The config this deployment is rolling back to. Will be cleared after rollback is done.
   // +optional
   optional RollbackConfig rollbackTo = 8;
@@ -224,6 +226,7 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
+// DEPRECATED.
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional
@@ -426,6 +429,12 @@ message StatefulSetStatus {
   // updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
   // [replicas-updatedReplicas,replicas)
   optional string updateRevision = 7;
+
+  // collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller
+  // uses this field as a collision avoidance mechanism when it needs to create the name for the
+  // newest ControllerRevision.
+  // +optional
+  optional int64 collisionCount = 9;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

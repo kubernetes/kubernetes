@@ -61,6 +61,8 @@ service RuntimeService {
     // ContainerStatus returns status of the container. If the container is not
     // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
+    // UpdateContainerResources updates ContainerConfig of the container.
+    rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
 
     // ExecSync runs a command in a container synchronously.
     rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
@@ -201,10 +203,11 @@ message LinuxSandboxSecurityContext {
     // privileged containers are expected to be run.
     bool privileged = 6;
     // Seccomp profile for the sandbox, candidate values are:
-    // * runtime/default: the default profile for the container runtime
+    // * docker/default: the default profile for the docker container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
+    // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 7;
 }
 
@@ -445,6 +448,10 @@ message LinuxContainerResources {
     int64 memory_limit_in_bytes = 4;
     // OOMScoreAdj adjusts the oom-killer score. Default: 0 (not specified).
     int64 oom_score_adj = 5;
+    // CpusetCpus constrains the allowed set of logical CPUs. Default: "" (not specified).
+    string cpuset_cpus = 6;
+    // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
+    string cpuset_mems = 7;
 }
 
 // SELinuxOption are the labels to be applied to the container.
@@ -509,10 +516,11 @@ message LinuxContainerSecurityContext {
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9;
     // Seccomp profile for the container, candidate values are:
-    // * runtime/default: the default profile for the container runtime
+    // * docker/default: the default profile for the docker container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
+    // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
@@ -771,6 +779,15 @@ message ContainerStatusResponse {
     // Status of the container.
     ContainerStatus status = 1;
 }
+
+message UpdateContainerResourcesRequest {
+    // ID of the container to update.
+    string container_id = 1;
+    // Resource configuration specific to Linux containers.
+    LinuxContainerResources linux = 2;
+}
+
+message UpdateContainerResourcesResponse {}
 
 message ExecSyncRequest {
     // ID of the container.

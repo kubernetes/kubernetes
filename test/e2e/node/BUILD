@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,13 +9,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apparmor.go",
+        "framework.go",
         "kubelet.go",
         "kubelet_perf.go",
         "nodeoutofdisk.go",
         "security_context.go",
-        "sig.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",

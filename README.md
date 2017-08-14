@@ -79,7 +79,7 @@ That said, if you have questions, reach out to us
 [interactive tutorial]: http://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: http://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[Submit Queue]: http://submit-queue.k8s.io/#/e2e
+[Submit Queue]: http://submit-queue.k8s.io/#/ci
 [Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/ 
 

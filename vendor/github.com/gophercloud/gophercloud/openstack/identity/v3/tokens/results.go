@@ -41,6 +41,32 @@ type ServiceCatalog struct {
 	Entries []CatalogEntry `json:"catalog"`
 }
 
+// Domain provides information about the domain to which this token grants access.
+type Domain struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// User represents a user resource that exists on the API.
+type User struct {
+	Domain Domain `json:"domain"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+}
+
+// Role provides information about roles to which User is authorized.
+type Role struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Project provides information about project to which User is authorized.
+type Project struct {
+	Domain Domain `json:"domain"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+}
+
 // commonResult is the deferred result of a Create or a Get call.
 type commonResult struct {
 	gophercloud.Result
@@ -67,10 +93,37 @@ func (r commonResult) ExtractToken() (*Token, error) {
 }
 
 // ExtractServiceCatalog returns the ServiceCatalog that was generated along with the user's Token.
-func (r CreateResult) ExtractServiceCatalog() (*ServiceCatalog, error) {
+func (r commonResult) ExtractServiceCatalog() (*ServiceCatalog, error) {
 	var s ServiceCatalog
 	err := r.ExtractInto(&s)
 	return &s, err
+}
+
+// ExtractUser returns the User that is the owner of the Token.
+func (r commonResult) ExtractUser() (*User, error) {
+	var s struct {
+		User *User `json:"user"`
+	}
+	err := r.ExtractInto(&s)
+	return s.User, err
+}
+
+// ExtractRoles returns Roles to which User is authorized.
+func (r commonResult) ExtractRoles() ([]Role, error) {
+	var s struct {
+		Roles []Role `json:"roles"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Roles, err
+}
+
+// ExtractProject returns Project to which User is authorized.
+func (r commonResult) ExtractProject() (*Project, error) {
+	var s struct {
+		Project *Project `json:"project"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Project, err
 }
 
 // CreateResult defers the interpretation of a created token.

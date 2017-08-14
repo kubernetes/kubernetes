@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 )
@@ -296,6 +297,119 @@ func TestValidateStatefulSet(t *testing.T) {
 				field != "spec.updateStrategy.rollingUpdate.partition" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
+		}
+	}
+}
+
+func TestValidateStatefulSetStatus(t *testing.T) {
+	minusOne := int64(-1)
+	tests := []struct {
+		name               string
+		replicas           int32
+		readyReplicas      int32
+		currentReplicas    int32
+		updatedReplicas    int32
+		observedGeneration *int64
+		collisionCount     *int64
+		expectedErr        bool
+	}{
+		{
+			name:            "valid status",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: 2,
+			updatedReplicas: 1,
+			expectedErr:     false,
+		},
+		{
+			name:            "invalid replicas",
+			replicas:        -1,
+			readyReplicas:   3,
+			currentReplicas: 2,
+			updatedReplicas: 1,
+			expectedErr:     true,
+		},
+		{
+			name:            "invalid readyReplicas",
+			replicas:        3,
+			readyReplicas:   -1,
+			currentReplicas: 2,
+			updatedReplicas: 1,
+			expectedErr:     true,
+		},
+		{
+			name:            "invalid currentReplicas",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: -1,
+			updatedReplicas: 1,
+			expectedErr:     true,
+		},
+		{
+			name:            "invalid updatedReplicas",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: 2,
+			updatedReplicas: -1,
+			expectedErr:     true,
+		},
+		{
+			name:               "invalid observedGeneration",
+			replicas:           3,
+			readyReplicas:      3,
+			currentReplicas:    2,
+			updatedReplicas:    1,
+			observedGeneration: &minusOne,
+			expectedErr:        true,
+		},
+		{
+			name:            "invalid collisionCount",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: 2,
+			updatedReplicas: 1,
+			collisionCount:  &minusOne,
+			expectedErr:     true,
+		},
+		{
+			name:            "readyReplicas greater than replicas",
+			replicas:        3,
+			readyReplicas:   4,
+			currentReplicas: 2,
+			updatedReplicas: 1,
+			expectedErr:     true,
+		},
+		{
+			name:            "currentReplicas greater than replicas",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: 4,
+			updatedReplicas: 1,
+			expectedErr:     true,
+		},
+		{
+			name:            "updatedReplicas greater than replicas",
+			replicas:        3,
+			readyReplicas:   3,
+			currentReplicas: 2,
+			updatedReplicas: 4,
+			expectedErr:     true,
+		},
+	}
+
+	for _, test := range tests {
+		status := apps.StatefulSetStatus{
+			Replicas:           test.replicas,
+			ReadyReplicas:      test.readyReplicas,
+			CurrentReplicas:    test.currentReplicas,
+			UpdatedReplicas:    test.updatedReplicas,
+			ObservedGeneration: test.observedGeneration,
+			CollisionCount:     test.collisionCount,
+		}
+
+		errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
+		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
 		}
 	}
 }

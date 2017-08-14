@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,14 +9,24 @@ go_library(
     name = "go_default_library",
     srcs = [
         "flags.go",
-        "flags_linux.go",
+        "flags_unsupported.go",
         "mount.go",
-        "mounter_linux.go",
+        "mounter_unsupported.go",
         "mountinfo.go",
-        "mountinfo_linux.go",
-        "sharedsubtree_linux.go",
-    ],
-    tags = ["automanaged"],
+        "mountinfo_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "flags_linux.go",
+            "mounter_linux.go",
+            "mountinfo_linux.go",
+            "sharedsubtree_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "mountinfo_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
 )
 
 filegroup(

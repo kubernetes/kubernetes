@@ -27,7 +27,6 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -225,7 +224,7 @@ func (rh *realHistory) ListControllerRevisions(parent metav1.Object, selector la
 	}
 	var owned []*apps.ControllerRevision
 	for i := range history {
-		ref := controller.GetControllerOf(history[i])
+		ref := metav1.GetControllerOf(history[i])
 		if ref == nil || ref.UID == parent.GetUID() {
 			owned = append(owned, history[i])
 		}
@@ -302,7 +301,7 @@ func (rh *realHistory) DeleteControllerRevision(revision *apps.ControllerRevisio
 
 func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	// Return an error if the parent does not own the revision
-	if owner := controller.GetControllerOf(revision); owner != nil {
+	if owner := metav1.GetControllerOf(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
 	// Use strategic merge patch to add an owner reference indicating a controller ref
@@ -346,7 +345,7 @@ func (fh *fakeHistory) ListControllerRevisions(parent metav1.Object, selector la
 
 	var owned []*apps.ControllerRevision
 	for i := range history {
-		ref := controller.GetControllerOf(history[i])
+		ref := metav1.GetControllerOf(history[i])
 		if ref == nil || ref.UID == parent.GetUID() {
 			owned = append(owned, history[i])
 		}
@@ -431,7 +430,7 @@ func (fh *fakeHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	blockOwnerDeletion := true
 	isController := true
-	if owner := controller.GetControllerOf(revision); owner != nil {
+	if owner := metav1.GetControllerOf(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(revision)

@@ -197,6 +197,7 @@ func (m *manager) Start() {
 	// loop to allow bootstrap scenarios, where the certificate manager
 	// doesn't have a certificate at all yet.
 	if m.shouldRotate() {
+		glog.V(1).Infof("shouldRotate() is true, forcing immediate rotation")
 		_, err := m.rotateCerts()
 		if err != nil {
 			glog.Errorf("Could not rotate certificates: %v", err)
@@ -209,7 +210,9 @@ func (m *manager) Start() {
 		Steps:    7,
 	}
 	go wait.Forever(func() {
-		time.Sleep(m.rotationDeadline.Sub(time.Now()))
+		sleepInterval := m.rotationDeadline.Sub(time.Now())
+		glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
+		time.Sleep(sleepInterval)
 		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
 			glog.Errorf("Reached backoff limit, still unable to rotate certs: %v", err)
 			wait.PollInfinite(128*time.Second, m.rotateCerts)
@@ -266,6 +269,8 @@ func (m *manager) shouldRotate() bool {
 }
 
 func (m *manager) rotateCerts() (bool, error) {
+	glog.V(2).Infof("Rotating certificates")
+
 	csrPEM, keyPEM, err := m.generateCSR()
 	if err != nil {
 		glog.Errorf("Unable to generate a certificate signing request: %v", err)
@@ -314,6 +319,7 @@ func (m *manager) setRotationDeadline() {
 	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 
 	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	glog.V(2).Infof("Certificate rotation deadline is %v", m.rotationDeadline)
 }
 
 func (m *manager) updateCached(cert *tls.Certificate) {

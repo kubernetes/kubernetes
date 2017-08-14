@@ -145,7 +145,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		// RC should be running successfully
 		// TODO: WaitForSchedulerAfterAction() can on be used to wait for failure event,
 		// not for successful RC, since no specific pod name can be provided.
-		_, err := cs.Core().ReplicationControllers(ns).Create(rc)
+		_, err := cs.CoreV1().ReplicationControllers(ns).Create(rc)
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(framework.WaitForControlledPodsRunning(cs, ns, affinityRCName, api.Kind("ReplicationController")))
 
@@ -167,7 +167,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
-		podList, err := cs.Core().Pods(ns).List(metav1.ListOptions{})
+		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
@@ -220,7 +220,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, labelRCName)
 
 		WaitForSchedulerAfterAction(f, func() error {
-			_, err := cs.Core().ReplicationControllers(ns).Create(rc)
+			_, err := cs.CoreV1().ReplicationControllers(ns).Create(rc)
 			return err
 		}, labelRCName, false)
 

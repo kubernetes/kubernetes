@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/spf13/pflag"
 
@@ -26,7 +27,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -127,13 +130,28 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
+	s.addEtcdHealthEndpoint(c)
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
 	return nil
 }
 
 func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
+	s.addEtcdHealthEndpoint(c)
 	c.RESTOptionsGetter = &storageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
+}
+
+func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) {
+	c.HealthzChecks = append(c.HealthzChecks, healthz.NamedCheck("etcd", func(r *http.Request) error {
+		done, err := preflight.EtcdConnection{ServerList: s.StorageConfig.ServerList}.CheckEtcdServers()
+		if !done {
+			return fmt.Errorf("etcd failed")
+		}
+		if err != nil {
+			return err
+		}
+		return nil
+	}))
 }
 
 type SimpleRestOptionsFactory struct {

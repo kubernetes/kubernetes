@@ -41,7 +41,7 @@ type SecretAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewSecretAdapter(client federationclientset.Interface, config *restclient.Config) FederatedTypeAdapter {
+func NewSecretAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &SecretAdapter{client: client}
 }
 

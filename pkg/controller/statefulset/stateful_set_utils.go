@@ -219,20 +219,6 @@ func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
 }
 
-// newControllerRef returns an ControllerRef pointing to a given StatefulSet.
-func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               set.Name,
-		UID:                set.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
-}
-
 // setPodRevision sets the revision of Pod to revision by adding the StatefulSetRevisionLabel
 func setPodRevision(pod *v1.Pod, revision string) {
 	if pod.Labels == nil {
@@ -252,7 +238,7 @@ func getPodRevision(pod *v1.Pod) string {
 
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, newControllerRef(set))
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerRef(set, controllerKind))
 	pod.Name = getPodName(set, ordinal)
 	updateIdentity(set, pod)
 	updateStorage(set, pod)
@@ -311,11 +297,21 @@ func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevisio
 	if err != nil {
 		return nil, err
 	}
-	return history.NewControllerRevision(set,
+	cr, err := history.NewControllerRevision(set,
 		controllerKind,
 		selector,
 		runtime.RawExtension{Raw: patch},
 		revision)
+	if err != nil {
+		return nil, err
+	}
+	if cr.ObjectMeta.Annotations == nil {
+		cr.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for key, value := range set.Annotations {
+		cr.ObjectMeta.Annotations[key] = value
+	}
+	return cr, nil
 }
 
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error

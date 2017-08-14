@@ -142,6 +142,9 @@ type SubjectAccessReviewSpec struct {
 	// it needs a reflection here.
 	// +optional
 	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,5,rep,name=extra"`
+	// UID information about the requesting user.
+	// +optional
+	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
 }
 
 // ExtraValue masks the value so protobuf can generate

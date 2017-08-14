@@ -36,18 +36,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
-		NewListFunc:       func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
-		PredicateFunc:     horizontalpodautoscaler.MatchAutoscaler,
-		QualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("horizontalpodautoscalers"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
+		NewListFunc:              func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
+		DefaultQualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("horizontalpodautoscalers"),
 
 		CreateStrategy: horizontalpodautoscaler.Strategy,
 		UpdateStrategy: horizontalpodautoscaler.Strategy,
 		DeleteStrategy: horizontalpodautoscaler.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: horizontalpodautoscaler.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

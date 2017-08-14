@@ -1885,6 +1885,20 @@ func TestGetTable(t *testing.T) {
 				},
 			},
 		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1alpha1;g=meta.k8s.io",
+			params: url.Values{"includeObject": []string{"Metadata"}},
+			expected: &metav1alpha1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
+				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1alpha1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
 	}
 	for i, test := range tests {
 		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
@@ -1901,18 +1915,20 @@ func TestGetTable(t *testing.T) {
 		}
 		if test.statusCode != 0 {
 			if resp.StatusCode != test.statusCode {
-				t.Errorf("%d: unexpected response: %#v", resp)
+				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected response: %#v", resp)
+			t.Errorf("%d: unexpected response: %#v", i, resp)
 		}
 		var itemOut metav1alpha1.Table
-		if _, err = extractBody(resp, &itemOut); err != nil {
+		body, err := extractBody(resp, &itemOut)
+		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(test.expected, &itemOut) {
+			t.Log(body)
 			t.Errorf("%d: did not match: %s", i, diff.ObjectReflectDiff(test.expected, &itemOut))
 		}
 	}
@@ -3228,91 +3244,6 @@ func TestCreateChecksDecode(t *testing.T) {
 	}
 }
 
-// TestUpdateREST tests that you can add new rest implementations to a pre-existing
-// web service.
-func TestUpdateREST(t *testing.T) {
-	makeGroup := func(storage map[string]rest.Storage) *APIGroupVersion {
-		return &APIGroupVersion{
-			Storage:   storage,
-			Root:      "/" + prefix,
-			Creater:   scheme,
-			Convertor: scheme,
-			Copier:    scheme,
-			Defaulter: scheme,
-			Typer:     scheme,
-			Linker:    selfLinker,
-
-			Admit:   admissionControl,
-			Context: requestContextMapper,
-			Mapper:  namespaceMapper,
-
-			GroupVersion:           newGroupVersion,
-			OptionsExternalVersion: &newGroupVersion,
-
-			Serializer:     codecs,
-			ParameterCodec: parameterCodec,
-		}
-	}
-
-	makeStorage := func(paths ...string) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		for _, s := range paths {
-			storage[s] = &SimpleRESTStorage{}
-		}
-		return storage
-	}
-
-	testREST := func(t *testing.T, container *restful.Container, barCode int) {
-		handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver(), requestContextMapper)
-		handler = request.WithRequestContext(handler, requestContextMapper)
-
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/foo/test"}})
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected OK: %#v", w)
-		}
-
-		w = httptest.NewRecorder()
-		handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/bar/test"}})
-		if w.Code != barCode {
-			t.Errorf("expected response code %d for GET to bar but received %d", barCode, w.Code)
-		}
-	}
-
-	storage1 := makeStorage("foo")
-	group1 := makeGroup(storage1)
-
-	storage2 := makeStorage("bar")
-	group2 := makeGroup(storage2)
-
-	container := restful.NewContainer()
-
-	// install group1.  Ensure that
-	// 1. Foo storage is accessible
-	// 2. Bar storage is not accessible
-	if err := group1.InstallREST(container); err != nil {
-		t.Fatal(err)
-	}
-	testREST(t, container, http.StatusNotFound)
-
-	// update with group2.  Ensure that
-	// 1.  Foo storage is still accessible
-	// 2.  Bar storage is now accessible
-	if err := group2.UpdateREST(container); err != nil {
-		t.Fatal(err)
-	}
-	testREST(t, container, http.StatusOK)
-
-	// try to update a group that does not have an existing webservice with a matching prefix
-	// should not affect the existing registered webservice
-	invalidGroup := makeGroup(storage1)
-	invalidGroup.Root = "bad"
-	if err := invalidGroup.UpdateREST(container); err == nil {
-		t.Fatal("expected an error from UpdateREST when updating a non-existing prefix but got none")
-	}
-	testREST(t, container, http.StatusOK)
-}
-
 func TestParentResourceIsRequired(t *testing.T) {
 	storage := &SimpleTypedStorage{
 		baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
@@ -3834,7 +3765,7 @@ func TestCreateTimeout(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, apierrs.StatusServerTimeout)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}

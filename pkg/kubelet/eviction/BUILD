@@ -1,24 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "cgo_genrule",
     "go_library",
     "go_test",
-)
-
-cgo_genrule(
-    name = "cgo_codegen",
-    srcs = ["threshold_notifier_linux.go"],
-    clinkopts = [
-        "-lz",
-        "-lm",
-        "-lpthread",
-        "-ldl",
-    ],
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -28,7 +13,6 @@ go_test(
         "helpers_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
@@ -53,10 +37,14 @@ go_library(
         "doc.go",
         "eviction_manager.go",
         "helpers.go",
+        "threshold_notifier_unsupported.go",
         "types.go",
-    ],
-    library = ":cgo_codegen",
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "threshold_notifier_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/helper/qos:go_default_library",
@@ -80,7 +68,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

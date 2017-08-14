@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -100,9 +101,17 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}, http.DefaultClient)
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := os.Stat(rootPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("rootDirectory %q does not exist", rootPath)
+		} else {
+			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
+		}
 	}
 
 	cadvisorClient := &cadvisorClient{

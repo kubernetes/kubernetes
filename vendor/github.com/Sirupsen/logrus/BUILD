@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -17,11 +15,21 @@ go_library(
         "json_formatter.go",
         "logger.go",
         "logrus.go",
-        "terminal_linux.go",
-        "terminal_notwindows.go",
         "text_formatter.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "terminal_darwin.go",
+            "terminal_notwindows.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "terminal_linux.go",
+            "terminal_notwindows.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "terminal_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

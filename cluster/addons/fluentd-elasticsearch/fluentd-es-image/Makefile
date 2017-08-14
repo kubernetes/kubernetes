@@ -14,12 +14,12 @@
 
 .PHONY:	build push
 
-PREFIX = gcr.io/google_containers
+PREFIX = gcr.io/google-containers
 IMAGE = fluentd-elasticsearch
-TAG = 1.24
+TAG = v2.0.0
 
 build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
-	gcloud docker --server=gcr.io -- push $(PREFIX)/$(IMAGE):$(TAG)
+	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)

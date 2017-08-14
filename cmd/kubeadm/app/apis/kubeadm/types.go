@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +39,6 @@ type MasterConfiguration struct {
 	Token    string
 	TokenTTL time.Duration
 
-	// SelfHosted enables an alpha deployment type where the apiserver, scheduler, and
-	// controller manager are managed by Kubernetes itself. This option is likely to
-	// become the default in the future.
-	SelfHosted bool
-
 	APIServerExtraArgs         map[string]string
 	ControllerManagerExtraArgs map[string]string
 	SchedulerExtraArgs         map[string]string
@@ -56,6 +52,9 @@ type MasterConfiguration struct {
 	ImageRepository string
 	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
 	UnifiedControlPlaneImage string
+
+	// FeatureFlags enabled by the user
+	FeatureFlags map[string]bool
 }
 
 type API struct {
@@ -101,4 +100,23 @@ type NodeConfiguration struct {
 	NodeName                 string
 	TLSBootstrapToken        string
 	Token                    string
+
+	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
+	// when token-based discovery is used. The root CA found during discovery
+	// must match one of these values. Specifying an empty set disables root CA
+	// pinning, which can be unsafe. Each hash is specified as "<type>:<value>",
+	// where the only currently supported type is "sha256". This is a hex-encoded
+	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
+	// ASN.1. These hashes can be calculated using, for example, OpenSSL:
+	// openssl x509 -pubkey -in ca.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+	DiscoveryTokenCACertHashes []string
+
+	// DiscoveryTokenUnsafeSkipCAVerification allows token-based discovery
+	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
+	// the security of kubeadm since other nodes can impersonate the master.
+	DiscoveryTokenUnsafeSkipCAVerification bool
+}
+
+func (cfg *MasterConfiguration) GetMasterEndpoint() string {
+	return fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort)
 }

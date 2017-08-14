@@ -17,16 +17,10 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -74,27 +68,4 @@ func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) fiel
 
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodSecurityPolicyUpdate(old.(*extensions.PodSecurityPolicy), obj.(*extensions.PodSecurityPolicy))
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	psp, ok := obj.(*extensions.PodSecurityPolicy)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a pod security policy.")
-	}
-	return labels.Set(psp.ObjectMeta.Labels), PodSecurityPolicyToSelectableFields(psp), psp.Initializers != nil, nil
-}
-
-// Matcher returns a generic matcher for a given label and field selector.
-func MatchPodSecurityPolicy(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// PodSecurityPolicyToSelectableFields returns a label set that represents the object
-func PodSecurityPolicyToSelectableFields(obj *extensions.PodSecurityPolicy) fields.Set {
-	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
 }

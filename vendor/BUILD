@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -386,6 +384,12 @@ filegroup(
         "//vendor/k8s.io/gengo/parser:all-srcs",
         "//vendor/k8s.io/gengo/types:all-srcs",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/aggregator:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/builder:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/common:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/generators:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/handler:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/util:all-srcs",
         "//vendor/k8s.io/utils/exec:all-srcs",
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],

@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/controller/node/ipam"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -108,7 +109,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		serviceCIDR,
 		int(ctx.Options.NodeCIDRMaskSize),
 		ctx.Options.AllocateNodeCIDRs,
-		nodecontroller.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
+		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 	)
@@ -339,7 +340,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(restMapper, discoveryClient, 30*time.Second, ctx.Stop)
+	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
 
 	return true, nil
 }

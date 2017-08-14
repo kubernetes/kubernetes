@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1beta1"
+	appsV1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -224,7 +225,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
 
 // UpdateReplicas updates the replicas of ss to count.
 func (s *StatefulSetTester) UpdateReplicas(ss *apps.StatefulSet, count int32) {
-	s.update(ss.Namespace, ss.Name, func(ss *apps.StatefulSet) { ss.Spec.Replicas = &count })
+	s.update(ss.Namespace, ss.Name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
 }
 
 // Restart scales ss to 0 and then back to its previous number of replicas.
@@ -808,6 +809,23 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			VolumeClaimTemplates: claims,
 			ServiceName:          governingSvcName,
+		},
+	}
+}
+
+// NewStatefulSetScale creates a new StatefulSet scale subresource and returns it
+func NewStatefulSetScale(ss *apps.StatefulSet) *appsV1beta2.Scale {
+	return &appsV1beta2.Scale{
+		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ss.Name,
+			Namespace: ss.Namespace,
+		},
+		Spec: appsV1beta2.ScaleSpec{
+			Replicas: *(ss.Spec.Replicas),
+		},
+		Status: appsV1beta2.ScaleStatus{
+			Replicas: ss.Status.Replicas,
 		},
 	}
 }

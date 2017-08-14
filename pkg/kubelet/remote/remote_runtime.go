@@ -38,20 +38,20 @@ type RemoteRuntimeService struct {
 }
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimout time.Duration) (internalapi.RuntimeService, error) {
+func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
 	glog.Infof("Connecting to runtime service %s", endpoint)
 	addr, dailer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
 	}
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dailer))
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dailer))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
 	}
 
 	return &RemoteRuntimeService{
-		timeout:       connectionTimout,
+		timeout:       connectionTimeout,
 		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
 	}, nil
 }
@@ -286,6 +286,23 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 	}
 
 	return resp.Status, nil
+}
+
+// UpdateContainerResources updates a containers resource config
+func (r *RemoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	_, err := r.runtimeClient.UpdateContainerResources(ctx, &runtimeapi.UpdateContainerResourcesRequest{
+		ContainerId: containerID,
+		Linux:       resources,
+	})
+	if err != nil {
+		glog.Errorf("UpdateContainerResources %q from runtime service failed: %v", containerID, err)
+		return err
+	}
+
+	return nil
 }
 
 // ExecSync executes a command in the container, and returns the stdout output.

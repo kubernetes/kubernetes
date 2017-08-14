@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "register.go",
         "register_custom.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/install:go_default_library",
         "//pkg/apis/admissionregistration/install:go_default_library",

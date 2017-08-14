@@ -107,6 +107,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			}
 
 			// if no StageResponseStarted event was sent b/c neither a status code nor a body was sent, fake it here
+			// But Audit-Id http header will only be sent when http.ResponseWriter.WriteHeader is called.
 			fakedSuccessStatus := &metav1.Status{
 				Code:    http.StatusOK,
 				Status:  metav1.StatusSuccess,
@@ -162,6 +163,10 @@ type auditResponseWriter struct {
 	sink  audit.Sink
 }
 
+func (a *auditResponseWriter) setHttpHeader() {
+	a.ResponseWriter.Header().Set(auditinternal.HeaderAuditID, string(a.event.AuditID))
+}
+
 func (a *auditResponseWriter) processCode(code int) {
 	a.once.Do(func() {
 		if a.event.ResponseStatus == nil {
@@ -177,12 +182,16 @@ func (a *auditResponseWriter) processCode(code int) {
 }
 
 func (a *auditResponseWriter) Write(bs []byte) (int, error) {
-	a.processCode(http.StatusOK) // the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
+	// the Go library calls WriteHeader internally if no code was written yet. But this will go unnoticed for us
+	a.processCode(http.StatusOK)
+	a.setHttpHeader()
+
 	return a.ResponseWriter.Write(bs)
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
 	a.processCode(code)
+	a.setHttpHeader()
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -204,6 +213,13 @@ func (f *fancyResponseWriterDelegator) Flush() {
 func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	// fake a response status before protocol switch happens
 	f.processCode(http.StatusSwitchingProtocols)
+
+	// This will be ignored if WriteHeader() function has aready been called.
+	// It's not guaranteed Audit-ID http header is sent for all requests.
+	// For example, when user run "kubectl exec", apiserver uses a proxy handler
+	// to deal with the request, users can only get http headers returned by kubelet node.
+	f.setHttpHeader()
+
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 

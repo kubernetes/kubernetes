@@ -218,7 +218,7 @@ var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", f
 		framework.Logf("Invoking Test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
-		errorMsg := "User specified datastore: \\\"" + VsanDatastore + "\\\" is not compatible with the storagePolicy: \\\"" + os.Getenv("VSPHERE_SPBM_TAG_POLICY") + "\\\""
+		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + os.Getenv("VSPHERE_SPBM_TAG_POLICY") + "\\\""
 		if !strings.Contains(err.Error(), errorMsg) {
 			Expect(err).NotTo(HaveOccurred(), errorMsg)
 		}
@@ -248,7 +248,7 @@ var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", f
 		framework.Logf("Invoking Test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
-		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one."
+		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
 		if !strings.Contains(err.Error(), errorMsg) {
 			Expect(err).NotTo(HaveOccurred(), errorMsg)
 		}

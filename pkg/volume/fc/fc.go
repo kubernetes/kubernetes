@@ -19,12 +19,13 @@ package fc
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -62,8 +63,15 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		return "", err
 	}
 
-	//  TargetWWNs are the FibreChannel target worldwide names
-	return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
+	if len(volumeSource.TargetWWNs) != 0 {
+		// TargetWWNs are the FibreChannel target worldwide names
+		return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
+	} else if len(volumeSource.WWIDs) != 0 {
+		// WWIDs are the FibreChannel World Wide Identifiers
+		return fmt.Sprintf("%v", volumeSource.WWIDs), nil
+	}
+
+	return "", err
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
@@ -106,11 +114,17 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		return nil, err
 	}
 
-	if fc.Lun == nil {
-		return nil, fmt.Errorf("empty lun")
+	var lun string
+	var wwids []string
+	if fc.Lun != nil && len(fc.TargetWWNs) != 0 {
+		lun = strconv.Itoa(int(*fc.Lun))
+	} else if len(fc.WWIDs) != 0 {
+		for _, wwid := range fc.WWIDs {
+			wwids = append(wwids, strings.Replace(wwid, " ", "_", -1))
+		}
+	} else {
+		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")
 	}
-
-	lun := strconv.Itoa(int(*fc.Lun))
 
 	return &fcDiskMounter{
 		fcDisk: &fcDisk{
@@ -118,6 +132,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 			volName: spec.Name(),
 			wwns:    fc.TargetWWNs,
 			lun:     lun,
+			wwids:   wwids,
 			manager: manager,
 			io:      &osIOHandler{},
 			plugin:  plugin},
@@ -166,6 +181,7 @@ type fcDisk struct {
 	portal  string
 	wwns    []string
 	lun     string
+	wwids   []string
 	plugin  *fcPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
@@ -177,7 +193,7 @@ type fcDisk struct {
 func (fc *fcDisk) GetPath() string {
 	name := fcPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, strings.EscapeQualifiedNameForDisk(name), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name), fc.volName)
 }
 
 type fcDiskMounter struct {

@@ -25,7 +25,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// NewCmdCerts return main command for certs phase
 func NewCmdCerts() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
@@ -42,12 +42,12 @@ func NewCmdCerts() *cobra.Command {
 		RunE:    subCmdRunE("certs"),
 	}
 
-	cmd.AddCommand(newSubCmdCerts()...)
+	cmd.AddCommand(getCertsSubCommands()...)
 	return cmd
 }
 
-// newSubCmdCerts returns sub commands for certs phase
-func newSubCmdCerts() []*cobra.Command {
+// getCertsSubCommands returns sub commands for certs phase
+func getCertsSubCommands() []*cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	// Default values for the cobra help text
@@ -122,33 +122,18 @@ func newSubCmdCerts() []*cobra.Command {
 	return subCmds
 }
 
-// runCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of inpunt parameters)
+// runCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
 func runCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration) error, cfgPath *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
 
-	// the following statement build a clousure that wraps a call to a CreateCertFunc, binding
+	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
 	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
-	// are shared between sub commnands and gets access to current value e.g. flags value.
+	// are shared between sub commands and gets access to current value e.g. flags value.
 
 	return func(cmd *cobra.Command, args []string) {
-		internalcfg := &kubeadmapi.MasterConfiguration{}
 
-		// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
-		// static default values to cfg only for values not provided with flags
-		api.Scheme.Default(cfg)
-		api.Scheme.Convert(cfg, internalcfg, nil)
-
-		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags
-		err := configutil.TryLoadMasterConfiguration(*cfgPath, internalcfg)
-		kubeadmutil.CheckErr(err)
-
-		// Applies dynamic defaults to settings not provided with flags
-		err = configutil.SetInitDynamicDefaults(internalcfg)
-		kubeadmutil.CheckErr(err)
-
-		// Validates cfg (flags/configs + defaults + dynamic defaults)
-		err = validation.ValidateMasterConfiguration(internalcfg).ToAggregate()
+		// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
 
 		// Execute the cmdFunc

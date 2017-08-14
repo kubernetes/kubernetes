@@ -1,0 +1,127 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/upgrade-docker.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Upgrade Docker Binaries
+      Requires=network-online.target
+      After=network-online.target docker.service
+
+      [Service]
+      Type=oneshot
+      # RemainAfterExit so the service runs exactly once.
+      RemainAfterExit=yes
+      ExecStartPre=/bin/mkdir -p /home/upgrade-docker/bin
+      ExecStartPre=/bin/mount --bind /home/upgrade-docker/bin /home/upgrade-docker/bin
+      ExecStartPre=/bin/mount -o remount,exec /home/upgrade-docker/bin
+      ExecStart=/bin/bash /tmp/upgrade-docker/upgrade.sh
+      ExecStartPost=-/bin/rm -rf /home/upgrade-docker/download
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /tmp/upgrade-docker/upgrade.sh
+    permissions: 0644
+    owner: root
+    content: |
+      # This script reads a GCE metadata key for the user speficied Docker
+      # version, downloads, and replaces the builtin Docker with it.
+
+      set -x
+      set -o errexit
+      set -o nounset
+      set -o pipefail
+
+      # Checks if a Docker binary is the version we want.
+      # $1: Docker binary
+      # $2: Requested version
+      check_installed() {
+        local docker_bin="$1"
+        local requested_version="$2"
+        [[ "$(${docker_bin} --version)" =~ "Docker version ${requested_version}," ]]
+      }
+
+      # $1: Docker version
+      download_and_install_docker() {
+        local requested_version="$1"
+        local download_dir=/home/upgrade-docker/download/docker-"${requested_version}"
+        local install_location=/home/upgrade-docker/bin
+        local docker_tgz="docker-${requested_version}.tgz"
+
+        if [[ "${requested_version}" =~ "rc" ]]; then
+          # RC releases all have the word "rc" in their version
+          # number, e.g., "1.11.1-rc1".
+          download_url="https://test.docker.com/builds/Linux/x86_64/${docker_tgz}"
+        else
+          download_url="https://get.docker.com/builds/Linux/x86_64/${docker_tgz}"
+        fi
+
+        echo "Downloading Docker version ${requested_version} from "\
+          "${download_url} to ${download_dir} ..."
+
+        # Download and install the binaries.
+        mkdir -p "${download_dir}"/binaries
+        /usr/bin/curl -o "${download_dir}/${docker_tgz}" --fail "${download_url}"
+        tar xzf "${download_dir}/${docker_tgz}" -C "${download_dir}"/binaries
+        cp "${download_dir}"/binaries/docker/docker* "${install_location}"
+        mount --bind "${install_location}"/docker /usr/bin/docker
+        mount --bind "${install_location}"/docker-containerd /usr/bin/docker-containerd
+        mount --bind "${install_location}"/docker-containerd-shim /usr/bin/docker-containerd-shim
+        mount --bind "${install_location}"/dockerd /usr/bin/dockerd
+        mount --bind "${install_location}"/docker-proxy /usr/bin/docker-proxy
+        mount --bind "${install_location}"/docker-runc /usr/bin/docker-runc
+        echo "PATH=/home/upgrade-docker/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /etc/default/docker
+      }
+
+      # $1: Metadata key
+      get_metadata() {
+        /usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error  \
+          -H "X-Google-Metadata-Request: True" \
+          http://metadata.google.internal/computeMetadata/v1/instance/attributes/"$1"
+      }
+
+      main() {
+        # Get the desired Docker version through the following metadata key.
+        local requested_version="$(get_metadata "gci-docker-version")"
+        if [[ -z "${requested_version}" ]]; then
+          exit 0
+        fi
+
+        # Check if we have the requested version installed.
+        if check_installed /usr/bin/docker "${requested_version}"; then
+          echo "Requested version already installed. Exiting."
+          exit 0
+        fi
+
+        # Stop the docker daemon during upgrade.
+        /usr/bin/systemctl stop docker
+        download_and_install_docker "${requested_version}"
+
+        # Assert that the upgrade was successful.
+        local rc=0
+        check_installed /usr/bin/docker "${requested_version}" || rc=1
+        /usr/bin/systemctl start docker && exit $rc
+      }
+
+      main "$@"
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl start upgrade-docker.service
+  - mount /tmp /tmp -o remount,exec,suid
+  - usermod -a -G docker jenkins
+  - mkdir -p /var/lib/kubelet
+  - mkdir -p /home/kubernetes/containerized_mounter/rootfs
+  - mount --bind /home/kubernetes/containerized_mounter/ /home/kubernetes/containerized_mounter/
+  - mount -o remount, exec /home/kubernetes/containerized_mounter/
+  - wget https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar -O /tmp/mounter.tar
+  - tar xvf /tmp/mounter.tar -C /home/kubernetes/containerized_mounter/rootfs
+  - mkdir -p /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --rbind /var/lib/kubelet /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --make-rshared /home/kubernetes/containerized_mounter/rootfs/var/lib/kubelet
+  - mount --bind /proc /home/kubernetes/containerized_mounter/rootfs/proc
+  - mount --bind /dev /home/kubernetes/containerized_mounter/rootfs/dev
+  - rm /tmp/mounter.tar

@@ -296,7 +296,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 // IMPORTANT: This test is designed to work on large (>= 100 Nodes) clusters. For smaller ones
 // results will not be representative for control-plane performance as we'll start hitting
 // limits on Docker's concurrent container startup.
-var _ = framework.KubeDescribe("Density", func() {
+var _ = SIGDescribe("Density", func() {
 	var c clientset.Interface
 	var nodeCount int
 	var additionalPodsPrefix string

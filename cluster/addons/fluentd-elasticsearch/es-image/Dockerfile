@@ -12,43 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A Dockerfile for creating an Elasticsearch instance that is designed
-# to work with Kubernetes logging. Inspired by the Dockerfile
-# dockerfile/elasticsearch
-
-FROM java:openjdk-8-jre-alpine
-
-
-ENV DEBIAN_FRONTEND noninteractive
-ENV ELASTICSEARCH_VERSION 5.4.0
-
-RUN apk update && \
-    apk --no-cache add \
-        --repository https://dl-3.alpinelinux.org/alpine/edge/testing \
-        --repository https://dl-3.alpinelinux.org/alpine/edge/community \
-        curl \
-        shadow \
-        tar \
-        gosu
-
-RUN set -x \
-    && cd / \
-    && mkdir /elasticsearch \
-    && curl -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
-    && tar xf elasticsearch-$ELASTICSEARCH_VERSION.tar.gz -C /elasticsearch --strip-components=1 \
-    && rm elasticsearch-$ELASTICSEARCH_VERSION.tar.gz
-
-COPY config /elasticsearch/config
-
-COPY run.sh /
-COPY elasticsearch_logging_discovery /
-
-RUN useradd --no-create-home --user-group elasticsearch \
-    && mkdir /data \
-    && chown -R elasticsearch:elasticsearch /elasticsearch
-
+FROM docker.elastic.co/elasticsearch/elasticsearch:5.5.1
 
 VOLUME ["/data"]
 EXPOSE 9200 9300
 
-CMD ["/run.sh"]
+COPY elasticsearch_logging_discovery run.sh bin/
+COPY config/elasticsearch.yml config/log4j2.properties config/
+
+USER root
+RUN chown -R elasticsearch:elasticsearch ./
+CMD ["bin/run.sh"]

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,9 +9,18 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "isatty_linux.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "isatty_bsd.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "isatty_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "isatty_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

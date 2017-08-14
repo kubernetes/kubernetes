@@ -1,33 +1,27 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "cgo_genrule",
     "go_library",
-)
-
-cgo_genrule(
-    name = "cgo_codegen",
-    srcs = [
-        "seccomp.go",
-        "seccomp_internal.go",
-    ],
-    clinkopts = [
-        "-lz",
-        "-lm",
-        "-lpthread",
-        "-ldl",
-    ],
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = [],
-    library = ":cgo_codegen",
-    tags = ["automanaged"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "seccomp.go",
+            "seccomp_internal.go",
+        ],
+        "//conditions:default": [],
+    }),
+    cgo = True,
+    clinkopts = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "-lseccomp",
+            "-lseccomp",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

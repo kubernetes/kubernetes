@@ -17,13 +17,10 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -69,44 +66,4 @@ func TestKubeletDirs(t *testing.T) {
 	got = kubelet.getPodContainerDir("abc123", "def456")
 	exp = filepath.Join(root, "pods/abc123/containers/def456")
 	assert.Equal(t, exp, got)
-}
-
-func TestKubeletDirsCompat(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	root := kubelet.rootDirectory
-	require.NoError(t, os.MkdirAll(root, 0750), "can't mkdir(%q)", root)
-
-	// Old-style pod dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/oldpod", root), 0750), "can't mkdir(%q)", root)
-
-	// New-style pod dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/pods/newpod", root), 0750), "can't mkdir(%q)", root)
-
-	// Both-style pod dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/bothpod", root), 0750), "can't mkdir(%q)", root)
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/pods/bothpod", root), 0750), "can't mkdir(%q)", root)
-
-	assert.Equal(t, filepath.Join(root, "oldpod"), kubelet.getPodDir("oldpod"))
-	assert.Equal(t, filepath.Join(root, "pods/newpod"), kubelet.getPodDir("newpod"))
-	assert.Equal(t, filepath.Join(root, "pods/bothpod"), kubelet.getPodDir("bothpod"))
-	assert.Equal(t, filepath.Join(root, "pods/neitherpod"), kubelet.getPodDir("neitherpod"))
-
-	root = kubelet.getPodDir("newpod")
-
-	// Old-style container dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/oldctr", root), 0750), "can't mkdir(%q)", root)
-
-	// New-style container dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/containers/newctr", root), 0750), "can't mkdir(%q)", root)
-
-	// Both-style container dir.
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/bothctr", root), 0750), "can't mkdir(%q)", root)
-	require.NoError(t, os.MkdirAll(fmt.Sprintf("%s/containers/bothctr", root), 0750), "can't mkdir(%q)", root)
-
-	assert.Equal(t, filepath.Join(root, "oldctr"), kubelet.getPodContainerDir("newpod", "oldctr"))
-	assert.Equal(t, filepath.Join(root, "containers/newctr"), kubelet.getPodContainerDir("newpod", "newctr"))
-	assert.Equal(t, filepath.Join(root, "containers/bothctr"), kubelet.getPodContainerDir("newpod", "bothctr"))
-	assert.Equal(t, filepath.Join(root, "containers/neitherctr"), kubelet.getPodContainerDir("newpod", "neitherctr"))
 }

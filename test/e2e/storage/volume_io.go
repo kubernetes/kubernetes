@@ -243,7 +243,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("NFS", func() {
+	Describe("NFS", func() {
 		testFile := "nfs_io_test"
 		// client pod uses selinux
 		podSec := v1.PodSecurityContext{
@@ -279,7 +279,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("GlusterFS", func() {
+	Describe("GlusterFS", func() {
 		var name string
 		testFile := "gluster_io_test"
 
@@ -300,7 +300,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Gluster endpoints %q...", name)
-			epErr := cs.Core().Endpoints(ns).Delete(name, nil)
+			epErr := cs.CoreV1().Endpoints(ns).Delete(name, nil)
 			framework.Logf("AfterEach: deleting Gluster server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if epErr != nil || err != nil {
@@ -325,7 +325,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	// iSCSI
 	// The iscsiadm utility and iscsi target kernel modules must be installed on all nodes.
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("iSCSI [Feature:Volumes]", func() {
+	Describe("iSCSI [Feature:Volumes]", func() {
 		testFile := "iscsi_io_test"
 
 		BeforeEach(func() {
@@ -362,7 +362,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
-	SIGDescribe("Ceph-RBD [Feature:Volumes]", func() {
+	Describe("Ceph-RBD [Feature:Volumes]", func() {
 		var (
 			secret *v1.Secret
 			name   string
@@ -389,7 +389,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 				Type: "kubernetes.io/rbd",
 			}
 			var err error
-			secret, err = cs.Core().Secrets(ns).Create(secret)
+			secret, err = cs.CoreV1().Secrets(ns).Create(secret)
 			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("BeforeEach: failed to create secret %q for Ceph-RBD: %v", name, err))
 
 			volSource = v1.VolumeSource{
@@ -409,7 +409,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Ceph-RDB server secret %q...", name)
-			secErr := cs.Core().Secrets(ns).Delete(name, &metav1.DeleteOptions{})
+			secErr := cs.CoreV1().Secrets(ns).Delete(name, &metav1.DeleteOptions{})
 			framework.Logf("AfterEach: deleting Ceph-RDB server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if secErr != nil || err != nil {

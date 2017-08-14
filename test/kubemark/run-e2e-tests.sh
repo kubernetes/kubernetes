@@ -38,6 +38,10 @@ else
 	ARGS=$@
 fi
 
+if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  ARGS="${ARGS} --kubemark-external-kubeconfig=${DEFAULT_KUBECONFIG}"
+fi
+
 if [[ -f /.dockerenv ]]; then
 	# Running inside a dockerized runner.
 	go run ./hack/e2e.go -- -v --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"

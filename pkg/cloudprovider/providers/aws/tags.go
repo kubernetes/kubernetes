@@ -276,3 +276,7 @@ func (t *awsTagging) buildTags(lifecycle ResourceLifecycle, additionalTags map[s
 
 	return tags
 }
+
+func (t *awsTagging) clusterID() string {
+	return t.ClusterID
+}

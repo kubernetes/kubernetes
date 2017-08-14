@@ -30,7 +30,6 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -38,46 +37,35 @@ func DefaultMemorySwap() int64 {
 	return 0
 }
 
-func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	// Apply seccomp options.
-	seccompSecurityOpts, err := getSeccompSecurityOpts(containerName, sandboxConfig, ds.seccompProfileRoot, separator)
+	seccompSecurityOpts, err := getSeccompSecurityOpts(seccompProfile, separator)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate seccomp security options for container %q: %v", containerName, err)
+		return nil, fmt.Errorf("failed to generate seccomp security options for container: %v", err)
 	}
 
 	return seccompSecurityOpts, nil
 }
 
-func getSeccompDockerOpts(annotations map[string]string, ctrName, profileRoot string) ([]dockerOpt, error) {
-	profile, profileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+ctrName]
-	if !profileOK {
-		// try the pod profile
-		profile, profileOK = annotations[v1.SeccompPodAnnotationKey]
-		if !profileOK {
-			// return early the default
-			return defaultSeccompOpt, nil
-		}
-	}
-
-	if profile == "unconfined" {
+func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
+	if seccompProfile == "" || seccompProfile == "unconfined" {
 		// return early the default
 		return defaultSeccompOpt, nil
 	}
 
-	if profile == "docker/default" {
+	if seccompProfile == "docker/default" {
 		// return nil so docker will load the default seccomp profile
 		return nil, nil
 	}
 
-	if !strings.HasPrefix(profile, "localhost/") {
-		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
+	if !strings.HasPrefix(seccompProfile, "localhost/") {
+		return nil, fmt.Errorf("unknown seccomp profile option: %s", seccompProfile)
 	}
 
-	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
-	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
-	file, err := ioutil.ReadFile(fname)
+	fname := strings.TrimPrefix(seccompProfile, "localhost/") // by pod annotation validation, name is a valid subpath
+	file, err := ioutil.ReadFile(filepath.FromSlash(fname))
 	if err != nil {
-		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
+		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", fname, err)
 	}
 
 	b := bytes.NewBuffer(nil)
@@ -85,16 +73,15 @@ func getSeccompDockerOpts(annotations map[string]string, ctrName, profileRoot st
 		return nil, err
 	}
 	// Rather than the full profile, just put the filename & md5sum in the event log.
-	msg := fmt.Sprintf("%s(md5:%x)", name, md5.Sum(file))
+	msg := fmt.Sprintf("%s(md5:%x)", fname, md5.Sum(file))
 
 	return []dockerOpt{{"seccomp", b.String(), msg}}, nil
 }
 
-// getSeccompSecurityOpts gets container seccomp options from container and sandbox
-// config, currently from sandbox annotations.
+// getSeccompSecurityOpts gets container seccomp options from container seccomp profile.
 // It is an experimental feature and may be promoted to official runtime api in the future.
-func getSeccompSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	seccompOpts, err := getSeccompDockerOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
+func getSeccompSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+	seccompOpts, err := getSeccompDockerOpts(seccompProfile)
 	if err != nil {
 		return nil, err
 	}

@@ -282,7 +282,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
 		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
 			volumes = append(volumes, pod.Spec.Volumes[i])
@@ -329,7 +329,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
 	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
 	for i := range pod.Spec.Volumes {
 		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
 			volumes = append(volumes, pod.Spec.Volumes[i])

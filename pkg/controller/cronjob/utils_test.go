@@ -322,7 +322,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(times) != 0 {
-			t.Errorf("expected 0 start times, got: , got: %v", times)
+			t.Errorf("expected 0 start times, got: %v", times)
 		}
 	}
 	{
@@ -338,7 +338,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(times) != 1 {
-			t.Errorf("expected 2 start times, got: , got: %v", times)
+			t.Errorf("expected 1 start times, got: %v", times)
 		} else if !times[0].Equal(T2) {
 			t.Errorf("expected: %v, got: %v", T1, times[0])
 		}
@@ -354,7 +354,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if len(times) != 2 {
-			t.Errorf("expected 2 start times, got: , got: %v", times)
+			t.Errorf("expected 2 start times, got: %v", times)
 		} else {
 			if !times[0].Equal(T1) {
 				t.Errorf("expected: %v, got: %v", T1, times[0])
@@ -371,7 +371,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		now := T2.Add(10 * 24 * time.Hour)
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err == nil {
-			t.Errorf("unexpected lack of error")
+			t.Errorf("expected an error")
 		}
 	}
 	{

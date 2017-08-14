@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/system"
-	"k8s.io/kubernetes/test/e2e/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -54,6 +54,10 @@ const (
 	// We set a higher threshold for list apicalls as they can take more time when
 	// the list is really big. For eg. list nodes in a 5000-node cluster.
 	apiListCallLatencyThreshold time.Duration = 2 * time.Second
+
+	// Cluster Autoscaler metrics names
+	caFunctionMetric      = "cluster_autoscaler_function_duration_seconds_bucket"
+	caFunctionMetricLabel = "function"
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -66,6 +70,10 @@ func (m *MetricsForE2E) filterMetrics() {
 	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
 	for _, metric := range InterestingControllerManagerMetrics {
 		interestingControllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
+	}
+	interestingClusterAutoscalerMetrics := make(metrics.ClusterAutoscalerMetrics)
+	for _, metric := range InterestingClusterAutoscalerMetrics {
+		interestingClusterAutoscalerMetrics[metric] = (*m).ClusterAutoscalerMetrics[metric]
 	}
 	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
 	for kubelet, grabbed := range (*m).KubeletMetrics {
@@ -90,6 +98,12 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 	for _, interestingMetric := range InterestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for _, interestingMetric := range InterestingClusterAutoscalerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
 			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
 		}
 	}
@@ -156,6 +170,12 @@ var InterestingKubeletMetrics = []string{
 	"kubelet_sync_pods_latency_microseconds",
 }
 
+var InterestingClusterAutoscalerMetrics = []string{
+	"function_duration_seconds",
+	"errors_total",
+	"evicted_pods_total",
+}
+
 // Dashboard metrics
 type LatencyMetric struct {
 	Perc50  time.Duration `json:"Perc50"`
@@ -199,7 +219,7 @@ func (l *SchedulingLatency) PrintJSON() string {
 }
 
 type SaturationTime struct {
-	TimeToSaturate time.Duration `json:"timeToStaturate"`
+	TimeToSaturate time.Duration `json:"timeToSaturate"`
 	NumberOfNodes  int           `json:"numberOfNodes"`
 	NumberOfPods   int           `json:"numberOfPods"`
 	Throughput     float32       `json:"throughput"`
@@ -574,4 +594,25 @@ func PrintLatencies(latencies []PodLatencyData, header string) {
 	metrics := ExtractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
 	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+}
+
+func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.MetricsCollection) {
+	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
+		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
+			beforeSamplesMap := make(map[string]*model.Sample)
+			for _, bSample := range beforeSamples {
+				beforeSamplesMap[makeKey(bSample.Metric[caFunctionMetricLabel], bSample.Metric["le"])] = bSample
+			}
+			for _, aSample := range afterSamples {
+				if bSample, found := beforeSamplesMap[makeKey(aSample.Metric[caFunctionMetricLabel], aSample.Metric["le"])]; found {
+					aSample.Value = aSample.Value - bSample.Value
+				}
+
+			}
+		}
+	}
+}
+
+func makeKey(a, b model.LabelValue) string {
+	return string(a) + "___" + string(b)
 }

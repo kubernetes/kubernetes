@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -142,7 +143,24 @@ func (detacher *fcDetacher) Detach(deviceMountPath string, nodeName types.NodeNa
 }
 
 func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	// Specify device name for DetachDisk later
+	devName, _, err := mount.GetDeviceNameFromMount(detacher.mounter, deviceMountPath)
+	if err != nil {
+		glog.Errorf("fc: failed to get device from mnt: %s\nError: %v", deviceMountPath, err)
+		return err
+	}
+	// Unmount for deviceMountPath(=globalPDPath)
+	err = volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	if err != nil {
+		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
+	}
+	unMounter := volumeSpecToUnmounter(detacher.mounter)
+	err = detacher.manager.DetachDisk(*unMounter, devName)
+	if err != nil {
+		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", devName, err)
+	}
+	glog.V(4).Infof("fc: successfully detached disk: %s", devName)
+	return nil
 }
 
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMounter, error) {
@@ -150,21 +168,39 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 	if err != nil {
 		return nil, err
 	}
-	if fc.Lun == nil {
-		return nil, fmt.Errorf("empty lun")
+	var lun string
+	var wwids []string
+	if fc.Lun != nil && len(fc.TargetWWNs) != 0 {
+		lun = strconv.Itoa(int(*fc.Lun))
+	} else if len(fc.WWIDs) != 0 {
+		for _, wwid := range fc.WWIDs {
+			wwids = append(wwids, strings.Replace(wwid, " ", "_", -1))
+		}
+	} else {
+		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")
 	}
-	lun := strconv.Itoa(int(*fc.Lun))
+
 	return &fcDiskMounter{
 		fcDisk: &fcDisk{
 			plugin: &fcPlugin{
 				host: host,
 			},
-			wwns: fc.TargetWWNs,
-			lun:  lun,
-			io:   &osIOHandler{},
+			wwns:  fc.TargetWWNs,
+			lun:   lun,
+			wwids: wwids,
+			io:    &osIOHandler{},
 		},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
 		mounter:  &mount.SafeFormatAndMount{Interface: host.GetMounter(), Runner: exec.New()},
 	}, nil
+}
+
+func volumeSpecToUnmounter(mounter mount.Interface) *fcDiskUnmounter {
+	return &fcDiskUnmounter{
+		fcDisk: &fcDisk{
+			io: &osIOHandler{},
+		},
+		mounter: mounter,
+	}
 }

@@ -143,10 +143,17 @@ func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, e
 
 func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet network.Subnet, exists bool, err error) {
 	var realErr error
+	var rg string
+
+	if len(az.VnetResourceGroup) > 0 {
+		rg = az.VnetResourceGroup
+	} else {
+		rg = az.ResourceGroup
+	}
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("SubnetsClient.Get(%s): start", subnetName)
-	subnet, err = az.SubnetsClient.Get(az.ResourceGroup, virtualNetworkName, subnetName, "")
+	subnet, err = az.SubnetsClient.Get(rg, virtualNetworkName, subnetName, "")
 	glog.V(10).Infof("SubnetsClient.Get(%s): end", subnetName)
 
 	exists, realErr = checkResourceExistsFromError(err)

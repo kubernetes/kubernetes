@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "bootstrap_token_cleaner.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/bootstrap/api:go_default_library",
         "//test/e2e/framework:go_default_library",

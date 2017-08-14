@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_test",
@@ -11,10 +9,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = ["garbage_collector_test.go"],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",

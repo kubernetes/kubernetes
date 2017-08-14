@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -121,7 +120,7 @@ func TestMarkMaster(t *testing.T) {
 		}))
 		defer s.Close()
 
-		cs, err := clientsetFromTestServer(s)
+		cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
 		if err != nil {
 			t.Fatalf("MarkMaster(%s): unexpected error building clientset: %v", tc.name, err)
 		}
@@ -135,15 +134,6 @@ func TestMarkMaster(t *testing.T) {
 			t.Errorf("MarkMaster(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
 		}
 	}
-}
-
-func clientsetFromTestServer(s *httptest.Server) (*clientset.Clientset, error) {
-	rc := &restclient.Config{Host: s.URL}
-	c, err := corev1.NewForConfig(rc)
-	if err != nil {
-		return nil, err
-	}
-	return &clientset.Clientset{CoreV1Client: c}, nil
 }
 
 func toString(r io.Reader) string {

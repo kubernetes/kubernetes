@@ -108,6 +108,15 @@ func (in instrumentedInterface) RemoveContainer(id string, opts dockertypes.Cont
 	return err
 }
 
+func (in instrumentedInterface) UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error {
+	const operation = "update_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.client.UpdateContainerResources(id, updateConfig)
+	recordError(operation, err)
+	return err
+}
+
 func (in instrumentedInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
 	const operation = "inspect_image"
 	defer recordOperation(operation, time.Now())

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -18,10 +16,14 @@ go_library(
         "frame.go",
         "go16.go",
         "go17.go",
+        "go17_not18.go",
         "go18.go",
         "gotrack.go",
         "headermap.go",
         "http2.go",
+        "not_go16.go",
+        "not_go17.go",
+        "not_go18.go",
         "pipe.go",
         "server.go",
         "transport.go",
@@ -30,7 +32,6 @@ go_library(
         "writesched_priority.go",
         "writesched_random.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/http2/hpack:go_default_library",
         "//vendor/golang.org/x/net/idna:go_default_library",

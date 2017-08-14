@@ -121,6 +121,8 @@ type SubjectAccessReviewSpec struct {
 	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
 	// it needs a reflection here.
 	Extra map[string]ExtraValue
+	// UID information about the requesting user.
+	UID string
 }
 
 // ExtraValue masks the value so protobuf can generate

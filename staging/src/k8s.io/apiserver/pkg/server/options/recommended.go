@@ -77,3 +77,15 @@ func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
 
 	return nil
 }
+
+func (o *RecommendedOptions) Validate() []error {
+	errors := []error{}
+	errors = append(errors, o.Etcd.Validate()...)
+	errors = append(errors, o.SecureServing.Validate()...)
+	errors = append(errors, o.Authentication.Validate()...)
+	errors = append(errors, o.Authorization.Validate()...)
+	errors = append(errors, o.Audit.Validate()...)
+	errors = append(errors, o.Features.Validate()...)
+
+	return errors
+}
