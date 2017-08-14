@@ -471,6 +471,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		node.Status.Addresses = nodeAddresses
 	} else {
 		var ipAddr net.IP
+		var externalIpAddr net.IP
 		var err error
 
 		// 1) Use nodeIP if set
@@ -479,9 +480,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
+			externalIpAddr = kl.nodeIP
 			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		} else if addr := net.ParseIP(kl.hostname); addr != nil {
 			ipAddr = addr
+			externalIpAddr = addr
 		} else {
 			var addrs []net.IP
 			addrs, err = net.LookupIP(node.Name)
@@ -505,6 +508,11 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			{Type: v1.NodeInternalIP, Address: ipAddr.String()},
 			{Type: v1.NodeHostName, Address: kl.GetHostname()},
 		}
+		if externalIpAddr != nil {
+			node.Status.Addresses = append(node.Status.Addresses,
+				v1.NodeAddress{Type: v1.NodeExternalIP, Address: externalIpAddr.String()})
+		}
+
 	}
 	return nil
 }
