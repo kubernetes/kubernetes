@@ -38,6 +38,7 @@ import (
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/token"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -272,6 +273,11 @@ func (i *Init) Run(out io.Writer) error {
 	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
 	if err != nil {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
+	}
+
+	// Upload currently used configuration to the cluster
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
+		return err
 	}
 
 	// Create the necessary ServiceAccounts
