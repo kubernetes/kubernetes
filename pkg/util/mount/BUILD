@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "exec.go",
         "fake.go",
         "mount.go",
         "mount_unsupported.go",

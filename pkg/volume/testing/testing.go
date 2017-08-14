@@ -49,6 +49,7 @@ type fakeVolumeHost struct {
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
+	exec       mount.Exec
 	writer     io.Writer
 }
 
@@ -64,6 +65,7 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
+	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, host)
 	return host
 }
@@ -140,6 +142,10 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	return func(namespace, name string) (*v1.Secret, error) {
 		return f.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
 	}
+}
+
+func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
+	return f.exec
 }
 
 func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {

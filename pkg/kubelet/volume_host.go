@@ -156,3 +156,7 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	}
 	return node.Labels, nil
 }
+
+func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
+}

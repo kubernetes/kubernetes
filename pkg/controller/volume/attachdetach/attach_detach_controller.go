@@ -571,6 +571,10 @@ func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name strin
 	}
 }
 
+func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
+}
+
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
 		keepTerminatedPodVolumes := false
