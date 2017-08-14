@@ -10,13 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["clusterroles_test.go"],
     library = ":go_default_library",
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
-    ],
 )
 
 go_library(

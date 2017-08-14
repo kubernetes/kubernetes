@@ -13,7 +13,14 @@ go_test(
     srcs = ["dns_test.go"],
     library = ":go_default_library",
     tags = ["automanaged"],
-    deps = ["//cmd/kubeadm/app/util:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/util:go_default_library",
+        "//pkg/api:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
+    ],
 )
 
 go_library(
