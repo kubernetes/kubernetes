@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.apimachinery.pkg.api.resource;
 
+import "k8s.io/apimachinery/pkg/util/arraystr/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
