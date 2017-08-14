@@ -20,10 +20,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/network"
 )
 
-var _ = network.SIGDescribe("Networking", func() {
+var _ = Describe("[sig-network] Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
 	Describe("Granular Checks: Pods", func() {
