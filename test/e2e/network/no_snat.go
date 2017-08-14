@@ -135,8 +135,8 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
-		pc := cs.Core().Pods(f.Namespace.Name)
-		nc := cs.Core().Nodes()
+		pc := cs.CoreV1().Pods(f.Namespace.Name)
+		nc := cs.CoreV1().Nodes()
 
 		By("creating a test pod on each Node")
 		nodes, err := nc.List(metav1.ListOptions{})

@@ -816,7 +816,7 @@ func TestInterPodAffinity(t *testing.T) {
 			} else {
 				nsName = context.ns.Name
 			}
-			createdPod, err := cs.Core().Pods(nsName).Create(pod)
+			createdPod, err := cs.CoreV1().Pods(nsName).Create(pod)
 			if err != nil {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
 			}
@@ -825,7 +825,7 @@ func TestInterPodAffinity(t *testing.T) {
 				t.Errorf("Test Failed: error, %v, while waiting for pod during test, %v", err, test)
 			}
 		}
-		testPod, err := cs.Core().Pods(context.ns.Name).Create(test.pod)
+		testPod, err := cs.CoreV1().Pods(context.ns.Name).Create(test.pod)
 		if err != nil {
 			if !(test.errorType == "invalidPod" && errors.IsInvalid(err)) {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
@@ -846,7 +846,7 @@ func TestInterPodAffinity(t *testing.T) {
 				} else {
 					nsName = context.ns.Name
 				}
-				err = cs.Core().Pods(nsName).Delete(pod.Name, metav1.NewDeleteOptions(0))
+				err = cs.CoreV1().Pods(nsName).Delete(pod.Name, metav1.NewDeleteOptions(0))
 				if err != nil {
 					t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 				}
@@ -855,7 +855,7 @@ func TestInterPodAffinity(t *testing.T) {
 					t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
 				}
 			}
-			err = cs.Core().Pods(context.ns.Name).Delete(test.pod.Name, metav1.NewDeleteOptions(0))
+			err = cs.CoreV1().Pods(context.ns.Name).Delete(test.pod.Name, metav1.NewDeleteOptions(0))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 			}
