@@ -266,6 +266,19 @@ func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliase
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
+	hostsFileContent := buffer.Bytes()
+	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
+	return hostsFileContent
+}
+
+func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
+	if len(hostAliases) == 0 {
+		return []byte{}
+	}
+
+	var buffer bytes.Buffer
+	buffer.WriteString("\n")
+	buffer.WriteString("# Entries added by HostAliases.\n")
 	// write each IP/hostname pair as an entry into hosts file
 	for _, hostAlias := range hostAliases {
 		for _, hostname := range hostAlias.Hostnames {

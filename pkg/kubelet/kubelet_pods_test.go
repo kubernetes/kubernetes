@@ -287,6 +287,8 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
+
+# Entries added by HostAliases.
 123.45.67.89	foo
 123.45.67.89	bar
 123.45.67.89	baz
@@ -308,6 +310,8 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
+
+# Entries added by HostAliases.
 123.45.67.89	foo
 123.45.67.89	bar
 123.45.67.89	baz
