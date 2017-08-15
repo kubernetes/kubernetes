@@ -99,6 +99,15 @@ func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
 }
 
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	stat, err := os.Lstat(file)
+	if err != nil {
+		return true, err
+	}
+	// If current file is a symlink, then it is a mountpoint.
+	if stat.Mode()&os.ModeSymlink != 0 {
+		return false, nil
+	}
+
 	return true, nil
 }
 
