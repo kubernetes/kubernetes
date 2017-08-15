@@ -98,13 +98,13 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 	cmdutil.AddPrinterFlags(cmd)
 	usage := "the resource to update the subjects"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "usernames to bind to the role")
-	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "groups to bind to the role")
-	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", []string{}, "service accounts to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", []string{}, "Service accounts to bind to the role")
 	return cmd
 }
 
