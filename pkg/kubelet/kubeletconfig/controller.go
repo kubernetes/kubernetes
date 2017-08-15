@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/validation"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/badconfig"
@@ -59,10 +59,10 @@ type Controller struct {
 	dynamicConfig bool
 
 	// defaultConfig is the configuration to use if no initConfig is provided
-	defaultConfig *componentconfig.KubeletConfiguration
+	defaultConfig *kubeletconfig.KubeletConfiguration
 
 	// initConfig is the unmarshaled init config, this will be loaded by the Controller if an initConfigDir is provided
-	initConfig *componentconfig.KubeletConfiguration
+	initConfig *kubeletconfig.KubeletConfiguration
 
 	// initLoader is for loading the Kubelet's init configuration files from disk
 	initLoader configfiles.Loader
@@ -90,7 +90,7 @@ type Controller struct {
 // If the `initConfigDir` is an empty string, skips trying to load the init config.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig *componentconfig.KubeletConfiguration) *Controller {
+func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig *kubeletconfig.KubeletConfiguration) *Controller {
 	fs := utilfs.DefaultFs{}
 
 	var initLoader configfiles.Loader
@@ -125,7 +125,7 @@ func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig 
 
 // Bootstrap attempts to return a valid KubeletConfiguration based on the configuration of the Controller,
 // or returns an error if no valid configuration could be produced. Bootstrap should be called synchronously before StartSync.
-func (cc *Controller) Bootstrap() (*componentconfig.KubeletConfiguration, error) {
+func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Infof("starting controller")
 
 	// ALWAYS validate the local (default and init) configs. This makes incorrectly provisioned nodes an error.
@@ -298,7 +298,7 @@ func (cc *Controller) initialize() error {
 }
 
 // localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig
-func (cc *Controller) localConfig() *componentconfig.KubeletConfiguration {
+func (cc *Controller) localConfig() *kubeletconfig.KubeletConfiguration {
 	if cc.initConfig != nil {
 		cc.configOK.Set(status.CurInitMessage, status.CurInitOKReason, apiv1.ConditionTrue)
 		return cc.initConfig

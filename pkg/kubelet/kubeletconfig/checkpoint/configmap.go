@@ -21,7 +21,7 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 )
 
@@ -49,7 +49,7 @@ func (c *configMapCheckpoint) UID() string {
 }
 
 // implements Parse for v1/ConfigMap checkpoints
-func (c *configMapCheckpoint) Parse() (*componentconfig.KubeletConfiguration, error) {
+func (c *configMapCheckpoint) Parse() (*kubeletconfig.KubeletConfiguration, error) {
 	const emptyCfgErr = "config was empty, but some parameters are required"
 
 	cm := c.configMap

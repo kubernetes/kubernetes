@@ -20,14 +20,14 @@ import (
 	"fmt"
 
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/validation"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 // badRollback makes an entry in the bad-config-tracking file for `uid` with `reason`, and returns the result of rolling back to the last-known-good config
-func (cc *Controller) badRollback(uid, reason, detail string) (*componentconfig.KubeletConfiguration, error) {
+func (cc *Controller) badRollback(uid, reason, detail string) (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Errorf(fmt.Sprintf("%s, %s", reason, detail))
 	if err := cc.badConfigTracker.MarkBad(uid, reason); err != nil {
 		return nil, err
@@ -37,7 +37,7 @@ func (cc *Controller) badRollback(uid, reason, detail string) (*componentconfig.
 
 // lkgRollback returns a valid last-known-good configuration, and updates the `cc.configOK` condition
 // regarding the `reason` for the rollback, or returns an error if a valid last-known-good could not be produced
-func (cc *Controller) lkgRollback(reason string) (*componentconfig.KubeletConfiguration, error) {
+func (cc *Controller) lkgRollback(reason string) (*kubeletconfig.KubeletConfiguration, error) {
 	utillog.Infof("rolling back to last-known-good config")
 
 	lkgUID := ""

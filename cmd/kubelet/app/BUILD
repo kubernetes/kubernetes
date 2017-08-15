@@ -10,7 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
     library = ":go_default_library",
-    deps = ["//pkg/apis/componentconfig:go_default_library"],
+    deps = ["//pkg/kubelet/apis/kubeletconfig:go_default_library"],
 )
 
 go_library(
@@ -29,8 +29,6 @@ go_library(
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/chaosclient:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -42,6 +40,8 @@ go_library(
         "//pkg/credentialprovider/rancher:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/certificate:go_default_library",
         "//pkg/kubelet/certificate/bootstrap:go_default_library",

@@ -14,8 +14,8 @@ go_library(
         "watch.go",
     ],
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/validation:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/kubeletconfig/badconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint/store:go_default_library",

@@ -25,7 +25,7 @@ import (
 
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
@@ -193,7 +193,7 @@ func TestInit_MTU(t *testing.T) {
 	sysctl.Settings["net/bridge/bridge-nf-call-iptables"] = 0
 	kubenet.sysctl = sysctl
 
-	if err := kubenet.Init(nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8", 1234); err != nil {
+	if err := kubenet.Init(nettest.NewFakeHost(nil), kubeletconfig.HairpinNone, "10.0.0.0/8", 1234); err != nil {
 		t.Fatalf("Unexpected error in Init: %v", err)
 	}
 	assert.Equal(t, 1234, kubenet.mtu, "kubenet.mtu should have been set")
