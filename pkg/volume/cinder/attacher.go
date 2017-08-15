@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -186,6 +187,17 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 
 	instanceID, err := attacher.nodeInstanceID(nodeName)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If node doesn't exist, OpenStack Nova will assume the volumes are not attached to it.
+			// Mark the volumes as detached and return false without error.
+			glog.Warningf("VolumesAreAttached: node %q does not exist.", nodeName)
+			for spec := range volumesAttachedCheck {
+				volumesAttachedCheck[spec] = false
+			}
+
+			return volumesAttachedCheck, nil
+		}
+
 		return volumesAttachedCheck, err
 	}
 
