@@ -358,7 +358,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 	filters := []string{
 		"options",
-		deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
 	}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
