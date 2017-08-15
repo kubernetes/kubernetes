@@ -368,7 +368,6 @@ pkg/registry/extensions/deployment
 pkg/registry/extensions/deployment/storage
 pkg/registry/extensions/ingress
 pkg/registry/extensions/ingress/storage
-pkg/registry/extensions/networkpolicy/storage
 pkg/registry/extensions/replicaset
 pkg/registry/extensions/replicaset/storage
 pkg/registry/extensions/rest
