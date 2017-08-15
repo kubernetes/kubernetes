@@ -36,6 +36,7 @@ type Backend interface {
 	Run(stopCh <-chan struct{}) error
 
 	// Shutdown will synchronously shut down the backend while making sure that all pending
-	// events are delivered.
+	// events are delivered. It can be assumed that this method is called after
+	// the stopCh channel passed to the Run method has been closed.
 	Shutdown()
 }

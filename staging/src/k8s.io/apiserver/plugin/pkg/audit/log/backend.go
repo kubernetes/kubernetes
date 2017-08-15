@@ -86,6 +86,6 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (u *backend) Shutdown() {
-	// nothing to do here
+func (b *backend) Shutdown() {
+	// Nothing to do here.
 }
