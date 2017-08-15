@@ -53,7 +53,7 @@ The entire experience is offloaded to Azure to manage disks:storage accounts. Yo
 Blob Disks works in two modes. Controlled by #kind# parameter on the storage class. 
 
 ### Dedicated (default mode)
-When *kind* parameter is set to *dedicated* K8S will create a new dedicated storage account for this new disk. No other disks will be allowed in the this storage account. The account will removed when the PVC is removed (according to K8S PVC reclaim policy) 
+When *kind* parameter is set to *dedicated* K8S will create a new dedicated storage account for this new disk. No other disks will be allowed in the this storage account. The account will be removed when the PVC is removed (according to K8S PVC reclaim policy) 
 
 > You can still use existing VHDs, again the general rule apply use storage accounts that are part of cluster resource group
 
