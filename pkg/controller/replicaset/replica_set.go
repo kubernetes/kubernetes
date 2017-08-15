@@ -606,11 +606,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
 	}
 
-	copy, err := scheme.Scheme.DeepCopy(rs)
-	if err != nil {
-		return err
-	}
-	rs = copy.(*extensions.ReplicaSet)
+	rs = rs.DeepCopy()
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 

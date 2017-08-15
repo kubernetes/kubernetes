@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -367,11 +366,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 					t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
 				}
 
-				copy, err := scheme.Scheme.DeepCopy(svc)
-				if err != nil {
-					t.Fatalf("copy service error: %v", err)
-				}
-				newService := copy.(*v1.Service)
+				newService := svc.DeepCopy()
 
 				newService.Spec.LoadBalancerIP = newLBIP
 				return newService
