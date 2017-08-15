@@ -80,6 +80,9 @@ type PodLister interface {
 	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
 	// performing expensive copies that are unneeded.
 	List(labels.Selector) ([]*v1.Pod, error)
+	// This is similar to "List()", but the returned slice does not
+	// contain pods that don't pass `podFilter`.
+	FilteredList(podFilter schedulercache.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.

@@ -57,3 +57,7 @@ func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.N
 }
 
 func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
+
+func (f *FakeCache) FilteredList(filter schedulercache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+	return nil, nil
+}

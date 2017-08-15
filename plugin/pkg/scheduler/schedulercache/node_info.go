@@ -26,6 +26,7 @@ import (
 	clientcache "k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 var emptyResource = Resource{}
@@ -457,4 +458,20 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 // getPodKey returns the string key of a pod.
 func getPodKey(pod *v1.Pod) (string, error) {
 	return clientcache.MetaNamespaceKeyFunc(pod)
+}
+
+// Filter implements PodFilter interface. It returns false only if the pod node name
+// matches NodeInfo.node and the pod is not found in the pods list. Otherwise,
+// returns true.
+func (n *NodeInfo) Filter(pod *v1.Pod) bool {
+	pFullName := util.GetPodFullName(pod)
+	if pod.Spec.NodeName != n.node.Name {
+		return true
+	}
+	for _, p := range n.pods {
+		if util.GetPodFullName(p) == pFullName {
+			return true
+		}
+	}
+	return false
 }
