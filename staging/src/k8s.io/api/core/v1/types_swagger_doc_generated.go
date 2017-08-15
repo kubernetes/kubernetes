@@ -1650,9 +1650,11 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceQuotaSpec = map[string]string{
-	"":       "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
-	"hard":   "Hard is the set of desired hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
-	"scopes": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
+	"":                  "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
+	"hard":              "Hard is the set of desired hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+	"scopes":            "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
+	"priorityClassName": "If specified, indicates this ResourceQuota applies to to that priority class If not specified, this ResourceQuota applies to all priority classes.",
+	"priority":          "The priority value. Various system components use this field to find the priority of the ResourceQuota. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority.",
 }
 
 func (ResourceQuotaSpec) SwaggerDoc() map[string]string {

@@ -4303,6 +4303,8 @@ func Convert_api_ResourceQuotaList_To_v1_ResourceQuotaList(in *api.ResourceQuota
 func autoConvert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *v1.ResourceQuotaSpec, out *api.ResourceQuotaSpec, s conversion.Scope) error {
 	out.Hard = *(*api.ResourceList)(unsafe.Pointer(&in.Hard))
 	out.Scopes = *(*[]api.ResourceQuotaScope)(unsafe.Pointer(&in.Scopes))
+	out.PriorityClassName = in.PriorityClassName
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
@@ -4314,6 +4316,8 @@ func Convert_v1_ResourceQuotaSpec_To_api_ResourceQuotaSpec(in *v1.ResourceQuotaS
 func autoConvert_api_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(in *api.ResourceQuotaSpec, out *v1.ResourceQuotaSpec, s conversion.Scope) error {
 	out.Hard = *(*v1.ResourceList)(unsafe.Pointer(&in.Hard))
 	out.Scopes = *(*[]v1.ResourceQuotaScope)(unsafe.Pointer(&in.Scopes))
+	out.PriorityClassName = in.PriorityClassName
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
 	return nil
 }
 
