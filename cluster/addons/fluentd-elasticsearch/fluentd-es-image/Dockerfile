@@ -19,8 +19,10 @@
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/log/containers/*
 
-FROM gcr.io/google-containers/debian-base-amd64:0.1
+FROM debian:stretch-slim
 
+COPY clean-apt /usr/bin
+COPY clean-install /usr/bin
 COPY Gemfile /Gemfile
 
 # 1. Install & configure dependencies.
@@ -31,18 +33,13 @@ RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev" \
     && clean-install $BUILD_DEPS \
                      ca-certificates \
                      libjemalloc1 \
-                     liblz4-1 \
                      ruby \
     && echo 'gem: --no-document' >> /etc/gemrc \
     && gem install --file Gemfile \
     && apt-get purge -y --auto-remove \
                      -o APT::AutoRemove::RecommendsImportant=false \
                      $BUILD_DEPS \
-    && rm -rf /tmp/* \
-              /var/lib/apt/lists/* \
-              /usr/lib/ruby/gems/*/cache/*.gem \
-              /var/log/* \
-              /var/tmp/* \
+    && clean-apt \
     # Ensure fluent has enough file descriptors
     && ulimit -n 65536
 
