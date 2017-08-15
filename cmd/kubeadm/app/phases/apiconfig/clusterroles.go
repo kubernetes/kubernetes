@@ -28,12 +28,12 @@ import (
 )
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
+// TODO: This function and phase package is DEPRECATED.
+// When the v1.9 cycle starts and deletePermissiveNodesBindingWhenUsingNodeAuthorization can be removed, this package will be removed with it.
 func CreateRBACRules(client clientset.Interface, k8sVersion *version.Version) error {
 	if err := deletePermissiveNodesBindingWhenUsingNodeAuthorization(client, k8sVersion); err != nil {
 		return fmt.Errorf("failed to remove the permissive 'system:nodes' Group Subject in the 'system:node' ClusterRoleBinding: %v", err)
 	}
-
-	fmt.Println("[apiconfig] Created RBAC rules")
 	return nil
 }
 

@@ -24,13 +24,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -69,19 +68,13 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		ds := buildDaemonSet(cfg, componentName, podSpec)
 
 		// Create the DaemonSet in the API Server
-		if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(ds); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return fmt.Errorf("failed to create self-hosted %q daemonset [%v]", componentName, err)
-			}
-
-			if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Update(ds); err != nil {
-				// TODO: We should retry on 409 responses
-				return fmt.Errorf("failed to update self-hosted %q daemonset [%v]", componentName, err)
-			}
+		if err := apiclient.CreateOrUpdateDaemonSet(client, ds); err != nil {
+			return err
 		}
 
 		// Wait for the self-hosted component to come up
-		kubeadmutil.WaitForPodsWithLabel(client, buildSelfHostedWorkloadLabelQuery(componentName))
+		// TODO: Enforce a timeout
+		apiclient.WaitForPodsWithLabel(client, buildSelfHostedWorkloadLabelQuery(componentName))
 
 		// Remove the old Static Pod manifest
 		if err := os.RemoveAll(manifestPath); err != nil {
@@ -89,7 +82,8 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		}
 
 		// Make sure the API is responsive at /healthz
-		kubeadmutil.WaitForAPI(client)
+		// TODO: Follow-up on fixing the race condition here and respect the timeout error that can be returned
+		apiclient.WaitForAPI(client)
 
 		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
