@@ -300,7 +300,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Gluster endpoints %q...", name)
-			epErr := cs.Core().Endpoints(ns).Delete(name, nil)
+			epErr := cs.CoreV1().Endpoints(ns).Delete(name, nil)
 			framework.Logf("AfterEach: deleting Gluster server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if epErr != nil || err != nil {
@@ -389,7 +389,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 				Type: "kubernetes.io/rbd",
 			}
 			var err error
-			secret, err = cs.Core().Secrets(ns).Create(secret)
+			secret, err = cs.CoreV1().Secrets(ns).Create(secret)
 			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("BeforeEach: failed to create secret %q for Ceph-RBD: %v", name, err))
 
 			volSource = v1.VolumeSource{
@@ -409,7 +409,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 
 		AfterEach(func() {
 			framework.Logf("AfterEach: deleting Ceph-RDB server secret %q...", name)
-			secErr := cs.Core().Secrets(ns).Delete(name, &metav1.DeleteOptions{})
+			secErr := cs.CoreV1().Secrets(ns).Delete(name, &metav1.DeleteOptions{})
 			framework.Logf("AfterEach: deleting Ceph-RDB server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
 			if secErr != nil || err != nil {

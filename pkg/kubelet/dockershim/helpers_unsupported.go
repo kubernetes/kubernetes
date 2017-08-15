@@ -29,7 +29,7 @@ func DefaultMemorySwap() int64 {
 	return -1
 }
 
-func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	glog.Warningf("getSecurityOpts is unsupported in this build")
 	return nil, nil
 }

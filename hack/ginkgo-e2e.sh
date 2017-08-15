@@ -112,7 +112,7 @@ elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
 fi
 
 if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
-ginkgo_args+=("--untilItFails=true")
+  ginkgo_args+=("--untilItFails=true")
 fi
 
 FLAKE_ATTEMPTS=1

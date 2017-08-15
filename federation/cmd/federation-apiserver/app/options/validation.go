@@ -20,6 +20,9 @@ import "fmt"
 
 func (options *ServerRunOptions) Validate() []error {
 	var errors []error
+	if errs := options.GenericServerRunOptions.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
 	if errs := options.Etcd.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}

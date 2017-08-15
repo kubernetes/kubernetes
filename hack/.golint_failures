@@ -18,7 +18,6 @@ cmd/kubeadm/app/discovery
 cmd/kubeadm/app/discovery/file
 cmd/kubeadm/app/discovery/token
 cmd/kubeadm/app/images
-cmd/kubeadm/app/phases/addons
 cmd/kubeadm/app/phases/certs/pkiutil
 cmd/kubeadm/app/preflight
 cmd/kubeadm/app/util
@@ -151,7 +150,6 @@ pkg/capabilities
 pkg/client/chaosclient
 pkg/client/informers/informers_generated/internalversion/internalinterfaces
 pkg/client/leaderelectionconfig
-pkg/client/retry
 pkg/client/tests
 pkg/client/unversioned/testclient/simple
 pkg/cloudprovider
@@ -749,6 +747,7 @@ staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/integer
 staging/src/k8s.io/client-go/util/jsonpath
+staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -800,6 +799,7 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e
 test/e2e/apimachinery
 test/e2e/apps
+test/e2e/auth
 test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common

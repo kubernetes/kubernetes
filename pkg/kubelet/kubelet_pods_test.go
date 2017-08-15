@@ -20,7 +20,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
@@ -179,7 +182,59 @@ func TestMakeMounts(t *testing.T) {
 	}
 }
 
-func TestHostsFileContent(t *testing.T) {
+func TestNodeHostsFileContent(t *testing.T) {
+	testCases := []struct {
+		hostsFileName   string
+		expectedContent string
+	}{
+		{
+			"hosts_test_file1",
+			`# hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+		},
+		{
+			"hosts_test_file2",
+			`# another hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+12.34.56.78	another.domain
+`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.expectedContent)
+		require.NoError(t, err, "could not create a temp hosts file")
+		defer os.RemoveAll(tmpdir)
+
+		actualContent, fileReadErr := nodeHostsFileContent(filepath.Join(tmpdir, testCase.hostsFileName))
+		require.NoError(t, fileReadErr, "could not create read hosts file")
+		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
+	}
+}
+
+// writeHostsFile will write a hosts file into a temporary dir, and return that dir.
+// Caller is responsible for deleting the dir and its contents.
+func writeHostsFile(filename string, cfg string) (string, error) {
+	tmpdir, err := ioutil.TempDir("", "kubelet=kubelet_pods_test.go=")
+	if err != nil {
+		return "", err
+	}
+	return tmpdir, ioutil.WriteFile(filepath.Join(tmpdir, filename), []byte(cfg), 0644)
+}
+
+func TestManagedHostsFileContent(t *testing.T) {
 	testCases := []struct {
 		hostIP          string
 		hostName        string
@@ -264,8 +319,8 @@ fe00::2	ip6-allrouters
 	}
 
 	for _, testCase := range testCases {
-		actualContent := string(hostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName, testCase.hostAliases))
-		assert.Equal(t, testCase.expectedContent, actualContent, "hosts file content not expected")
+		actualContent := managedHostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
+		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
 	}
 }
 

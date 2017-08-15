@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	clientretry "k8s.io/kubernetes/pkg/client/retry"
+	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

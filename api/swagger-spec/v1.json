@@ -18327,7 +18327,7 @@
    },
    "v1.Taint": {
     "id": "v1.Taint",
-    "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+    "description": "The node this Taint is attached to has the \"effect\" on any pod that does not tolerate the Taint.",
     "required": [
      "key",
      "effect"

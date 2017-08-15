@@ -15,7 +15,6 @@ go_library(
     ],
     deps = [
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/retry:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/listers/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 

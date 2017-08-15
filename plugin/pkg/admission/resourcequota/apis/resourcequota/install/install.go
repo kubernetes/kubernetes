@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  resourcequotaapi.GroupName,
 			VersionPreferenceOrder:     []string{resourcequotav1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota",
 			AddInternalObjectsToScheme: resourcequotaapi.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

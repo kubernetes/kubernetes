@@ -500,7 +500,11 @@ func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.
 		}
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
-	utilproxy.DeleteServiceConnections(proxier.exec, staleUDPServices.List())
+	for _, svcIP := range staleUDPServices.List() {
+		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
+			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
+		}
+	}
 }
 
 func (proxier *Proxier) OnServiceAdd(service *api.Service) {

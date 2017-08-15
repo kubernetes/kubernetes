@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package auth
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ var serviceAccountTokenNamespaceVersion = utilversion.MustParseSemantic("v1.2.0"
 
 var serviceAccountTokenAutomountVersion = utilversion.MustParseSemantic("v1.6.0-alpha.2")
 
-var _ = framework.KubeDescribe("ServiceAccounts", func() {
+var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
 	It("should ensure a single API token exists", func() {

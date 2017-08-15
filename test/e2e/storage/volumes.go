@@ -141,7 +141,7 @@ var _ = SIGDescribe("Volumes", func() {
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
-					err := cs.Core().Endpoints(namespace.Name).Delete(name, nil)
+					err := cs.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
 					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()
@@ -233,7 +233,7 @@ var _ = SIGDescribe("Volumes", func() {
 				Type: "kubernetes.io/rbd",
 			}
 
-			secClient := cs.Core().Secrets(config.Namespace)
+			secClient := cs.CoreV1().Secrets(config.Namespace)
 
 			defer func() {
 				if clean {
@@ -309,14 +309,14 @@ var _ = SIGDescribe("Volumes", func() {
 
 			defer func() {
 				if clean {
-					if err := cs.Core().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
+					if err := cs.CoreV1().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
 						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 					}
 				}
 			}()
 
 			var err error
-			if secret, err = cs.Core().Secrets(namespace.Name).Create(secret); err != nil {
+			if secret, err = cs.CoreV1().Secrets(namespace.Name).Create(secret); err != nil {
 				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 			}
 
@@ -481,11 +481,11 @@ var _ = SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.Core().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.Core().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502

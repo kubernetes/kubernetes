@@ -167,7 +167,10 @@ func TestInstallAPIGroups(t *testing.T) {
 			}, nil
 		}
 
-		mapper := meta.NewDefaultRESTMapperFromScheme([]schema.GroupVersion{gv}, interfacesFor, "", sets.NewString(), sets.NewString(), scheme)
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, interfacesFor)
+		for kind := range scheme.KnownTypes(gv) {
+			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
+		}
 		groupMeta := apimachinery.GroupMeta{
 			GroupVersion:  gv,
 			GroupVersions: []schema.GroupVersion{gv},

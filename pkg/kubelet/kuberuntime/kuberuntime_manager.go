@@ -105,6 +105,9 @@ type kubeGenericRuntimeManager struct {
 
 	// The version cache of runtime daemon.
 	versionCache *cache.ObjectCache
+
+	// The directory path for seccomp profiles.
+	seccompProfileRoot string
 }
 
 type KubeGenericRuntime interface {
@@ -117,6 +120,7 @@ type KubeGenericRuntime interface {
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
+	seccompProfileRoot string,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
 	podGetter podGetter,
@@ -134,6 +138,7 @@ func NewKubeGenericRuntimeManager(
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
+		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
 		machineInfo:         machineInfo,

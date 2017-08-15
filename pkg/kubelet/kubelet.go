@@ -577,8 +577,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration,
 		case kubetypes.DockerContainerRuntime:
 			// Create and start the CRI shim running as a grpc server.
 			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
-			ds, err := dockershim.NewDockerService(kubeDeps.DockerClient, kubeCfg.SeccompProfileRoot, crOptions.PodSandboxImage,
-				streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, crOptions.DockerExecHandlerName,
+			ds, err := dockershim.NewDockerService(kubeDeps.DockerClient, crOptions.PodSandboxImage, streamingConfig,
+				&pluginSettings, kubeCfg.RuntimeCgroups, kubeCfg.CgroupDriver, crOptions.DockerExecHandlerName,
 				crOptions.DockershimRootDirectory, crOptions.DockerDisableSharedPID)
 			if err != nil {
 				return nil, err
@@ -621,6 +621,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration,
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
+			kubeCfg.SeccompProfileRoot,
 			containerRefManager,
 			machineInfo,
 			klet.podManager,

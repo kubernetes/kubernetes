@@ -68,10 +68,6 @@ def get_all_files(rootdir):
             dirs.remove('.make')
         if 'BUILD' in files:
            files.remove('BUILD')
-        if 'exceptions.txt' in files:
-            files.remove('exceptions.txt')
-        if 'known-flags.txt' in files:
-            files.remove('known-flags.txt')
 
         for name in files:
             pathname = os.path.join(root, name)

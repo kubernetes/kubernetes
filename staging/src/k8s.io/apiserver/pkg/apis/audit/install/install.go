@@ -33,7 +33,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:              audit.GroupName,
 			VersionPreferenceOrder: []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:           "k8s.io/apiserver/pkg/apis/audit",
 			// Any Kind that is not namespaced must be cluster scoped.
 			RootScopedKinds:            sets.NewString("Event", "Policy"),
 			AddInternalObjectsToScheme: audit.AddToScheme,

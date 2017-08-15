@@ -59,6 +59,7 @@ var CommonImageWhiteList = sets.NewString(
 	"gcr.io/google_containers/hostexec:1.2",
 	"gcr.io/google_containers/volume-nfs:0.8",
 	"gcr.io/google_containers/volume-gluster:0.2",
+	"gcr.io/google_containers/e2e-net-amd64:1.0",
 )
 
 func svcByName(name string, port int) *v1.Service {

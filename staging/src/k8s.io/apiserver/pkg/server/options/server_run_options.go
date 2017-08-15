@@ -83,6 +83,22 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 	return nil
 }
 
+// Validate checks validation of ServerRunOptions
+func (s *ServerRunOptions) Validate() []error {
+	errors := []error{}
+	if s.TargetRAMMB < 0 {
+		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
+	}
+	if s.MaxRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
+	}
+	if s.MaxMutatingRequestsInFlight < 0 {
+		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
+	return errors
+}
+
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
