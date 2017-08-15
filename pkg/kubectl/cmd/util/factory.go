@@ -149,6 +149,16 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
+	// AddDefaultHandlers receives a printers.PrintHandler
+	// and registers default printer handlers
+	AddDefaultHandlers(p printers.PrintHandler) error
+	// AddTableHandler receives a printers.PrintHandler, a list of metav1alpha1.TableColumnDefinitions
+	// and a resource print handler function and registers the print handler fn with the given printer.
+	AddTableHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error
+	// AddHandler receives a printers.PrintHandler, a list of columns, and a print function and
+	// registers the print function with the given printer.
+	AddHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error
+
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.

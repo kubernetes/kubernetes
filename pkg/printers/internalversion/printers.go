@@ -62,9 +62,10 @@ import (
 
 const loadBalancerWidth = 16
 
-// AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
-// TODO: handle errors from Handler
-func AddHandlers(h printers.PrintHandler) {
+// DefaultHandlers returns a slice of *printers.HandlerEntry containing podColumnDefinitions and a printFunc.
+func DefaultHandlers() ([]*printers.HandlerEntry, error) {
+	handlers := []*printers.HandlerEntry{}
+
 	podColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Ready", Type: "string", Description: "The aggregate readiness state of this pod for accepting traffic."},
@@ -74,8 +75,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "IP", Type: "string", Priority: 1, Description: apiv1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["nodeName"]},
 	}
-	h.TableHandler(podColumnDefinitions, printPodList)
-	h.TableHandler(podColumnDefinitions, printPod)
+	entry, err := printers.NewHandlerEntry(podColumnDefinitions, printPodList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(podColumnDefinitions, printPod)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	podTemplateColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -83,8 +93,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Description: "Images referenced by each container in the template."},
 		{Name: "Pod Labels", Type: "string", Description: "The labels for the pod template."},
 	}
-	h.TableHandler(podTemplateColumnDefinitions, printPodTemplate)
-	h.TableHandler(podTemplateColumnDefinitions, printPodTemplateList)
+	entry, err = printers.NewHandlerEntry(podTemplateColumnDefinitions, printPodTemplate)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(podTemplateColumnDefinitions, printPodTemplateList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	podDisruptionBudgetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -93,8 +112,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Allowed Disruptions", Type: "integer", Description: "Calculated number of pods that may be disrupted at this time."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(podDisruptionBudgetColumnDefinitions, printPodDisruptionBudget)
-	h.TableHandler(podDisruptionBudgetColumnDefinitions, printPodDisruptionBudgetList)
+	entry, err = printers.NewHandlerEntry(podDisruptionBudgetColumnDefinitions, printPodDisruptionBudget)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(podDisruptionBudgetColumnDefinitions, printPodDisruptionBudgetList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	replicationControllerColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -106,8 +134,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: apiv1.ReplicationControllerSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(replicationControllerColumnDefinitions, printReplicationController)
-	h.TableHandler(replicationControllerColumnDefinitions, printReplicationControllerList)
+	entry, err = printers.NewHandlerEntry(replicationControllerColumnDefinitions, printReplicationController)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(replicationControllerColumnDefinitions, printReplicationControllerList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	replicaSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -119,8 +156,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: extensionsv1beta1.ReplicaSetSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(replicaSetColumnDefinitions, printReplicaSet)
-	h.TableHandler(replicaSetColumnDefinitions, printReplicaSetList)
+	entry, err = printers.NewHandlerEntry(replicaSetColumnDefinitions, printReplicaSet)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(replicaSetColumnDefinitions, printReplicaSetList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	daemonSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -135,8 +181,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: extensionsv1beta1.DaemonSetSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(daemonSetColumnDefinitions, printDaemonSet)
-	h.TableHandler(daemonSetColumnDefinitions, printDaemonSetList)
+	entry, err = printers.NewHandlerEntry(daemonSetColumnDefinitions, printDaemonSet)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(daemonSetColumnDefinitions, printDaemonSetList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	jobColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -147,8 +202,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: batchv1.JobSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(jobColumnDefinitions, printJob)
-	h.TableHandler(jobColumnDefinitions, printJobList)
+	entry, err = printers.NewHandlerEntry(jobColumnDefinitions, printJob)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(jobColumnDefinitions, printJobList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	cronJobColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -161,8 +225,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: batchv1.JobSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(cronJobColumnDefinitions, printCronJob)
-	h.TableHandler(cronJobColumnDefinitions, printCronJobList)
+	entry, err = printers.NewHandlerEntry(cronJobColumnDefinitions, printCronJob)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(cronJobColumnDefinitions, printCronJobList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	serviceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -173,9 +246,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Selector", Type: "string", Priority: 1, Description: apiv1.ServiceSpec{}.SwaggerDoc()["selector"]},
 	}
+	entry, err = printers.NewHandlerEntry(serviceColumnDefinitions, printService)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
-	h.TableHandler(serviceColumnDefinitions, printService)
-	h.TableHandler(serviceColumnDefinitions, printServiceList)
+	entry, err = printers.NewHandlerEntry(serviceColumnDefinitions, printServiceList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	ingressColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -184,8 +265,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Ports", Type: "string", Description: "Ports of TLS configurations that open"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(ingressColumnDefinitions, printIngress)
-	h.TableHandler(ingressColumnDefinitions, printIngressList)
+	entry, err = printers.NewHandlerEntry(ingressColumnDefinitions, printIngress)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(ingressColumnDefinitions, printIngressList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	statefulSetColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -195,16 +285,34 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 	}
-	h.TableHandler(statefulSetColumnDefinitions, printStatefulSet)
-	h.TableHandler(statefulSetColumnDefinitions, printStatefulSetList)
+	entry, err = printers.NewHandlerEntry(statefulSetColumnDefinitions, printStatefulSet)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(statefulSetColumnDefinitions, printStatefulSetList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	endpointColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Endpoints", Type: "string", Description: apiv1.Endpoints{}.SwaggerDoc()["subsets"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(endpointColumnDefinitions, printEndpoints)
-	h.TableHandler(endpointColumnDefinitions, printEndpointsList)
+	entry, err = printers.NewHandlerEntry(endpointColumnDefinitions, printEndpoints)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(endpointColumnDefinitions, printEndpointsList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	nodeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -216,9 +324,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Kernel-Version", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kernelVersion"]},
 		{Name: "Container-Runtime", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["containerRuntimeVersion"]},
 	}
+	entry, err = printers.NewHandlerEntry(nodeColumnDefinitions, printNode)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
-	h.TableHandler(nodeColumnDefinitions, printNode)
-	h.TableHandler(nodeColumnDefinitions, printNodeList)
+	entry, err = printers.NewHandlerEntry(nodeColumnDefinitions, printNodeList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	eventColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Last Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
@@ -232,16 +348,34 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Source", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["source"]},
 		{Name: "Message", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["message"]},
 	}
-	h.TableHandler(eventColumnDefinitions, printEvent)
-	h.TableHandler(eventColumnDefinitions, printEventList)
+	entry, err = printers.NewHandlerEntry(eventColumnDefinitions, printEvent)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(eventColumnDefinitions, printEventList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	namespaceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "The status of the namespace"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(namespaceColumnDefinitions, printNamespace)
-	h.TableHandler(namespaceColumnDefinitions, printNamespaceList)
+	entry, err = printers.NewHandlerEntry(namespaceColumnDefinitions, printNamespace)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(namespaceColumnDefinitions, printNamespaceList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	secretColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -249,16 +383,34 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Data", Type: "string", Description: apiv1.Secret{}.SwaggerDoc()["data"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(secretColumnDefinitions, printSecret)
-	h.TableHandler(secretColumnDefinitions, printSecretList)
+	entry, err = printers.NewHandlerEntry(secretColumnDefinitions, printSecret)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(secretColumnDefinitions, printSecretList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	serviceAccountColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Secrets", Type: "string", Description: apiv1.ServiceAccount{}.SwaggerDoc()["secrets"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(serviceAccountColumnDefinitions, printServiceAccount)
-	h.TableHandler(serviceAccountColumnDefinitions, printServiceAccountList)
+	entry, err = printers.NewHandlerEntry(serviceAccountColumnDefinitions, printServiceAccount)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(serviceAccountColumnDefinitions, printServiceAccountList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	persistentVolumeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -271,8 +423,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Reason", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["reason"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolume)
-	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolumeList)
+	entry, err = printers.NewHandlerEntry(persistentVolumeColumnDefinitions, printPersistentVolume)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(persistentVolumeColumnDefinitions, printPersistentVolumeList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	persistentVolumeClaimColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -282,8 +443,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
-	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
+	entry, err = printers.NewHandlerEntry(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	componentStatusColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -291,17 +461,34 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Message", Type: "string", Description: "Message of the component conditions"},
 		{Name: "Error", Type: "string", Description: "Error of the component conditions"},
 	}
-	h.TableHandler(componentStatusColumnDefinitions, printComponentStatus)
-	h.TableHandler(componentStatusColumnDefinitions, printComponentStatusList)
+	entry, err = printers.NewHandlerEntry(componentStatusColumnDefinitions, printComponentStatus)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(componentStatusColumnDefinitions, printComponentStatusList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	thirdPartyResourceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Description", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["description"]},
 		{Name: "Version(s)", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["versions"]},
 	}
+	entry, err = printers.NewHandlerEntry(thirdPartyResourceColumnDefinitions, printThirdPartyResource)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
-	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResource)
-	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResourceList)
+	entry, err = printers.NewHandlerEntry(thirdPartyResourceColumnDefinitions, printThirdPartyResourceList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	deploymentColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -314,8 +501,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
 		{Name: "Selector", Type: "string", Priority: 1, Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["selector"]},
 	}
-	h.TableHandler(deploymentColumnDefinitions, printDeployment)
-	h.TableHandler(deploymentColumnDefinitions, printDeploymentList)
+	entry, err = printers.NewHandlerEntry(deploymentColumnDefinitions, printDeployment)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(deploymentColumnDefinitions, printDeploymentList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	horizontalPodAutoscalerColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -326,16 +522,34 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Replicas", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
-	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscalerList)
+	entry, err = printers.NewHandlerEntry(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscalerList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	configMapColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Data", Type: "string", Description: apiv1.ConfigMap{}.SwaggerDoc()["data"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(configMapColumnDefinitions, printConfigMap)
-	h.TableHandler(configMapColumnDefinitions, printConfigMapList)
+	entry, err = printers.NewHandlerEntry(configMapColumnDefinitions, printConfigMap)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(configMapColumnDefinitions, printConfigMapList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	podSecurityPolicyColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -348,26 +562,63 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "ReadOnlyRootFs", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
 		{Name: "Volumes", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
 	}
-	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
-	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
+	entry, err = printers.NewHandlerEntry(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	clusterColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "Status of the cluster"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(clusterColumnDefinitions, printCluster)
-	h.TableHandler(clusterColumnDefinitions, printClusterList)
+	entry, err = printers.NewHandlerEntry(clusterColumnDefinitions, printCluster)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(clusterColumnDefinitions, printClusterList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	networkPolicyColumnDefinitioins := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Pod-Selector", Type: "string", Description: extensionsv1beta1.NetworkPolicySpec{}.SwaggerDoc()["podSelector"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicy)
-	h.TableHandler(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicyList)
-	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicy)
-	h.TableHandler(networkPolicyColumnDefinitioins, printNetworkPolicyList)
+	entry, err = printers.NewHandlerEntry(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicy)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(networkPolicyColumnDefinitioins, printExtensionsNetworkPolicyList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(networkPolicyColumnDefinitioins, printNetworkPolicy)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(networkPolicyColumnDefinitioins, printNetworkPolicyList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	roleBindingsColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -377,8 +628,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
 		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
 	}
-	h.TableHandler(roleBindingsColumnDefinitions, printRoleBinding)
-	h.TableHandler(roleBindingsColumnDefinitions, printRoleBindingList)
+	entry, err = printers.NewHandlerEntry(roleBindingsColumnDefinitions, printRoleBinding)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(roleBindingsColumnDefinitions, printRoleBindingList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	clusterRoleBindingsColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -388,8 +648,17 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Groups", Type: "string", Priority: 1, Description: "Gruops in the roleBinding"},
 		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
 	}
-	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBinding)
-	h.TableHandler(clusterRoleBindingsColumnDefinitions, printClusterRoleBindingList)
+	entry, err = printers.NewHandlerEntry(clusterRoleBindingsColumnDefinitions, printClusterRoleBinding)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(clusterRoleBindingsColumnDefinitions, printClusterRoleBindingList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	certificateSigningRequestColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -397,24 +666,44 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Requestor", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestSpec{}.SwaggerDoc()["request"]},
 		{Name: "Condition", Type: "string", Description: certificatesv1beta1.CertificateSigningRequestStatus{}.SwaggerDoc()["conditions"]},
 	}
-	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
-	h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
+	entry, err = printers.NewHandlerEntry(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	entry, err = printers.NewHandlerEntry(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	storageClassColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Provisioner", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["provisioner"]},
 	}
+	entry, err = printers.NewHandlerEntry(storageClassColumnDefinitions, printStorageClass)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
-	h.TableHandler(storageClassColumnDefinitions, printStorageClass)
-	h.TableHandler(storageClassColumnDefinitions, printStorageClassList)
+	entry, err = printers.NewHandlerEntry(storageClassColumnDefinitions, printStorageClassList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	statusColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Status", Type: "string", Description: metav1.Status{}.SwaggerDoc()["status"]},
 		{Name: "Reason", Type: "string", Description: metav1.Status{}.SwaggerDoc()["reason"]},
 		{Name: "Message", Type: "string", Description: metav1.Status{}.SwaggerDoc()["Message"]},
 	}
-
-	h.TableHandler(statusColumnDefinitions, printStatus)
+	entry, err = printers.NewHandlerEntry(statusColumnDefinitions, printStatus)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
 	controllerRevisionColumnDefinition := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -422,20 +711,37 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Revision", Type: "string", Description: appsv1beta1.ControllerRevision{}.SwaggerDoc()["revision"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
-	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
+	entry, err = printers.NewHandlerEntry(controllerRevisionColumnDefinition, printControllerRevision)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
 
-	AddDefaultHandlers(h)
+	entry, err = printers.NewHandlerEntry(controllerRevisionColumnDefinition, printControllerRevisionList)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	return handlers, nil
 }
 
-// AddDefaultHandlers adds handlers that can work with most Kubernetes objects.
-func AddDefaultHandlers(h printers.PrintHandler) {
+// GenericHandlers returns handlers that can work with most Kubernetes objects.
+func GenericHandlers() ([]*printers.HandlerEntry, error) {
+	handlers := []*printers.HandlerEntry{}
+
 	// types without defined columns
 	objectMetaColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	h.DefaultTableHandler(objectMetaColumnDefinitions, printObjectMeta)
+	entry, err := printers.NewHandlerEntry(objectMetaColumnDefinitions, printObjectMeta)
+	if err != nil {
+		return nil, err
+	}
+	handlers = append(handlers, entry)
+
+	return handlers, nil
 }
 
 func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {

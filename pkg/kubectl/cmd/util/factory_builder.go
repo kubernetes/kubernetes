@@ -65,7 +65,7 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outpu
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return PrinterForCommand(cmd, outputOpts, mapper, typer, encoder, decoders, options)
+	return PrinterForCommand(f.clientAccessFactory, cmd, outputOpts, mapper, typer, encoder, decoders, options)
 }
 
 func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {

@@ -38,18 +38,37 @@ type TablePrinter interface {
 }
 
 type PrintHandler interface {
+	HandlerFromEntry(handlerEntry *HandlerEntry) error
 	Handler(columns, columnsWithWide []string, printFunc interface{}) error
+	TableHandlerFromEntry(handlerEntry *HandlerEntry) error
 	TableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
-	DefaultTableHandler(columns []metav1alpha1.TableColumnDefinition, printFunc interface{}) error
+	DefaultTableHandler(handlerEntry *HandlerEntry) error
 }
 
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
-type handlerEntry struct {
+type HandlerEntry struct {
 	columnDefinitions []metav1alpha1.TableColumnDefinition
 	printRows         bool
 	printFunc         reflect.Value
 	args              []reflect.Value
+}
+
+// NewHandlerEntry receives a list of metav1alpha1.TableColumnDefinitions
+// and a handlerFunc that knows how to print a specific resource and
+// returns a HandlerEntry containing the given data.
+// Returns an error if a given printFunc is invalid
+func NewHandlerEntry(columnDefinitions []metav1alpha1.TableColumnDefinition, printFunc interface{}) (*HandlerEntry, error) {
+	printFuncValue := reflect.ValueOf(printFunc)
+	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
+		return nil, err
+	}
+
+	return &HandlerEntry{
+		columnDefinitions: columnDefinitions,
+		printFunc:         printFuncValue,
+	}, nil
 }
 
 // HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
@@ -57,8 +76,8 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap     map[reflect.Type]*handlerEntry
-	defaultHandler *handlerEntry
+	handlerMap     map[reflect.Type]*HandlerEntry
+	defaultHandler *HandlerEntry
 	options        PrintOptions
 	lastType       interface{}
 	skipTabWriter  bool
@@ -72,7 +91,7 @@ var _ PrintHandler = &HumanReadablePrinter{}
 // If encoder and decoder are provided, an attempt to convert unstructured types to internal types is made.
 func NewHumanReadablePrinter(encoder runtime.Encoder, decoder runtime.Decoder, options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
+		handlerMap: make(map[reflect.Type]*HandlerEntry),
 		options:    options,
 		encoder:    encoder,
 		decoder:    decoder,
@@ -83,7 +102,7 @@ func NewHumanReadablePrinter(encoder runtime.Encoder, decoder runtime.Decoder, o
 // NewTablePrinter creates a HumanReadablePrinter suitable for calling PrintTable().
 func NewTablePrinter() *HumanReadablePrinter {
 	return &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
+		handlerMap: make(map[reflect.Type]*HandlerEntry),
 	}
 }
 
@@ -123,6 +142,17 @@ func (h *HumanReadablePrinter) EnsurePrintHeaders() {
 	h.lastType = nil
 }
 
+func (h *HumanReadablePrinter) HandlerFromEntry(entry *HandlerEntry) error {
+	objType := entry.printFunc.Type().In(0)
+	if _, ok := h.handlerMap[objType]; ok {
+		err := fmt.Errorf("registered duplicate printer for %v", objType)
+		utilruntime.HandleError(err)
+		return err
+	}
+	h.handlerMap[objType] = entry
+	return nil
+}
+
 // Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
 // See ValidatePrintHandlerFunc for required method signature.
 func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printFunc interface{}) error {
@@ -147,18 +177,26 @@ func (h *HumanReadablePrinter) Handler(columns, columnsWithWide []string, printF
 		return err
 	}
 
-	entry := &handlerEntry{
+	entry := &HandlerEntry{
 		columnDefinitions: columnDefinitions,
 		printFunc:         printFuncValue,
 	}
 
-	objType := printFuncValue.Type().In(0)
+	return h.HandlerFromEntry(entry)
+}
+
+// TableHandlerFromEntry adds a print handler from a HandlerEntry to a HumanReadablePrinter instance.
+func (h *HumanReadablePrinter) TableHandlerFromEntry(entry *HandlerEntry) error {
+	entry.printRows = true
+
+	objType := entry.printFunc.Type().In(0)
 	if _, ok := h.handlerMap[objType]; ok {
 		err := fmt.Errorf("registered duplicate printer for %v", objType)
 		utilruntime.HandleError(err)
 		return err
 	}
 	h.handlerMap[objType] = entry
+
 	return nil
 }
 
@@ -170,38 +208,25 @@ func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1alpha1.Tab
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
 		return err
 	}
-	entry := &handlerEntry{
+	entry := &HandlerEntry{
 		columnDefinitions: columnDefinitions,
-		printRows:         true,
 		printFunc:         printFuncValue,
 	}
 
-	objType := printFuncValue.Type().In(0)
-	if _, ok := h.handlerMap[objType]; ok {
-		err := fmt.Errorf("registered duplicate printer for %v", objType)
-		utilruntime.HandleError(err)
-		return err
-	}
-	h.handlerMap[objType] = entry
-	return nil
+	return h.TableHandlerFromEntry(entry)
 }
 
 // DefaultTableHandler registers a set of columns and a print func that is given a chance to process
 // any object without an explicit handler. Only the most recently set print handler is used.
 // See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1alpha1.TableColumnDefinition, printFunc interface{}) error {
-	printFuncValue := reflect.ValueOf(printFunc)
-	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
+func (h *HumanReadablePrinter) DefaultTableHandler(handlerEntry *HandlerEntry) error {
+	if err := ValidateRowPrintHandlerFunc(handlerEntry.printFunc); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
 		return err
 	}
-	entry := &handlerEntry{
-		columnDefinitions: columnDefinitions,
-		printRows:         true,
-		printFunc:         printFuncValue,
-	}
 
-	h.defaultHandler = entry
+	handlerEntry.printRows = true
+	h.defaultHandler = handlerEntry
 	return nil
 }
 
@@ -534,7 +559,7 @@ func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptio
 // printRowsForHandlerEntry prints the incremental table output (headers if the current type is
 // different from lastType) including all the rows in the object. It returns the current type
 // or an error, if any.
-func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
+func printRowsForHandlerEntry(output io.Writer, handler *HandlerEntry, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
 	if includeHeaders {
 		var headers []string
 		for _, column := range handler.columnDefinitions {
@@ -614,7 +639,7 @@ func printRows(output io.Writer, rows []metav1alpha1.TableRow, options PrintOpti
 
 // legacyPrinterToTable uses the old printFunc with tabbed writer to generate a table.
 // TODO: remove when all legacy printers are removed.
-func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler *handlerEntry) (*metav1alpha1.Table, error) {
+func (h *HumanReadablePrinter) legacyPrinterToTable(obj runtime.Object, handler *HandlerEntry) (*metav1alpha1.Table, error) {
 	printFunc := handler.printFunc
 	table := &metav1alpha1.Table{
 		ColumnDefinitions: handler.columnDefinitions,

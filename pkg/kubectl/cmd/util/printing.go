@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
 	"github.com/spf13/cobra"
 )
@@ -110,7 +109,7 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 // returns the default printer for the command. Requires that printer flags have
 // been added to cmd (see AddPrinterFlags).
 // TODO: remove the dependency on cmd object
-func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func PrinterForCommand(f ClientAccessFactory, cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 
 	if outputOpts == nil {
 		outputOpts = extractOutputOptions(cmd)
@@ -131,7 +130,7 @@ func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, m
 	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
 	// need to convert to delegatePrinter again then invoke AddHandlers()
 	if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
-		printersinternal.AddHandlers(humanReadablePrinter)
+		f.AddDefaultHandlers(humanReadablePrinter)
 	}
 
 	return maybeWrapSortingPrinter(cmd, printer), nil

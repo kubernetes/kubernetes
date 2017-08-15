@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 // +k8s:deepcopy-gen=true
@@ -352,6 +353,27 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 
 func (f *FakeFactory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
+}
+
+func (f *FakeFactory) AddDefaultHandlers(p printers.PrintHandler) error {
+	handlers, err := printersinternal.DefaultHandlers()
+	if err != nil {
+		return err
+	}
+
+	for _, h := range handlers {
+		f.AddTableHandler(p, h)
+	}
+
+	return nil
+}
+
+func (f *FakeFactory) AddTableHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.TableHandlerFromEntry(handlerEntry)
+}
+
+func (f *FakeFactory) AddHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.HandlerFromEntry(handlerEntry)
 }
 
 func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
@@ -723,6 +745,27 @@ func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper me
 		return err
 	}
 	return printer.PrintObj(obj, out)
+}
+
+func (f *fakeAPIFactory) AddDefaultHandlers(p printers.PrintHandler) error {
+	handlers, err := printersinternal.DefaultHandlers()
+	if err != nil {
+		return err
+	}
+
+	for _, h := range handlers {
+		f.AddTableHandler(p, h)
+	}
+
+	return nil
+}
+
+func (f *fakeAPIFactory) AddTableHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.TableHandlerFromEntry(handlerEntry)
+}
+
+func (f *fakeAPIFactory) AddHandler(p printers.PrintHandler, handlerEntry *printers.HandlerEntry) error {
+	return p.HandlerFromEntry(handlerEntry)
 }
 
 func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
