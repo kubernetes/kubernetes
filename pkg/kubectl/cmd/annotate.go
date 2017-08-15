@@ -59,6 +59,8 @@ type AnnotateOptions struct {
 	newAnnotations    map[string]string
 	removeAnnotations []string
 
+	PrintOpts *printers.PrintOptions
+
 	// Common share fields
 	out io.Writer
 }
@@ -101,9 +103,14 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
+
+	// fetch resource printer with "isLocal" set to "true"
+	// in order to still allow this command to succeed in the
+	// event that --local is set and there is no connection
+	// to an api server.
+	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	})
+	}, true)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -153,6 +160,8 @@ func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []str
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
+
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
@@ -285,9 +294,9 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 		}
 		if len(o.outputFormat) > 0 {
-			return f.PrintObject(cmd, o.local, mapper, outputObj, o.out)
+			return f.PrintObject(o.PrintOpts, o.local, mapper, outputObj, o.out)
 		}
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
+		f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "annotated")
 		return nil
 	})
 }

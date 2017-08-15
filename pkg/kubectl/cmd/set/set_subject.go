@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -74,6 +75,7 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
+	PrintOpts   *printers.PrintOptions
 	PrintObject func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 }
 
@@ -114,8 +116,9 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 	o.PrintObject = func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-		return f.PrintObject(cmd, o.Local, mapper, obj, out)
+		return f.PrintObject(o.PrintOpts, o.Local, mapper, obj, out)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -235,7 +238,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

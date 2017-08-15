@@ -37,6 +37,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -141,16 +142,22 @@ type ClientAccessFactory interface {
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
 	BindExternalFlags(flags *pflag.FlagSet)
 
-	// TODO: Break the dependency on cmd here.
-	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions
 	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
 	DefaultResourceFilterFunc() kubectl.Filters
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
-	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
+	// TODO(juanvallejo): have this method return an error to propagate to any downstream consumers
+	// AddDefaultHandlers receives a printers.TabularPrintHandler
+	// and registers default printer handlers
+	AddDefaultHandlers(handler printers.TabularPrintHandler)
+	// AddTableHandler receives a printers.TabularPrintHandler, a list of metav1alpha1.TableColumnDefinitions
+	// and a resource print handler function and registers the print handler fn with the given printer.
+	AddTableHandler(p printers.TabularPrintHandler, podColumnDefinitions []metav1alpha1.TableColumnDefinition, handler interface{}) error
+	// AddHandler receives a printers.TabularPrintHandler, a list of columns, and a print function and
+	// registers the print function with the given printer.
+	AddHandler(p printers.TabularPrintHandler, columns, columsnWithWide []string, printFunc interface{}) error
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
 	// Returns the patched object in bytes and any error that occured during the encoding or
 	// in case the object is already paused.
@@ -178,7 +185,7 @@ type ClientAccessFactory interface {
 
 	// EditorEnvs returns a group of environment variables that the edit command
 	// can range over in order to determine if the user has specified an editor
-	// of their choice.
+	// of their choice.PrintO
 	EditorEnvs() []string
 
 	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
@@ -230,18 +237,16 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
-	// could not be found.
-	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error)
-	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	// Returns a printer, true if the printer is generic (is not internal), or
-	// an error if a printer could not be found.
-	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
-	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	// PrinterWithOptions returns the standard printer for the given set of options.
+	PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error)
+	// VersionedPrinterWithOptions returns a printer suitable for displaying versioned resources.
+	// Returns a versioned printer if the resulting standard printer is generic.
+	// Returns an error if the given RESTMapping is nil or has an empty groupversion.
+	VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
+	// PrintObject prints an api object given a set of *printers.PrintOptions to modify the output format
+	PrintObject(printOpts *printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	// PrintSuccess prints message after finishing mutating operations
+	PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	// One stop shopping for a Builder
 	NewBuilder(allowRemoteCalls bool) *resource.Builder
 	// Resource builder for working with unstructured objects

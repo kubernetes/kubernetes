@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -382,24 +383,6 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-	opts := &printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	return opts
-}
-
 func (f *ring0Factory) DefaultResourceFilterFunc() kubectl.Filters {
 	return kubectl.NewResourceFilter()
 }
@@ -414,10 +397,22 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
-	printersinternal.AddHandlers(p)
-	return p, nil
+// TODO(juanvallejo): change printersinternal.AddHandlers to printersinternal.GetDefaultHandlers and return
+// a *printers.HandlerEntry list. Handle any errors returned from generating this list.
+func (f *ring0Factory) AddDefaultHandlers(handler printers.TabularPrintHandler) {
+	printersinternal.AddHandlers(handler)
+}
+
+// TODO(juanvallejo): add printers.TabularPrintHandler#TableHandlerFromEntry(*printers.HandlerEntry)
+// and change this method's signature to receive a *printers.HandlerEntry
+func (f *ring0Factory) AddTableHandler(p printers.TabularPrintHandler, podColumnDefinitions []metav1alpha1.TableColumnDefinition, handler interface{}) error {
+	return p.TableHandler(podColumnDefinitions, handler)
+}
+
+// TODO(juanvallejo): add printers.TabularPrintHandler#HandlerFromEntry(*printers.HandlerEntry)
+// and change this method's signature to receive a *printers.HandlerEntry
+func (f *ring0Factory) AddHandler(p printers.TabularPrintHandler, columns, columsnWithWide []string, printFunc interface{}) error {
+	return p.Handler(columns, columsnWithWide, printFunc)
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {

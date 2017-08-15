@@ -18,13 +18,11 @@ package util
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
@@ -73,30 +71,6 @@ func AddNoHeadersFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
 }
 
-// PrintSuccess prints message after finishing mutating operations
-func PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource string, name string, dryRun bool, operation string) {
-	resource, _ = mapper.ResourceSingularizer(resource)
-	dryRunMsg := ""
-	if dryRun {
-		dryRunMsg = " (dry run)"
-	}
-	if shortOutput {
-		// -o name: prints resource/name
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s/%s\n", resource, name)
-		} else {
-			fmt.Fprintf(out, "%s\n", name)
-		}
-	} else {
-		// understandable output by default
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
-		} else {
-			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
-		}
-	}
-}
-
 // ValidateOutputArgs validates -o flag args for mutations
 func ValidateOutputArgs(cmd *cobra.Command) error {
 	outputMode := GetFlagString(cmd, "output")
@@ -106,59 +80,25 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
-// PrinterForCommand returns the printer for the outputOptions (if given) or
-// returns the default printer for the command. Requires that printer flags have
-// been added to cmd (see AddPrinterFlags).
-// TODO: remove the dependency on cmd object
-func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-
-	if outputOpts == nil {
-		outputOpts = extractOutputOptions(cmd)
-	}
-
-	// this function may be invoked by a command that did not call AddPrinterFlags first, so we need
-	// to be safe about how we access the no-headers flag
-	noHeaders := false
-	if cmd.Flags().Lookup("no-headers") != nil {
-		noHeaders = GetFlagBool(cmd, "no-headers")
-	}
-	printer, err := printers.GetStandardPrinter(outputOpts, noHeaders, mapper, typer, encoder, decoders, options)
-	if err != nil {
-		return nil, err
-	}
-
-	// we try to convert to HumanReadablePrinter, if return ok, it must be no generic
-	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
-	// need to convert to delegatePrinter again then invoke AddHandlers()
-	if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
-		printersinternal.AddHandlers(humanReadablePrinter)
-	}
-
-	return maybeWrapSortingPrinter(cmd, printer), nil
-}
-
-// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
-// attempts to print an info object based on the specified output format. If the
-// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
-// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Factory, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
-}
-
-// extractOutputOptions parses printer specific commandline args and returns
-// printers.OutputsOptions object.
-func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
+// ExtractCmdPrintOptions parses printer specific commandline args and
+// returns a PrintOptions object.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags)
+func ExtractCmdPrintOptions(cmd *cobra.Command) *printers.PrintOptions {
 	flags := cmd.Flags()
+
+	columnLabel, err := flags.GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+
+	options := &printers.PrintOptions{
+		NoHeaders:          GetFlagBool(cmd, "no-headers"),
+		Wide:               GetWideFlag(cmd),
+		ShowAll:            GetFlagBool(cmd, "show-all"),
+		ShowLabels:         GetFlagBool(cmd, "show-labels"),
+		AbsoluteTimestamps: isWatch(cmd),
+		ColumnLabels:       columnLabel,
+	}
 
 	var outputFormat string
 	if flags.Lookup("output") != nil {
@@ -189,29 +129,42 @@ func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
 
 	// this function may be invoked by a command that did not call AddPrinterFlags first, so we need
 	// to be safe about how we access the allow-missing-template-keys flag
-	allowMissingTemplateKeys := false
 	if flags.Lookup("allow-missing-template-keys") != nil {
-		allowMissingTemplateKeys = GetFlagBool(cmd, "allow-missing-template-keys")
+		options.AllowMissingKeys = GetFlagBool(cmd, "allow-missing-template-keys")
 	}
 
-	return &printers.OutputOptions{
-		FmtType:          outputFormat,
-		FmtArg:           templateFile,
-		AllowMissingKeys: allowMissingTemplateKeys,
-	}
+	options.OutputFmt = outputFormat
+	options.OutputFmtArg = templateFile
+
+	return options
 }
 
-func maybeWrapSortingPrinter(cmd *cobra.Command, printer printers.ResourcePrinter) printers.ResourcePrinter {
-	sorting, err := cmd.Flags().GetString("sort-by")
+// printerWithOptions returns the printer for the given options.
+// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+func printerWithOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options *printers.PrintOptions) (printers.ResourcePrinter, error) {
+	printer, err := printers.GetStandardPrinter(mapper, typer, encoder, decoders, options)
 	if err != nil {
-		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
-		return printer
+		return nil, err
 	}
 
-	if len(sorting) != 0 {
+	// We add handlers to the printer in case it implements printers.TabularPrintHandler.
+	// printers.AddHandlers expects a type that implements printers.TabularPrintHandler
+	// as its parameter. Ensure that the current printer is a printers.TabularPrintHandler
+	// and register tabular output handlers to it.
+	// We add printer handlers before a call to maybeWrapSortingPrinter so that we don't
+	// need to convert to delegatePrinter again before invoking AddHandlers()
+	if tabularPrinter, ok := printer.(printers.TabularPrintHandler); ok {
+		printersinternal.AddHandlers(tabularPrinter)
+	}
+
+	return maybeWrapSortingPrinter(printer, options), nil
+}
+
+func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts *printers.PrintOptions) printers.ResourcePrinter {
+	if len(printOpts.SortBy) != 0 {
 		return &kubectl.SortingPrinter{
 			Delegate:  printer,
-			SortField: fmt.Sprintf("{%s}", sorting),
+			SortField: fmt.Sprintf("{%s}", printOpts.SortBy),
 		}
 	}
 	return printer

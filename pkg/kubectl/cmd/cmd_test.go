@@ -155,7 +155,7 @@ func stringBody(body string) io.ReadCloser {
 
 func Example_printReplicationControllerWithNamespace() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{},
 	})
@@ -197,7 +197,8 @@ func Example_printReplicationControllerWithNamespace() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -208,7 +209,7 @@ func Example_printReplicationControllerWithNamespace() {
 
 func Example_printMultiContainersReplicationControllerWithWide() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
@@ -252,7 +253,8 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -263,7 +265,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 
 func Example_printReplicationController() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	printersinternal.AddHandlers(p)
@@ -306,7 +308,8 @@ func Example_printReplicationController() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -317,7 +320,7 @@ func Example_printReplicationController() {
 
 func Example_printPodWithWideFormat() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		Wide:         true,
 		ColumnLabels: []string{},
 	})
@@ -349,7 +352,8 @@ func Example_printPodWithWideFormat() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -360,7 +364,7 @@ func Example_printPodWithWideFormat() {
 
 func Example_printPodWithShowLabels() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ShowLabels:   true,
 		ColumnLabels: []string{},
 	})
@@ -395,7 +399,8 @@ func Example_printPodWithShowLabels() {
 		},
 	}
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -498,7 +503,7 @@ func newAllPhasePodList() *api.PodList {
 
 func Example_printPodHideTerminated() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ColumnLabels: []string{},
 	})
 	printersinternal.AddHandlers(p)
@@ -512,14 +517,16 @@ func Example_printPodHideTerminated() {
 	podList := newAllPhasePodList()
 	// filter pods
 	filterFuncs := f.DefaultResourceFilterFunc()
-	filterOpts := f.DefaultResourceFilterOptions(cmd, false)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	filterOpts.WithNamespace = false
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
 		fmt.Printf("Unexpected filter error: %v\n", errs)
 	}
 	for _, pod := range filteredPodList {
 		mapper, _ := f.Object()
-		err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+		err := f.PrintObject(printOpts, false, mapper, pod, os.Stdout)
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
@@ -533,7 +540,7 @@ func Example_printPodHideTerminated() {
 
 func Example_printPodShowAll() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		ShowAll:      true,
 		ColumnLabels: []string{},
 	})
@@ -547,7 +554,8 @@ func Example_printPodShowAll() {
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, podList, os.Stdout)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, podList, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -562,7 +570,7 @@ func Example_printPodShowAll() {
 
 func Example_printServiceWithNamespacesAndLabels() {
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
-	p := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+	p := printers.NewHumanReadablePrinter(nil, nil, &printers.PrintOptions{
 		WithNamespace: true,
 		ColumnLabels:  []string{"l1"},
 	})
@@ -624,7 +632,8 @@ func Example_printServiceWithNamespacesAndLabels() {
 	ld := strings.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
 	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, svc, ld)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
+	err := f.PrintObject(printOpts, false, mapper, svc, ld)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}

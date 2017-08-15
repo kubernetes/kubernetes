@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -57,6 +58,9 @@ type ApplyOptions struct {
 	PruneResources  []pruneResource
 	Timeout         time.Duration
 	cmdBaseName     string
+
+	Printer   printers.ResourcePrinter
+	PrintOpts *printers.PrintOptions
 }
 
 const (
@@ -110,7 +114,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(validatePruneAll(options.Prune, cmdutil.GetFlagBool(cmd, "all"), options.Selector))
-			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, &options))
+			cmdutil.CheckErr(options.Complete(f, cmd, out, errOut))
+			cmdutil.CheckErr(options.RunApply(f, cmd, out, errOut))
 		},
 	}
 
@@ -138,6 +143,18 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
 
 	return cmd
+}
+
+func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+
+	printer, err := f.PrinterWithOptions(o.PrintOpts, false)
+	if err != nil {
+		return err
+	}
+
+	o.Printer = printer
+	return nil
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -186,7 +203,7 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
-func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
+func (o *ApplyOptions) RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
@@ -202,8 +219,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
-	if options.Prune {
-		options.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+	if o.Prune {
+		o.PruneResources, err = parsePruneResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
 		if err != nil {
 			return err
 		}
@@ -218,8 +235,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		SelectorParam(options.Selector).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		SelectorParam(o.Selector).
 		Flatten().
 		Do()
 	err = r.Err()
@@ -292,9 +309,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			count++
 			if len(output) > 0 && !shortOutput {
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+				return o.Printer.PrintObj(info.Object, out)
 			}
-			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -304,7 +321,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return err
 			}
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation, options.cmdBaseName)
+				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
@@ -317,10 +334,10 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				clientsetFunc: f.ClientSet,
 				overwrite:     overwrite,
 				backOff:       clockwork.NewRealClock(),
-				force:         options.Force,
-				cascade:       options.Cascade,
-				timeout:       options.Timeout,
-				gracePeriod:   options.GracePeriod,
+				force:         o.Force,
+				cascade:       o.Cascade,
+				timeout:       o.Timeout,
+				gracePeriod:   o.GracePeriod,
 			}
 
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
@@ -338,9 +355,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			return o.Printer.PrintObj(info.Object, out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -351,11 +368,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return fmt.Errorf("no objects passed to apply")
 	}
 
-	if !options.Prune {
+	if !o.Prune {
 		return nil
 	}
 
-	selector, err := labels.Parse(options.Selector)
+	selector, err := labels.Parse(o.Selector)
 	if err != nil {
 		return err
 	}
@@ -367,27 +384,27 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		selector:    selector,
 		visitedUids: visitedUids,
 
-		cascade:     options.Cascade,
+		cascade:     o.Cascade,
 		dryRun:      dryRun,
-		gracePeriod: options.GracePeriod,
+		gracePeriod: o.GracePeriod,
 
 		out: out,
 	}
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(options.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(o.PruneResources))
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(n, m, shortOutput); err != nil {
+			if err := p.prune(f, n, m, shortOutput); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m, shortOutput); err != nil {
+		if err := p.prune(f, metav1.NamespaceNone, m, shortOutput); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -460,7 +477,7 @@ type pruner struct {
 	out io.Writer
 }
 
-func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput bool) error {
+func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, shortOutput bool) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
@@ -501,7 +518,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 				return err
 			}
 		}
-		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }

@@ -37,6 +37,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -74,8 +75,16 @@ var (
 	pollInterval, _ = time.ParseDuration("3s")
 )
 
+type RollingUpdateOptions struct {
+	*resource.FilenameOptions
+
+	PrinterOpts *printers.PrintOptions
+}
+
 func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	options := &RollingUpdateOptions{
+		FilenameOptions: &resource.FilenameOptions{},
+	}
 
 	cmd := &cobra.Command{
 		Use:     "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
@@ -83,8 +92,8 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    rollingUpdateLong,
 		Example: rollingUpdateExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunRollingUpdate(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(f, cmd, out))
+			cmdutil.CheckErr(options.RunRollingUpdate(f, out, cmd, args))
 		},
 	}
 	cmd.Flags().Duration("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
@@ -105,6 +114,11 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
+}
+
+func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
+	o.PrinterOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+	return nil
 }
 
 func validateArguments(cmd *cobra.Command, filenames, args []string) error {
@@ -139,8 +153,8 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	err := validateArguments(cmd, options.Filenames, args)
+func (o *RollingUpdateOptions) RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	err := validateArguments(cmd, o.Filenames, args)
 	if err != nil {
 		return err
 	}
@@ -158,8 +172,8 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	container := cmdutil.GetFlagString(cmd, "container")
 
-	if len(options.Filenames) > 0 {
-		filename = options.Filenames[0]
+	if len(o.Filenames) > 0 {
+		filename = o.Filenames[0]
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -328,10 +342,10 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			oldRcData.WriteString(oldRc.Name)
 			newRcData.WriteString(newRc.Name)
 		} else {
-			if err := f.PrintObject(cmd, false, mapper, oldRc, oldRcData); err != nil {
+			if err := f.PrintObject(o.PrinterOpts, false, mapper, oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := f.PrintObject(cmd, false, mapper, newRc, newRcData); err != nil {
+			if err := f.PrintObject(o.PrinterOpts, false, mapper, newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -376,9 +390,9 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		return err
 	}
 	if outputFormat != "" {
-		return f.PrintObject(cmd, false, mapper, newRc, out)
+		return f.PrintObject(o.PrinterOpts, false, mapper, newRc, out)
 	}
-	cmdutil.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
+	f.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil
 }
 

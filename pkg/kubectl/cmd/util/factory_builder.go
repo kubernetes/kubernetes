@@ -23,8 +23,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +46,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 	var err error
@@ -62,52 +60,58 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outpu
 			return nil, err
 		}
 	}
+
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return PrinterForCommand(cmd, outputOpts, mapper, typer, encoder, decoders, options)
+	return printerWithOptions(mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
-	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-
-	options := printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	printer, err := f.PrinterForCommand(cmd, isLocal, outputOpts, options)
+func (f *ring2Factory) VersionedPrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+	printer, err := f.PrinterWithOptions(options, isLocal)
 	if err != nil {
 		return nil, err
 	}
-
-	// Make sure we output versioned data for generic printers
-	if printer.IsGeneric() {
-		if mapping == nil {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-		version := mapping.GroupVersionKind.GroupVersion()
-		if version.Empty() {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-
-		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
-
+	if !printer.IsGeneric() {
+		return printer, nil
 	}
 
-	return printer, nil
+	// Make sure we output versioned data for generic printers
+	if mapping == nil {
+		return nil, fmt.Errorf("no serialization format found")
+	}
+	version := mapping.GroupVersionKind.GroupVersion()
+	if version.Empty() {
+		return nil, fmt.Errorf("no serialization format found")
+	}
+
+	return printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion()), nil
 }
 
-func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *ring2Factory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
+	resource, _ = mapper.ResourceSingularizer(resource)
+	dryRunMsg := ""
+	if dryRun {
+		dryRunMsg = " (dry run)"
+	}
+	if shortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
+		} else {
+			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
+		}
+	}
+}
+
+func (f *ring2Factory) PrintObject(printOpts *printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
 	// try to get a typed object
 	_, typer := f.objectMappingFactory.Object()
 	gvks, _, err := typer.ObjectKinds(obj)
@@ -131,7 +135,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, isLocal, nil, mapping, false)
+	printer, err := f.VersionedPrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err
 	}

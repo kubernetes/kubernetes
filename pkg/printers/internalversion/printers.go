@@ -64,7 +64,7 @@ const loadBalancerWidth = 16
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
 // TODO: handle errors from Handler
-func AddHandlers(h printers.PrintHandler) {
+func AddHandlers(h printers.TabularPrintHandler) {
 	podColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Ready", Type: "string", Description: "The aggregate readiness state of this pod for accepting traffic."},
@@ -427,7 +427,7 @@ func AddHandlers(h printers.PrintHandler) {
 }
 
 // AddDefaultHandlers adds handlers that can work with most Kubernetes objects.
-func AddDefaultHandlers(h printers.PrintHandler) {
+func AddDefaultHandlers(h printers.TabularPrintHandler) {
 	// types without defined columns
 	objectMetaColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},

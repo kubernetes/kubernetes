@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
@@ -50,6 +51,8 @@ type TaintOptions struct {
 	f              cmdutil.Factory
 	out            io.Writer
 	cmd            *cobra.Command
+
+	PrintOpts *printers.PrintOptions
 }
 
 var (
@@ -118,6 +121,8 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 	if err != nil {
 		return err
 	}
+
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
 	// retrieves resource and taint args from args
 	// also checks args to verify that all resources are specified before taints
@@ -274,10 +279,10 @@ func (o TaintOptions) RunTaint() error {
 		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
+			return o.f.PrintObject(o.PrintOpts, false, mapper, outputObj, o.out)
 		}
 
-		cmdutil.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
+		o.f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
 		return nil
 	})
 }

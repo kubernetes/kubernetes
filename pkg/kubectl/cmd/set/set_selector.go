@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
@@ -49,6 +50,8 @@ type SelectorOptions struct {
 	selector  *metav1.LabelSelector
 
 	out              io.Writer
+	PrintOpts        *printers.PrintOptions
+	PrintSuccess     func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
@@ -107,6 +110,8 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.record = cmdutil.GetRecordFlag(cmd)
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 
+	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -133,8 +138,9 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 			Latest()
 	}
 
+	o.PrintSuccess = f.PrintSuccess
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
+		return f.PrintObject(o.PrintOpts, o.local, mapper, obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
@@ -194,7 +200,7 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
+		o.PrintSuccess(o.mapper, false, o.out, info.Mapping.Resource, info.Name, o.dryrun, "selector updated")
 		return nil
 	})
 }
