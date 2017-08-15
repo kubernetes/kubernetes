@@ -528,11 +528,15 @@ func (s *ServiceDNSController) ensureDNSRecords(clusterName string, service *v1.
 	}
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf
-	dnsNames := []string{
-		strings.Join([]string{commonPrefix, zoneNames[0], regionName, s.serviceDNSSuffix}, "."), // zone level - TODO might need other zone names for multi-zone clusters
-		strings.Join([]string{commonPrefix, regionName, s.serviceDNSSuffix}, "."),               // region level, one up from zone level
-		strings.Join([]string{commonPrefix, s.serviceDNSSuffix}, "."),                           // global level, one up from region level
-		"", // nowhere to go up from global level
+	var dnsNames [][]string
+	for _, zoneName := range zoneNames {
+		zoneDNSNames := []string{
+			strings.Join([]string{commonPrefix, zoneName, regionName, s.serviceDNSSuffix}, "."), // zone level - TODO might need other zone names for multi-zone clusters
+			strings.Join([]string{commonPrefix, regionName, s.serviceDNSSuffix}, "."),           // region level, one up from zone level
+			strings.Join([]string{commonPrefix, s.serviceDNSSuffix}, "."),                       // global level, one up from region level
+			"", // nowhere to go up from global level
+		}
+		dnsNames = append(dnsNames, zoneDNSNames)
 	}
 
 	zoneEndpoints, regionEndpoints, globalEndpoints, err := s.getHealthyEndpoints(clusterName, service)
@@ -540,9 +544,11 @@ func (s *ServiceDNSController) ensureDNSRecords(clusterName string, service *v1.
 		return err
 	}
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
-	for i, endpoint := range endpoints {
-		if err = s.ensureDNSRrsets(s.dnsZone, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
-			return err
+	for _, dnsName := range dnsNames {
+		for i, endpoint := range endpoints {
+			if err = s.ensureDNSRrsets(s.dnsZone, dnsName[i], endpoint, dnsName[i+1]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
