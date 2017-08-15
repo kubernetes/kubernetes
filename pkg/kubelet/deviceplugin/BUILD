@@ -5,6 +5,7 @@ licenses(["notice"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -12,6 +13,7 @@ go_library(
     srcs = [
         "endpoint.go",
         "manager.go",
+        "mock_device_plugin.go",
         "types.go",
         "utils.go",
     ],
@@ -35,4 +37,18 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "endpoint_test.go",
+        "manager_test.go",
+        "utils_test.go",
+    ],
+    library = ":go_default_library",
+    deps = [
+        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+    ],
 )
