@@ -76,14 +76,6 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	return net
 }
 
-func deepCloneService(svc *api.Service) *api.Service {
-	value, err := api.Scheme.DeepCopy(svc)
-	if err != nil {
-		panic("couldn't copy service")
-	}
-	return value.(*api.Service)
-}
-
 func TestServiceRegistryCreate(t *testing.T) {
 	storage, registry := NewTestREST(t, nil)
 
@@ -505,14 +497,14 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	}
 
 	// Modify load balancer to be external.
-	svc2 := deepCloneService(svc1)
+	svc2 := svc1.DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, api.Scheme)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// Change port.
-	svc3 := deepCloneService(svc2)
+	svc3 := svc2.DeepCopy()
 	svc3.Spec.Ports[0].Port = 6504
 	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3, api.Scheme)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -548,7 +540,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	}
 
 	// Modify ports
-	svc2 := deepCloneService(svc1)
+	svc2 := svc1.DeepCopy()
 	svc2.Spec.Ports[1].Port = 8088
 	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, api.Scheme)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -886,7 +878,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
 	}
 
-	update := deepCloneService(created_service)
+	update := created_service.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 
 	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, api.Scheme))
@@ -904,7 +896,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		}
 	}
 
-	update = deepCloneService(created_service)
+	update = created_service.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 	update.Spec.ClusterIP = testIP // Error: Cluster IP is immutable
 
@@ -940,7 +932,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 		t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
 	}
 
-	update := deepCloneService(created_service)
+	update := created_service.DeepCopy()
 
 	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, api.Scheme))
 	if err != nil {
