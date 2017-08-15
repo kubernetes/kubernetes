@@ -31,13 +31,15 @@ func NewCmdPhase(out io.Writer) *cobra.Command {
 		RunE:  subCmdRunE("phase"),
 	}
 
-	cmd.AddCommand(NewCmdKubeConfig(out))
+	cmd.AddCommand(NewCmdBootstrapToken())
 	cmd.AddCommand(NewCmdCerts())
+	cmd.AddCommand(NewCmdControlplane())
+	cmd.AddCommand(NewCmdEtcd())
+	cmd.AddCommand(NewCmdKubeConfig(out))
+	cmd.AddCommand(NewCmdMarkMaster())
 	cmd.AddCommand(NewCmdPreFlight())
 	cmd.AddCommand(NewCmdSelfhosting())
-	cmd.AddCommand(NewCmdMarkMaster())
 	cmd.AddCommand(NewCmdUploadConfig())
-	cmd.AddCommand(NewCmdBootstrapToken())
 
 	return cmd
 }

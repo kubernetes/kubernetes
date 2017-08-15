@@ -18,20 +18,17 @@ package controlplane
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
+
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (
@@ -39,189 +36,98 @@ const (
 	etcdDataDir  = "/var/lib/etcd"
 )
 
-func TestWriteStaticPodManifests(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
+func TestGetStaticPodSpecs(t *testing.T) {
+
+	// Creates a Master Configuration
+	cfg := &kubeadmapi.MasterConfiguration{
+		KubernetesVersion: "v1.7.0",
 	}
-	defer os.RemoveAll(tmpdir)
 
-	// set up tmp KubernetesDir for testing
-	kubeadmconstants.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
-	defer func() { kubeadmconstants.KubernetesDir = "/etc/kubernetes" }()
+	// Executes GetStaticPodSpecs
 
-	var tests = []struct {
-		cfg                  *kubeadmapi.MasterConfiguration
-		expectErr            bool
-		expectedAPIProbePort int32
+	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
+	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
+
+	specs := GetStaticPodSpecs(cfg, k8sVersion)
+
+	var assertions = []struct {
+		staticPodName string
 	}{
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				KubernetesVersion: "v1.7.0",
-			},
-			expectErr: false,
+			staticPodName: kubeadmconstants.KubeAPIServer,
 		},
 		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadmapi.API{
-					BindPort: 443,
-				},
-				KubernetesVersion: "v1.7.0",
-			},
-			expectErr:            false,
-			expectedAPIProbePort: 443,
+			staticPodName: kubeadmconstants.KubeControllerManager,
+		},
+		{
+			staticPodName: kubeadmconstants.KubeScheduler,
 		},
 	}
-	for _, rt := range tests {
 
-		actual := WriteStaticPodManifests(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion), fmt.Sprintf("%s/etc/kubernetes/manifests", tmpdir))
-		if (actual == nil) && rt.expectErr {
-			t.Error("expected an error from WriteStaticPodManifests but got none")
-			continue
-		}
-		if (actual != nil) && !rt.expectErr {
-			t.Errorf("didn't expect an error from WriteStaticPodManifests but got: %v", err)
-			continue
-		}
-		if rt.expectErr {
-			continue
-		}
+	for _, assertion := range assertions {
 
-		// Below is dead code.
-		if rt.expectedAPIProbePort != 0 {
-			manifest, err := os.Open(filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "kube-apiserver.yaml"))
-			if err != nil {
-				t.Errorf("WriteStaticPodManifests: %v", err)
-				continue
-			}
-			defer manifest.Close()
+		// assert the spec for the staticPodName exists
+		if spec, ok := specs[assertion.staticPodName]; ok {
 
-			var pod v1.Pod
-			d := yaml.NewYAMLOrJSONDecoder(manifest, 4096)
-			if err := d.Decode(&pod); err != nil {
-				t.Error("WriteStaticPodManifests: error decoding manifests/kube-apiserver.yaml into Pod")
-				continue
+			// Assert each specs refers to the right pod
+			if spec.Spec.Containers[0].Name != assertion.staticPodName {
+				t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expectes %s", assertion.staticPodName, spec.Spec.Containers[0].Name, assertion.staticPodName)
 			}
 
-			// Lots of individual checks as we traverse pointers so we don't panic dereferencing a nil on failure
-			containers := pod.Spec.Containers
-			if containers == nil || len(containers) == 0 {
-				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without any containers")
-				continue
-			}
-
-			probe := containers[0].LivenessProbe
-			if probe == nil {
-				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without a liveness probe")
-				continue
-			}
-
-			httpGET := probe.Handler.HTTPGet
-			if httpGET == nil {
-				t.Error("WriteStaticPodManifests: wrote an apiserver manifest without an HTTP liveness probe")
-				continue
-			}
-
-			port := httpGET.Port.IntVal
-			if rt.expectedAPIProbePort != port {
-				t.Errorf("WriteStaticPodManifests: apiserver pod liveness probe port was: %v, wanted %v", port, rt.expectedAPIProbePort)
-			}
+		} else {
+			t.Errorf("getStaticPodSpecs didn't create spec for %s ", assertion.staticPodName)
 		}
 	}
 }
 
-func TestComponentResources(t *testing.T) {
-	a := componentResources("250m")
-	if a.Requests == nil {
-		t.Errorf(
-			"failed componentResources, return value was nil",
-		)
-	}
-}
+func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
-func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
-		port   int
-		path   string
-		scheme v1.URIScheme
+		createStaticPodFunction func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+		expectedFiles           []string
 	}{
-		{
-			port:   1,
-			path:   "foo",
-			scheme: v1.URISchemeHTTP,
+		{ // CreateInitStaticPodManifestFiles
+			createStaticPodFunction: CreateInitStaticPodManifestFiles,
+			expectedFiles:           []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
-		{
-			port:   2,
-			path:   "bar",
-			scheme: v1.URISchemeHTTPS,
+		{ // CreateAPIServerStaticPodManifestFile
+			createStaticPodFunction: CreateAPIServerStaticPodManifestFile,
+			expectedFiles:           []string{kubeadmconstants.KubeAPIServer},
 		},
-	}
-	for _, rt := range tests {
-		actual := componentProbe(rt.port, rt.path, rt.scheme)
-		if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
-				rt.port,
-				actual.Handler.HTTPGet.Port,
-			)
-		}
-		if actual.Handler.HTTPGet.Path != rt.path {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %s\n\t  actual: %s",
-				rt.path,
-				actual.Handler.HTTPGet.Path,
-			)
-		}
-		if actual.Handler.HTTPGet.Scheme != rt.scheme {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
-				rt.scheme,
-				actual.Handler.HTTPGet.Scheme,
-			)
-		}
-	}
-}
-
-func TestComponentPod(t *testing.T) {
-	var tests = []struct {
-		name     string
-		expected v1.Pod
-	}{
-		{
-			name: "foo",
-			expected: v1.Pod{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "Pod",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "foo",
-					Namespace:   "kube-system",
-					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/critical-pod": ""},
-					Labels:      map[string]string{"component": "foo", "tier": "control-plane"},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "foo",
-						},
-					},
-					HostNetwork: true,
-					Volumes:     []v1.Volume{},
-				},
-			},
+		{ // CreateControllerManagerStaticPodManifestFile
+			createStaticPodFunction: CreateControllerManagerStaticPodManifestFile,
+			expectedFiles:           []string{kubeadmconstants.KubeControllerManager},
+		},
+		{ // CreateSchedulerStaticPodManifestFile
+			createStaticPodFunction: CreateSchedulerStaticPodManifestFile,
+			expectedFiles:           []string{kubeadmconstants.KubeScheduler},
 		},
 	}
 
-	for _, rt := range tests {
-		c := v1.Container{Name: rt.name}
-		actual := componentPod(c, []v1.Volume{})
-		if !reflect.DeepEqual(rt.expected, actual) {
-			t.Errorf(
-				"failed componentPod:\n\texpected: %v\n\t  actual: %v",
-				rt.expected,
-				actual,
-			)
+	for _, test := range tests {
+
+		// Create temp folder for the test case
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		// Creates a Master Configuration
+		cfg := &kubeadmapi.MasterConfiguration{
+			KubernetesVersion: "v1.7.0",
+		}
+
+		// Execute createStaticPodFunction
+		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+		err := test.createStaticPodFunction(manifestPath, cfg)
+		if err != nil {
+			t.Errorf("Error executing createStaticPodFunction: %v", err)
+			continue
+		}
+
+		// Assert expected files are there
+		testutil.AssertFilesCount(t, manifestPath, len(test.expectedFiles))
+
+		for _, fileName := range test.expectedFiles {
+			testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
 		}
 	}
 }
@@ -498,62 +404,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 }
 
-func TestGetEtcdCommand(t *testing.T) {
-	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		expected []string
-	}{
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
-			},
-			expected: []string{
-				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/var/lib/etcd",
-			},
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{
-					DataDir: "/var/lib/etcd",
-					ExtraArgs: map[string]string{
-						"listen-client-urls":    "http://10.0.1.10:2379",
-						"advertise-client-urls": "http://10.0.1.10:2379",
-					},
-				},
-			},
-			expected: []string{
-				"etcd",
-				"--listen-client-urls=http://10.0.1.10:2379",
-				"--advertise-client-urls=http://10.0.1.10:2379",
-				"--data-dir=/var/lib/etcd",
-			},
-		},
-		{
-			cfg: &kubeadmapi.MasterConfiguration{
-				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
-			},
-			expected: []string{
-				"etcd",
-				"--listen-client-urls=http://127.0.0.1:2379",
-				"--advertise-client-urls=http://127.0.0.1:2379",
-				"--data-dir=/etc/foo",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := getEtcdCommand(rt.cfg)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-		}
-	}
-}
-
 func TestGetSchedulerCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
@@ -648,53 +498,6 @@ func TestGetAuthzParameters(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getAuthzParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-		}
-	}
-}
-
-func TestGetExtraParameters(t *testing.T) {
-	var tests = []struct {
-		overrides map[string]string
-		defaults  map[string]string
-		expected  []string
-	}{
-		{
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-			},
-			defaults: map[string]string{
-				"admission-control":     "NamespaceLifecycle",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
-			},
-			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
-				"--allow-privileged=true",
-			},
-		},
-		{
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-			},
-			defaults: map[string]string{
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
-			},
-			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
-				"--allow-privileged=true",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		actual := getExtraParameters(rt.overrides, rt.defaults)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 		}
 	}
 }

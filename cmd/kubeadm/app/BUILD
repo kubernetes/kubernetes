@@ -40,6 +40,7 @@ filegroup(
         "//cmd/kubeadm/app/phases/bootstraptoken/node:all-srcs",
         "//cmd/kubeadm/app/phases/certs:all-srcs",
         "//cmd/kubeadm/app/phases/controlplane:all-srcs",
+        "//cmd/kubeadm/app/phases/etcd:all-srcs",
         "//cmd/kubeadm/app/phases/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/phases/markmaster:all-srcs",
         "//cmd/kubeadm/app/phases/selfhosting:all-srcs",
