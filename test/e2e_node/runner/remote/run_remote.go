@@ -113,6 +113,7 @@ type Resources struct {
 
 type GCEImage struct {
 	Image      string `json:"image, omitempty"`
+	ImageDesc  string `json:"image_description, omitempty"`
 	Project    string `json:"project"`
 	Metadata   string `json:"metadata"`
 	ImageRegex string `json:"image_regex, omitempty"`
@@ -131,7 +132,10 @@ type internalImageConfig struct {
 }
 
 type internalGCEImage struct {
-	image     string
+	image string
+	// imageDesc is the description of the image. If empty, the value in the
+	// 'image' will be used.
+	imageDesc string
 	project   string
 	resources Resources
 	metadata  *compute.Metadata
@@ -206,11 +210,15 @@ func main() {
 			for _, image := range images {
 				gceImage := internalGCEImage{
 					image:     image,
+					imageDesc: imageConfig.ImageDesc,
 					project:   imageConfig.Project,
 					metadata:  getImageMetadata(imageConfig.Metadata),
 					machine:   imageConfig.Machine,
 					tests:     imageConfig.Tests,
 					resources: imageConfig.Resources,
+				}
+				if gceImage.imageDesc == "" {
+					gceImage.imageDesc = gceImage.image
 				}
 				if isRegex && len(images) > 1 {
 					// Use image name when shortName is not unique.
@@ -485,7 +493,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
 
-	result := testHost(host, deleteFiles, imageConfig.image, junitFilePrefix, ginkgoFlagsStr)
+	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFilePrefix, ginkgoFlagsStr)
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
 	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
 	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()

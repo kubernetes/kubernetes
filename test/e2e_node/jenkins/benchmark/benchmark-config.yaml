@@ -113,6 +113,7 @@ images:
       - 'resource tracking for 105 pods per node \[Benchmark\]'
   cos-docker112-resource1:
     image: cos-stable-60-9592-76-0
+    image_description: cos-stable-60-9592-76-0 with docker 1.12.6
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
@@ -120,6 +121,7 @@ images:
       - 'resource tracking for 0 pods per node \[Benchmark\]'
   cos-docker112-resource2:
     image: cos-stable-60-9592-76-0
+    image_description: cos-stable-60-9592-76-0 with docker 1.12.6
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
@@ -127,6 +129,7 @@ images:
       - 'resource tracking for 35 pods per node \[Benchmark\]'
   cos-docker112-resource3:
     image: cos-stable-60-9592-76-0
+    image_description: cos-stable-60-9592-76-0 with docker 1.12.6
     project: cos-cloud
     machine: n1-standard-1
     metadata: "user-data<test/e2e_node/jenkins/cos-init-docker.yaml,gci-update-strategy=update_disabled,gci-docker-version=1.12.6"
