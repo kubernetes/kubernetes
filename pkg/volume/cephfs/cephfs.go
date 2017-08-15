@@ -260,7 +260,7 @@ func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
 	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 
-// GetPath global mount path
+// GetPath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
 	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
