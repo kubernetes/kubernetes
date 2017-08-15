@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push
+# A script encapsulating a common Dockerimage pattern for installing packages
+# and then cleaning up the unnecessary install artifacts.
+# e.g. clean-install iptables ebtables conntrack
 
-PREFIX = gcr.io/google-containers
-IMAGE = fluentd-elasticsearch
-TAG = v2.0.1
+set -o errexit
 
-build:
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
+if [ $# = 0 ]; then
+  echo >&2 "No packages specified"
+  exit 1
+fi
 
-push:
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
+apt-get update
+apt-get install -y --no-install-recommends $@
+clean-apt
