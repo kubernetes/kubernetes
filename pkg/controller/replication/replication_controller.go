@@ -621,11 +621,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	}
 	trace.Step("manageReplicas done")
 
-	copy, err := scheme.Scheme.DeepCopy(rc)
-	if err != nil {
-		return err
-	}
-	rc = copy.(*v1.ReplicationController)
+	rc = rc.DeepCopy()
 
 	newStatus := calculateStatus(rc, filteredPods, manageReplicasErr)
 

@@ -130,12 +130,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 		return
 	}
 	for _, volume := range volumeList {
-		clone, err := scheme.Scheme.DeepCopy(volume)
-		if err != nil {
-			glog.Errorf("error cloning volume %q: %v", volume.Name, err)
-			continue
-		}
-		volumeClone := clone.(*v1.PersistentVolume)
+		volumeClone := volume.DeepCopy()
 		if _, err = ctrl.storeVolumeUpdate(volumeClone); err != nil {
 			glog.Errorf("error updating volume cache: %v", err)
 		}
@@ -147,13 +142,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelister
 		return
 	}
 	for _, claim := range claimList {
-		clone, err := scheme.Scheme.DeepCopy(claim)
-		if err != nil {
-			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
-			continue
-		}
-		claimClone := clone.(*v1.PersistentVolumeClaim)
-		if _, err = ctrl.storeClaimUpdate(claimClone); err != nil {
+		if _, err = ctrl.storeClaimUpdate(claim.DeepCopy()); err != nil {
 			glog.Errorf("error updating claim cache: %v", err)
 		}
 	}
@@ -433,14 +422,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning pv: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
+	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
 	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
