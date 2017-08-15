@@ -88,6 +88,7 @@ filegroup(
         "//federation/pkg/federation-controller/util/deletionhelper:all-srcs",
         "//federation/pkg/federation-controller/util/eventsink:all-srcs",
         "//federation/pkg/federation-controller/util/finalizers:all-srcs",
+        "//federation/pkg/federation-controller/util/hpa:all-srcs",
         "//federation/pkg/federation-controller/util/planner:all-srcs",
         "//federation/pkg/federation-controller/util/podanalyzer:all-srcs",
         "//federation/pkg/federation-controller/util/replicapreferences:all-srcs",
