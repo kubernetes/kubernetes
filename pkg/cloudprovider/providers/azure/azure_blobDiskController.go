@@ -223,7 +223,7 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 
 // delete a vhd blob
 func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName string) error {
-	client, err := azstorage.NewBasicClientOnSovereignCloud(storageAccount, key, c.common.cloud.Environment)
+	client, err := azstorage.NewBasicClientOnSovereignCloud(accountName, accountKey, c.common.cloud.Environment)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (c *BlobDiskController) getBlobSvcClient(SAName string) (azstorage.BlobStor
 		return blobSvc, err
 	}
 
-	if client, err = azstorage.NewBasicClientOnSovereignCloud(storageAccount, key, c.common.cloud.Environment); err != nil {
+	if client, err = azstorage.NewBasicClientOnSovereignCloud(SAName, key, c.common.cloud.Environment); err != nil {
 		return blobSvc, err
 	}
 
