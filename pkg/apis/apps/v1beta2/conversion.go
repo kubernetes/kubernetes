@@ -48,6 +48,12 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus,
 		Convert_v1beta2_Deployment_To_extensions_Deployment,
 		Convert_extensions_Deployment_To_v1beta2_Deployment,
+		Convert_extensions_DaemonSet_To_v1beta2_DaemonSet,
+		Convert_v1beta2_DaemonSet_To_extensions_DaemonSet,
+		Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec,
+		Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec,
+		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy,
+		Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
@@ -470,6 +476,98 @@ func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployme
 
 	if err := Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSet_To_v1beta2_DaemonSet(in *extensions.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if out.Annotations == nil {
+		out.Annotations = make(map[string]string)
+	}
+	out.Annotations[appsv1beta2.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
+	if err := Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *extensions.DaemonSetSpec, out *appsv1beta2.DaemonSetSpec, s conversion.Scope) error {
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	out.MinReadySeconds = int32(in.MinReadySeconds)
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
+	} else {
+		out.RevisionHistoryLimit = nil
+	}
+	return nil
+}
+
+func Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *appsv1beta2.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = appsv1beta2.DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = &appsv1beta2.RollingUpdateDaemonSet{}
+		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_v1beta2_DaemonSet_To_extensions_DaemonSet(in *appsv1beta2.DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if value, ok := in.Annotations[appsv1beta2.DeprecatedTemplateGeneration]; ok {
+		if value64, err := strconv.ParseInt(value, 10, 64); err != nil {
+			return err
+		} else {
+			out.Spec.TemplateGeneration = value64
+			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
+		}
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec(in *appsv1beta2.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+		return err
+	}
+	if in.RevisionHistoryLimit != nil {
+		out.RevisionHistoryLimit = new(int32)
+		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
+	} else {
+		out.RevisionHistoryLimit = nil
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	return nil
+}
+
+func Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *appsv1beta2.DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+	if in.RollingUpdate != nil {
+		out.RollingUpdate = &extensions.RollingUpdateDaemonSet{}
+		if err := Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+			return err
+		}
 	}
 	return nil
 }
