@@ -711,7 +711,7 @@ func TestConvertToVersion(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		original, _ := test.scheme.DeepCopy(test.in)
+		original := test.in.DeepCopyObject()
 		out, err := test.scheme.ConvertToVersion(test.in, test.gv)
 		switch {
 		case test.errFn != nil:
