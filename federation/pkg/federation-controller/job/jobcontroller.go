@@ -434,7 +434,7 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 		}
 		ljob := &batchv1.Job{
 			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(fjob.ObjectMeta),
-			Spec:       *fedutil.DeepCopyApiTypeOrPanic(&fjob.Spec).(*batchv1.JobSpec),
+			Spec:       *fjob.Spec.DeepCopy(),
 		}
 		// use selector generated at federation level, or user specified value
 		manualSelector := true

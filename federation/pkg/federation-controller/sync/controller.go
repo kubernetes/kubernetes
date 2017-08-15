@@ -397,20 +397,7 @@ func (s *FederationSyncController) objFromCache(kind, key string) (pkgruntime.Ob
 	if !exist {
 		return nil, nil
 	}
-
-	// Create a copy before modifying the resource to prevent racing with other readers.
-	copiedObj, err := api.Scheme.DeepCopy(cachedObj)
-	if err != nil {
-		wrappedErr := fmt.Errorf("Error in retrieving %s %q from store: %v", kind, key, err)
-		runtime.HandleError(wrappedErr)
-		return nil, err
-	}
-	if !s.adapter.IsExpectedType(copiedObj) {
-		err = fmt.Errorf("Object is not the expected type: %v", copiedObj)
-		runtime.HandleError(err)
-		return nil, err
-	}
-	return copiedObj.(pkgruntime.Object), nil
+	return cachedObj.(pkgruntime.Object).DeepCopyObject(), nil
 }
 
 // delete deletes the given resource or returns error if the deletion was not complete.
