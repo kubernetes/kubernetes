@@ -273,6 +273,17 @@ func validateArrayMap(x reflect.Value, v Constraint) error {
 		if x.Len() != 0 {
 			return createError(x, v, "readonly parameter; must send as nil or empty in request")
 		}
+	case Pattern:
+		reg, err := regexp.Compile(v.Rule.(string))
+		if err != nil {
+			return createError(x, v, err.Error())
+		}
+		keys := x.MapKeys()
+		for _, k := range keys {
+			if !reg.MatchString(k.String()) {
+				return createError(k, v, fmt.Sprintf("map key doesn't match pattern %v", v.Rule))
+			}
+		}
 	default:
 		return createError(x, v, fmt.Sprintf("constraint %v is not applicable to array, slice and map type", v.Name))
 	}

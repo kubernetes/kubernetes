@@ -50,7 +50,7 @@ type IncrementalCopyOptionsConditions struct {
 
 // Copy starts a blob copy operation and waits for the operation to
 // complete. sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.) There is no SLA on blob copy and therefore
+// obtained using the GetURL method.) There is no SLA on blob copy and therefore
 // this helper method works faster on smaller files.
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
@@ -65,7 +65,7 @@ func (b *Blob) Copy(sourceBlob string, options *CopyOptions) error {
 
 // StartCopy starts a blob copy operation.
 // sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.)
+// obtained using the GetURL method.)
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
 func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error) {

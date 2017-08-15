@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 )
 
 const fourMB = uint64(4194304)
@@ -22,6 +23,7 @@ type File struct {
 	Properties         FileProperties `xml:"Properties"`
 	share              *Share
 	FileCopyProperties FileCopyState
+	mutex              *sync.Mutex
 }
 
 // FileProperties contains various properties of a file.
@@ -148,7 +150,9 @@ func (f *File) CopyFile(sourceURL string, options *FileRequestOptions) error {
 		return err
 	}
 
-	f.updateEtagLastModifiedAndCopyHeaders(headers)
+	f.updateEtagAndLastModified(headers)
+	f.FileCopyProperties.ID = headers.Get("X-Ms-Copy-Id")
+	f.FileCopyProperties.Status = headers.Get("X-Ms-Copy-Status")
 	return nil
 }
 
@@ -399,14 +403,6 @@ func (f *File) updateEtagAndLastModified(headers http.Header) {
 	f.Properties.LastModified = headers.Get("Last-Modified")
 }
 
-// updates Etag, last modified date and x-ms-copy-id
-func (f *File) updateEtagLastModifiedAndCopyHeaders(headers http.Header) {
-	f.Properties.Etag = headers.Get("Etag")
-	f.Properties.LastModified = headers.Get("Last-Modified")
-	f.FileCopyProperties.ID = headers.Get("X-Ms-Copy-Id")
-	f.FileCopyProperties.Status = headers.Get("X-Ms-Copy-Status")
-}
-
 // updates file properties from the specified HTTP header
 func (f *File) updateProperties(header http.Header) {
 	size, err := strconv.ParseUint(header.Get("Content-Length"), 10, 64)
@@ -456,7 +452,11 @@ func (f *File) WriteRange(bytes io.Reader, fileRange FileRange, options *WriteRa
 	if err != nil {
 		return err
 	}
-
+	// it's perfectly legal for multiple go routines to call WriteRange
+	// on the same *File (e.g. concurrently writing non-overlapping ranges)
+	// so we must take the file mutex before updating our properties.
+	f.mutex.Lock()
 	f.updateEtagAndLastModified(headers)
+	f.mutex.Unlock()
 	return nil
 }

@@ -136,7 +136,7 @@ func addTimeout(params url.Values, timeout uint) url.Values {
 
 func addSnapshot(params url.Values, snapshot *time.Time) url.Values {
 	if snapshot != nil {
-		params.Add("snapshot", timeRfc1123Formatted(*snapshot))
+		params.Add("snapshot", snapshot.Format("2006-01-02T15:04:05.0000000Z"))
 	}
 	return params
 }

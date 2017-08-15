@@ -68,6 +68,8 @@ type BlockResponse struct {
 
 // CreateBlockBlob initializes an empty block blob with no blocks.
 //
+// See CreateBlockBlobFromReader for more info on creating blobs.
+//
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Put-Blob
 func (b *Blob) CreateBlockBlob(options *PutBlobOptions) error {
 	return b.CreateBlockBlobFromReader(nil, options)
@@ -77,9 +79,16 @@ func (b *Blob) CreateBlockBlob(options *PutBlobOptions) error {
 // reader. Size must be the number of bytes read from reader. To
 // create an empty blob, use size==0 and reader==nil.
 //
+// Any headers set in blob.Properties or metadata in blob.Metadata
+// will be set on the blob.
+//
 // The API rejects requests with size > 256 MiB (but this limit is not
 // checked by the SDK). To write a larger blob, use CreateBlockBlob,
 // PutBlock, and PutBlockList.
+//
+// To create a blob from scratch, call container.GetBlobReference() to
+// get an empty blob, fill in blob.Properties and blob.Metadata as
+// appropriate then call this method.
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Put-Blob
 func (b *Blob) CreateBlockBlobFromReader(blob io.Reader, options *PutBlobOptions) error {
@@ -91,12 +100,21 @@ func (b *Blob) CreateBlockBlobFromReader(blob io.Reader, options *PutBlobOptions
 	var n int64
 	var err error
 	if blob != nil {
-		buf := &bytes.Buffer{}
-		n, err = io.Copy(buf, blob)
-		if err != nil {
-			return err
+		type lener interface {
+			Len() int
 		}
-		blob = buf
+		// TODO(rjeczalik): handle io.ReadSeeker, in case blob is *os.File etc.
+		if l, ok := blob.(lener); ok {
+			n = int64(l.Len())
+		} else {
+			var buf bytes.Buffer
+			n, err = io.Copy(&buf, blob)
+			if err != nil {
+				return err
+			}
+			blob = &buf
+		}
+
 		headers["Content-Length"] = strconv.FormatInt(n, 10)
 	}
 	b.Properties.ContentLength = n

@@ -11,6 +11,8 @@ import (
 // PutAppendBlob initializes an empty append blob with specified name. An
 // append blob must be created using this method before appending blocks.
 //
+// See CreateBlockBlobFromReader for more info on creating blobs.
+//
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Put-Blob
 func (b *Blob) PutAppendBlob(options *PutBlobOptions) error {
 	params := url.Values{}

@@ -174,11 +174,17 @@ type BlobRange struct {
 }
 
 func (br BlobRange) String() string {
+	if br.End == 0 {
+		return fmt.Sprintf("bytes=%d-", br.Start)
+	}
 	return fmt.Sprintf("bytes=%d-%d", br.Start, br.End)
 }
 
 // Get returns a stream to read the blob. Caller must call both Read and Close()
 // to correctly close the underlying connection.
+//
+// See the GetRange method for use with a Range header.
+//
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Get-Blob
 func (b *Blob) Get(options *GetBlobOptions) (io.ReadCloser, error) {
 	rangeOptions := GetBlobRangeOptions{
@@ -192,7 +198,7 @@ func (b *Blob) Get(options *GetBlobOptions) (io.ReadCloser, error) {
 	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
 		return nil, err
 	}
-	if err := b.writePropoerties(resp.headers); err != nil {
+	if err := b.writeProperties(resp.headers, true); err != nil {
 		return resp.body, err
 	}
 	return resp.body, nil
@@ -212,7 +218,9 @@ func (b *Blob) GetRange(options *GetBlobRangeOptions) (io.ReadCloser, error) {
 	if err := checkRespCode(resp.statusCode, []int{http.StatusPartialContent}); err != nil {
 		return nil, err
 	}
-	if err := b.writePropoerties(resp.headers); err != nil {
+	// Content-Length header should not be updated, as the service returns the range length
+	// (which is not alwys the full blob length)
+	if err := b.writeProperties(resp.headers, false); err != nil {
 		return resp.body, err
 	}
 	return resp.body, nil
@@ -225,7 +233,9 @@ func (b *Blob) getRange(options *GetBlobRangeOptions) (*storageResponse, error) 
 	if options != nil {
 		if options.Range != nil {
 			headers["Range"] = options.Range.String()
-			headers["x-ms-range-get-content-md5"] = fmt.Sprintf("%v", options.GetRangeContentMD5)
+			if options.GetRangeContentMD5 {
+				headers["x-ms-range-get-content-md5"] = "true"
+			}
 		}
 		if options.GetBlobOptions != nil {
 			headers = mergeHeaders(headers, headersFromStruct(*options.GetBlobOptions))
@@ -322,18 +332,20 @@ func (b *Blob) GetProperties(options *GetBlobPropertiesOptions) error {
 	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
 		return err
 	}
-	return b.writePropoerties(resp.headers)
+	return b.writeProperties(resp.headers, true)
 }
 
-func (b *Blob) writePropoerties(h http.Header) error {
+func (b *Blob) writeProperties(h http.Header, includeContentLen bool) error {
 	var err error
 
-	var contentLength int64
-	contentLengthStr := h.Get("Content-Length")
-	if contentLengthStr != "" {
-		contentLength, err = strconv.ParseInt(contentLengthStr, 0, 64)
-		if err != nil {
-			return err
+	contentLength := b.Properties.ContentLength
+	if includeContentLen {
+		contentLengthStr := h.Get("Content-Length")
+		if contentLengthStr != "" {
+			contentLength, err = strconv.ParseInt(contentLengthStr, 0, 64)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
