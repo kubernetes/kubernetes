@@ -26,8 +26,6 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -107,7 +105,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir string) []*cobra.Command {
 		cmd := &cobra.Command{
 			Use:   properties.use,
 			Short: properties.short,
-			Run:   runCmdFuncKubeConfig(properties.cmdFunc, &outDir, &cfgPath, cfg),
+			Run:   runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg),
 		}
 
 		// Add flags to the command
@@ -129,24 +127,4 @@ func getKubeConfigSubCommands(out io.Writer, outDir string) []*cobra.Command {
 	}
 
 	return subCmds
-}
-
-// runCmdFuncKubeConfig creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runCmdFuncKubeConfig(cmdFunc func(outDir string, cfg *kubeadmapi.MasterConfiguration) error, outDir, cfgPath *string, cfg *kubeadmapiext.MasterConfiguration) func(cmd *cobra.Command, args []string) {
-
-	// the following statement build a clousure that wraps a call to a CreateKubeConfigFunc, binding
-	// the function itself with the specific parameters of each sub command.
-	// Please note that specific parameter should be passed as value, while other parameters - passed as reference -
-	// are shared between sub commands and gets access to current value e.g. flags value.
-
-	return func(cmd *cobra.Command, args []string) {
-
-		// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
-		kubeadmutil.CheckErr(err)
-
-		// Execute the cmdFunc
-		err = cmdFunc(*outDir, internalcfg)
-		kubeadmutil.CheckErr(err)
-	}
 }
