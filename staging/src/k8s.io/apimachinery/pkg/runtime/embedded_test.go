@@ -243,12 +243,8 @@ func TestDeepCopyOfRuntimeObject(t *testing.T) {
 	}
 	t.Logf("originalRole = %v\n", string(originalData))
 
-	copyOfOriginal, err := s.DeepCopy(original)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	copiedData, err := runtime.Encode(codec, copyOfOriginal.(runtime.Object))
+	copyOfOriginal := original.DeepCopy()
+	copiedData, err := runtime.Encode(codec, copyOfOriginal)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
