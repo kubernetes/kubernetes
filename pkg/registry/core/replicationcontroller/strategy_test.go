@@ -186,14 +186,8 @@ func TestValidateUpdate(t *testing.T) {
 	oldController.Annotations[api.NonConvertibleAnnotationPrefix+"/"+"spec.selector"] = "no way"
 
 	// Deep-copy so we won't mutate both selectors.
-	objCopy, err := api.Scheme.DeepCopy(oldController)
-	if err != nil {
-		t.Fatalf("unexpected deep-copy error: %v", err)
-	}
-	newController, ok := objCopy.(*api.ReplicationController)
-	if !ok {
-		t.Fatalf("unexpected object: %#v", objCopy)
-	}
+	newController := oldController.DeepCopy()
+
 	// Irrelevant (to the selector) update for the replication controller.
 	newController.Spec.Replicas = 5
 
