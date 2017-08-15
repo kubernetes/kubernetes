@@ -172,10 +172,7 @@ func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 	// so we don't return the original. BeforeUpdate can mutate the returned object, doing things like clearing ResourceVersion.
 	// If we're re-called, we need to be able to return the pristine version.
 	if newObj != nil {
-		newObj, err = i.copier.Copy(newObj)
-		if err != nil {
-			return nil, err
-		}
+		newObj = newObj.DeepCopyObject()
 	}
 
 	// Allow any configured transformers to update the new object
