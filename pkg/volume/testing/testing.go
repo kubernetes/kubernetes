@@ -50,6 +50,7 @@ type fakeVolumeHost struct {
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	writer     io.Writer
+	nodeLabels map[string]string
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
@@ -58,6 +59,12 @@ func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 
 func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
 	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud)
+}
+
+func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+	volHost.nodeLabels = labels
+	return volHost
 }
 
 func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
@@ -149,7 +156,10 @@ func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.Co
 }
 
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
-	return map[string]string{"test-label": "test-value"}, nil
+	if f.nodeLabels == nil {
+		f.nodeLabels = map[string]string{"test-label": "test-value"}
+	}
+	return f.nodeLabels, nil
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
