@@ -322,11 +322,14 @@ func (r *Request) setParam(paramName, value string) *Request {
 	return r
 }
 
-func (r *Request) SetHeader(key, value string) *Request {
+func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
-	r.headers.Set(key, value)
+	r.headers.Del(key)
+	for _, value := range values {
+		r.headers.Add(key, value)
+	}
 	return r
 }
 
