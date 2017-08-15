@@ -18,6 +18,13 @@ package scheduling
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+const (
+	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
+	// that do not specify any priority class and there is no priority class
+	// marked as default.
+	DefaultPriorityWhenNoDefaultClassExists = 0
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
