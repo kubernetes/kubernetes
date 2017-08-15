@@ -424,16 +424,7 @@ func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	glog.V(3).Infof("Reconciling federated service: %s", key)
 
 	// Create a copy before modifying the service to prevent race condition with other readers of service from store
-	fedServiceObj, err := api.Scheme.DeepCopy(service)
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("Error in copying obj: %s, %v", key, err))
-		return statusNonRecoverableError
-	}
-	fedService, ok := fedServiceObj.(*v1.Service)
-	if err != nil || !ok {
-		runtime.HandleError(fmt.Errorf("Unknown obj received from store: %#v, %v", fedServiceObj, err))
-		return statusNonRecoverableError
-	}
+	fedService := service.DeepCopy()
 
 	// Handle deletion of federated service
 	if fedService.DeletionTimestamp != nil {
@@ -546,7 +537,7 @@ func getOperationsToPerformOnCluster(informer fedutil.FederatedInformer, cluster
 
 	desiredService := &v1.Service{
 		ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(fedService.ObjectMeta),
-		Spec:       *(fedutil.DeepCopyApiTypeOrPanic(&fedService.Spec).(*v1.ServiceSpec)),
+		Spec:       *fedService.Spec.DeepCopy(),
 	}
 	switch {
 	case found && send:
