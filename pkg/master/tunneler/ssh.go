@@ -56,11 +56,11 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 		}
 		lag := tunneler.SecondsSinceSync()
 		if lag > 600 {
-			return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
+			return fmt.Errorf("Tunnel sync is taking too long: %d", lag)
 		}
 		sshKeyLag := tunneler.SecondsSinceSSHKeySync()
 		if sshKeyLag > 600 {
-			return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
+			return fmt.Errorf("SSHKey sync is taking too long: %d", sshKeyLag)
 		}
 		return nil
 	}
