@@ -3884,8 +3884,8 @@ message TCPSocketAction {
   optional string host = 2;
 }
 
-// The node this Taint is attached to has the effect "effect" on
-// any pod that that does not tolerate the Taint.
+// The node this Taint is attached to has the "effect" on
+// any pod that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
   // +patchMergeKey=key
