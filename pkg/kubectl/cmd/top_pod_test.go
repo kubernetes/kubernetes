@@ -139,7 +139,7 @@ func TestTopPod(t *testing.T) {
 		tf.ClientConfig = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdTopPod(f, buf)
+		cmd := NewCmdTopPod(f, nil, buf)
 		for name, value := range testCase.flags {
 			cmd.Flags().Set(name, value)
 		}

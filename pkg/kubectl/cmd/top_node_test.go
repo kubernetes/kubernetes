@@ -67,7 +67,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -116,7 +116,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Run(cmd, []string{expectedMetrics.Name})
 
 	// Check the presence of node names in the output.
@@ -176,7 +176,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Flags().Set("selector", label)
 	cmd.Run(cmd, []string{})
 
