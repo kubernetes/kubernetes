@@ -543,11 +543,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		glog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
-		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
-		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
-		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
@@ -877,26 +874,11 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Added, Object: object}
+		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
 	case curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Modified, Object: object}
+		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
 	case !curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.PrevObject)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: event.PrevObject.DeepCopyObject()}
 	}
 
 	// We need to ensure that if we put event X to the c.result, all

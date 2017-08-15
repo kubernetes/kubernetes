@@ -123,12 +123,7 @@ func makeTestPod(name string) *example.Pod {
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := scheme.DeepCopy(obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*example.Pod), nil, nil
+		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
