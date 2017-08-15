@@ -34,4 +34,8 @@ type Backend interface {
 	// Run will initialize the backend. It must not block, but may run go routines in the background. If
 	// stopCh is closed, it is supposed to stop them. Run will be called before the first call to ProcessEvents.
 	Run(stopCh <-chan struct{}) error
+
+	// Shutdown will synchronously shut down the backend while making sure that all pending
+	// events are delivered.
+	Shutdown()
 }

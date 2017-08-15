@@ -21,8 +21,10 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server"
-	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/util/logs"
 )
 
@@ -34,9 +36,10 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := server.NewCommandStartCustomResourceDefinitionsServer(os.Stdout, os.Stderr, wait.NeverStop)
+	stopCh := genericapiserver.SetupSignalHandler()
+	cmd := server.NewCommandStartCustomResourceDefinitionsServer(os.Stdout, os.Stderr, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
-		panic(err)
+		glog.Fatal(err)
 	}
 }

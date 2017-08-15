@@ -38,7 +38,7 @@ func NewKubelet() (*Server, error) {
 		queries Docker to see what is currently running.  It synchronizes the
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
-		Run: func(_ *Server, _ []string) error {
+		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
 			return app.Run(s, nil)
 		},
 	}

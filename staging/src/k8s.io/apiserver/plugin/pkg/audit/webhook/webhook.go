@@ -117,6 +117,10 @@ func (b *blockingBackend) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
+func (b *blockingBackend) Shutdown() {
+	// nothing to do here
+}
+
 func (b *blockingBackend) ProcessEvents(ev ...*auditinternal.Event) {
 	if err := b.processEvents(ev...); err != nil {
 		audit.HandlePluginError(pluginName, err, ev...)
@@ -201,6 +205,10 @@ func (b *batchBackend) Run(stopCh <-chan struct{}) error {
 		}
 	}()
 	return nil
+}
+
+func (b *batchBackend) Shutdown() {
+	// TODO: send out batched events
 }
 
 // sendBatchEvents attempts to batch some number of events to the backend. It POSTs events
