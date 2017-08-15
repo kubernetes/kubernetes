@@ -39,7 +39,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["taint_test.go"],
+    srcs = [
+        "taint_test.go",
+        "toleration_test.go",
+    ],
     library = ":go_default_library",
 )
 
