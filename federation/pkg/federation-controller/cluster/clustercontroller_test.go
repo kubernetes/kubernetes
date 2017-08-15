@@ -22,17 +22,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	controllerutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
@@ -125,16 +123,9 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	}
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 
-	// Override KubeconfigGetterForSecret to avoid having to setup service accounts and mount files with secret tokens.
-	originalGetter := controllerutil.KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = func(s *api.Secret) clientcmd.KubeconfigGetter {
-		return func() (*clientcmdapi.Config, error) {
-			return &clientcmdapi.Config{}, nil
-		}
-	}
-
 	manager := newClusterController(federationClientSet, 5)
-	err = manager.UpdateClusterStatus()
+	manager.addToClusterSet(federationCluster)
+	err = manager.updateClusterStatus()
 	if err != nil {
 		t.Errorf("Failed to Update Cluster Status: %v", err)
 	}
@@ -146,9 +137,6 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 			t.Errorf("Failed to Update Cluster Status")
 		}
 	}
-
-	// Reset KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = originalGetter
 }
 
 // Test races between informer's updates and routine updates of cluster status
@@ -170,29 +158,16 @@ func TestUpdateClusterRace(t *testing.T) {
 	}
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 
-	// Override KubeconfigGetterForSecret to avoid having to setup service accounts and mount files with secret tokens.
-	originalGetter := controllerutil.KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = func(s *api.Secret) clientcmd.KubeconfigGetter {
-		return func() (*clientcmdapi.Config, error) {
-			return &clientcmdapi.Config{}, nil
-		}
-	}
+	manager := newClusterController(federationClientSet, 1*time.Millisecond)
 
-	manager := newClusterController(federationClientSet, 5)
-
-	go func() {
-		for {
-			manager.UpdateClusterStatus()
-		}
-	}()
+	stop := make(chan struct{})
+	manager.Run(stop)
 
 	// try to trigger the race in UpdateClusterStatus
 	for i := 0; i < 10; i++ {
-		manager.GetClusterClient(federationCluster)
 		manager.addToClusterSet(federationCluster)
 		manager.delFromClusterSet(federationCluster)
 	}
 
-	// Reset KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = originalGetter
+	close(stop)
 }
