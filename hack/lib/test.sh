@@ -250,6 +250,17 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
+# Compare sort-by resource name output with expected order specify in the last parameter
+kube::test::if_sort_by_has_correct_order() {
+  local array=($(echo "$1" |awk '{if(NR!=1) print $1}'))
+  local var
+  for i in "${array[@]}"; do
+    var+="$i:"
+  done
+
+  kube::test::if_has_string "$var" "${@:$#}"
+}
+
 kube::test::if_has_string() {
   local message=$1
   local match=$2
