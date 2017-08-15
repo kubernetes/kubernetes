@@ -22,12 +22,12 @@ import (
 	"github.com/ghodss/yaml"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -45,7 +45,7 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 		return err
 	}
 
-	cm := &v1.ConfigMap{
+	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.MasterConfigurationConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -53,15 +53,5 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 		Data: map[string]string{
 			kubeadmconstants.MasterConfigurationConfigMapKey: string(cfgYaml),
 		},
-	}
-
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
-			return err
-		}
-	}
-	return nil
+	})
 }

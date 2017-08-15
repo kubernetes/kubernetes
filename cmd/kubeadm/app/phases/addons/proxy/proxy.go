@@ -23,17 +23,14 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/version"
-	k8sversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -41,9 +38,12 @@ const (
 	// KubeProxyClusterRoleName sets the name for the kube-proxy ClusterRole
 	// TODO: This k8s-generic, well-known constant should be fetchable from another source, not be in this package
 	KubeProxyClusterRoleName = "system:node-proxier"
+
+	// KubeProxyServiceAccountName describes the name of the ServiceAccount for the kube-proxy addon
+	KubeProxyServiceAccountName = "kube-proxy"
 )
 
-// EnsureProxyAddon creates the kube-proxy and kube-dns addons
+// EnsureProxyAddon creates the kube-proxy addons
 func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
 		return fmt.Errorf("error when creating kube-proxy service account: %v", err)
@@ -70,41 +70,30 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
 	}
 
-	if err = createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
+	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: kube-proxy")
-
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
-	}
-	if err = CreateRBACRules(client, k8sVersion); err != nil {
+	if err := CreateRBACRules(client); err != nil {
 		return fmt.Errorf("error when creating kube-proxy RBAC rules: %v", err)
 	}
 
+	fmt.Println("[addons] Applied essential addon: kube-proxy")
 	return nil
 }
 
 // CreateServiceAccount creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
 func CreateServiceAccount(client clientset.Interface) error {
-	sa := v1.ServiceAccount{
+
+	return apiclient.CreateOrUpdateServiceAccount(client, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeProxyServiceAccountName,
+			Name:      KubeProxyServiceAccountName,
 			Namespace: metav1.NamespaceSystem,
 		},
-	}
-
-	if _, err := client.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
-func CreateRBACRules(client clientset.Interface, k8sVersion *k8sversion.Version) error {
+func CreateRBACRules(client clientset.Interface) error {
 	if err := createClusterRoleBindings(client); err != nil {
 		return err
 	}
@@ -117,14 +106,9 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
 	}
 
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(kubeproxyConfigMap); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create a new kube-proxy configmap: %v", err)
-		}
-
-		if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(kubeproxyConfigMap); err != nil {
-			return fmt.Errorf("unable to update the kube-proxy configmap: %v", err)
-		}
+	// Create the ConfigMap for kube-proxy or update it in case it already exists
+	if err := apiclient.CreateOrUpdateConfigMap(client, kubeproxyConfigMap); err != nil {
+		return err
 	}
 
 	kubeproxyDaemonSet := &extensions.DaemonSet{}
@@ -132,20 +116,15 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
 
-	if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Create(kubeproxyDaemonSet); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create a new kube-proxy daemonset: %v", err)
-		}
-
-		if _, err := client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Update(kubeproxyDaemonSet); err != nil {
-			return fmt.Errorf("unable to update the kube-proxy daemonset: %v", err)
-		}
+	// Create the DaemonSet for kube-proxy or update it in case it already exists
+	if err := apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet); err != nil {
+		return err
 	}
 	return nil
 }
 
 func createClusterRoleBindings(client clientset.Interface) error {
-	return apiclientutil.CreateClusterRoleBindingIfNotExists(client, &rbac.ClusterRoleBinding{
+	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubeadm:node-proxier",
 		},
@@ -157,7 +136,7 @@ func createClusterRoleBindings(client clientset.Interface) error {
 		Subjects: []rbac.Subject{
 			{
 				Kind:      rbac.ServiceAccountKind,
-				Name:      kubeadmconstants.KubeProxyServiceAccountName,
+				Name:      KubeProxyServiceAccountName,
 				Namespace: metav1.NamespaceSystem,
 			},
 		},

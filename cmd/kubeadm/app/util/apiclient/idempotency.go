@@ -14,49 +14,77 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package apiclient
 
 import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
+// TODO: We may want to retry if .Update() fails on 409 Conflict
 
-// CreateClusterRoleIfNotExists creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateClusterRoleIfNotExists(client clientset.Interface, clusterRole *rbac.ClusterRole) error {
-	if _, err := client.RbacV1beta1().ClusterRoles().Create(clusterRole); err != nil {
+// CreateOrUpdateConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create RBAC clusterrole: %v", err)
+			return fmt.Errorf("unable to create configmap: %v", err)
 		}
 
-		if _, err := client.RbacV1beta1().ClusterRoles().Update(clusterRole); err != nil {
-			return fmt.Errorf("unable to update RBAC clusterrole: %v", err)
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
+			return fmt.Errorf("unable to update configmap: %v", err)
 		}
 	}
 	return nil
 }
 
-// CreateClusterRoleBindingIfNotExists creates a ClusterRoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateClusterRoleBindingIfNotExists(client clientset.Interface, clusterRoleBinding *rbac.ClusterRoleBinding) error {
-	if _, err := client.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
+// CreateOrUpdateServiceAccount creates a ServiceAccount if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAccount) error {
+	if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(sa); err != nil {
+		// Note: We don't run .Update here afterwards as that's probably not required
+		// Only thing that could be updated is annotations/labels in .metadata, but we don't use that currently
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create RBAC clusterrolebinding: %v", err)
-		}
-
-		if _, err := client.RbacV1beta1().ClusterRoleBindings().Update(clusterRoleBinding); err != nil {
-			return fmt.Errorf("unable to update RBAC clusterrolebinding: %v", err)
+			return fmt.Errorf("unable to create serviceaccount: %v", err)
 		}
 	}
 	return nil
 }
 
-// CreateRoleIfNotExists creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateRoleIfNotExists(client clientset.Interface, role *rbac.Role) error {
+// CreateOrUpdateDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateDeployment(client clientset.Interface, deploy *extensions.Deployment) error {
+	if _, err := client.ExtensionsV1beta1().Deployments(deploy.ObjectMeta.Namespace).Create(deploy); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create deployment: %v", err)
+		}
+
+		if _, err := client.ExtensionsV1beta1().Deployments(deploy.ObjectMeta.Namespace).Update(deploy); err != nil {
+			return fmt.Errorf("unable to update deployment: %v", err)
+		}
+	}
+	return nil
+}
+
+// CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateDaemonSet(client clientset.Interface, ds *extensions.DaemonSet) error {
+	if _, err := client.ExtensionsV1beta1().DaemonSets(ds.ObjectMeta.Namespace).Create(ds); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create daemonset: %v", err)
+		}
+
+		if _, err := client.ExtensionsV1beta1().DaemonSets(ds.ObjectMeta.Namespace).Update(ds); err != nil {
+			return fmt.Errorf("unable to update daemonset: %v", err)
+		}
+	}
+	return nil
+}
+
+// CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	if _, err := client.RbacV1beta1().Roles(role.ObjectMeta.Namespace).Create(role); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("unable to create RBAC role: %v", err)
@@ -69,8 +97,8 @@ func CreateRoleIfNotExists(client clientset.Interface, role *rbac.Role) error {
 	return nil
 }
 
-// CreateRoleBindingIfNotExists creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateRoleBindingIfNotExists(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
+// CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
 	if _, err := client.RbacV1beta1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(roleBinding); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("unable to create RBAC rolebinding: %v", err)
@@ -83,15 +111,29 @@ func CreateRoleBindingIfNotExists(client clientset.Interface, roleBinding *rbac.
 	return nil
 }
 
-// CreateConfigMapIfNotExists creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateConfigMapIfNotExists(client clientset.Interface, cm *v1.ConfigMap) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
+// CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.ClusterRole) error {
+	if _, err := client.RbacV1beta1().ClusterRoles().Create(clusterRole); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create configmap: %v", err)
+			return fmt.Errorf("unable to create RBAC clusterrole: %v", err)
 		}
 
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
-			return fmt.Errorf("unable to update configmap: %v", err)
+		if _, err := client.RbacV1beta1().ClusterRoles().Update(clusterRole); err != nil {
+			return fmt.Errorf("unable to update RBAC clusterrole: %v", err)
+		}
+	}
+	return nil
+}
+
+// CreateOrUpdateClusterRoleBinding creates a ClusterRoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBinding *rbac.ClusterRoleBinding) error {
+	if _, err := client.RbacV1beta1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create RBAC clusterrolebinding: %v", err)
+		}
+
+		if _, err := client.RbacV1beta1().ClusterRoleBindings().Update(clusterRoleBinding); err != nil {
+			return fmt.Errorf("unable to update RBAC clusterrolebinding: %v", err)
 		}
 	}
 	return nil

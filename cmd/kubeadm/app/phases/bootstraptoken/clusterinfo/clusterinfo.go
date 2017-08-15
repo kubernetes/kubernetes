@@ -26,7 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	apiclientutil "k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
@@ -59,7 +59,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	}
 
 	// Create or update the ConfigMap in the kube-public namespace
-	return apiclientutil.CreateConfigMapIfNotExists(client, &v1.ConfigMap{
+	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapapi.ConfigMapClusterInfo,
 			Namespace: metav1.NamespacePublic,
@@ -72,7 +72,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 // CreateClusterInfoRBACRules creates the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace to unauthenticated users
 func CreateClusterInfoRBACRules(client clientset.Interface) error {
-	err := apiclientutil.CreateRoleIfNotExists(client, &rbac.Role{
+	err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,
@@ -85,7 +85,7 @@ func CreateClusterInfoRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclientutil.CreateRoleBindingIfNotExists(client, &rbac.RoleBinding{
+	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,

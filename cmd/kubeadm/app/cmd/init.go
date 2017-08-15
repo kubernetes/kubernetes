@@ -47,7 +47,9 @@ import (
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -246,10 +248,14 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubeadmutil.CreateClientAndWaitForAPI(kubeadmconstants.GetAdminKubeConfigPath())
+	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
+	// TODO: Don't wait forever here
+	apiclient.WaitForAPI(client)
 
 	// PHASE 4: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
