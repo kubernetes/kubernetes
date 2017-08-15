@@ -157,7 +157,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
-			allocatable, found := node.Status.Allocatable["cpu"]
+			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 			Expect(found).To(Equal(true))
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
@@ -201,10 +201,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					Labels: map[string]string{"name": ""},
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 						Requests: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 					},
 				}), true, framework.Logf))
@@ -215,7 +215,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+					v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 				},
 			},
 		}

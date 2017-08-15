@@ -278,20 +278,20 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	// we need the max one to keep the same cpu/mem use rate
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
 	for _, node := range nodes {
-		memAllocatable, found := node.Status.Allocatable["memory"]
+		memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
 		Expect(found).To(Equal(true))
 		memAllocatableVal := memAllocatable.Value()
 
-		cpuAllocatable, found := node.Status.Allocatable["cpu"]
+		cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 		Expect(found).To(Equal(true))
 		cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 		needCreateResource := v1.ResourceList{}
 		cpuFraction := cpuFractionMap[node.Name]
 		memFraction := memFractionMap[node.Name]
-		needCreateResource["cpu"] = *resource.NewMilliQuantity(int64((ratio-cpuFraction)*float64(cpuAllocatableMil)), resource.DecimalSI)
+		needCreateResource[v1.ResourceCPU] = *resource.NewMilliQuantity(int64((ratio-cpuFraction)*float64(cpuAllocatableMil)), resource.DecimalSI)
 
-		needCreateResource["memory"] = *resource.NewQuantity(int64((ratio-memFraction)*float64(memAllocatableVal)), resource.BinarySI)
+		needCreateResource[v1.ResourceMemory] = *resource.NewQuantity(int64((ratio-memFraction)*float64(memAllocatableVal)), resource.BinarySI)
 
 		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
 			*initPausePod(f, pausePodConfig{
@@ -332,12 +332,12 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
 		}
 	}
-	cpuAllocatable, found := node.Status.Allocatable["cpu"]
+	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 	Expect(found).To(Equal(true))
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
-	memAllocatable, found := node.Status.Allocatable["memory"]
+	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
 	Expect(found).To(Equal(true))
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)

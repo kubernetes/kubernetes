@@ -390,12 +390,12 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 		},
 	}
@@ -438,9 +438,9 @@ func TestZeroRequest(t *testing.T) {
 			{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						"cpu": resource.MustParse(
+						v1.ResourceCPU: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
-						"memory": resource.MustParse(
+						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
 					},
 				},
@@ -455,9 +455,9 @@ func TestZeroRequest(t *testing.T) {
 			{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						"cpu": resource.MustParse(
+						v1.ResourceCPU: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
-						"memory": resource.MustParse(
+						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
 					},
 				},
