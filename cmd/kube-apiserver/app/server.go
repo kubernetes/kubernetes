@@ -430,6 +430,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 			versionedInformers.Core().V1().Services().Lister(),
 		)
 	}
+	genericConfig.SharedInformerFactory = versionedInformers
 
 	genericConfig.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, sharedInformers)
 	if err != nil {
