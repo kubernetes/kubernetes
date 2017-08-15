@@ -181,7 +181,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
-	subsystems, err := GetCgroupSubsystems()
+	subsystems, err := GetCgroupSubsystems(&nodeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}

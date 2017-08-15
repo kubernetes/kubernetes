@@ -436,6 +436,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.VolumePluginDir = in.VolumePluginDir
 	out.KubeletCgroups = in.KubeletCgroups
+	out.ExcludeCgroupSubsystems = *(*[]string)(unsafe.Pointer(&in.ExcludeCgroupSubsystems))
 	out.RuntimeCgroups = in.RuntimeCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
@@ -616,6 +617,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.VolumePluginDir = in.VolumePluginDir
 	out.KubeletCgroups = in.KubeletCgroups
+	if in.ExcludeCgroupSubsystems == nil {
+		out.ExcludeCgroupSubsystems = make([]string, 0)
+	} else {
+		out.ExcludeCgroupSubsystems = *(*[]string)(unsafe.Pointer(&in.ExcludeCgroupSubsystems))
+	}
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CgroupsPerQOS, &out.CgroupsPerQOS, s); err != nil {
 		return err
 	}

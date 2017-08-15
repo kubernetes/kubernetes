@@ -398,6 +398,9 @@ type KubeletConfiguration struct {
 	VolumePluginDir string `json:"volumePluginDir"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups"`
+	// Comma-separated list of cgroup subsystem names, kubelet won't create cgroups
+	// in mounts with these subsystems attached
+	ExcludeCgroupSubsystems []string `json:"excludeCgroupSubsystems"`
 	// runtimeCgroups are cgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string `json:"runtimeCgroups"`
 	// systemCgroups is absolute name of cgroups in which to place

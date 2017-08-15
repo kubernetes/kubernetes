@@ -311,6 +311,7 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *componentconfig.KubeletConfigur
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 
 	fs.StringVar(&c.KubeletCgroups, "kubelet-cgroups", c.KubeletCgroups, "Optional absolute name of cgroups to create and run the Kubelet in.")
+	fs.StringSliceVar(&c.ExcludeCgroupSubsystems, "experimental-exclude-cgroup-subsystems", c.ExcludeCgroupSubsystems, "Comma-separated list of subsystem names. Kubelet won't create cgroups in mounts with these subsystems attached.")
 	fs.StringVar(&c.SystemCgroups, "system-cgroups", c.SystemCgroups, "Optional absolute name of cgroups in which to place all non-kernel processes that are not already inside a cgroup under `/`. Empty for no container. Rolling back the flag requires a reboot.")
 
 	fs.BoolVar(&c.CgroupsPerQOS, "cgroups-per-qos", c.CgroupsPerQOS, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")

@@ -25,9 +25,11 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
 const (
@@ -144,7 +146,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 }
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+func GetCgroupSubsystems(nodeConfig *NodeConfig) (*CgroupSubsystems, error) {
 	// get all cgroup mounts.
 	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
 	if err != nil {
@@ -153,14 +155,42 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 	if len(allCgroups) == 0 {
 		return &CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
+
+	cgroups := make([]libcontainercgroups.Mount, 0)
+
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
+		needAdd := true
+		atLeastOne := false
+
 		for _, subsystem := range mount.Subsystems {
-			mountPoints[subsystem] = mount.Mountpoint
+
+			if nodeConfig != nil {
+				if !sliceutils.StringInSlice(subsystem, nodeConfig.ExcludeCgroupSubsystems) {
+					atLeastOne = true
+				} else {
+					needAdd = false
+				}
+			} else {
+				atLeastOne = true
+			}
+		}
+
+		if needAdd {
+			cgroups = append(cgroups, mount)
+
+			for _, subsystem := range mount.Subsystems {
+				mountPoints[subsystem] = mount.Mountpoint
+			}
+		} else if atLeastOne {
+			return &CgroupSubsystems{}, fmt.Errorf("You need to enable all subsystems, attached to %s", mount.Mountpoint)
+		} else {
+			glog.Warningf("Skipping cgroups mount point %s", mount.Mountpoint)
 		}
 	}
+
 	return &CgroupSubsystems{
-		Mounts:      allCgroups,
+		Mounts:      cgroups,
 		MountPoints: mountPoints,
 	}, nil
 }

@@ -139,7 +139,7 @@ func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error
 
 func runTest(f *framework.Framework) error {
 	var oldCfg *componentconfig.KubeletConfiguration
-	subsystems, err := cm.GetCgroupSubsystems()
+	subsystems, err := cm.GetCgroupSubsystems(nil)
 	if err != nil {
 		return err
 	}

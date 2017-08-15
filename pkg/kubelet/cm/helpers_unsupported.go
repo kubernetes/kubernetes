@@ -45,7 +45,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 }
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+func GetCgroupSubsystems(nodeConfig *NodeConfig) (*CgroupSubsystems, error) {
 	return nil, nil
 }
 

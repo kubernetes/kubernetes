@@ -442,6 +442,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	if in.ExcludeCgroupSubsystems != nil {
+		in, out := &in.ExcludeCgroupSubsystems, &out.ExcludeCgroupSubsystems
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.CgroupsPerQOS != nil {
 		in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
 		if *in == nil {
