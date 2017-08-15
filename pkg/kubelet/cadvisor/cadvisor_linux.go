@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -108,7 +109,9 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 
 	if _, err := os.Stat(rootPath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("rootDirectory %q does not exist", rootPath)
+			if err := os.MkdirAll(path.Clean(rootPath), 0750); err != nil {
+				return nil, fmt.Errorf("error creating root directory %q: %v", rootPath, err)
+			}
 		} else {
 			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
 		}
