@@ -88,6 +88,8 @@ go_test(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
