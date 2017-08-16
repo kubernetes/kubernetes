@@ -50,6 +50,7 @@ func (r *ProxyREST) New() runtime.Object {
 	return &api.Node{}
 }
 
+// Destroy releases resources
 func (r *ProxyREST) Destroy() {
 	r.Store.Destroy()
 }

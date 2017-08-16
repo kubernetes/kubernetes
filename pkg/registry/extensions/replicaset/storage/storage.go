@@ -113,6 +113,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &extensions.ReplicaSet{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }
@@ -144,6 +145,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
+// Destroy releases resources
 func (r *ScaleREST) Destroy() {}
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {

@@ -84,6 +84,7 @@ func (r *REST) New() runtime.Object {
 	return r.store.New()
 }
 
+// Destroy releases resources
 func (r *REST) Destroy() {
 	r.store.Destroy()
 }
@@ -220,6 +221,7 @@ func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }
@@ -238,6 +240,7 @@ func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
 
+// Destroy releases resources
 func (r *FinalizeREST) Destroy() {
 	r.store.Destroy()
 }

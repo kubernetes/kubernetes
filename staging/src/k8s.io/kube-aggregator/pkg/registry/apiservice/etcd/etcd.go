@@ -72,6 +72,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &apiregistration.APIService{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

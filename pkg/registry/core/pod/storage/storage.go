@@ -135,6 +135,7 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
+// Destroy releases resources
 func (r *BindingREST) Destroy() {
 	r.store.Destroy()
 }
@@ -213,6 +214,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

@@ -70,6 +70,7 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Destroy releases resources
 func (r *EvictionREST) Destroy() {
 	r.store.Destroy()
 }

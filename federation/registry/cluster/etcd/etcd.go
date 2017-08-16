@@ -40,6 +40,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &federation.Cluster{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

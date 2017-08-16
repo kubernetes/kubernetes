@@ -81,6 +81,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }
@@ -99,6 +100,7 @@ func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Destroy releases resources
 func (r *ApprovalREST) Destroy() {
 	r.store.Destroy()
 }

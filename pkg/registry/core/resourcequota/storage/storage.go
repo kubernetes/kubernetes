@@ -74,6 +74,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &api.ResourceQuota{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

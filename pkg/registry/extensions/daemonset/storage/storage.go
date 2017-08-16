@@ -87,6 +87,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &extensions.DaemonSet{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

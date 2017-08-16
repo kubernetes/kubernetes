@@ -516,6 +516,7 @@ func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
+// Destroy releases resources
 func (storage *SimpleRESTStorage) Destroy() {}
 
 func (storage *SimpleRESTStorage) NewList() runtime.Object {
@@ -621,6 +622,7 @@ func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
+// Destroy releases resources
 func (s *ConnecterRESTStorage) Destroy() {}
 
 func (s *ConnecterRESTStorage) Connect(ctx request.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
@@ -746,6 +748,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
 
+// Destroy releases resources
 func (storage *SimpleTypedStorage) Destroy() {}
 
 func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -887,6 +890,7 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
+// Destroy releases resources
 func (UnimplementedRESTStorage) Destroy() {}
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -3875,6 +3879,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
 
+// Destroy releases resources
 func (storage *SimpleXGSubresourceRESTStorage) Destroy() {}
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {

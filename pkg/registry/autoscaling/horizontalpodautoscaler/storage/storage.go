@@ -81,6 +81,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &autoscaling.HorizontalPodAutoscaler{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

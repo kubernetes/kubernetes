@@ -51,6 +51,7 @@ func (r *ProxyREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *ProxyREST) Destroy() {
 	r.Store.Destroy()
 }
@@ -97,6 +98,7 @@ func (r *AttachREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *AttachREST) Destroy() {
 	r.Store.Destroy()
 }
@@ -138,6 +140,7 @@ func (r *ExecREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *ExecREST) Destroy() {
 	r.Store.Destroy()
 }
@@ -179,6 +182,7 @@ func (r *PortForwardREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *PortForwardREST) Destroy() {
 	r.Store.Destroy()
 }

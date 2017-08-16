@@ -76,4 +76,5 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo)
 }
 
+// Destroy releases resources
 func (s *Storage) Destroy() {}

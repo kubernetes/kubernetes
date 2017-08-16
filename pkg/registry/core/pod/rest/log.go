@@ -46,6 +46,7 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
 func (r *LogREST) Destroy() {
 	r.Store.Destroy()
 }

@@ -114,6 +114,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &api.ReplicationController{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }
@@ -145,6 +146,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Destroy releases resources
 func (r *ScaleREST) Destroy() {
 }
 

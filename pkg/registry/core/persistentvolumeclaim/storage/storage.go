@@ -75,6 +75,7 @@ func (r *StatusREST) New() runtime.Object {
 	return &api.PersistentVolumeClaim{}
 }
 
+// Destroy releases resources
 func (r *StatusREST) Destroy() {
 	r.store.Destroy()
 }

@@ -312,4 +312,5 @@ func (p RESTStorageProvider) GroupName() string {
 	return rbac.GroupName
 }
 
+// Destroy releases resources
 func (p RESTStorageProvider) Destroy() {}
