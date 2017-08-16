@@ -323,7 +323,7 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	}
 
 	// Always include mandatory fit predicates.
-	for _, name := range mandatoryFitPredicates.List() {
+	for name := range mandatoryFitPredicates {
 		if factory, found := fitPredicateMap[name]; found {
 			predicates[name] = factory(args)
 		}
