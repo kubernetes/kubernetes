@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	kubeclientset "k8s.io/client-go/kubernetes"
+	kubecoreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	federationcoreclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
@@ -40,6 +42,14 @@ const (
 	NamespaceKind           = "namespace"
 	NamespaceControllerName = "namespaces"
 )
+
+type podsGetterWrapper struct {
+	podsGetter federationcoreclientset.PodsGetter
+}
+
+func (w *podsGetterWrapper) Pods(namespace string) kubecoreclientset.PodInterface {
+	return w.podsGetter.Pods(namespace)
+}
 
 func init() {
 	RegisterFederatedType(NamespaceKind, NamespaceControllerName, []schema.GroupVersionResource{apiv1.SchemeGroupVersion.WithResource(NamespaceControllerName)}, NewNamespaceAdapter)
@@ -56,7 +66,7 @@ func NewNamespaceAdapter(client federationclientset.Interface, config *restclien
 	deleter := deletion.NewNamespacedResourcesDeleter(
 		client.Core().Namespaces(),
 		dynamicClientPool,
-		nil,
+		&podsGetterWrapper{client.CoreV1()},
 		discoverResourcesFunc,
 		apiv1.FinalizerKubernetes,
 		false)
