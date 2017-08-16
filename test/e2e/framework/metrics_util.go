@@ -449,6 +449,10 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 		data = string(rawData)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
+		if TestContext.Provider == "gke" {
+			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+			return nil, nil
+		}
 		cmd := "curl http://localhost:10251/metrics"
 		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
