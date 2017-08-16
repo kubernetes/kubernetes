@@ -18,10 +18,10 @@ package api
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -3626,13 +3626,7 @@ type EventList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // List holds a list of objects, which may not be known by the server.
-type List struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	Items []runtime.Object
-}
+type List metainternalversion.List
 
 // A type of object that is limited
 type LimitType string

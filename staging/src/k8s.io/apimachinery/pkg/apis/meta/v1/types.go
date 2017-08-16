@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -678,6 +679,20 @@ const (
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// List holds a list of objects, which may not be known by the server.
+type List struct {
+	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// List of objects
+	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.

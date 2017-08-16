@@ -19,7 +19,6 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -4150,16 +4149,7 @@ type EventList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // List holds a list of objects, which may not be known by the server.
-type List struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// List of objects
-	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
+type List metav1.List
 
 // LimitType is a type of object that is limited
 type LimitType string
