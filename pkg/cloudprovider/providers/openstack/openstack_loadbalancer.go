@@ -570,6 +570,34 @@ func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, d
 	return defaultSetting
 }
 
+// getSubnetIDForLB returns subnet-id for a specific node
+func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string, error) {
+	ipAddress, err := nodeAddressForLB(&node)
+	if err != nil {
+		return "", err
+	}
+
+	instanceID := node.Spec.ProviderID
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
+	}
+
+	interfaces, err := getAttachedInterfacesByID(compute, instanceID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, intf := range interfaces {
+		for _, fixedIP := range intf.FixedIPs {
+			if fixedIP.IPAddress == ipAddress {
+				return intf.NetID, nil
+			}
+		}
+	}
+
+	return "", ErrNotFound
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in
@@ -579,7 +607,15 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	if len(lbaas.opts.SubnetId) == 0 {
-		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			return nil, fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
 	}
 
 	ports := apiService.Spec.Ports
@@ -947,7 +983,15 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	if len(lbaas.opts.SubnetId) == 0 {
-		return fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", service.Namespace, service.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
 	}
 
 	ports := service.Spec.Ports
@@ -1226,7 +1270,15 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	if len(lb.opts.SubnetId) == 0 {
-		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lb.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			return nil, fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lb.opts.SubnetId = subnetID
 	}
 
 	ports := apiService.Spec.Ports

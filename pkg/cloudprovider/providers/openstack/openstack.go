@@ -77,7 +77,7 @@ type LoadBalancer struct {
 
 type LoadBalancerOpts struct {
 	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. v1 or v2
-	SubnetId             string     `gcfg:"subnet-id"`           // required
+	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
 	CreateMonitor        bool       `gcfg:"create-monitor"`
@@ -220,12 +220,6 @@ func readInstanceID() (string, error) {
 // check opts for OpenStack
 func checkOpenStackOpts(openstackOpts *OpenStack) error {
 	lbOpts := openstackOpts.lbOpts
-
-	// subnet-id is required
-	if len(lbOpts.SubnetId) == 0 {
-		glog.Warningf("subnet-id not set in cloud provider config. " +
-			"OpenStack Load balancer will not work.")
-	}
 
 	// if need to create health monitor for Neutron LB,
 	// monitor-delay, monitor-timeout and monitor-max-retries should be set.
