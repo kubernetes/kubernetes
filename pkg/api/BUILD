@@ -102,7 +102,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/endpoints:all-srcs",
-        "//pkg/api/errors:all-srcs",
         "//pkg/api/events:all-srcs",
         "//pkg/api/fuzzer:all-srcs",
         "//pkg/api/helper:all-srcs",
