@@ -14,23 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO: Delete this file if we generate a clientset.
-package audit
+package install
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
+	"testing"
+
+	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apiserver/pkg/apis/audit/fuzzer"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-
-func init() {
-	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	v1alpha1.AddToScheme(Scheme)
-	v1beta1.AddToScheme(Scheme)
+func TestRoundTrip(t *testing.T) {
+	roundtrip.RoundTripTestForAPIGroup(t, Install, fuzzer.Funcs)
 }
