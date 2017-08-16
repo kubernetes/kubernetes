@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -391,4 +389,5 @@ filegroup(
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

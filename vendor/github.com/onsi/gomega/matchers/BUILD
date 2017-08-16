@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -47,6 +42,7 @@ go_library(
         "type_support.go",
         "with_transform.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",
         "//vendor/github.com/onsi/gomega/internal/oraclematcher:go_default_library",
@@ -73,4 +69,5 @@ filegroup(
         "//vendor/github.com/onsi/gomega/matchers/support/goraph/util:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
