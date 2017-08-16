@@ -76,6 +76,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -212,6 +220,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -300,6 +316,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -660,6 +684,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -760,6 +792,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -847,6 +887,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -932,6 +980,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -1073,6 +1129,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1161,6 +1225,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -1521,6 +1593,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1621,6 +1701,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -1706,6 +1794,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        }
@@ -1963,6 +2059,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -2099,6 +2203,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -2187,6 +2299,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -2547,6 +2667,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -2647,6 +2775,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -2732,6 +2868,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        }
@@ -3154,6 +3298,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -3290,6 +3442,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -3378,6 +3538,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -3738,6 +3906,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -3838,6 +4014,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -3923,6 +4107,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        }
@@ -4345,6 +4537,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -4481,6 +4681,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -4569,6 +4777,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        },
@@ -4929,6 +5145,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -5029,6 +5253,14 @@
         "description": "Timeout for the list/watch call.",
         "required": false,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+        "required": false,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -5114,6 +5346,14 @@
         "paramType": "query",
         "name": "timeoutSeconds",
         "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "clusterSelector",
+        "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
         "required": false,
         "allowMultiple": false
        }

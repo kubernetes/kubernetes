@@ -13,7 +13,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//federation/apis/core:all-srcs",
         "//federation/apis/federation:all-srcs",
         "//federation/client/cache:all-srcs",
         "//federation/client/clientset_generated/federation_clientset:all-srcs",
@@ -29,6 +28,10 @@ filegroup(
         "//federation/pkg/kubefed:all-srcs",
         "//federation/plugin/pkg/admission/schedulingpolicy:all-srcs",
         "//federation/registry/cluster:all-srcs",
+        "//federation/registry/core/node/storage:all-srcs",
+        "//federation/registry/core/pod/storage:all-srcs",
+        "//federation/registry/extensions/replicaset/storage:all-srcs",
+        "//federation/registry/proxy:all-srcs",
     ],
     tags = ["automanaged"],
 )

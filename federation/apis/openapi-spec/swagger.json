@@ -113,6 +113,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -203,6 +210,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -272,6 +286,13 @@
      ],
      "operationId": "listCoreV1Namespace",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -412,6 +433,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -533,6 +561,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -872,6 +907,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -993,6 +1035,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedEvent",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -1308,6 +1357,526 @@
      }
     ]
    },
+   "/api/v1/namespaces/{namespace}/pods": {
+    "get": {
+     "description": "list or watch objects of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PodList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "list",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "post": {
+     "description": "create a Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "delete": {
+     "description": "delete collection of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1CollectionNamespacedPod",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "deletecollection",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/pods/{name}": {
+    "get": {
+     "description": "read the specified Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1NamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "put": {
+     "description": "replace the specified Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "replaceCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "delete": {
+     "description": "delete a Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+       "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+       "name": "propagationPolicy",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "delete",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "patch": {
+     "description": "partially update the specified Pod",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "patchCoreV1NamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/pods/{name}/status": {
+    "get": {
+     "description": "read status of the specified Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1NamespacedPodStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/namespaces/{namespace}/secrets": {
     "get": {
      "description": "list or watch objects of kind Secret",
@@ -1329,6 +1898,13 @@
      ],
      "operationId": "listCoreV1NamespacedSecret",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -1453,6 +2029,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedSecret",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -1792,6 +2375,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -1913,6 +2503,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedService",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -2820,6 +3417,599 @@
      }
     ]
    },
+   "/api/v1/nodes": {
+    "get": {
+     "description": "list or watch objects of kind Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1Node",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.NodeList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "list",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "post": {
+     "description": "create a Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "createCoreV1Node",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "post",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "delete": {
+     "description": "delete collection of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1CollectionNode",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "If true, partially initialized resources are included in the response.",
+       "name": "includeUninitialized",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "deletecollection",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/nodes/{name}": {
+    "get": {
+     "description": "read the specified Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1Node",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "put": {
+     "description": "replace the specified Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "replaceCoreV1Node",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "put",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "delete": {
+     "description": "delete a Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCoreV1Node",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+       "name": "gracePeriodSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+       "name": "orphanDependents",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+       "name": "propagationPolicy",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "delete",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "patch": {
+     "description": "partially update the specified Node",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "patchCoreV1Node",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "patch",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Node",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/nodes/{name}/status": {
+    "get": {
+     "description": "read status of the specified Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readCoreV1NodeStatus",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "get",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Node",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/pods": {
+    "get": {
+     "description": "list or watch objects of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listCoreV1PodForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PodList"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "list",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/secrets": {
     "get": {
      "description": "list or watch objects of kind Secret",
@@ -2859,6 +4049,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -2952,6 +4149,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -3039,6 +4243,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -3132,6 +4343,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -3222,6 +4440,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -3309,6 +4534,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -3407,6 +4639,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -3516,6 +4755,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -3614,6 +4860,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -3636,6 +4889,224 @@
       "uniqueItems": true,
       "type": "string",
       "description": "name of the Event",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/pods": {
+    "get": {
+     "description": "watch individual changes to a list of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedPodList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "watchlist",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/pods/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NamespacedPod",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "watch",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Pod",
       "name": "name",
       "in": "path",
       "required": true
@@ -3717,6 +5188,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -3815,6 +5293,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -3924,6 +5409,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -4019,6 +5511,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -4128,6 +5627,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -4153,6 +5659,305 @@
       "name": "name",
       "in": "path",
       "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/nodes": {
+    "get": {
+     "description": "watch individual changes to a list of Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1NodeList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "watchlist",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/nodes/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind Node",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1Node",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "watch",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the Node",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/pods": {
+    "get": {
+     "description": "watch individual changes to a list of Pod",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchCoreV1PodListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     },
+     "x-kubernetes-action": "watchlist",
+     "x-kubernetes-group-version-kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "If true, partially initialized resources are included in the response.",
+      "name": "includeUninitialized",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
      },
      {
       "uniqueItems": true,
@@ -4223,6 +6028,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -4313,6 +6125,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -4505,6 +6324,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -4592,6 +6418,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -4685,6 +6518,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -4754,6 +6594,13 @@
      ],
      "operationId": "listExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -4878,6 +6725,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDaemonSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -5371,6 +7225,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -5492,6 +7353,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDeployment",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -6211,6 +8079,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -6332,6 +8207,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedIngress",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -6825,6 +8707,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -6949,6 +8838,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -7043,22 +8939,6 @@
       "extensions_v1beta1"
      ],
      "operationId": "readExtensionsV1beta1NamespacedReplicaSet",
-     "parameters": [
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
-       "name": "exact",
-       "in": "query"
-      },
-      {
-       "uniqueItems": true,
-       "type": "boolean",
-       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
-       "name": "export",
-       "in": "query"
-      }
-     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -7611,6 +9491,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -7698,6 +9585,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -7791,6 +9685,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -7881,6 +9782,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -7968,6 +9876,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8066,6 +9981,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8175,6 +10097,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -8270,6 +10199,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8379,6 +10315,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -8474,6 +10417,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8583,6 +10533,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -8678,6 +10635,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8784,6 +10748,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -8925,6 +10896,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -9046,6 +11024,13 @@
      ],
      "operationId": "deleteFederationV1beta1CollectionCluster",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -9451,6 +11436,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -9538,6 +11530,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -9713,6 +11712,23 @@
      "podAntiAffinity": {
       "description": "Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).",
       "$ref": "#/definitions/io.k8s.api.core.v1.PodAntiAffinity"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.AttachedVolume": {
+    "description": "AttachedVolume describes a volume attached to a node",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "devicePath": {
+      "description": "DevicePath represents the device path where the volume should be available",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name of the attached volume",
+      "type": "string"
      }
     }
    },
@@ -10110,6 +12126,26 @@
      }
     }
    },
+   "io.k8s.api.core.v1.ContainerImage": {
+    "description": "Describe a container image",
+    "required": [
+     "names"
+    ],
+    "properties": {
+     "names": {
+      "description": "Names by which this image is known. e.g. [\"gcr.io/google_containers/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "sizeBytes": {
+      "description": "The size of the image in bytes.",
+      "type": "integer",
+      "format": "int64"
+     }
+    }
+   },
    "io.k8s.api.core.v1.ContainerPort": {
     "description": "ContainerPort represents a network port in a single container.",
     "required": [
@@ -10137,6 +12173,141 @@
      "protocol": {
       "description": "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\".",
       "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerState": {
+    "description": "ContainerState holds a possible state of container. Only one of its members may be specified. If none of them is specified, the default one is ContainerStateWaiting.",
+    "properties": {
+     "running": {
+      "description": "Details about a running container",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateRunning"
+     },
+     "terminated": {
+      "description": "Details about a terminated container",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateTerminated"
+     },
+     "waiting": {
+      "description": "Details about a waiting container",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStateWaiting"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerStateRunning": {
+    "description": "ContainerStateRunning is a running state of a container.",
+    "properties": {
+     "startedAt": {
+      "description": "Time at which the container was last (re-)started",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerStateTerminated": {
+    "description": "ContainerStateTerminated is a terminated state of a container.",
+    "required": [
+     "exitCode"
+    ],
+    "properties": {
+     "containerID": {
+      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'",
+      "type": "string"
+     },
+     "exitCode": {
+      "description": "Exit status from the last termination of the container",
+      "type": "integer",
+      "format": "int32"
+     },
+     "finishedAt": {
+      "description": "Time at which the container last terminated",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Message regarding the last termination of the container",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason from the last termination of the container",
+      "type": "string"
+     },
+     "signal": {
+      "description": "Signal from the last termination of the container",
+      "type": "integer",
+      "format": "int32"
+     },
+     "startedAt": {
+      "description": "Time at which previous execution of the container started",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerStateWaiting": {
+    "description": "ContainerStateWaiting is a waiting state of a container.",
+    "properties": {
+     "message": {
+      "description": "Message regarding why the container is not yet running.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason the container is not yet running.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.ContainerStatus": {
+    "description": "ContainerStatus contains details for the current status of this container.",
+    "required": [
+     "name",
+     "ready",
+     "restartCount",
+     "image",
+     "imageID"
+    ],
+    "properties": {
+     "containerID": {
+      "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'.",
+      "type": "string"
+     },
+     "image": {
+      "description": "The image the container is running. More info: https://kubernetes.io/docs/concepts/containers/images",
+      "type": "string"
+     },
+     "imageID": {
+      "description": "ImageID of the container's image.",
+      "type": "string"
+     },
+     "lastState": {
+      "description": "Details about the container's last termination condition.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerState"
+     },
+     "name": {
+      "description": "This must be a DNS_LABEL. Each container in a pod must have a unique name. Cannot be updated.",
+      "type": "string"
+     },
+     "ready": {
+      "description": "Specifies whether the container has passed its readiness probe.",
+      "type": "boolean"
+     },
+     "restartCount": {
+      "description": "The number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed. Note that this is calculated from dead containers. But those containers are subject to garbage collection. This value will get capped at 5 by GC.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "state": {
+      "description": "Details about the container's current condition.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ContainerState"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.DaemonEndpoint": {
+    "description": "DaemonEndpoint contains information about a single Daemon endpoint.",
+    "required": [
+     "Port"
+    ],
+    "properties": {
+     "Port": {
+      "description": "Port number of the given endpoint.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
@@ -10859,6 +13030,55 @@
      }
     }
    },
+   "io.k8s.api.core.v1.Node": {
+    "description": "Node is a worker node in Kubernetes. Each node will have a unique identifier in the cache (i.e. in etcd).",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec defines the behavior of a node. https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the node. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Node"
+     }
+    ]
+   },
+   "io.k8s.api.core.v1.NodeAddress": {
+    "description": "NodeAddress contains information for the node's address.",
+    "required": [
+     "type",
+     "address"
+    ],
+    "properties": {
+     "address": {
+      "description": "The node address.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Node address type, one of Hostname, ExternalIP or InternalIP.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.NodeAffinity": {
     "description": "Node affinity is a group of node affinity scheduling rules.",
     "properties": {
@@ -10874,6 +13094,105 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector"
      }
     }
+   },
+   "io.k8s.api.core.v1.NodeCondition": {
+    "description": "NodeCondition contains condition information for a node.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastHeartbeatTime": {
+      "description": "Last time we got an update on a given condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transit from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "(brief) reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of node condition.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.NodeConfigSource": {
+    "description": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "configMapRef": {
+      "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "NodeConfigSource"
+     }
+    ]
+   },
+   "io.k8s.api.core.v1.NodeDaemonEndpoints": {
+    "description": "NodeDaemonEndpoints lists ports opened by daemons running on the Node.",
+    "properties": {
+     "kubeletEndpoint": {
+      "description": "Endpoint on which Kubelet is listening.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.DaemonEndpoint"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.NodeList": {
+    "description": "NodeList is the whole list of all Nodes which have been registered with master.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "List of nodes",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "NodeList"
+     }
+    ]
    },
    "io.k8s.api.core.v1.NodeSelector": {
     "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
@@ -10926,6 +13245,165 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelectorRequirement"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.NodeSpec": {
+    "description": "NodeSpec describes the attributes that a node is created with.",
+    "properties": {
+     "configSource": {
+      "description": "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeConfigSource"
+     },
+     "externalID": {
+      "description": "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
+      "type": "string"
+     },
+     "podCIDR": {
+      "description": "PodCIDR represents the pod IP range assigned to the node.",
+      "type": "string"
+     },
+     "providerID": {
+      "description": "ID of the node assigned by the cloud provider in the format: \u003cProviderName\u003e://\u003cProviderSpecificNodeID\u003e",
+      "type": "string"
+     },
+     "taints": {
+      "description": "If specified, the node's taints.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Taint"
+      }
+     },
+     "unschedulable": {
+      "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
+      "type": "boolean"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.NodeStatus": {
+    "description": "NodeStatus is information about the current status of a node.",
+    "properties": {
+     "addresses": {
+      "description": "List of addresses reachable to the node. Queried from cloud provider, if available. More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.NodeAddress"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
+     "allocatable": {
+      "description": "Allocatable represents the resources of a node that are available for scheduling. Defaults to Capacity.",
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+      }
+     },
+     "capacity": {
+      "description": "Capacity represents the total resources of a node. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+      "type": "object",
+      "additionalProperties": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+      }
+     },
+     "conditions": {
+      "description": "Conditions is an array of current observed node conditions. More info: https://kubernetes.io/docs/concepts/nodes/node/#condition",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.NodeCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
+     "daemonEndpoints": {
+      "description": "Endpoints of daemons running on the Node.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeDaemonEndpoints"
+     },
+     "images": {
+      "description": "List of container images on this node",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.ContainerImage"
+      }
+     },
+     "nodeInfo": {
+      "description": "Set of ids/uuids to uniquely identify the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#info",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NodeSystemInfo"
+     },
+     "phase": {
+      "description": "NodePhase is the recently observed lifecycle phase of the node. More info: https://kubernetes.io/docs/concepts/nodes/node/#phase The field is never populated, and now is deprecated.",
+      "type": "string"
+     },
+     "volumesAttached": {
+      "description": "List of volumes that are attached to the node.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.AttachedVolume"
+      }
+     },
+     "volumesInUse": {
+      "description": "List of attachable volumes in use (mounted) by the node.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.NodeSystemInfo": {
+    "description": "NodeSystemInfo is a set of ids/uuids to uniquely identify the node.",
+    "required": [
+     "machineID",
+     "systemUUID",
+     "bootID",
+     "kernelVersion",
+     "osImage",
+     "containerRuntimeVersion",
+     "kubeletVersion",
+     "kubeProxyVersion",
+     "operatingSystem",
+     "architecture"
+    ],
+    "properties": {
+     "architecture": {
+      "description": "The Architecture reported by the node",
+      "type": "string"
+     },
+     "bootID": {
+      "description": "Boot ID reported by the node.",
+      "type": "string"
+     },
+     "containerRuntimeVersion": {
+      "description": "ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).",
+      "type": "string"
+     },
+     "kernelVersion": {
+      "description": "Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).",
+      "type": "string"
+     },
+     "kubeProxyVersion": {
+      "description": "KubeProxy Version reported by the node.",
+      "type": "string"
+     },
+     "kubeletVersion": {
+      "description": "Kubelet Version reported by the node.",
+      "type": "string"
+     },
+     "machineID": {
+      "description": "MachineID reported by the node. For unique machine identification in the cluster this field is preferred. Learn more from man(5) machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html",
+      "type": "string"
+     },
+     "operatingSystem": {
+      "description": "The Operating System reported by the node",
+      "type": "string"
+     },
+     "osImage": {
+      "description": "OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).",
+      "type": "string"
+     },
+     "systemUUID": {
+      "description": "SystemUUID reported by the node. For unique machine identification MachineID is preferred. This field is specific to Red Hat hosts https://access.redhat.com/documentation/en-US/Red_Hat_Subscription_Management/1/html/RHSM/getting-system-uuid.html",
+      "type": "string"
      }
     }
    },
@@ -11010,6 +13488,38 @@
      }
     }
    },
+   "io.k8s.api.core.v1.Pod": {
+    "description": "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PodSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PodStatus"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Pod"
+     }
+    ]
+   },
    "io.k8s.api.core.v1.PodAffinity": {
     "description": "Pod affinity is a group of inter pod affinity scheduling rules.",
     "properties": {
@@ -11067,6 +13577,73 @@
       }
      }
     }
+   },
+   "io.k8s.api.core.v1.PodCondition": {
+    "description": "PodCondition contains details for the current condition of this pod.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status is the status of the condition. Can be True, False, Unknown. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type is the type of the condition. Currently only Ready. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PodList": {
+    "description": "PodList is a list of Pods.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "List of pods. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "PodList"
+     }
+    ]
    },
    "io.k8s.api.core.v1.PodSecurityContext": {
     "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
@@ -11238,6 +13815,62 @@
       },
       "x-kubernetes-patch-merge-key": "name",
       "x-kubernetes-patch-strategy": "merge,retainKeys"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PodStatus": {
+    "description": "PodStatus represents information about the status of a pod. Status may trail the actual state of a system.",
+    "properties": {
+     "conditions": {
+      "description": "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PodCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
+     "containerStatuses": {
+      "description": "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStatus"
+      }
+     },
+     "hostIP": {
+      "description": "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
+      "type": "string"
+     },
+     "initContainerStatuses": {
+      "description": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.ContainerStatus"
+      }
+     },
+     "message": {
+      "description": "A human readable message indicating details about why the pod is in this condition.",
+      "type": "string"
+     },
+     "phase": {
+      "description": "Current condition of the pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-phase",
+      "type": "string"
+     },
+     "podIP": {
+      "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+      "type": "string"
+     },
+     "qosClass": {
+      "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md",
+      "type": "string"
+     },
+     "reason": {
+      "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
+      "type": "string"
+     },
+     "startTime": {
+      "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
      }
     }
    },
@@ -11950,6 +14583,31 @@
      "port": {
       "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.Taint": {
+    "description": "The node this Taint is attached to has the \"effect\" on any pod that does not tolerate the Taint.",
+    "required": [
+     "key",
+     "effect"
+    ],
+    "properties": {
+     "effect": {
+      "description": "Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.",
+      "type": "string"
+     },
+     "key": {
+      "description": "Required. The taint key to be applied to a node.",
+      "type": "string"
+     },
+     "timeAdded": {
+      "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "value": {
+      "description": "Required. The taint value corresponding to the taint key.",
+      "type": "string"
      }
     }
    },

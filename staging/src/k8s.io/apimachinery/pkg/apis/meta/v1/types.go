@@ -339,7 +339,7 @@ type ListOptions struct {
 	// Used in federation only, selects clusters to list the objects in
 	// Defaults to federation control plane.
 	// +optional
-	ClusterSelector string `json:"clusterSelector,omitempty"`
+	ClusterSelector string `json:"clusterSelector,omitempty" protobuf:"bytes,7,opt,name=clusterSelector"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -370,7 +370,7 @@ type GetOptions struct {
 	// Used in federation only, selects name of the cluster to get the object
 	// Defaults to federation control plane.
 	// +optional
-	ClusterName string `json:"clusterName,omitempty"`
+	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,3,opt,name=clusterName"`
 }
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of

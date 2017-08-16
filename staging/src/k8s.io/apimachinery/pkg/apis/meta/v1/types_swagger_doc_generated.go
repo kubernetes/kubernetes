@@ -109,6 +109,7 @@ var map_GetOptions = map[string]string{
 	"":                     "GetOptions is the standard query options to the standard REST get call.",
 	"resourceVersion":      "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 	"includeUninitialized": "If true, partially initialized resources are included in the response.",
+	"clusterName":          "Used in federation only, selects name of the cluster to get the object Defaults to federation control plane.",
 }
 
 func (GetOptions) SwaggerDoc() map[string]string {
@@ -193,6 +194,7 @@ var map_ListOptions = map[string]string{
 	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
 	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 	"timeoutSeconds":       "Timeout for the list/watch call.",
+	"clusterSelector":      "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
