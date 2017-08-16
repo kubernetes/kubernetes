@@ -250,7 +250,7 @@ func validatePath(targetPath string) error {
 	}
 
 	if len(targetPath) > maxPathLength {
-		return fmt.Errorf("invalid path: must be less than %d characters", maxPathLength)
+		return fmt.Errorf("invalid path: must be less than or equal to %d characters", maxPathLength)
 	}
 
 	items := strings.Split(targetPath, string(os.PathSeparator))
@@ -259,7 +259,7 @@ func validatePath(targetPath string) error {
 			return fmt.Errorf("invalid path: must not contain '..': %s", targetPath)
 		}
 		if len(item) > maxFileNameLength {
-			return fmt.Errorf("invalid path: filenames must be less than %d characters", maxFileNameLength)
+			return fmt.Errorf("invalid path: filenames must be less than or equal to %d characters", maxFileNameLength)
 		}
 	}
 	if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
