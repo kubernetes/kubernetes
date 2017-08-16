@@ -21,13 +21,11 @@ import (
 
 	// ensure the core apis are installed
 	_ "k8s.io/kubernetes/pkg/api/install"
-	// ensure the kubeletconfig apis are installed
-	_ "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/install"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 )
 
 // TODO(mtaufen): allow an encoder to be injected into checkpoint objects at creation time? (then we could ultimately instantiate only one encoder)
@@ -50,28 +48,18 @@ func NewJSONEncoder(groupName string) (runtime.Encoder, error) {
 	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
 }
 
-// DecodeKubeletConfiguration decodes an encoded (v1alpha1) KubeletConfiguration object to the internal type
-func DecodeKubeletConfiguration(data []byte) (*kubeletconfig.KubeletConfiguration, error) {
-	// decode the object, note we use the external version scheme to decode, because users provide the external version
-	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(kubeletconfigv1alpha1.SchemeGroupVersion), data)
+// DecodeKubeletConfiguration decodes a serialized KubeletConfiguration to the internal type
+func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []byte) (*kubeletconfig.KubeletConfiguration, error) {
+	// the UniversalDecoder runs defaulting and returns the internal type by default
+	obj, gvk, err := kubeletCodecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
 
-	externalKC, ok := obj.(*kubeletconfigv1alpha1.KubeletConfiguration)
+	internalKC, ok := obj.(*kubeletconfig.KubeletConfiguration)
 	if !ok {
-		return nil, fmt.Errorf("failed to cast object to KubeletConfiguration, object: %#v", obj)
+		return nil, fmt.Errorf("failed to cast object to KubeletConfiguration, unexpected type: %v", gvk)
 	}
 
-	// TODO(mtaufen): confirm whether api.Codecs.UniversalDecoder runs the defaulting, which would make this redundant
-	// run the defaulter on the decoded configuration before converting to internal type
-	api.Scheme.Default(externalKC)
-
-	// convert to internal type
-	internalKC := &kubeletconfig.KubeletConfiguration{}
-	err = api.Scheme.Convert(externalKC, internalKC, nil)
-	if err != nil {
-		return nil, err
-	}
 	return internalKC, nil
 }
