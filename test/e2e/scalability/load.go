@@ -518,7 +518,9 @@ func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Servi
 }
 
 func sleepUpTo(d time.Duration) {
-	time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
+	if d.Nanoseconds() > 0 {
+		time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
+	}
 }
 
 func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration) {
