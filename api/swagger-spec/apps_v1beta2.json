@@ -4634,7 +4634,7 @@
   "models": {
    "v1beta2.DaemonSetList": {
     "id": "v1beta2.DaemonSetList",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetList is a collection of daemon sets.",
+    "description": "DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -4676,7 +4676,7 @@
    },
    "v1beta2.DaemonSet": {
     "id": "v1beta2.DaemonSet",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSet represents the configuration of a daemon set.",
+    "description": "DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "kind": {
       "type": "string",
@@ -4940,7 +4940,7 @@
    },
    "v1beta2.DaemonSetSpec": {
     "id": "v1beta2.DaemonSetSpec",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetSpec is the specification of a daemon set.",
+    "description": "DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
@@ -6979,7 +6979,7 @@
    },
    "v1beta2.DaemonSetUpdateStrategy": {
     "id": "v1beta2.DaemonSetUpdateStrategy",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it.",
+    "description": "DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.",
     "properties": {
      "type": {
       "type": "string",
@@ -6993,7 +6993,7 @@
    },
    "v1beta2.RollingUpdateDaemonSet": {
     "id": "v1beta2.RollingUpdateDaemonSet",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of daemon set rolling update.",
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -7003,7 +7003,7 @@
    },
    "v1beta2.DaemonSetStatus": {
     "id": "v1beta2.DaemonSetStatus",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetStatus represents the current status of a daemon set.",
+    "description": "DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -7129,7 +7129,7 @@
    },
    "v1beta2.DeploymentList": {
     "id": "v1beta2.DeploymentList",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentList is a list of Deployments.",
+    "description": "DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -7157,7 +7157,7 @@
    },
    "v1beta2.Deployment": {
     "id": "v1beta2.Deployment",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7183,7 +7183,7 @@
    },
    "v1beta2.DeploymentSpec": {
     "id": "v1beta2.DeploymentSpec",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -7228,7 +7228,7 @@
    },
    "v1beta2.DeploymentStrategy": {
     "id": "v1beta2.DeploymentStrategy",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "type": {
       "type": "string",
@@ -7242,7 +7242,7 @@
    },
    "v1beta2.RollingUpdateDeployment": {
     "id": "v1beta2.RollingUpdateDeployment",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of rolling update.",
+    "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -7256,7 +7256,7 @@
    },
    "v1beta2.DeploymentStatus": {
     "id": "v1beta2.DeploymentStatus",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "observedGeneration": {
       "type": "integer",
@@ -7304,7 +7304,7 @@
    },
    "v1beta2.DeploymentCondition": {
     "id": "v1beta2.DeploymentCondition",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -7338,7 +7338,7 @@
    },
    "v1beta2.Scale": {
     "id": "v1beta2.Scale",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Scale represents a scaling request for a resource.",
+    "description": "Scale represents a scaling request for a resource.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7364,7 +7364,7 @@
    },
    "v1beta2.ScaleSpec": {
     "id": "v1beta2.ScaleSpec",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ScaleSpec describes the attributes of a scale subresource",
+    "description": "ScaleSpec describes the attributes of a scale subresource",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -7375,7 +7375,7 @@
    },
    "v1beta2.ScaleStatus": {
     "id": "v1beta2.ScaleStatus",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ScaleStatus represents the current status of a scale subresource.",
+    "description": "ScaleStatus represents the current status of a scale subresource.",
     "required": [
      "replicas"
     ],
@@ -7397,7 +7397,7 @@
    },
    "v1beta2.ReplicaSetList": {
     "id": "v1beta2.ReplicaSetList",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetList is a collection of ReplicaSets.",
+    "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
      "items"
     ],
@@ -7425,7 +7425,7 @@
    },
    "v1beta2.ReplicaSet": {
     "id": "v1beta2.ReplicaSet",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7451,7 +7451,7 @@
    },
    "v1beta2.ReplicaSetSpec": {
     "id": "v1beta2.ReplicaSetSpec",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -7475,7 +7475,7 @@
    },
    "v1beta2.ReplicaSetStatus": {
     "id": "v1beta2.ReplicaSetStatus",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
     ],
@@ -7516,7 +7516,7 @@
    },
    "v1beta2.ReplicaSetCondition": {
     "id": "v1beta2.ReplicaSetCondition",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
     "required": [
      "type",
      "status"
@@ -7546,7 +7546,7 @@
    },
    "v1beta2.StatefulSetList": {
     "id": "v1beta2.StatefulSetList",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetList is a collection of StatefulSets.",
+    "description": "StatefulSetList is a collection of StatefulSets.",
     "required": [
      "items"
     ],
@@ -7572,7 +7572,7 @@
    },
    "v1beta2.StatefulSet": {
     "id": "v1beta2.StatefulSet",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7597,7 +7597,7 @@
    },
    "v1beta2.StatefulSetSpec": {
     "id": "v1beta2.StatefulSetSpec",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. A StatefulSetSpec is the specification of a StatefulSet.",
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
      "template",
      "serviceName"
@@ -7724,7 +7724,7 @@
    },
    "v1beta2.StatefulSetUpdateStrategy": {
     "id": "v1beta2.StatefulSetUpdateStrategy",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+    "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
     "properties": {
      "type": {
       "type": "string",
@@ -7738,7 +7738,7 @@
    },
    "v1beta2.RollingUpdateStatefulSetStrategy": {
     "id": "v1beta2.RollingUpdateStatefulSetStrategy",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
       "type": "integer",
@@ -7749,7 +7749,7 @@
    },
    "v1beta2.StatefulSetStatus": {
     "id": "v1beta2.StatefulSetStatus",
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetStatus represents the current state of a StatefulSet.",
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
     "required": [
      "replicas"
     ],

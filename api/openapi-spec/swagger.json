@@ -53531,7 +53531,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DaemonSet": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSet represents the configuration of a daemon set.",
+    "description": "DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -53563,7 +53563,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.DaemonSetList": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetList is a collection of daemon sets.",
+    "description": "DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -53597,7 +53597,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.DaemonSetSpec": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetSpec is the specification of a daemon set.",
+    "description": "DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
@@ -53627,7 +53627,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DaemonSetStatus": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DaemonSetStatus represents the current status of a daemon set.",
+    "description": "DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -53683,7 +53683,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DaemonSetUpdateStrategy": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it.",
+    "description": "DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.",
     "properties": {
      "rollingUpdate": {
       "description": "Rolling update config params. Present only if type = \"RollingUpdate\".",
@@ -53696,7 +53696,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.Deployment": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -53728,7 +53728,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.DeploymentCondition": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -53761,7 +53761,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DeploymentList": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentList is a list of Deployments.",
+    "description": "DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -53795,7 +53795,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.DeploymentSpec": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -53839,7 +53839,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DeploymentStatus": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
@@ -53888,7 +53888,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.DeploymentStrategy": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "rollingUpdate": {
       "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
@@ -53901,7 +53901,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.ReplicaSet": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -53933,7 +53933,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.ReplicaSetCondition": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
     "required": [
      "type",
      "status"
@@ -53962,7 +53962,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.ReplicaSetList": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetList is a collection of ReplicaSets.",
+    "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
      "items"
     ],
@@ -53996,7 +53996,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.ReplicaSetSpec": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
     "properties": {
      "minReadySeconds": {
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
@@ -54019,7 +54019,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.ReplicaSetStatus": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
     ],
@@ -54061,7 +54061,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.RollingUpdateDaemonSet": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of daemon set rolling update.",
+    "description": "Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
      "maxUnavailable": {
       "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
@@ -54070,7 +54070,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.RollingUpdateDeployment": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Spec to control the desired behavior of rolling update.",
+    "description": "Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
       "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
@@ -54083,7 +54083,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.RollingUpdateStatefulSetStrategy": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
       "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
@@ -54093,7 +54093,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.Scale": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. Scale represents a scaling request for a resource.",
+    "description": "Scale represents a scaling request for a resource.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -54125,7 +54125,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.ScaleSpec": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ScaleSpec describes the attributes of a scale subresource",
+    "description": "ScaleSpec describes the attributes of a scale subresource",
     "properties": {
      "replicas": {
       "description": "desired number of instances for the scaled object.",
@@ -54135,7 +54135,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.ScaleStatus": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. ScaleStatus represents the current status of a scale subresource.",
+    "description": "ScaleStatus represents the current status of a scale subresource.",
     "required": [
      "replicas"
     ],
@@ -54159,7 +54159,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.StatefulSet": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -54190,7 +54190,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.StatefulSetList": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetList is a collection of StatefulSets.",
+    "description": "StatefulSetList is a collection of StatefulSets.",
     "required": [
      "items"
     ],
@@ -54222,7 +54222,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta2.StatefulSetSpec": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. A StatefulSetSpec is the specification of a StatefulSet.",
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
      "template",
      "serviceName"
@@ -54268,7 +54268,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.StatefulSetStatus": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetStatus represents the current state of a StatefulSet.",
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
     "required": [
      "replicas"
     ],
@@ -54314,7 +54314,7 @@
     }
    },
    "io.k8s.api.apps.v1beta2.StatefulSetUpdateStrategy": {
-    "description": "WIP: This is not ready to be used and we plan to make breaking changes to it. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+    "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
     "properties": {
      "rollingUpdate": {
       "description": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
