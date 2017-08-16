@@ -249,7 +249,7 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 	ssc.queue.Done(key)
 
@@ -260,7 +260,7 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 	ssc.queue.Done(key)
 }
@@ -317,7 +317,7 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 
 	prev = *pod2
@@ -329,7 +329,7 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 }
 
@@ -430,7 +430,7 @@ func TestStatefulSetControllerDeletePod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 
 	ssc.deletePod(pod2)
@@ -440,7 +440,7 @@ func TestStatefulSetControllerDeletePod(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 }
 
@@ -474,7 +474,7 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	} else if key, ok := key.(string); !ok {
 		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
-		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
+		t.Errorf("expected StatefulSet key = %s, want %s", expectedKey, key)
 	}
 }
 
