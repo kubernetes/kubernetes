@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
@@ -45,6 +47,28 @@ const (
 	clusters   string = "clusters"
 )
 
+type fakeDiscoveryForFedNSTest struct {
+	fakediscovery.FakeDiscovery
+}
+
+// ServerPreferredNamespacedResources here overrides the fakeDiscovery ServerPreferredNamespacedResources()
+// implementation only for this federated unit test.
+func (f *fakeDiscoveryForFedNSTest) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	preferredFakeResources := []*metav1.APIResourceList{}
+	preferredFakeResources = append(preferredFakeResources, &metav1.APIResourceList{})
+
+	return preferredFakeResources, nil
+}
+
+type fakeClientSetForFedNSTest struct {
+	fakefedclientset.Clientset
+}
+
+// Discovery overrides the fakefedclientset Discovery() method only for this federated unit test.
+func (fc *fakeClientSetForFedNSTest) Discovery() discovery.DiscoveryInterface {
+	return &fakeDiscoveryForFedNSTest{FakeDiscovery: fakediscovery.FakeDiscovery{Fake: &fc.Fake}}
+}
+
 func TestNamespaceController(t *testing.T) {
 	cluster1 := NewCluster("cluster1", apiv1.ConditionTrue)
 	cluster2 := NewCluster("cluster2", apiv1.ConditionTrue)
@@ -58,7 +82,7 @@ func TestNamespaceController(t *testing.T) {
 		},
 	}
 
-	fakeClient := &fakefedclientset.Clientset{}
+	fakeClient := &fakeClientSetForFedNSTest{}
 	RegisterFakeList(clusters, &fakeClient.Fake, &federationapi.ClusterList{Items: []federationapi.Cluster{*cluster1}})
 	RegisterFakeList(namespaces, &fakeClient.Fake, &apiv1.NamespaceList{Items: []apiv1.Namespace{}})
 	namespaceWatch := RegisterFakeWatch(namespaces, &fakeClient.Fake)
