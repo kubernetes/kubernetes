@@ -56,7 +56,6 @@ go_library(
         "rollingupdate.go",
         "run.go",
         "scale.go",
-        "stop.go",
         "taint.go",
         "top.go",
         "top_node.go",
