@@ -25,7 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+)
+
+const (
+	volumeName      = "k8s"
+	volumeMountName = "k8s"
 )
 
 type tlsKeyPair struct {
@@ -36,16 +42,16 @@ type tlsKeyPair struct {
 
 func k8sSelfHostedVolumeMount() v1.VolumeMount {
 	return v1.VolumeMount{
-		Name:      "k8s",
+		Name:      volumeMountName,
 		MountPath: kubeadmconstants.KubernetesDir,
 		ReadOnly:  true,
 	}
 }
 
-func apiServerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
+func apiServerVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
+	var volumeSource v1.VolumeSource
+	if features.Enabled(cfg.FeatureFlags, features.StoreCertsInSecrets) {
+		volumeSource = v1.VolumeSource{
 			Projected: &v1.ProjectedVolumeSource{
 				Sources: []v1.VolumeProjection{
 					{
@@ -148,14 +154,24 @@ func apiServerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
 					},
 				},
 			},
-		},
+		}
+	} else {
+		volumeSource = v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: kubeadmconstants.KubernetesDir,
+			},
+		}
+	}
+	return v1.Volume{
+		Name:         volumeName,
+		VolumeSource: volumeSource,
 	}
 }
 
-func schedulerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
+func schedulerVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
+	var volumeSource v1.VolumeSource
+	if features.Enabled(cfg.FeatureFlags, features.StoreCertsInSecrets) {
+		volumeSource = v1.VolumeSource{
 			Projected: &v1.ProjectedVolumeSource{
 				Sources: []v1.VolumeProjection{
 					{
@@ -167,14 +183,24 @@ func schedulerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
 					},
 				},
 			},
-		},
+		}
+	} else {
+		volumeSource = v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: kubeadmconstants.KubernetesDir,
+			},
+		}
+	}
+	return v1.Volume{
+		Name:         volumeName,
+		VolumeSource: volumeSource,
 	}
 }
 
-func controllerManagerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
+func controllerManagerVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
+	var volumeSource v1.VolumeSource
+	if features.Enabled(cfg.FeatureFlags, features.StoreCertsInSecrets) {
+		volumeSource = v1.VolumeSource{
 			Projected: &v1.ProjectedVolumeSource{
 				Sources: []v1.VolumeProjection{
 					{
@@ -216,7 +242,17 @@ func controllerManagerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Vo
 					},
 				},
 			},
-		},
+		}
+	} else {
+		volumeSource = v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: kubeadmconstants.KubernetesDir,
+			},
+		}
+	}
+	return v1.Volume{
+		Name:         volumeName,
+		VolumeSource: volumeSource,
 	}
 }
 

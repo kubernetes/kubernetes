@@ -33,8 +33,7 @@ type FeatureList map[utilfeature.Feature]utilfeature.FeatureSpec
 
 // Enabled indicates whether a feature name has been enabled
 func Enabled(featureList map[string]bool, featureName utilfeature.Feature) bool {
-	_, ok := featureList[string(featureName)]
-	return ok
+	return featureList[string(featureName)]
 }
 
 // Supports indicates whether a feature name is supported on the given

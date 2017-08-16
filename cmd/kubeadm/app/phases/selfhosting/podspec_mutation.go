@@ -79,7 +79,7 @@ func setRightDNSPolicyOnPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1
 
 // setVolumesOnKubeAPIServerPodSpec makes sure the self-hosted api server has the required files
 func setVolumesOnKubeAPIServerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
-	setK8sVolume(apiServerProjectedVolume, cfg, podSpec)
+	setK8sVolume(apiServerVolume, cfg, podSpec)
 	for _, c := range podSpec.Containers {
 		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
 	}
@@ -87,7 +87,7 @@ func setVolumesOnKubeAPIServerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSp
 
 // setVolumesOnKubeControllerManagerPodSpec makes sure the self-hosted controller manager has the required files
 func setVolumesOnKubeControllerManagerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
-	setK8sVolume(controllerManagerProjectedVolume, cfg, podSpec)
+	setK8sVolume(controllerManagerVolume, cfg, podSpec)
 	for _, c := range podSpec.Containers {
 		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
 	}
@@ -95,7 +95,7 @@ func setVolumesOnKubeControllerManagerPodSpec(cfg *kubeadmapi.MasterConfiguratio
 
 // setVolumesOnKubeSchedulerPodSpec makes sure the self-hosted scheduler has the required files
 func setVolumesOnKubeSchedulerPodSpec(cfg *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
-	setK8sVolume(schedulerProjectedVolume, cfg, podSpec)
+	setK8sVolume(schedulerVolume, cfg, podSpec)
 	for _, c := range podSpec.Containers {
 		c.VolumeMounts = append(c.VolumeMounts, k8sSelfHostedVolumeMount())
 	}
