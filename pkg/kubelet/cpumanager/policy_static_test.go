@@ -80,7 +80,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 			pod:             makePod("1000m", "1000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
-			expCSet:         cpuset.NewCPUSet(1),
+			expCSet:         cpuset.NewCPUSet(4), // expect sibling of partial core
 		},
 		{
 			description: "GuPodMultipleCores, SingleSocketHT, ExpectAllocOneCore",

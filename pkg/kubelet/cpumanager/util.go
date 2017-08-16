@@ -114,12 +114,14 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 		func(i, j int) bool {
 			// Compute the number of CPUs on the same socket as i and j in
 			// the result.
-			iSocketScore := topo.CPUtopoDetails.CPUsInSocket(i).Intersection(result).Size()
-			jSocketScore := topo.CPUtopoDetails.CPUsInSocket(j).Intersection(result).Size()
+			iSocket := topo.CPUtopoDetails[cpuIDs[i]].SocketID
+			jSocket := topo.CPUtopoDetails[cpuIDs[j]].SocketID
+			iSocketScore := topo.CPUtopoDetails.CPUsInSocket(iSocket).Intersection(result).Size()
+			jSocketScore := topo.CPUtopoDetails.CPUsInSocket(jSocket).Intersection(result).Size()
 
 			// Compute the number of available CPUs on the same core as i and j.
-			iCoreScore := topoDetails.CPUsInCore(topoDetails[i].CoreID).Size()
-			jCoreScore := topoDetails.CPUsInCore(topoDetails[j].CoreID).Size()
+			iCoreScore := topoDetails.CPUsInCore(topoDetails[cpuIDs[i]].CoreID).Size()
+			jCoreScore := topoDetails.CPUsInCore(topoDetails[cpuIDs[j]].CoreID).Size()
 
 			return iSocketScore > jSocketScore || iCoreScore < jCoreScore || i < j
 		})

@@ -51,6 +51,14 @@ func TestTakeByTopology(t *testing.T) {
 			cpuset.NewCPUSet(0),
 		},
 		{
+			"take one cpu from single socket with HT, some cpus are taken",
+			topoSingleSocketHT,
+			cpuset.NewCPUSet(1, 3, 5, 6, 7),
+			1,
+			nil,
+			cpuset.NewCPUSet(6),
+		},
+		{
 			"take two cpus from single socket with HT",
 			topoSingleSocketHT,
 			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
@@ -73,6 +81,14 @@ func TestTakeByTopology(t *testing.T) {
 			2,
 			nil,
 			cpuset.NewCPUSet(2, 6),
+		},
+		{
+			"take three cpus from dual socket with HT - core from Socket 1",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(1, 2, 4, 5, 6, 7, 8, 10),
+			3,
+			nil,
+			cpuset.NewCPUSet(1, 5, 7),
 		},
 		{
 			"take a socket of cpus from dual socket with HT",
