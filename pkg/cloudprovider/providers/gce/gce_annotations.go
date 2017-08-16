@@ -16,7 +16,11 @@ limitations under the License.
 
 package gce
 
-import "k8s.io/kubernetes/pkg/api/v1"
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+
+	"github.com/golang/glog"
+)
 
 type LoadBalancerType string
 
@@ -26,12 +30,16 @@ const (
 	// Currently, only "internal" is supported.
 	ServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
 
-	LBTypeInternal LoadBalancerType = "internal"
+	LBTypeInternal LoadBalancerType = "Internal"
+	// Deprecating the lowercase spelling of Internal.
+	deprecatedTypeInternalLowerCase LoadBalancerType = "internal"
 
 	// ServiceAnnotationInternalBackendShare is annotated on a service with "true" when users
 	// want to share GCP Backend Services for a set of internal load balancers.
 	// ALPHA feature - this may be removed in a future release.
-	ServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
+	ServiceAnnotationILBBackendShare = "alpha.cloud.google.com/load-balancer-backend-share"
+	// This annotation did not correctly specify "alpha", so both annotations will be checked.
+	deprecatedServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
@@ -48,8 +56,8 @@ func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool)
 	}
 
 	switch v {
-	case LBTypeInternal:
-		return v, true
+	case LBTypeInternal, deprecatedTypeInternalLowerCase:
+		return LBTypeInternal, true
 	default:
 		return v, false
 	}
@@ -58,8 +66,13 @@ func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool)
 // GetLoadBalancerAnnotationBackendShare returns whether this service's backend service should be
 // shared with other load balancers. Health checks and the healthcheck firewall will be shared regardless.
 func GetLoadBalancerAnnotationBackendShare(service *v1.Service) bool {
-	l, exists := service.Annotations[ServiceAnnotationILBBackendShare]
-	if exists && l == "true" {
+	if l, exists := service.Annotations[ServiceAnnotationILBBackendShare]; exists && l == "true" {
+		return true
+	}
+
+	// Check for deprecated annotation key
+	if l, exists := service.Annotations[deprecatedServiceAnnotationILBBackendShare]; exists && l == "true" {
+		glog.Warningf("Annotation %q is deprecated and replaced with an alpha-specific key: %q", deprecatedServiceAnnotationILBBackendShare, ServiceAnnotationILBBackendShare)
 		return true
 	}
 
