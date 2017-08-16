@@ -109,6 +109,7 @@ func TestInitFederation(t *testing.T) {
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
 		isRBACAPIAvailable           bool
+		nodeSelector                 string
 	}{
 		{
 			federation:            "union",
@@ -126,6 +127,7 @@ func TestInitFederation(t *testing.T) {
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
 			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+			nodeSelector:          "disk=ssh,role=node",
 		},
 		{
 			federation:           "union",
@@ -246,7 +248,7 @@ func TestInitFederation(t *testing.T) {
 			tc.etcdImage = defaultEtcdImage
 		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.nodeSelector)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -291,6 +293,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.apiserverEnableTokenAuth {
 			cmd.Flags().Set("apiserver-enable-token-auth", "true")
+		}
+		if tc.nodeSelector != "" {
+			cmd.Flags().Set("node-selector", tc.nodeSelector)
 		}
 
 		cmd.Run(cmd, []string{tc.federation})
@@ -621,7 +626,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, nodeSelectorString string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -889,6 +894,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
+	nodeSelector, err := marshallOverrides(nodeSelectorString)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling --node-selector: %v", err)
+	}
+
 	apiserver := &v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -943,6 +953,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					NodeSelector: nodeSelector,
 					Volumes: []v1.Volume{
 						{
 							Name: credSecretName,
@@ -1051,6 +1062,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					NodeSelector: nodeSelector,
 					Volumes: []v1.Volume{
 						{
 							Name: cmKubeconfigSecretName,
