@@ -19,14 +19,15 @@ package codec
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	// ensure the core apis are installed
 	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	// ensure the componentconfig api group is installed
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	ccv1a1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	// ensure the kubeletconfig apis are installed
+	_ "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/install"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 )
 
 // TODO(mtaufen): allow an encoder to be injected into checkpoint objects at creation time? (then we could ultimately instantiate only one encoder)
@@ -50,15 +51,14 @@ func NewJSONEncoder(groupName string) (runtime.Encoder, error) {
 }
 
 // DecodeKubeletConfiguration decodes an encoded (v1alpha1) KubeletConfiguration object to the internal type
-func DecodeKubeletConfiguration(data []byte) (*componentconfig.KubeletConfiguration, error) {
-	// TODO(mtaufen): when KubeletConfiguration moves out of componentconfig, will the UniversalDecoder still work?
+func DecodeKubeletConfiguration(data []byte) (*kubeletconfig.KubeletConfiguration, error) {
 	// decode the object, note we use the external version scheme to decode, because users provide the external version
-	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(ccv1a1.SchemeGroupVersion), data)
+	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(kubeletconfigv1alpha1.SchemeGroupVersion), data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
 
-	externalKC, ok := obj.(*ccv1a1.KubeletConfiguration)
+	externalKC, ok := obj.(*kubeletconfigv1alpha1.KubeletConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast object to KubeletConfiguration, object: %#v", obj)
 	}
@@ -68,7 +68,7 @@ func DecodeKubeletConfiguration(data []byte) (*componentconfig.KubeletConfigurat
 	api.Scheme.Default(externalKC)
 
 	// convert to internal type
-	internalKC := &componentconfig.KubeletConfiguration{}
+	internalKC := &kubeletconfig.KubeletConfiguration{}
 	err = api.Scheme.Convert(externalKC, internalKC, nil)
 	if err != nil {
 		return nil, err

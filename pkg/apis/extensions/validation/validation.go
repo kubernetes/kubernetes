@@ -19,7 +19,6 @@ package validation
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -885,75 +884,5 @@ func ValidatePodSecurityPolicyUpdate(old *extensions.PodSecurityPolicy, new *ext
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-// ValidateNetworkPolicyName can be used to check whether the given networkpolicy
-// name is valid.
-func ValidateNetworkPolicyName(name string, prefix bool) []string {
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
-}
-
-// ValidateNetworkPolicySpec tests if required fields in the networkpolicy spec are set.
-func ValidateNetworkPolicySpec(spec *extensions.NetworkPolicySpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
-
-	// Validate ingress rules.
-	for i, ingress := range spec.Ingress {
-		ingressPath := fldPath.Child("ingress").Index(i)
-		for i, port := range ingress.Ports {
-			portPath := ingressPath.Child("ports").Index(i)
-			if port.Protocol != nil && *port.Protocol != api.ProtocolTCP && *port.Protocol != api.ProtocolUDP {
-				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), *port.Protocol, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-			}
-			if port.Port != nil {
-				if port.Port.Type == intstr.Int {
-					for _, msg := range validation.IsValidPortNum(int(port.Port.IntVal)) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.IntVal, msg))
-					}
-				} else {
-					for _, msg := range validation.IsValidPortName(port.Port.StrVal) {
-						allErrs = append(allErrs, field.Invalid(portPath.Child("port"), port.Port.StrVal, msg))
-					}
-				}
-			}
-		}
-		for i, from := range ingress.From {
-			fromPath := ingressPath.Child("from").Index(i)
-			numFroms := 0
-			if from.PodSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.PodSelector, fromPath.Child("podSelector"))...)
-			}
-			if from.NamespaceSelector != nil {
-				numFroms++
-				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.NamespaceSelector, fromPath.Child("namespaceSelector"))...)
-			}
-
-			if numFroms == 0 {
-				allErrs = append(allErrs, field.Required(fromPath, "must specify a from type"))
-			} else if numFroms > 1 {
-				allErrs = append(allErrs, field.Forbidden(fromPath, "may not specify more than 1 from type"))
-			}
-		}
-	}
-	return allErrs
-}
-
-// ValidateNetworkPolicy validates a networkpolicy.
-func ValidateNetworkPolicy(np *extensions.NetworkPolicy) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMeta(&np.ObjectMeta, true, ValidateNetworkPolicyName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateNetworkPolicySpec(&np.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-// ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
-func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	if !reflect.DeepEqual(update.Spec, old.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
-	}
 	return allErrs
 }

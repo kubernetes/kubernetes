@@ -30,7 +30,13 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
+)
+
+const (
+	// KubeDNSServiceAccountName describes the name of the ServiceAccount for the kube-dns addon
+	KubeDNSServiceAccountName = "kube-dns"
 )
 
 // EnsureDNSAddon creates the kube-dns addon
@@ -62,7 +68,7 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 
-	if err = createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
+	if err := createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
 		return err
 	}
 	fmt.Println("[addons] Applied essential addon: kube-dns")
@@ -71,18 +77,13 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 
 // CreateServiceAccount creates the necessary serviceaccounts that kubeadm uses/might use, if they don't already exist.
 func CreateServiceAccount(client clientset.Interface) error {
-	sa := v1.ServiceAccount{
+
+	return apiclient.CreateOrUpdateServiceAccount(client, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeDNSServiceAccountName,
+			Name:      KubeDNSServiceAccountName,
 			Namespace: metav1.NamespaceSystem,
 		},
-	}
-	if _, err := client.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(&sa); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
 func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
@@ -91,14 +92,9 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
 	}
 
-	if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Create(kubednsDeployment); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("unable to create a new kube-dns deployment: %v", err)
-		}
-
-		if _, err := client.ExtensionsV1beta1().Deployments(metav1.NamespaceSystem).Update(kubednsDeployment); err != nil {
-			return fmt.Errorf("unable to update the kube-dns deployment: %v", err)
-		}
+	// Create the Deployment for kube-dns or update it in case it already exists
+	if err := apiclient.CreateOrUpdateDeployment(client, kubednsDeployment); err != nil {
+		return err
 	}
 
 	kubednsService := &v1.Service{}
@@ -106,6 +102,7 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 		return fmt.Errorf("unable to decode kube-dns service %v", err)
 	}
 
+	// Can't use a generic apiclient helper func here as we have to tolerate more than AlreadyExists.
 	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(kubednsService); err != nil {
 		// Ignore if the Service is invalid with this error message:
 		// 	Service "kube-dns" is invalid: spec.clusterIP: Invalid value: "10.96.0.10": provided IP is already allocated

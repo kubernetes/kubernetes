@@ -8,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -17,7 +16,6 @@ go_library(
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/networking/v1:go_default_library",

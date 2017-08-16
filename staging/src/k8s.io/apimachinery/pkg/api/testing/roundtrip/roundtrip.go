@@ -19,7 +19,6 @@ package roundtrip
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -269,11 +268,7 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	original := object
 
 	// deep copy the original object
-	copied, err := scheme.DeepCopy(object)
-	if err != nil {
-		panic(fmt.Sprintf("unable to copy: %v", err))
-	}
-	object = copied.(runtime.Object)
+	object = object.DeepCopyObject()
 	name := reflect.TypeOf(object).Elem().Name()
 
 	// catch deepcopy errors early

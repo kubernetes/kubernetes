@@ -27,10 +27,12 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install" // Need to make sure the componentconfig api is installed so defaulting funcs work
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	componentconfigvalidation "k8s.io/kubernetes/pkg/apis/componentconfig/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
+	// Need to make sure the kubeletconfig api is installed so defaulting funcs work
+	_ "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/install"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 
 	"github.com/spf13/pflag"
@@ -139,10 +141,10 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 }
 
 // NewKubeletConfiguration will create a new KubeletConfiguration with default values
-func NewKubeletConfiguration() (*componentconfig.KubeletConfiguration, error) {
+func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 	versioned := &v1alpha1.KubeletConfiguration{}
 	api.Scheme.Default(versioned)
-	config := &componentconfig.KubeletConfiguration{}
+	config := &kubeletconfig.KubeletConfiguration{}
 	if err := api.Scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
@@ -153,7 +155,7 @@ func NewKubeletConfiguration() (*componentconfig.KubeletConfiguration, error) {
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	KubeletFlags
-	componentconfig.KubeletConfiguration
+	kubeletconfig.KubeletConfiguration
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -170,8 +172,8 @@ func NewKubeletServer() (*KubeletServer, error) {
 
 // validateKubeletServer validates configuration of KubeletServer and returns an error if the input configuration is invalid
 func ValidateKubeletServer(s *KubeletServer) error {
-	// please add any KubeletConfiguration validation to the componentconfigvalidation.ValidateKubeletConfiguration function
-	if err := componentconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
+	// please add any KubeletConfiguration validation to the kubeletconfigvalidation.ValidateKubeletConfiguration function
+	if err := kubeletconfigvalidation.ValidateKubeletConfiguration(&s.KubeletConfiguration); err != nil {
 		return err
 	}
 	if err := ValidateKubeletFlags(&s.KubeletFlags); err != nil {
@@ -225,8 +227,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&f.InitConfigDir, "init-config-dir", "The Kubelet will look in this directory for the init configuration. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this argument to use the built-in default configuration values. Presently, you must also enable the DynamicKubeletConfig feature gate to pass this flag.")
 }
 
-// AddKubeletConfigFlags adds flags for a specific componentconfig.KubeletConfiguration to the specified FlagSet
-func AddKubeletConfigFlags(fs *pflag.FlagSet, c *componentconfig.KubeletConfiguration) {
+// AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
+func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
 	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", true, "Makes the Kubelet fail to start if swap is enabled on the node. ")
 	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", true, "DEPRECATED: please use --fail-swap-on instead.")
 	fs.MarkDeprecated("experimental-fail-swap-on", "This flag is deprecated and will be removed in future releases. please use --fail-swap-on instead.")

@@ -13,7 +13,7 @@ go_library(
         "startups.go",
     ],
     deps = [
-        "//pkg/apis/componentconfig/validation:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/filesystem:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",

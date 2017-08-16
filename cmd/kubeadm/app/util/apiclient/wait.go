@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package apiclient
 
 import (
 	"fmt"
@@ -26,21 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
-
-// CreateClientAndWaitForAPI takes a path to a kubeconfig file, makes a client of it and waits for the API to be healthy
-func CreateClientAndWaitForAPI(file string) (*clientset.Clientset, error) {
-	client, err := kubeconfigutil.ClientSetFromFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("[apiclient] Created API client, waiting for the control plane to become ready")
-	WaitForAPI(client)
-
-	return client, nil
-}
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func WaitForAPI(client clientset.Interface) {

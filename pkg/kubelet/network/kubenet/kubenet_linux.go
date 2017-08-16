@@ -38,7 +38,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
@@ -89,7 +89,7 @@ type kubenetNetworkPlugin struct {
 	mtu             int
 	execer          utilexec.Interface
 	nsenterPath     string
-	hairpinMode     componentconfig.HairpinMode
+	hairpinMode     kubeletconfig.HairpinMode
 	// kubenet can use either hostportSyncer and hostportManager to implement hostports
 	// Currently, if network host supports legacy features, hostportSyncer will be used,
 	// otherwise, hostportManager will be used.
@@ -124,7 +124,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 	}
 }
 
-func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
 	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
@@ -257,7 +257,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
 	_, cidr, err := net.ParseCIDR(podCIDR)
 	if err == nil {
-		setHairpin := plugin.hairpinMode == componentconfig.HairpinVeth
+		setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 		// Set bridge address to first address in IPNet
 		cidr.IP[len(cidr.IP)-1] += 1
 
@@ -353,7 +353,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
 	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
-	if plugin.hairpinMode == componentconfig.PromiscuousBridge {
+	if plugin.hairpinMode == kubeletconfig.PromiscuousBridge {
 		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
 		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
 			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()

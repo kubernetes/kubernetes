@@ -85,3 +85,7 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 func (b *backend) Run(stopCh <-chan struct{}) error {
 	return nil
 }
+
+func (b *backend) Shutdown() {
+	// Nothing to do here.
+}

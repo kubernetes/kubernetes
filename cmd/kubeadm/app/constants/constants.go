@@ -73,10 +73,6 @@ const (
 	NodesGroup              = "system:nodes"
 	NodesClusterRoleBinding = "system:node"
 
-	// Constants for what we name our ServiceAccounts with limited access to the cluster in case of RBAC
-	KubeDNSServiceAccountName   = "kube-dns"
-	KubeProxyServiceAccountName = "kube-proxy"
-
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
 	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery

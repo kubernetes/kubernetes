@@ -163,7 +163,7 @@ func TestBatchWebhookMaxEvents(t *testing.T) {
 	stopCh := make(chan struct{})
 	timer := make(chan time.Time, 1)
 
-	backend.sendBatchEvents(stopCh, timer)
+	backend.sendBatchEvents(backend.collectEvents(stopCh, timer))
 	require.Equal(t, defaultBatchMaxSize, <-got, "did not get batch max size")
 
 	go func() {
@@ -171,7 +171,7 @@ func TestBatchWebhookMaxEvents(t *testing.T) {
 		timer <- time.Now()         // Trigger the wait timeout
 	}()
 
-	backend.sendBatchEvents(stopCh, timer)
+	backend.sendBatchEvents(backend.collectEvents(stopCh, timer))
 	require.Equal(t, nRest, <-got, "failed to get the rest of the events")
 }
 
@@ -198,8 +198,76 @@ func TestBatchWebhookStopCh(t *testing.T) {
 		waitForEmptyBuffer(backend)
 		close(stopCh) // stop channel has stopped
 	}()
-	backend.sendBatchEvents(stopCh, timer)
+	backend.sendBatchEvents(backend.collectEvents(stopCh, timer))
 	require.Equal(t, expected, <-got, "get queued events after timer expires")
+}
+
+func TestBatchWebhookProcessEventsAfterStop(t *testing.T) {
+	events := make([]*auditinternal.Event, 1) // less than max size.
+	for i := range events {
+		events[i] = &auditinternal.Event{}
+	}
+
+	got := make(chan struct{})
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+		close(got)
+	}))
+	defer s.Close()
+
+	backend := newTestBatchWebhook(t, s.URL)
+	stopCh := make(chan struct{})
+
+	backend.Run(stopCh)
+	close(stopCh)
+	<-backend.shutdownCh
+	backend.ProcessEvents(events...)
+	assert.Equal(t, 0, len(backend.buffer), "processed events after the backed has been stopped")
+}
+
+func TestBatchWebhookShutdown(t *testing.T) {
+	events := make([]*auditinternal.Event, 1)
+	for i := range events {
+		events[i] = &auditinternal.Event{}
+	}
+
+	got := make(chan struct{})
+	contReqCh := make(chan struct{})
+	shutdownCh := make(chan struct{})
+	s := httptest.NewServer(newWebhookHandler(t, func(events *auditv1alpha1.EventList) {
+		close(got)
+		<-contReqCh
+	}))
+	defer s.Close()
+
+	backend := newTestBatchWebhook(t, s.URL)
+	backend.ProcessEvents(events...)
+
+	go func() {
+		// Assume stopCh was closed.
+		close(backend.buffer)
+		backend.sendBatchEvents(backend.collectLastEvents())
+	}()
+
+	<-got
+
+	go func() {
+		close(backend.shutdownCh)
+		backend.Shutdown()
+		close(shutdownCh)
+	}()
+
+	// Wait for some time in case there's a bug that allows for the Shutdown
+	// method to exit before all requests has been completed.
+	time.Sleep(1 * time.Second)
+	select {
+	case <-shutdownCh:
+		t.Fatal("Backend shut down before all requests finished")
+	default:
+		// Continue.
+	}
+
+	close(contReqCh)
+	<-shutdownCh
 }
 
 func TestBatchWebhookEmptyBuffer(t *testing.T) {
@@ -223,7 +291,7 @@ func TestBatchWebhookEmptyBuffer(t *testing.T) {
 	timer <- time.Now() // Timer is done.
 
 	// Buffer is empty, no events have been queued. This should exit but send no events.
-	backend.sendBatchEvents(stopCh, timer)
+	backend.sendBatchEvents(backend.collectEvents(stopCh, timer))
 
 	// Send additional events after the sendBatchEvents has been called.
 	backend.ProcessEvents(events...)
@@ -232,7 +300,7 @@ func TestBatchWebhookEmptyBuffer(t *testing.T) {
 		timer <- time.Now()
 	}()
 
-	backend.sendBatchEvents(stopCh, timer)
+	backend.sendBatchEvents(backend.collectEvents(stopCh, timer))
 
 	// Make sure we didn't get a POST with zero events.
 	require.Equal(t, expected, <-got, "expected one event")

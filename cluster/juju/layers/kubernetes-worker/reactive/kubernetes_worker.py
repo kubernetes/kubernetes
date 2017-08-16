@@ -17,6 +17,8 @@
 import os
 import random
 import shutil
+import subprocess
+import time
 
 from shlex import split
 from subprocess import check_call, check_output
@@ -422,10 +424,7 @@ def apply_node_labels():
     for label in previous_labels:
         if label not in user_labels:
             hookenv.log('Deleting node label {}'.format(label))
-            try:
-                _apply_node_label(label, delete=True)
-            except CalledProcessError:
-                hookenv.log('Error removing node label {}'.format(label))
+            _apply_node_label(label, delete=True)
         # if the label is in user labels we do nothing here, it will get set
         # during the atomic update below.
 
@@ -844,6 +843,10 @@ def _systemctl_is_active(application):
         return False
 
 
+class ApplyNodeLabelFailed(Exception):
+    pass
+
+
 def _apply_node_label(label, delete=False, overwrite=False):
     ''' Invoke kubectl to apply node label changes '''
 
@@ -859,7 +862,19 @@ def _apply_node_label(label, delete=False, overwrite=False):
         cmd = cmd_base.format(kubeconfig_path, hostname, label)
         if overwrite:
             cmd = '{} --overwrite'.format(cmd)
-    check_call(split(cmd))
+    cmd = cmd.split()
+
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        code = subprocess.call(cmd)
+        if code == 0:
+            break
+        hookenv.log('Failed to apply label %s, exit code %d. Will retry.' % (
+            label, code))
+        time.sleep(1)
+    else:
+        msg = 'Failed to apply label %s' % label
+        raise ApplyNodeLabelFailed(msg)
 
 
 def _parse_labels(labels):

@@ -52,7 +52,14 @@ go_library(
         "hooks.go",
         "plugins.go",
         "serve.go",
-    ],
+        "signal.go",
+        "signal_posix.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "signal_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",

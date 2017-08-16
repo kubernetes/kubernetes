@@ -26,7 +26,6 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
@@ -34,19 +33,10 @@ func DefaultMemorySwap() int64 {
 	return 0
 }
 
-func (ds *dockerService) getSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, separator rune) ([]string, error) {
-	hasSeccompSetting := false
-	annotations := sandboxConfig.GetAnnotations()
-	if _, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; !ok {
-		_, hasSeccompSetting = annotations[v1.SeccompPodAnnotationKey]
-	} else {
-		hasSeccompSetting = true
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+	if seccompProfile != "" {
+		glog.Warningf("seccomp annotations are not supported on windows")
 	}
-
-	if hasSeccompSetting {
-		glog.Warningf("seccomp annotations found, but it is not supported on windows")
-	}
-
 	return nil, nil
 }
 

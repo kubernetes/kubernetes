@@ -16,8 +16,8 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
@@ -39,7 +39,7 @@ go_library(
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

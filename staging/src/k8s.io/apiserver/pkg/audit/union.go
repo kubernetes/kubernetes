@@ -49,3 +49,9 @@ func (u union) Run(stopCh <-chan struct{}) error {
 	}
 	return errors.AggregateGoroutines(funcs...)
 }
+
+func (u union) Shutdown() {
+	for _, backend := range u.backends {
+		backend.Shutdown()
+	}
+}

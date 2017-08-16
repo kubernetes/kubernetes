@@ -13,7 +13,7 @@ go_library(
         "mock_network_plugin.go",
     ],
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/network:go_default_library",
@@ -30,7 +30,7 @@ go_test(
     srcs = ["plugins_test.go"],
     library = ":go_default_library",
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",

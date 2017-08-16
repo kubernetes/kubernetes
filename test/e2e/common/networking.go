@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("Networking", func() {
+var _ = Describe("[sig-network] Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
-	framework.KubeDescribe("Granular Checks: Pods", func() {
+	Describe("Granular Checks: Pods", func() {
 
 		// Try to hit all endpoints through a test container, retry 5 times,
 		// expect exactly one unique hostname. Each of these endpoints reports

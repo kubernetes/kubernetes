@@ -23,7 +23,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
 // Checkpoint represents a local copy of a config source (payload) object
@@ -31,7 +31,7 @@ type Checkpoint interface {
 	// UID returns the UID of the config source object behind the Checkpoint
 	UID() string
 	// Parse parses the checkpoint into the internal KubeletConfiguration type
-	Parse() (*componentconfig.KubeletConfiguration, error)
+	Parse() (*kubeletconfig.KubeletConfiguration, error)
 	// Encode returns a []byte representation of the config source object behind the Checkpoint
 	Encode() ([]byte, error)
 

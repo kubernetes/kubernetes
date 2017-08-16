@@ -26,6 +26,7 @@ const (
 	ControllerRevisionHashLabelKey = "controller-revision-hash"
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
 	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
+	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
 )
 
 // WIP: This is not ready to be used and we plan to make breaking changes to it.
@@ -561,12 +562,6 @@ type DaemonSetSpec struct {
 	// is ready).
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
-
-	// DEPRECATED.
-	// A sequence number representing a specific generation of the template.
-	// Populated by the system. It can be set only during the creation.
-	// +optional
-	TemplateGeneration int64 `json:"templateGeneration,omitempty" protobuf:"varint,5,opt,name=templateGeneration"`
 
 	// The number of old history to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
