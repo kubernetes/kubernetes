@@ -220,3 +220,13 @@ func instanceIDFromProviderID(providerID string) (instanceID string, err error) 
 	}
 	return matches[1], nil
 }
+
+// Notification handler when node is registered.
+func (i *Instances) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (i *Instances) NodeUnregistered(node *v1.Node) {
+
+}

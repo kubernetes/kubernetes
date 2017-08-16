@@ -56,9 +56,9 @@ func GetVSphere() (*VSphere, error) {
 	}
 	vSphereConn.GoVmomiClient = client
 	vs := &VSphere{
-		conn:            vSphereConn,
-		cfg:             cfg,
-		localInstanceID: "",
+		conn:     vSphereConn,
+		cfg:      cfg,
+		hostName: "",
 	}
 	runtime.SetFinalizer(vs, logout)
 	return vs, nil
@@ -246,7 +246,7 @@ func getPbmCompatibleDatastore(ctx context.Context, client *vim25.Client, storag
 
 func (vs *VSphere) setVMOptions(ctx context.Context, dc *vclib.Datacenter) (*vclib.VMOptions, error) {
 	var vmOptions vclib.VMOptions
-	vm, err := dc.GetVMByPath(ctx, vs.cfg.Global.WorkingDir+"/"+vs.localInstanceID)
+	vm, err := dc.GetVMByPath(ctx, vs.cfg.Global.WorkingDir+"/"+vs.hostName)
 	if err != nil {
 		return nil, err
 	}

@@ -262,3 +262,13 @@ func (cs *CSCloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zon
 
 	return zone, nil
 }
+
+// Notification handler when node is registered.
+func (cs *CSCloud) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (cs *CSCloud) NodeUnregistered(node *v1.Node) {
+
+}

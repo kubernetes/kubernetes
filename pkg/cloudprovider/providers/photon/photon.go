@@ -746,3 +746,13 @@ func (pc *PCCloud) DeleteDisk(pdID string) error {
 
 	return nil
 }
+
+// Notification handler when node is registered.
+func (pc *PCCloud) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (pc *PCCloud) NodeUnregistered(node *v1.Node) {
+
+}
