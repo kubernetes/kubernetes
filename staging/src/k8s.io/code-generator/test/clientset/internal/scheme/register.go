@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	testgroup "k8s.io/kube-gen/test/apis/testgroup/install"
+	testgroup "k8s.io/code-generator/test/apis/testgroup/install"
 	os "os"
 )
 

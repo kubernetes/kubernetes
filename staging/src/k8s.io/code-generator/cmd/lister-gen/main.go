@@ -19,8 +19,8 @@ package main
 import (
 	"path/filepath"
 
+	"k8s.io/code-generator/cmd/lister-gen/generators"
 	"k8s.io/gengo/args"
-	"k8s.io/kube-gen/cmd/lister-gen/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"

@@ -21,7 +21,7 @@ package internalinterfaces
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	cache "k8s.io/client-go/tools/cache"
-	internal "k8s.io/kube-gen/test/clientset/internal"
+	internal "k8s.io/code-generator/test/clientset/internal"
 	time "time"
 )
 

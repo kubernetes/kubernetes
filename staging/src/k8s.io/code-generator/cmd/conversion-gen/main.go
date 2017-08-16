@@ -37,8 +37,8 @@ package main
 import (
 	"path/filepath"
 
+	"k8s.io/code-generator/cmd/conversion-gen/generators"
 	"k8s.io/gengo/args"
-	"k8s.io/kube-gen/cmd/conversion-gen/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"

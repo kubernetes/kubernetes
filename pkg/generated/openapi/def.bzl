@@ -17,7 +17,7 @@ def openapi_library(name, tags, srcs, openapi_targets=[], vendor_targets=[]):
       srcs = srcs + ["//hack/boilerplate:boilerplate.go.txt"],
       outs = ["zz_generated.openapi.go"],
       cmd = " ".join([
-        "$(location //vendor/k8s.io/kube-gen/cmd/openapi-gen)",
+        "$(location //vendor/k8s.io/code-generator/cmd/openapi-gen)",
         "--v 1",
         "--logtostderr",
         "--go-header-file $(location //hack/boilerplate:boilerplate.go.txt)",
@@ -27,5 +27,5 @@ def openapi_library(name, tags, srcs, openapi_targets=[], vendor_targets=[]):
         "&& cp pkg/generated/openapi/zz_generated.openapi.go $(location :zz_generated.openapi.go)",
       ]),
       go_deps = deps,
-      tools = ["//vendor/k8s.io/kube-gen/cmd/openapi-gen"],
+      tools = ["//vendor/k8s.io/code-generator/cmd/openapi-gen"],
 )

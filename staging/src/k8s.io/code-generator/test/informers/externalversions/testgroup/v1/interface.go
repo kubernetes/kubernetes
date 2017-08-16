@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	internalinterfaces "k8s.io/kube-gen/test/informers/externalversions/internalinterfaces"
+	internalinterfaces "k8s.io/code-generator/test/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

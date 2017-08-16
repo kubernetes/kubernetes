@@ -18,7 +18,7 @@ package internalversion
 
 import (
 	rest "k8s.io/client-go/rest"
-	"k8s.io/kube-gen/test/clientset/internal/scheme"
+	"k8s.io/code-generator/test/clientset/internal/scheme"
 )
 
 type TestgroupInterface interface {

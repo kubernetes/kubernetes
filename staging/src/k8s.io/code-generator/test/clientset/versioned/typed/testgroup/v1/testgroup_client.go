@@ -19,8 +19,8 @@ package v1
 import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/kube-gen/test/apis/testgroup/v1"
-	"k8s.io/kube-gen/test/clientset/versioned/scheme"
+	v1 "k8s.io/code-generator/test/apis/testgroup/v1"
+	"k8s.io/code-generator/test/clientset/versioned/scheme"
 )
 
 type TestgroupV1Interface interface {

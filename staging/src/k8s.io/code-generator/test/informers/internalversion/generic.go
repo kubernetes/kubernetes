@@ -22,7 +22,7 @@ import (
 	"fmt"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	testgroup "k8s.io/kube-gen/test/apis/testgroup"
+	testgroup "k8s.io/code-generator/test/apis/testgroup"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other

@@ -19,8 +19,8 @@ limitations under the License.
 package testgroup
 
 import (
-	internalinterfaces "k8s.io/kube-gen/test/informers/externalversions/internalinterfaces"
-	v1 "k8s.io/kube-gen/test/informers/externalversions/testgroup/v1"
+	internalinterfaces "k8s.io/code-generator/test/informers/externalversions/internalinterfaces"
+	v1 "k8s.io/code-generator/test/informers/externalversions/testgroup/v1"
 )
 
 // Interface provides access to each of this group's versions.

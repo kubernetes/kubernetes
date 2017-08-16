@@ -19,10 +19,10 @@ package generators
 import (
 	"io"
 
+	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
 )

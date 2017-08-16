@@ -15,7 +15,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/apis/testgroup:go_default_library",
+        "//vendor/k8s.io/code-generator/test/apis/testgroup:go_default_library",
     ],
 )
 

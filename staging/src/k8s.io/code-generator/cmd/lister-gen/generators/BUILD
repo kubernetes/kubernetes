@@ -14,12 +14,12 @@ go_library(
     ],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/generators/util:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/types:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/util:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library",
     ],
 )
 

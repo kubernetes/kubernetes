@@ -16,10 +16,10 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/apis/testgroup/v1:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/clientset/versioned:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/informers/externalversions/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/listers/testgroup/v1:go_default_library",
+        "//vendor/k8s.io/code-generator/test/apis/testgroup/v1:go_default_library",
+        "//vendor/k8s.io/code-generator/test/clientset/versioned:go_default_library",
+        "//vendor/k8s.io/code-generator/test/informers/externalversions/internalinterfaces:go_default_library",
+        "//vendor/k8s.io/code-generator/test/listers/testgroup/v1:go_default_library",
     ],
 )
 

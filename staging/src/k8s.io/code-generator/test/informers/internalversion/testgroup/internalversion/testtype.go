@@ -23,10 +23,10 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	testgroup "k8s.io/kube-gen/test/apis/testgroup"
-	internal "k8s.io/kube-gen/test/clientset/internal"
-	internalinterfaces "k8s.io/kube-gen/test/informers/internalversion/internalinterfaces"
-	internalversion "k8s.io/kube-gen/test/listers/testgroup/internalversion"
+	testgroup "k8s.io/code-generator/test/apis/testgroup"
+	internal "k8s.io/code-generator/test/clientset/internal"
+	internalinterfaces "k8s.io/code-generator/test/informers/internalversion/internalinterfaces"
+	internalversion "k8s.io/code-generator/test/listers/testgroup/internalversion"
 	time "time"
 )
 

@@ -21,7 +21,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	testgroupinternalversion "k8s.io/kube-gen/test/clientset/internal/typed/testgroup/internalversion"
+	testgroupinternalversion "k8s.io/code-generator/test/clientset/internal/typed/testgroup/internalversion"
 )
 
 type Interface interface {

@@ -16,7 +16,7 @@ go_library(
     srcs = ["main.go"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/go-to-protobuf/protobuf:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:go_default_library",
     ],
 )
 
@@ -31,8 +31,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/go-to-protobuf/protobuf:all-srcs",
-        "//staging/src/k8s.io/kube-gen/cmd/go-to-protobuf/protoc-gen-gogo:all-srcs",
+        "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:all-srcs",
+        "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo:all-srcs",
     ],
     tags = ["automanaged"],
 )

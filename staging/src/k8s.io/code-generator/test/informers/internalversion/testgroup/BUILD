@@ -9,8 +9,8 @@ go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
     deps = [
-        "//vendor/k8s.io/kube-gen/test/informers/internalversion/internalinterfaces:go_default_library",
-        "//vendor/k8s.io/kube-gen/test/informers/internalversion/testgroup/internalversion:go_default_library",
+        "//vendor/k8s.io/code-generator/test/informers/internalversion/internalinterfaces:go_default_library",
+        "//vendor/k8s.io/code-generator/test/informers/internalversion/testgroup/internalversion:go_default_library",
     ],
 )
 
@@ -25,7 +25,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-gen/test/informers/internalversion/testgroup/internalversion:all-srcs",
+        "//staging/src/k8s.io/code-generator/test/informers/internalversion/testgroup/internalversion:all-srcs",
     ],
     tags = ["automanaged"],
 )

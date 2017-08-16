@@ -16,7 +16,7 @@ limitations under the License.
 
 package args
 
-import "k8s.io/kube-gen/cmd/client-gen/types"
+import "k8s.io/code-generator/cmd/client-gen/types"
 
 // ClientGenArgs is a wrapper for arguments to client-gen.
 type Args struct {

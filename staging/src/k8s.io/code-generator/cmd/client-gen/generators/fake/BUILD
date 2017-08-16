@@ -14,14 +14,14 @@ go_library(
         "generator_fake_for_type.go",
     ],
     deps = [
+        "//vendor/k8s.io/code-generator/cmd/client-gen/args:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/generators/scheme:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/generators/util:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/path:go_default_library",
+        "//vendor/k8s.io/code-generator/cmd/client-gen/types:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
         "//vendor/k8s.io/gengo/namer:go_default_library",
         "//vendor/k8s.io/gengo/types:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/args:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/scheme:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/generators/util:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/path:go_default_library",
-        "//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library",
     ],
 )
 

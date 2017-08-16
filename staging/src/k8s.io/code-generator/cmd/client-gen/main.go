@@ -23,10 +23,10 @@ import (
 	"sort"
 	"strings"
 
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/generators"
+	"k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/args"
-	clientgenargs "k8s.io/kube-gen/cmd/client-gen/args"
-	"k8s.io/kube-gen/cmd/client-gen/generators"
-	"k8s.io/kube-gen/cmd/client-gen/types"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"

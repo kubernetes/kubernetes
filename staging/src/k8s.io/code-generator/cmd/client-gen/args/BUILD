@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["args.go"],
-    deps = ["//vendor/k8s.io/kube-gen/cmd/client-gen/types:go_default_library"],
+    deps = ["//vendor/k8s.io/code-generator/cmd/client-gen/types:go_default_library"],
 )
 
 filegroup(

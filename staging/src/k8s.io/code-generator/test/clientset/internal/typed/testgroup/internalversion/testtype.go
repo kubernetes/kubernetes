@@ -21,8 +21,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	testgroup "k8s.io/kube-gen/test/apis/testgroup"
-	scheme "k8s.io/kube-gen/test/clientset/internal/scheme"
+	testgroup "k8s.io/code-generator/test/apis/testgroup"
+	scheme "k8s.io/code-generator/test/clientset/internal/scheme"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.

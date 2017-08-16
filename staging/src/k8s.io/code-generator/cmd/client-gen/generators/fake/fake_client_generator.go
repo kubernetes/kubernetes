@@ -23,10 +23,10 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
 
-	clientgenargs "k8s.io/kube-gen/cmd/client-gen/args"
-	scheme "k8s.io/kube-gen/cmd/client-gen/generators/scheme"
-	"k8s.io/kube-gen/cmd/client-gen/generators/util"
-	clientgentypes "k8s.io/kube-gen/cmd/client-gen/types"
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
+	scheme "k8s.io/code-generator/cmd/client-gen/generators/scheme"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
 func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, inputPackage string, boilerplate []byte, generatedBy string) generator.Package {

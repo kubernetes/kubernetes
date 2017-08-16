@@ -1,5 +1,5 @@
 {
-	"ImportPath": "k8s.io/kube-gen",
+	"ImportPath": "k8s.io/code-generator",
 	"GoVersion": "go1.8",
 	"GodepVersion": "v79",
 	"Packages": [

@@ -14,23 +14,23 @@
     ]
   },
   {
-    "baseImportPath": "./vendor/k8s.io/kube-gen/",
+    "baseImportPath": "./vendor/k8s.io/code-generator/",
     "ignoredSubTrees": [
-      "./vendor/k8s.io/kube-gen/test"
+      "./vendor/k8s.io/code-generator/test"
     ],
     "allowedImports": [
       "k8s.io/gengo",
-      "k8s.io/kube-gen",
+      "k8s.io/code-generator",
       "k8s.io/kube-openapi"
     ]
   },
   {
-    "baseImportPath": "./vendor/k8s.io/kube-gen/test/",
+    "baseImportPath": "./vendor/k8s.io/code-generator/test/",
     "allowedImports": [
       "k8s.io/apimachinery",
       "k8s.io/client-go",
       "k8s.io/gengo",
-      "k8s.io/kube-gen/test",
+      "k8s.io/code-generator/test",
       "k8s.io/kube-openapi"
     ]
   },
