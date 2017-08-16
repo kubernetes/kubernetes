@@ -52,6 +52,7 @@ const (
 type KubeletFlags struct {
 	KubeConfig          flag.StringFlag
 	BootstrapKubeconfig string
+	RotateCertificates  bool
 
 	// RequireKubeConfig is deprecated! A valid KubeConfig is now required if --kubeconfig is provided.
 	RequireKubeConfig bool
@@ -126,7 +127,8 @@ func NewKubeletFlags() *KubeletFlags {
 		// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
 		// with cloud providers instead of in the core repo.
 		// More details here: https://github.com/kubernetes/kubernetes/issues/50986
-		CloudProvider: v1alpha1.AutoDetectCloudProvider,
+		CloudProvider:      v1alpha1.AutoDetectCloudProvider,
+		RotateCertificates: false,
 	}
 }
 
@@ -209,6 +211,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
 		"The client certificate and key file will be stored in the directory pointed by --cert-dir.")
+	fs.BoolVar(&f.RotateCertificates, "rotate-certificates", f.RotateCertificates, "<Warning: Beta feature> Auto rotate the kubelet client certificates by requesting new certificates from the kube-apiserver when the certificate expiration approaches.")
 
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
