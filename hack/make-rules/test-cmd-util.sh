@@ -1184,7 +1184,7 @@ run_kubectl_run_tests() {
 
   create_and_use_new_namespace
   kube::log::status "Testing kubectl run"
-  ## kubectl run should create deployments or jobs
+  ## kubectl run should create deployments, jobs or cronjob
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1197,6 +1197,7 @@ run_kubectl_run_tests() {
   kubectl delete jobs pi "${kube_flags[@]}"
   # Post-condition: no pods exist.
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -1217,6 +1218,17 @@ run_kubectl_run_tests() {
   kube::test::if_has_string "${output_message}" '2'
   # Clean up
   kubectl delete deployment nginx-apps "${kube_flags[@]}"
+
+  # TODO: enable batch/v1beta1 by default before 1.8 release, after issues
+  # with CronJobs existing in multiple versions at once is solved
+  # # Pre-Condition: no Job exists
+  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # # Command
+  # kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # # Post-Condition: CronJob "pi" is created
+  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # # Clean up
+  # kubectl delete cronjobs pi "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit

@@ -13299,6 +13299,11 @@
      },
      {
       "group": "batch",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "batch",
       "version": "v2alpha1",
       "kind": "DeleteOptions"
      },
@@ -13798,6 +13803,11 @@
      {
       "group": "batch",
       "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "batch",
+      "version": "v1beta1",
       "kind": "WatchEvent"
      },
      {

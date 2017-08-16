@@ -386,6 +386,9 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
+		// TODO: enable batch/v1beta1 by default before 1.8 release, after issues
+		// with CronJobs existing in multiple versions at once is solved
+		// batchapiv1beta1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
