@@ -190,7 +190,7 @@ func (kubemarkController *KubemarkController) SetNodeGroupSize(nodeGroup string,
 			if i == absDelta {
 				return nil
 			}
-			if err := kubemarkController.removeNodeFromNodeGroup(nodeGroup, node); err != nil {
+			if err := kubemarkController.RemoveNodeFromNodeGroup(nodeGroup, node); err != nil {
 				return err
 			}
 		}
@@ -240,7 +240,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 	return err
 }
 
-func (kubemarkController *KubemarkController) removeNodeFromNodeGroup(nodeGroup string, node string) error {
+func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup string, node string) error {
 	pod := kubemarkController.getPodByName(node)
 	if pod == nil {
 		glog.Warningf("Can't delete node %s from nodegroup %s. Node does not exist.", node, nodeGroup)
