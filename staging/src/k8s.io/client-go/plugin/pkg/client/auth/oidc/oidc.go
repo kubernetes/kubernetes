@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -189,6 +190,8 @@ type roundTripper struct {
 	wrapped  http.RoundTripper
 }
 
+var _ net.RoundTripperWrapper = &roundTripper{}
+
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if len(req.Header.Get("Authorization")) != 0 {
 		return r.wrapped.RoundTrip(req)
@@ -211,6 +214,8 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	return r.wrapped.RoundTrip(r2)
 }
+
+func (t *roundTripper) WrappedRoundTripper() http.RoundTripper { return t.wrapped }
 
 func (p *oidcAuthProvider) idToken() (string, error) {
 	p.mu.Lock()
