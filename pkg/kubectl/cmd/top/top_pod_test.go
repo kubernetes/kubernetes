@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package top
 
 import (
 	"bytes"
@@ -85,7 +85,7 @@ func TestTopPod(t *testing.T) {
 			containers:   true,
 		},
 	}
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Logf("Running test case: %s", testCase.name)
 		metricsList := testPodMetricsData()
@@ -116,7 +116,7 @@ func TestTopPod(t *testing.T) {
 		}
 
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		tf.Printer = &cmdtesting.TestPrinter{}
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
@@ -127,7 +127,7 @@ func TestTopPod(t *testing.T) {
 					if err != nil {
 						t.Errorf("%s: unexpected error: %v", testCase.name, err)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
 						testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
@@ -136,7 +136,7 @@ func TestTopPod(t *testing.T) {
 			}),
 		}
 		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdTopPod(f, buf)

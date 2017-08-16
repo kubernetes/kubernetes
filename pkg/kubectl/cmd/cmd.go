@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/top"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/i18n"
 
@@ -315,7 +316,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
 				deprecatedAlias("clusterinfo", NewCmdClusterInfo(f, out)),
-				NewCmdTop(f, out, err),
+				top.NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
 				NewCmdDrain(f, out, err),
