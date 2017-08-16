@@ -46,7 +46,7 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	*set.Spec.Replicas = 0
 	if err := scaleDownStatefulSetController(set, ssc, spc); err != nil {
@@ -74,7 +74,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
 	}
 }
 
@@ -90,7 +90,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	pods, err := spc.addTerminatingPod(set, 3)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
 	}
 }
 
@@ -141,7 +141,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	*set.Spec.Replicas = 5
 	fakeResourceVersion(set)
