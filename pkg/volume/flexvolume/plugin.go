@@ -42,6 +42,7 @@ type flexVolumePlugin struct {
 	runner     exec.Interface
 
 	sync.Mutex
+	capabilities        *driverCapabilities
 	unsupportedCommands []string
 }
 
@@ -64,44 +65,29 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 		unsupportedCommands: []string{},
 	}
 
-	// Check whether the plugin is attachable.
-	ok, err := isAttachable(flexPlugin)
+	// Retrieve driver reported capabilities
+	call := flexPlugin.NewDriverCall(initCmd)
+	ds, err := call.Run()
 	if err != nil {
 		return nil, err
 	}
 
-	if ok {
-		// Plugin supports attach/detach, so return flexVolumeAttachablePlugin
+	driverCaps := ds.getDriverCapabilities()
+	flexPlugin.capabilities = driverCaps
+
+	// Check whether the plugin is attachable.
+	if driverCaps.attach {
+		// Plugin supports attach/detach by default, so return flexVolumeAttachablePlugin
 		return &flexVolumeAttachablePlugin{flexVolumePlugin: flexPlugin}, nil
 	} else {
 		return flexPlugin, nil
 	}
 }
 
-func isAttachable(plugin *flexVolumePlugin) (bool, error) {
-	call := plugin.NewDriverCall(initCmd)
-	res, err := call.Run()
-	if err != nil {
-		return false, err
-	}
-
-	// By default all plugins are attachable, unless they report otherwise.
-	cap, ok := res.Capabilities[attachCapability]
-	if ok {
-		// cap is false, so plugin does not support attach/detach calls.
-		return cap, nil
-	}
-
-	return true, nil
-}
-
 // Init is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
-	plugin.host = host
-	// call the init script
-	call := plugin.NewDriverCall(initCmd)
-	_, err := call.Run()
-	return err
+	// Hardwired 'success' as any errors from calling init() will be caught by NewFlexVolumePlugin()
+	return nil
 }
 
 func (plugin *flexVolumePlugin) getExecutable() string {
