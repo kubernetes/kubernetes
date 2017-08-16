@@ -122,11 +122,11 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts CA certs and CA keys loaded into specs
-			if spec.CaCert == nil {
-				t.Errorf("getKubeConfigSpecs didn't loaded CaCert into spec for %s!", assertion.kubeConfigFile)
+			if spec.CACert == nil {
+				t.Errorf("getKubeConfigSpecs didn't loaded CACert into spec for %s!", assertion.kubeConfigFile)
 			}
-			if spec.ClientCertAuth == nil || spec.ClientCertAuth.CaKey == nil {
-				t.Errorf("getKubeConfigSpecs didn't loaded CaKey into spec for %s!", assertion.kubeConfigFile)
+			if spec.ClientCertAuth == nil || spec.ClientCertAuth.CAKey == nil {
+				t.Errorf("getKubeConfigSpecs didn't loaded CAKey into spec for %s!", assertion.kubeConfigFile)
 			}
 		} else {
 			t.Errorf("getKubeConfigSpecs didn't create spec for %s ", assertion.kubeConfigFile)
@@ -398,11 +398,11 @@ func TestWriteKubeConfig(t *testing.T) {
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
 func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName string, organizations ...string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
-		CaCert:     caCert,
+		CACert:     caCert,
 		APIServer:  APIServer,
 		ClientName: clientName,
 		ClientCertAuth: &clientCertAuth{
-			CaKey:         caKey,
+			CAKey:         caKey,
 			Organizations: organizations,
 		},
 	}
@@ -418,7 +418,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With Token
 func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
-		CaCert:     caCert,
+		CACert:     caCert,
 		APIServer:  APIServer,
 		ClientName: clientName,
 		TokenAuth: &tokenAuth{
