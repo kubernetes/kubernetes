@@ -73,7 +73,7 @@ var (
 
 	// maps that hold registered algorithm types
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
-	mandatoryFitPredicates = make(map[string]bool)
+	mandatoryFitPredicates = sets.NewString()
 	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
 	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
@@ -108,7 +108,7 @@ func RegisterMandatoryFitPredicate(name string, predicate algorithm.FitPredicate
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
 	fitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
-	mandatoryFitPredicates[name] = true
+	mandatoryFitPredicates.Insert(name)
 	return name
 }
 
@@ -323,11 +323,9 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	}
 
 	// Always include mandatory fit predicates.
-	for name, mandatory := range mandatoryFitPredicates {
-		if mandatory {
-			if factory, found := fitPredicateMap[name]; found {
-				predicates[name] = factory(args)
-			}
+	for _, name := range mandatoryFitPredicates.List() {
+		if factory, found := fitPredicateMap[name]; found {
+			predicates[name] = factory(args)
 		}
 	}
 
