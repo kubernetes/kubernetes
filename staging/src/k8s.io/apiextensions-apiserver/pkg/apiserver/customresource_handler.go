@@ -52,7 +52,7 @@ import (
 )
 
 // crdHandler serves the `/apis` endpoint.
-// This is registered as a filter so that it never collides with any explictly registered endpoints
+// This is registered as a filter so that it never collides with any explicitly registered endpoints
 type crdHandler struct {
 	versionDiscoveryHandler *versionDiscoveryHandler
 	groupDiscoveryHandler   *groupDiscoveryHandler

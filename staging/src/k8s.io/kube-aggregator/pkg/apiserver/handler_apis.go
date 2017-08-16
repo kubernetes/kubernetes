@@ -34,7 +34,7 @@ import (
 )
 
 // apisHandler serves the `/apis` endpoint.
-// This is registered as a filter so that it never collides with any explictly registered endpoints
+// This is registered as a filter so that it never collides with any explicitly registered endpoints
 type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
