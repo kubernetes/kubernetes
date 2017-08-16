@@ -46,6 +46,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
 	}
 	m, err := NewManager(&Config{
+		Name: "server",
 		CertificateSigningRequestClient: certSigningRequestClient,
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
@@ -92,6 +93,7 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
 	}
 	m, err := NewManager(&Config{
+		Name: "client",
 		Template: &x509.CertificateRequest{
 			Subject: pkix.Name{
 				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
