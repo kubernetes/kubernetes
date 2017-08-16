@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apimachinery
 
 import (
 	"strconv"
@@ -148,7 +148,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	return
 }
 
-var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
+var _ = SIGDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
@@ -260,7 +260,7 @@ func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
 	}
 }
 
-var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
+var _ = SIGDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		var enabled bool
@@ -338,7 +338,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	})
 })
 
-var _ = framework.KubeDescribe("Staging client repo client", func() {
+var _ = SIGDescribe("Staging client repo client", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, delete pods, watch pods", func() {
 		podClient := f.StagingClient.CoreV1().Pods(f.Namespace.Name)
