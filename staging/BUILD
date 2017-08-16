@@ -73,6 +73,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/selection:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/test:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/types:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/arraystr:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/cache:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:all-srcs",
