@@ -169,7 +169,7 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 }
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	return f.clientCache.KubernetesClientSet(nil)
+	return f.clientCache.KubernetesClientSetForVersion(nil)
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {

@@ -60,10 +60,11 @@ type ClientCache struct {
 	discoveryClientFactory DiscoveryClientFactory
 	discoveryClient        discovery.DiscoveryInterface
 
-	kubernetesClientLoader KubernetesClientCache
+	kubernetesClientCache KubernetesClientCache
 }
 
-// kubernetesClientLoader provides a new kubernetes.Clientset
+// KubernetesClientCache creates a new kubernetes.Clientset one time
+// and then returns the result for all future requests
 type KubernetesClientCache struct {
 	// once makes sure the client is only initialized once
 	once sync.Once
@@ -73,20 +74,20 @@ type KubernetesClientCache struct {
 	err error
 }
 
-// KubernetesClientSet returns a new kubernetes.Clientset.  It will cache the value
+// KubernetesClientSetForVersion returns a new kubernetes.Clientset.  It will cache the value
 // the first time it is called and return the cached value on subsequent calls.
-// If an error is encountered the first time KubernetesClientSet is called,
+// If an error is encountered the first time KubernetesClientSetForVersion is called,
 // the error will be cached.
-func (c *ClientCache) KubernetesClientSet(requiredVersion *schema.GroupVersion) (*kubernetes.Clientset, error) {
-	c.kubernetesClientLoader.once.Do(func() {
+func (c *ClientCache) KubernetesClientSetForVersion(requiredVersion *schema.GroupVersion) (*kubernetes.Clientset, error) {
+	c.kubernetesClientCache.once.Do(func() {
 		config, err := c.ClientConfigForVersion(requiredVersion)
 		if err != nil {
-			c.kubernetesClientLoader.err = err
+			c.kubernetesClientCache.err = err
 			return
 		}
-		c.kubernetesClientLoader.client, c.kubernetesClientLoader.err = kubernetes.NewForConfig(config)
+		c.kubernetesClientCache.client, c.kubernetesClientCache.err = kubernetes.NewForConfig(config)
 	})
-	return c.kubernetesClientLoader.client, c.kubernetesClientLoader.err
+	return c.kubernetesClientCache.client, c.kubernetesClientCache.err
 }
 
 // also looks up the discovery client.  We can't do this during init because the flags won't have been set

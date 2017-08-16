@@ -93,7 +93,7 @@ type ClientAccessFactory interface {
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
 
-	// KubernetesClientSet gives you back an external clientset
+	// KubernetesClientSetForVersion gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
 	// Returns a RESTClient for accessing Kubernetes resources or an error.

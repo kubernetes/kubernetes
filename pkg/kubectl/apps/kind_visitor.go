@@ -47,16 +47,16 @@ func (elem GroupKindElement) Accept(visitor KindVisitor) error {
 		visitor.VisitDeployment(elem)
 		return nil
 	}
-	if elem.GroupMatch("apps", "extensions") && elem.Kind == "Job" {
-		visitor.VisitDeployment(elem)
+	if elem.GroupMatch("batch") && elem.Kind == "Job" {
+		visitor.VisitJob(elem)
 		return nil
 	}
 	if elem.GroupMatch("", "core") && elem.Kind == "Pod" {
 		visitor.VisitPod(elem)
 		return nil
 	}
-	if elem.GroupMatch("apps", "extensions") && elem.Kind == "ReplicaSet" {
-		visitor.VisitReplicationController(elem)
+	if elem.GroupMatch("extensions") && elem.Kind == "ReplicaSet" {
+		visitor.VisitReplicaSet(elem)
 		return nil
 	}
 	if elem.GroupMatch("", "core") && elem.Kind == "ReplicationController" {
@@ -81,15 +81,15 @@ func (elem GroupKindElement) GroupMatch(groups ...string) bool {
 	return false
 }
 
-// DefaultKindVisitor implements KindVisitor with no-op functions.
-type DefaultKindVisitor struct{}
+// NoOpKindVisitor implements KindVisitor with no-op functions.
+type NoOpKindVisitor struct{}
 
-var _ KindVisitor = &DefaultKindVisitor{}
+var _ KindVisitor = &NoOpKindVisitor{}
 
-func (*DefaultKindVisitor) VisitDaemonSet(kind GroupKindElement)             {}
-func (*DefaultKindVisitor) VisitDeployment(kind GroupKindElement)            {}
-func (*DefaultKindVisitor) VisitJob(kind GroupKindElement)                   {}
-func (*DefaultKindVisitor) VisitPod(kind GroupKindElement)                   {}
-func (*DefaultKindVisitor) VisitReplicaSet(kind GroupKindElement)            {}
-func (*DefaultKindVisitor) VisitReplicationController(kind GroupKindElement) {}
-func (*DefaultKindVisitor) VisitStatefulSet(kind GroupKindElement)           {}
+func (*NoOpKindVisitor) VisitDaemonSet(kind GroupKindElement)             {}
+func (*NoOpKindVisitor) VisitDeployment(kind GroupKindElement)            {}
+func (*NoOpKindVisitor) VisitJob(kind GroupKindElement)                   {}
+func (*NoOpKindVisitor) VisitPod(kind GroupKindElement)                   {}
+func (*NoOpKindVisitor) VisitReplicaSet(kind GroupKindElement)            {}
+func (*NoOpKindVisitor) VisitReplicationController(kind GroupKindElement) {}
+func (*NoOpKindVisitor) VisitStatefulSet(kind GroupKindElement)           {}
