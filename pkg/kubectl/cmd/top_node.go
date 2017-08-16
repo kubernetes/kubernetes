@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // TopNodeOptions contains all the options for running the top-node cli command.
