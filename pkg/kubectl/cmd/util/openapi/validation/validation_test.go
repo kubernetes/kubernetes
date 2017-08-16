@@ -328,4 +328,32 @@ spec:
 
 		Expect(err).To(BeNil())
 	})
+
+	It("can validate lists", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      labels:
+        name: redis-master
+      name: name
+    spec:
+      containers:
+      - name: name
+`))
+
+		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "image",
+				},
+			},
+		})))
+	})
+
 })

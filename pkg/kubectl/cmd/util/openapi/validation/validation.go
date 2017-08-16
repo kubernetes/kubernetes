@@ -19,6 +19,7 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -49,21 +50,42 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 		return err
 	}
 
+	if strings.HasSuffix(gvk.Kind, "List") {
+		return utilerrors.NewAggregate(v.validateList(obj))
+	}
+
+	return utilerrors.NewAggregate(v.validateResource(obj, gvk))
+}
+
+func (v *SchemaValidation) validateList(object interface{}) []error {
+	fields := object.(map[string]interface{})
+	if fields == nil {
+		return []error{errors.New("invalid object to validate")}
+	}
+
+	errs := []error{}
+	for _, item := range fields["items"].([]interface{}) {
+		if gvk, err := getObjectKind(item); err != nil {
+			errs = append(errs, err)
+		} else {
+			errs = append(errs, v.validateResource(item, gvk)...)
+		}
+	}
+	return errs
+}
+
+func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
 	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
-		return fmt.Errorf("unknown object type %#v", gvk)
+		return []error{fmt.Errorf("unknown object type %#v", gvk)}
 	}
 
 	rootValidation, err := itemFactory(openapi.NewPath(gvk.Kind), obj)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	resource.Accept(rootValidation)
-	errs := rootValidation.Errors()
-	if errs != nil {
-		return utilerrors.NewAggregate(errs)
-	}
-	return nil
+	return rootValidation.Errors()
 }
 
 func parse(data []byte) (interface{}, error) {
