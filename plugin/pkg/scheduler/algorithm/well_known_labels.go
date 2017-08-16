@@ -17,16 +17,14 @@ limitations under the License.
 package algorithm
 
 const (
-	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeNotReady would be automatically added by node controller
 	// when node is not ready, and removed when node becomes ready.
-	TaintNodeNotReady = "node.alpha.kubernetes.io/notReady"
+	TaintNodeNotReady = "node.beta.kubernetes.io/notReady"
 
-	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeUnreachable would be automatically added by node controller
 	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
-	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
+	TaintNodeUnreachable = "node.beta.kubernetes.io/unreachable"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeOutOfDisk would be automatically added by node controller
