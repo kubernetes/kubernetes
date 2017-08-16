@@ -72,7 +72,7 @@ type KubeControllerManagerOptions struct {
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
 	NamespaceController              *NamespaceControllerOptions
-	NodeIpamController               *NodeIpamControllerOptions
+	NodeIpamController               *cmoptions.NodeIpamControllerOptions
 	NodeLifecycleController          *NodeLifecycleControllerOptions
 	PersistentVolumeBinderController *PersistentVolumeBinderControllerOptions
 	PodGCController                  *PodGCControllerOptions
@@ -145,7 +145,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			NamespaceSyncPeriod:      componentConfig.NamespaceController.NamespaceSyncPeriod,
 			ConcurrentNamespaceSyncs: componentConfig.NamespaceController.ConcurrentNamespaceSyncs,
 		},
-		NodeIpamController: &NodeIpamControllerOptions{
+		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
 			NodeCIDRMaskSize: componentConfig.NodeIpamController.NodeCIDRMaskSize,
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{

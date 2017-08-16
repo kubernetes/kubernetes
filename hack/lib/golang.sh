@@ -24,8 +24,8 @@ kube::golang::server_targets() {
   local targets=(
     cmd/kube-proxy
     cmd/kube-apiserver
-    cmd/kube-controller-manager
     cmd/cloud-controller-manager
+    cmd/kube-controller-manager
     cmd/kubelet
     cmd/kubeadm
     cmd/hyperkube

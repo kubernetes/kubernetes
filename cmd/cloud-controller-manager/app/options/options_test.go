@@ -70,6 +70,10 @@ func TestDefaultFlags(t *testing.T) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 1,
 		},
+		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+			ServiceCIDR: "",
+			NodeCIDRMaskSize: 0,
+		},
 		SecureServing: &apiserveroptions.SecureServingOptions{
 			BindPort:    0,
 			BindAddress: net.ParseIP("0.0.0.0"),
@@ -122,11 +126,13 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-retry-period=5s",
 		"--master=192.168.4.20",
 		"--min-resync-period=100m",
+		"--node-cidr-mask-size=48",
 		"--node-status-update-frequency=10m",
 		"--port=10000",
 		"--profiling=false",
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
+		"--service-cluster-ip-range=10.0.0.0/16",
 		"--use-service-account-credentials=false",
 	}
 	f.Parse(args)
@@ -163,6 +169,10 @@ func TestAddFlags(t *testing.T) {
 			AllocateNodeCIDRs:         true,
 			CIDRAllocatorType:         "RangeAllocator",
 			ConfigureCloudRoutes:      false,
+		},
+		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+			ServiceCIDR: "10.0.0.0/16",
+			NodeCIDRMaskSize: 48,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 1,

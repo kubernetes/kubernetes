@@ -8,6 +8,7 @@ go_library(
         "generic.go",
         "insecure_serving.go",
         "kubecloudshared.go",
+        "nodeipamcontroller.go",
         "servicecontroller.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/controller-manager/app/options",

@@ -113,6 +113,7 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+	glog.V(1).Infof("WRF running storage_rbac::PostStartHook()")
 	policy := &PolicyData{
 		ClusterRoles:            append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
 		ClusterRoleBindings:     append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
@@ -133,10 +134,13 @@ type PolicyData struct {
 }
 
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
+	glog.V(1).Infof("WRF running PolicyData::EnsureRBACPolicy()")
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// intializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
+		glog.V(1).Infof("WRF running PolicyData::EnsureRBACPolicy()::anonymous()")
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+			glog.V(1).Infof("WRF running PolicyData::EnsureRBACPolicy()::Poll()")
 
 			coreclientset, err := corev1client.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {

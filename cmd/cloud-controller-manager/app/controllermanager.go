@@ -37,6 +37,8 @@ import (
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
+	ipamcontoller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -181,11 +183,46 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
 		cloud.Initialize(c.ClientBuilder)
+	} else {
+		glog.Warningf("Was unable to initialize the cloud %s. Will not configure cloud provider routes.", c.ComponentConfig.CloudProvider.Name)
 	}
+
+	// TODO: move this setup into Config
+	kubeClient := client("cloud-node-controller")
+
+	// Start the NodeIPAMController
+	var clusterCIDR *net.IPNet
+	var err error
+	if len(strings.TrimSpace(c.ComponentConfig.KubeCloudShared.ClusterCIDR)) != 0 {
+		_, clusterCIDR, err = net.ParseCIDR(c.ComponentConfig.KubeCloudShared.ClusterCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.ComponentConfig.KubeCloudShared.ClusterCIDR, err)
+		}
+	}
+	var serviceCIDR *net.IPNet
+	if len(strings.TrimSpace(c.NodeIpamController.ServiceCIDR)) != 0 {
+		_, serviceCIDR, err = net.ParseCIDR(c.NodeIpamController.ServiceCIDR)
+		if err != nil {
+			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", c.NodeIpamController.ServiceCIDR, err)
+		}
+	}
+
+	nodeIPAMController, err := ipamcontoller.NewNodeIpamController(
+		c.SharedInformers.Core().V1().Nodes(),
+		cloud,
+		kubeClient,
+		clusterCIDR,
+		serviceCIDR,
+		int(c.ComponentConfig.NodeIpamController.NodeCIDRMaskSize),
+		ipam.CIDRAllocatorType(c.ComponentConfig.KubeCloudShared.CIDRAllocatorType))
+	if err != nil {
+		glog.Fatalf("Failed to start the node controller: %v", err)
+	}
+	go nodeIPAMController.Run(stop)
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		c.SharedInformers.Core().V1().Nodes(),
-		client("cloud-node-controller"), cloud,
+		kubeClient, cloud,
 		c.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		c.ComponentConfig.NodeStatusUpdateFrequency.Duration)
 

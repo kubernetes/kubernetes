@@ -19,7 +19,6 @@ go_library(
         "hpacontroller.go",
         "jobcontroller.go",
         "namespacecontroller.go",
-        "nodeipamcontroller.go",
         "nodelifecyclecontroller.go",
         "options.go",
         "persistentvolumebindercontroller.go",

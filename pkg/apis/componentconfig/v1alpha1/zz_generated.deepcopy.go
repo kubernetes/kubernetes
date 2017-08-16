@@ -82,6 +82,7 @@ func (in *CloudControllerManagerConfiguration) DeepCopyInto(out *CloudController
 	out.Debugging = in.Debugging
 	in.GenericComponent.DeepCopyInto(&out.GenericComponent)
 	in.KubeCloudShared.DeepCopyInto(&out.KubeCloudShared)
+	out.NodeIpamController = in.NodeIpamController
 	out.ServiceController = in.ServiceController
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	return

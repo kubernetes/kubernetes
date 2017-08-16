@@ -194,7 +194,7 @@ func TestAddFlags(t *testing.T) {
 			NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 			ConcurrentNamespaceSyncs: 20,
 		},
-		NodeIpamController: &NodeIpamControllerOptions{
+		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
 			NodeCIDRMaskSize: 48,
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
