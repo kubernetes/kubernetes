@@ -107,7 +107,6 @@ filegroup(
         "//pkg/api/fuzzer:all-srcs",
         "//pkg/api/helper:all-srcs",
         "//pkg/api/install:all-srcs",
-        "//pkg/api/meta:all-srcs",
         "//pkg/api/persistentvolume:all-srcs",
         "//pkg/api/pod:all-srcs",
         "//pkg/api/ref:all-srcs",

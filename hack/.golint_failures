@@ -79,7 +79,6 @@ federation/registry/cluster/etcd
 pkg/api/endpoints
 pkg/api/helper
 pkg/api/helper/qos
-pkg/api/meta/metatypes
 pkg/api/ref
 pkg/api/testapi
 pkg/api/testing
@@ -145,7 +144,6 @@ pkg/apis/storage/v1/util
 pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
-pkg/auth/user
 pkg/capabilities
 pkg/client/chaosclient
 pkg/client/informers/informers_generated/internalversion/internalinterfaces
