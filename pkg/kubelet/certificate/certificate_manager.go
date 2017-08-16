@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,10 +37,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
-	syncPeriod = 1 * time.Hour
+	syncPeriod                  = 1 * time.Hour
+	certificateManagerSubsystem = "certificate_manager"
+	certificateExpirationKey    = "expiration_seconds"
 )
 
 // Manager maintains and updates the certificates in use by this certificate
@@ -59,6 +63,10 @@ type Manager interface {
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
+	// Name is a name describing the certificate being managed by this
+	// certificate manager. It will be used for recording metrics relevant to
+	// the certificate.
+	Name string
 	// CertificateSigningRequestClient will be used for signing new certificate
 	// requests generated when a key rotation occurs. It must be set either at
 	// initialization or by using CertificateSigningRequestClient before
@@ -128,12 +136,17 @@ type manager struct {
 	cert                     *tls.Certificate
 	rotationDeadline         time.Time
 	forceRotation            bool
+	certificateExpiration    prometheus.Gauge
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
 // responsible for being the authoritative source of certificates in the
 // Kubelet and handling updates due to rotation.
 func NewManager(config *Config) (Manager, error) {
+	if config.Name == "" {
+		return nil, fmt.Errorf("the 'Name' is required to disambiguate metric values of different certificate manager instances")
+	}
+
 	cert, forceRotation, err := getCurrentCertificateOrBootstrap(
 		config.CertificateStore,
 		config.BootstrapCertificatePEM,
@@ -142,6 +155,17 @@ func NewManager(config *Config) (Manager, error) {
 		return nil, err
 	}
 
+	var certificateExpiration = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: metrics.KubeletSubsystem,
+			Subsystem: certificateManagerSubsystem,
+			Name:      fmt.Sprintf("%s_%s", config.Name, certificateExpirationKey),
+			Help:      "Gauge of the lifetime of a certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
+		},
+	)
+
+	prometheus.MustRegister(certificateExpiration)
+
 	m := manager{
 		certSigningRequestClient: config.CertificateSigningRequestClient,
 		template:                 config.Template,
@@ -149,6 +173,7 @@ func NewManager(config *Config) (Manager, error) {
 		certStore:                config.CertificateStore,
 		cert:                     cert,
 		forceRotation:            forceRotation,
+		certificateExpiration:    certificateExpiration,
 	}
 
 	return &m, nil
@@ -319,7 +344,8 @@ func (m *manager) setRotationDeadline() {
 	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 
 	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration)
-	glog.V(2).Infof("Certificate rotation deadline is %v", m.rotationDeadline)
+	glog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, m.rotationDeadline)
+	m.certificateExpiration.Set(float64(notAfter.Unix()))
 }
 
 func (m *manager) updateCached(cert *tls.Certificate) {
