@@ -43,8 +43,8 @@ var (
 		use --revision=N where N is the revision you need to watch for.`)
 
 	status_example = templates.Examples(`
-		# Watch the rollout status of a deployment
-		kubectl rollout status deployment/nginx`)
+		# Watch the rollout status of a deployment.
+		$ kubectl rollout status deployment/nginx`)
 )
 
 func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {

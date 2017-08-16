@@ -46,13 +46,13 @@ var (
 
 	createExample = templates.Examples(i18n.T(`
 		# Create a pod using the data in pod.json.
-		kubectl create -f ./pod.json
+		$ kubectl create -f ./pod.json
 
 		# Create a pod based on the JSON passed into stdin.
-		cat pod.json | kubectl create -f -
+		$ cat pod.json | kubectl create -f -
 
 		# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.
-		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`))
+		$ kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`))
 )
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

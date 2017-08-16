@@ -63,11 +63,11 @@ var (
 		The top-node command allows you to see the resource consumption of nodes.`))
 
 	topNodeExample = templates.Examples(i18n.T(`
-		  # Show metrics for all nodes
-		  kubectl top node
+		  # Show metrics for all nodes.
+		  $ kubectl top node
 
-		  # Show metrics for a given node
-		  kubectl top node NODE_NAME`))
+		  # Show metrics for a given node.
+		  $ kubectl top node NODE_NAME`))
 )
 
 func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {

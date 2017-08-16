@@ -29,8 +29,8 @@ import (
 
 var (
 	get_clusters_example = templates.Examples(`
-		# List the clusters kubectl knows about
-		kubectl config get-clusters`)
+		# List the clusters kubectl knows about.
+		$ kubectl config get-clusters`)
 )
 
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which

@@ -39,17 +39,17 @@ var (
 		Create a role with single rule.`))
 
 	roleExample = templates.Examples(i18n.T(`
-		# Create a Role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
-		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
+		# Create a Role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods.
+		$ kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
-		# Create a Role named "pod-reader" with ResourceName specified
-		kubectl create role pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
+		# Create a Role named "pod-reader" with ResourceName specified.
+		$ kubectl create role pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
-		# Create a Role named "foo" with API Group specified
-		kubectl create role foo --verb=get,list,watch --resource=rs.extensions
+		# Create a Role named "foo" with API Group specified.
+		$ kubectl create role foo --verb=get,list,watch --resource=rs.extensions
 
-		# Create a Role named "foo" with SubResource specified
-		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
+		# Create a Role named "foo" with SubResource specified.
+		$ kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "impersonate"}

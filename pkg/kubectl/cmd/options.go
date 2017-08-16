@@ -27,8 +27,8 @@ import (
 
 var (
 	optionsExample = templates.Examples(i18n.T(`
-		# Print flags inherited by all commands
-		kubectl options`))
+		# Print flags inherited by all commands.
+		$ kubectl options`))
 )
 
 // NewCmdOptions implements the options command

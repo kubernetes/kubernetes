@@ -29,8 +29,8 @@ import (
 
 var (
 	delete_context_example = templates.Examples(`
-		# Delete the context for the minikube cluster
-		kubectl config delete-context minikube`)
+		# Delete the context for the minikube cluster.
+		$ kubectl config delete-context minikube`)
 )
 
 func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

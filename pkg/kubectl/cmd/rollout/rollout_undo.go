@@ -51,14 +51,14 @@ var (
 		Rollback to a previous rollout.`)
 
 	undo_example = templates.Examples(`
-		# Rollback to the previous deployment
-		kubectl rollout undo deployment/abc
+		# Rollback to the previous deployment.
+		$ kubectl rollout undo deployment/abc
 
-		# Rollback to daemonset revision 3
-		kubectl rollout undo daemonset/abc --to-revision=3
+		# Rollback to daemonset revision 3.
+		$ kubectl rollout undo daemonset/abc --to-revision=3
 
-		# Rollback to the previous deployment with dry-run
-		kubectl rollout undo --dry-run=true deployment/abc`)
+		# Rollback to the previous deployment with dry-run.
+		$ kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {

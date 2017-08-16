@@ -66,25 +66,25 @@ var (
 
 	delete_example = templates.Examples(i18n.T(`
 		# Delete a pod using the type and name specified in pod.json.
-		kubectl delete -f ./pod.json
+		$ kubectl delete -f ./pod.json
 
 		# Delete a pod based on the type and name in the JSON passed into stdin.
-		cat pod.json | kubectl delete -f -
+		$ cat pod.json | kubectl delete -f -
 
-		# Delete pods and services with same names "baz" and "foo"
-		kubectl delete pod,service baz foo
+		# Delete pods and services with same names "baz" and "foo".
+		$ kubectl delete pod,service baz foo
 
 		# Delete pods and services with label name=myLabel.
-		kubectl delete pods,services -l name=myLabel
+		$ kubectl delete pods,services -l name=myLabel
 
-		# Delete a pod with minimal delay
-		kubectl delete pod foo --now
+		# Delete a pod with minimal delay.
+		$ kubectl delete pod foo --now
 
-		# Force delete a pod on a dead node
-		kubectl delete pod foo --grace-period=0 --force
+		# Force delete a pod on a dead node.
+		$ kubectl delete pod foo --grace-period=0 --force
 
-		# Delete all pods
-		kubectl delete pods --all`))
+		# Delete all pods.
+		$ kubectl delete pods --all`))
 )
 
 type DeleteOptions struct {

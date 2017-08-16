@@ -31,8 +31,8 @@ import (
 
 var (
 	apiversionsExample = templates.Examples(i18n.T(`
-		# Print the supported API versions
-		kubectl api-versions`))
+		# Print the supported API versions.
+		$ kubectl api-versions`))
 )
 
 func NewCmdApiVersions(f cmdutil.Factory, out io.Writer) *cobra.Command {

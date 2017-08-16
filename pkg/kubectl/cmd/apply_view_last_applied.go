@@ -51,10 +51,10 @@ var (
 
 	applyViewLastAppliedExample = templates.Examples(i18n.T(`
 		# View the last-applied-configuration annotations by type/name in YAML.
-		kubectl apply view-last-applied deployment/nginx
+		$ kubectl apply view-last-applied deployment/nginx
 
-		# View the last-applied-configuration annotations by file in JSON
-		kubectl apply view-last-applied -f deploy.yaml -o json`))
+		# View the last-applied-configuration annotations by file in JSON.
+		$ kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {

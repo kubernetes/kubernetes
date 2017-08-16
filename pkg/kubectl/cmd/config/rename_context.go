@@ -52,8 +52,8 @@ var (
 		Note: In case the context being renamed is the 'current-context', this field will also be updated.`)
 
 	renameContextExample = templates.Examples(`
-		# Rename the context 'old-name' to 'new-name' in your kubeconfig file
-		kubectl config rename-context old-name new-name`)
+		# Rename the context 'old-name' to 'new-name' in your kubeconfig file.
+		$ kubectl config rename-context old-name new-name`)
 )
 
 // NewCmdConfigRenameContext creates a command object for the "rename-context" action

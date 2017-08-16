@@ -29,8 +29,8 @@ import (
 
 var (
 	delete_cluster_example = templates.Examples(`
-		# Delete the minikube cluster
-		kubectl config delete-cluster minikube`)
+		# Delete the minikube cluster.
+		$ kubectl config delete-cluster minikube`)
 )
 
 func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

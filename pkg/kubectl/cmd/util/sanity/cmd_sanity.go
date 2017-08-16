@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -91,22 +92,105 @@ func CheckLongDesc(cmd *cobra.Command) []error {
 	return nil
 }
 
+type lineType int
+
+const (
+	LineInitial lineType = iota
+	LineEmpty
+	LineComment
+	LineCommand
+	LineMalformed
+)
+
 func CheckExamples(cmd *cobra.Command) []error {
 	fmt.Fprint(os.Stdout, "   ↳ checking examples\n")
-	cmdPath := cmd.CommandPath()
+
 	examples := cmd.Example
+	if len(examples) == 0 {
+		return []error{}
+	}
+
+	cmdPath := cmd.CommandPath()
 	errors := []error{}
-	if len(examples) > 0 {
-		for _, line := range strings.Split(examples, "\n") {
-			if !strings.HasPrefix(line, templates.Indentation) {
-				errors = append(errors, fmt.Errorf(`command %q: examples are not normalized, make sure you are calling templates.Examples (from pkg/cmd/templates) before assigning cmd.Example`, cmdPath))
+
+	appendErr := func(exampleIndex int, msg string) {
+		errors = append(errors, fmt.Errorf("command %q(subline: %d): %s", cmdPath, exampleIndex, msg))
+	}
+
+	seen := LineInitial
+	for i, line := range strings.Split(examples, "\n") {
+		if !isCorrectlyIndented(line) {
+			appendErr(i, `examples are not normalized, make sure you are calling templates.Examples (from pkg/cmd/templates) before assigning cmd.Example`)
+		}
+
+		trimmed := strings.TrimSpace(line)
+
+		if isEmpty(trimmed) {
+			if seen == LineInitial {
+				appendErr(i, "please don't start examples with a blank line")
 			}
-			if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
-				errors = append(errors, fmt.Errorf(`command %q: we use # to start comments in examples instead of //`, cmdPath))
+			if seen == LineEmpty {
+				appendErr(i, "please leave only a single blank line between examples")
 			}
+			seen = LineEmpty
+			continue
+		}
+
+		if !(isComment(trimmed) || isCommand(trimmed)) {
+			appendErr(i, "examples should either be comments (#) or commands ($), please start example line with the correct character for it's type.")
+			seen = LineMalformed
+		}
+
+		if isComment(trimmed) {
+			if !strings.HasPrefix(trimmed, "# ") {
+				appendErr(i, "please add a space after the hash character for Example comments")
+			} else {
+				// Allow multi-line comments, enforce capitalization on initial line only.
+				if seen != LineComment && thirdCharacterIsLower(trimmed) {
+					appendErr(i, "please capitalize Example comments")
+				}
+			}
+
+			if !strings.HasSuffix(trimmed, ".") {
+				appendErr(i, "please terminate Example comments with a period")
+			}
+			seen = LineComment
+		} else if isCommand(trimmed) {
+			if !strings.HasPrefix(trimmed, "$ ") {
+				appendErr(i, "please add a space after the dollar sign for Example commands")
+			}
+			seen = LineCommand
 		}
 	}
 	return errors
+}
+
+func isCorrectlyIndented(line string) bool {
+	return strings.HasPrefix(line, templates.Indentation)
+}
+
+func isEmpty(line string) bool {
+	return line == ""
+}
+
+func isComment(line string) bool {
+	return strings.HasPrefix(line, "#")
+}
+
+func isCommand(line string) bool {
+	return strings.HasPrefix(line, "$")
+}
+
+// thirdCharacterIsLower returns true if third character of s is a capital.
+func thirdCharacterIsLower(s string) bool {
+	if len(s) < 3 {
+		return false
+	}
+	runes := []rune(s)
+	if !unicode.IsLetter(runes[2]) {
+		return false
+	}
+	return unicode.IsLower(runes[2])
 }
 
 func CheckFlags(cmd *cobra.Command) []error {

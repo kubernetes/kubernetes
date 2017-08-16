@@ -34,11 +34,11 @@ var (
 		View previous rollout revisions and configurations.`)
 
 	history_example = templates.Examples(`
-		# View the rollout history of a deployment
-		kubectl rollout history deployment/abc
+		# View the rollout history of a deployment.
+		$ kubectl rollout history deployment/abc
 
-		# View the details of daemonset revision 3
-		kubectl rollout history daemonset/abc --revision=3`)
+		# View the details of daemonset revision 3.
+		$ kubectl rollout history daemonset/abc --revision=3`)
 )
 
 func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {

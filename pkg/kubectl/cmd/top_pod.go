@@ -59,17 +59,17 @@ var (
 		since pod creation.`))
 
 	topPodExample = templates.Examples(i18n.T(`
-		# Show metrics for all pods in the default namespace
-		kubectl top pod
+		# Show metrics for all pods in the default namespace.
+		$ kubectl top pod
 
-		# Show metrics for all pods in the given namespace
-		kubectl top pod --namespace=NAMESPACE
+		# Show metrics for all pods in the given namespace.
+		$ kubectl top pod --namespace=NAMESPACE
 
-		# Show metrics for a given pod and its containers
-		kubectl top pod POD_NAME --containers
+		# Show metrics for a given pod and its containers.
+		$ kubectl top pod POD_NAME --containers
 
-		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		# Show metrics for the pods defined by label name=myLabel.
+		$ kubectl top pod -l name=myLabel`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
