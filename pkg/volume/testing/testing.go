@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
@@ -160,6 +161,11 @@ func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
 	}
 	return f.nodeLabels, nil
+}
+
+func (f *fakeVolumeHost) ProbeFlexVolumePlugins() []VolumePlugin {
+	// TODO implement
+	return nil
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
