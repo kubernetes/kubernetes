@@ -41,6 +41,7 @@ go_library(
         "//test/e2e/perftype:go_default_library",
         "//test/e2e_node/perftype:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/client/v2:go_default_library",

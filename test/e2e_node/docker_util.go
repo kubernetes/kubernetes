@@ -21,11 +21,13 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
+	systemdutil "github.com/coreos/go-systemd/util"
 	"github.com/docker/docker/client"
 )
 
 const (
-	defaultDockerEndpoint = "unix:///var/run/docker.sock"
+	defaultDockerEndpoint  = "unix:///var/run/docker.sock"
+	dockerDaemonConfigName = "/etc/docker/daemon.json"
 )
 
 // getDockerAPIVersion returns the Docker's API version.
@@ -36,7 +38,7 @@ func getDockerAPIVersion() (semver.Version, error) {
 	}
 	version, err := c.ServerVersion(context.Background())
 	if err != nil {
-		return semver.Version{}, fmt.Errorf("failed to get docker info: %v", err)
+		return semver.Version{}, fmt.Errorf("failed to get docker server version: %v", err)
 	}
 	return semver.MustParse(version.APIVersion + ".0"), nil
 }
@@ -59,4 +61,52 @@ func isDockerNoNewPrivilegesSupported() (bool, error) {
 		return false, err
 	}
 	return version.GTE(semver.MustParse("1.23.0")), nil
+}
+
+// isDockerLiveRestoreSupported returns true if live-restore is supported in
+// the current Docker version.
+func isDockerLiveRestoreSupported() (bool, error) {
+	version, err := getDockerAPIVersion()
+	if err != nil {
+		return false, err
+	}
+	return version.GTE(semver.MustParse("1.26.0")), nil
+}
+
+// isDockerLiveRestoreEnabled returns true if live-restore is enabled in the
+// Docker.
+func isDockerLiveRestoreEnabled() (bool, error) {
+	c, err := client.NewClient(defaultDockerEndpoint, "", nil, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create docker client: %v", err)
+	}
+	info, err := c.Info(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("failed to get docker info: %v", err)
+	}
+	return info.LiveRestoreEnabled, nil
+}
+
+// stopDockerDaemon starts the Docker daemon.
+func startDockerDaemon() error {
+	switch {
+	case systemdutil.IsRunningSystemd():
+		_, err := runCommand("systemctl", "start", "docker")
+		return err
+	default:
+		_, err := runCommand("service", "docker", "start")
+		return err
+	}
+}
+
+// stopDockerDaemon stops the Docker daemon.
+func stopDockerDaemon() error {
+	switch {
+	case systemdutil.IsRunningSystemd():
+		_, err := runCommand("systemctl", "stop", "docker")
+		return err
+	default:
+		_, err := runCommand("service", "docker", "stop")
+		return err
+	}
 }

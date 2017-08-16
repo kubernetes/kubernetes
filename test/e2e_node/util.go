@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
 	"reflect"
 	"strings"
 	"time"
@@ -324,4 +325,14 @@ func newJSONEncoder(groupName string) (runtime.Encoder, error) {
 
 	// the "best" version supposedly comes first in the list returned from api.Registry.EnabledVersionsForGroup
 	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
+}
+
+// runCommand runs the cmd and returns the combined stdout and stderr, or an
+// error if the command failed.
+func runCommand(cmd ...string) (string, error) {
+	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
+	}
+	return string(output), nil
 }
