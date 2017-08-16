@@ -18,6 +18,7 @@ package diskmanagers
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -95,7 +96,9 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	var dummyVM *vclib.VirtualMachine
 	// Check if VM already exist in the folder.
 	// If VM is already present, use it, else create a new dummy VM.
-	dummyVMFullName := vclib.DummyVMPrefixName + "-" + vmdisk.volumeOptions.Name
+	fnvHash := fnv.New32a()
+	fnvHash.Write([]byte(vmdisk.volumeOptions.Name))
+	dummyVMFullName := vclib.DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	dummyVM, err = datastore.Datacenter.GetVMByPath(ctx, vmdisk.vmOptions.VMFolder.InventoryPath+"/"+dummyVMFullName)
 	if err != nil {
 		// Create a dummy VM
