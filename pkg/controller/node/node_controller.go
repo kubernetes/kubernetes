@@ -948,8 +948,6 @@ func (nc *NodeController) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.
 			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
-			// We don't change 'NodeInodePressure' condition, as it'll be removed in future.
-			// v1.NodeInodePressure,
 			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.
 			// v1.NodeNetworkUnavailable,
 		}
