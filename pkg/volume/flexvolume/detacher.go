@@ -19,7 +19,6 @@ package flexvolume
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,18 +42,6 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 	_, err := call.Run()
 	if isCmdNotSupportedErr(err) {
 		return (*detacherDefaults)(d).Detach(volumeName, hostName)
-	}
-	return err
-}
-
-// WaitForDetach is part of the volume.Detacher interface.
-func (d *flexVolumeDetacher) WaitForDetach(devicePath string, timeout time.Duration) error {
-	call := d.plugin.NewDriverCallWithTimeout(waitForDetachCmd, timeout)
-	call.Append(devicePath)
-
-	_, err := call.Run()
-	if isCmdNotSupportedErr(err) {
-		return (*detacherDefaults)(d).WaitForDetach(devicePath, timeout)
 	}
 	return err
 }
