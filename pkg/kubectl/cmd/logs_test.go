@@ -113,7 +113,7 @@ func TestValidateLogFlags(t *testing.T) {
 		{
 			name:     "negative limit-bytes",
 			flags:    map[string]string{"limit-bytes": "-100"},
-			expected: "must be greater than 0",
+			expected: "must be greater than or equal to 1",
 		},
 		{
 			name:     "negative tail",

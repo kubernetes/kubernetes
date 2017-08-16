@@ -305,7 +305,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					MaxReplicas:    5,
 				},
 			},
-			msg: "must be greater than 0",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
@@ -345,7 +345,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					},
 				},
 			},
-			msg: "must be greater than 0",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
@@ -408,7 +408,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					},
 				},
 			},
-			msg: "must be greater than 0",
+			msg: "must be greater than or equal to 1",
 		},
 		{
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
