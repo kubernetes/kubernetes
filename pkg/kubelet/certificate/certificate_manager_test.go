@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
@@ -135,6 +138,7 @@ func TestNewManagerNoRotation(t *testing.T) {
 		cert: storeCertData.certificate,
 	}
 	if _, err := NewManager(&Config{
+		Name:             "test_no_rotation",
 		Template:         &x509.CertificateRequest{},
 		Usages:           []certificates.KeyUsage{},
 		CertificateStore: store,
@@ -170,6 +174,11 @@ func TestShouldRotate(t *testing.T) {
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
+				certificateExpiration: prometheus.NewGauge(
+					prometheus.GaugeOpts{
+						Name: "test_gauge_name",
+					},
+				),
 			}
 			m.setRotationDeadline()
 			if m.shouldRotate() != test.shouldRotate {
@@ -212,6 +221,11 @@ func TestSetRotationDeadline(t *testing.T) {
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
+				certificateExpiration: prometheus.NewGauge(
+					prometheus.GaugeOpts{
+						Name: "test_gauge_name",
+					},
+				),
 			}
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
 			upperBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.9))
@@ -282,6 +296,7 @@ func TestNewManagerBootstrap(t *testing.T) {
 
 	var cm Manager
 	cm, err := NewManager(&Config{
+		Name:                    "test_bootstrap",
 		Template:                &x509.CertificateRequest{},
 		Usages:                  []certificates.KeyUsage{},
 		CertificateStore:        store,
@@ -319,6 +334,7 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 	}
 
 	cm, err := NewManager(&Config{
+		Name:                    "test_no_bootstrap",
 		Template:                &x509.CertificateRequest{},
 		Usages:                  []certificates.KeyUsage{},
 		CertificateStore:        store,
@@ -454,13 +470,14 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
 
 			certificateManager, err := NewManager(&Config{
+				Name: fmt.Sprintf("test_initialize_client_%d", i),
 				Template: &x509.CertificateRequest{
 					Subject: pkix.Name{
 						Organization: []string{"system:nodes"},
@@ -555,13 +572,14 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			certificateStore := &fakeStore{
 				cert: tc.storeCert.certificate,
 			}
 
 			certificateManager, err := NewManager(&Config{
+				Name: fmt.Sprintf("test_initialize_other_rest_clients_%d", i),
 				Template: &x509.CertificateRequest{
 					Subject: pkix.Name{
 						Organization: []string{"system:nodes"},
