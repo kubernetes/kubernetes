@@ -784,3 +784,13 @@ func (rs *Rackspace) DisksAreAttached(instanceID string, volumeIDs []string) (ma
 func (rs *Rackspace) ShouldTrustDevicePath() bool {
 	return true
 }
+
+// Notification handler when node is registered.
+func (i *Instances) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (i *Instances) NodeUnregistered(node *v1.Node) {
+
+}

@@ -999,6 +999,16 @@ func (c *Cloud) HasClusterID() bool {
 	return len(c.tagging.clusterID()) > 0
 }
 
+// Notification handler when node is registered.
+func (c *Cloud) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (c *Cloud) NodeUnregistered(node *v1.Node) {
+
+}
+
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
