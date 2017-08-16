@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
@@ -301,6 +303,7 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
+	userAgent := fmt.Sprintf("(%s %s) Kubernetes/%s", runtime.GOOS, runtime.GOARCH, version.Get().GitVersion)
 
 	client, err := newOauthClient(config.TokenSource)
 	if err != nil {
@@ -310,6 +313,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	service.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -319,6 +323,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceBeta.UserAgent = userAgent
 
 	client, err = newOauthClient(config.TokenSource)
 	if err != nil {
@@ -328,6 +333,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceAlpha.UserAgent = userAgent
 
 	// Expect override api endpoint to always be v1 api and follows the same pattern as prod.
 	// Generate alpha and beta api endpoints based on override v1 api endpoint.
@@ -343,11 +349,13 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
+	containerService.UserAgent = userAgent
 
 	cloudkmsService, err := cloudkms.New(client)
 	if err != nil {
 		return nil, err
 	}
+	cloudkmsService.UserAgent = userAgent
 
 	if config.NetworkURL == "" {
 		networkName, err := getNetworkNameViaAPICall(service, config.ProjectID)
