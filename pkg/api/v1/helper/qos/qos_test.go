@@ -132,7 +132,7 @@ func TestGetPodQOS(t *testing.T) {
 		},
 		{
 			pod: newPod("burstable-hugepages", []v1.Container{
-				newContainer("burstable", getResourceList("0", "0"), addResource("hugepages-2Mi", "1Gi", getResourceList("0", "0"))),
+				newContainer("burstable", addResource("hugepages-2Mi", "1Gi", getResourceList("0", "0")), addResource("hugepages-2Mi", "1Gi", getResourceList("0", "0"))),
 			}),
 			expected: v1.PodQOSBurstable,
 		},
@@ -147,7 +147,7 @@ func TestGetPodQOS(t *testing.T) {
 		k8sv1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
 
 		if actual := qos.GetPodQOS(&pod); api.PodQOSClass(testCase.expected) != actual {
-			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
+			t.Errorf("[%d]: conversion invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 	}
 }

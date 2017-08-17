@@ -22,10 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/helper"
 )
 
 // supportedComputeResources is the list of compute resources for with QoS is supported.
 var supportedQoSComputeResources = sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
+
+func isSupportedQoSComputeResource(name api.ResourceName) bool {
+	return supportedQoSComputeResources.Has(string(name)) || helper.IsHugePageResourceName(name)
+}
 
 // GetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
@@ -39,7 +44,7 @@ func GetPodQOS(pod *api.Pod) api.PodQOSClass {
 	for _, container := range pod.Spec.Containers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
-			if !supportedQoSComputeResources.Has(string(name)) {
+			if !isSupportedQoSComputeResource(name) {
 				continue
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
@@ -55,7 +60,7 @@ func GetPodQOS(pod *api.Pod) api.PodQOSClass {
 		// process limits
 		qosLimitsFound := sets.NewString()
 		for name, quantity := range container.Resources.Limits {
-			if !supportedQoSComputeResources.Has(string(name)) {
+			if !isSupportedQoSComputeResource(name) {
 				continue
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
