@@ -47,6 +47,9 @@ message StorageClass {
   // create volumes of this storage class.
   // +optional
   map<string, string> parameters = 3;
+
+  // +optional
+  optional bool allowVolumeExpand = 4;
 }
 
 // StorageClassList is a collection of storage classes.

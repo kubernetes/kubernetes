@@ -716,6 +716,9 @@
      "parameters": {
       "type": "object",
       "description": "Parameters holds the parameters for the provisioner that should create volumes of this storage class."
+     },
+     "allowVolumeExpand": {
+      "type": "boolean"
      }
     }
    },

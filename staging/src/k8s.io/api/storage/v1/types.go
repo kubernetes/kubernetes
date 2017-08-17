@@ -43,6 +43,9 @@ type StorageClass struct {
 	// create volumes of this storage class.
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
+
+	// +optional
+	AllowVolumeExpand bool `json:"allowVolumeExpand,omitempty" protobuf:"varint,4,opt,name=allowVolumeExpand"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
