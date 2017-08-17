@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -68,6 +69,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateFeatureFlags(c.FeatureFlags, field.NewPath("feature-flags"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
 	return allErrs
 }
 
@@ -307,5 +309,15 @@ func ValidateFeatureFlags(featureFlags map[string]bool, fldPath *field.Path) fie
 		}
 	}
 
+	return allErrs
+}
+
+func ValidateAPIEndpoint(c *kubeadm.MasterConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	endpoint, err := kubeadmutil.GetMasterEndpoint(c)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "Invalid API Endpoint"))
+	}
 	return allErrs
 }
