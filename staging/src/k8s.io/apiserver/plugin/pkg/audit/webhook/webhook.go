@@ -71,6 +71,7 @@ const pluginName = "webhook"
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
 // The mode indicates the caching behavior of the webhook. Either blocking (ModeBlocking)
 // or buffered with batch POSTs (ModeBatch).
+// TODO(audit): figure out a general way to let the client choose their preferred version
 func NewBackend(kubeConfigFile string, mode string, groupVersions []schema.GroupVersion) (audit.Backend, error) {
 	switch mode {
 	case ModeBatch:
@@ -88,8 +89,7 @@ var (
 	//
 	// Can we make these passable to NewGenericWebhook?
 	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	// TODO(audit): figure out a general way to let the client choose their preferred version
-	registry = registered.NewOrDie("")
+	registry             = registered.NewOrDie("")
 )
 
 func init() {
