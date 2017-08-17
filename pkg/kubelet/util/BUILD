@@ -21,7 +21,7 @@ go_library(
         "util_unsupported.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "util_linux.go",
+            "util_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "util_windows.go",
