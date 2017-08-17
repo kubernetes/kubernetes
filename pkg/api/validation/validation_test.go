@@ -3287,7 +3287,6 @@ func TestValidateContainers(t *testing.T) {
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3329,6 +3328,41 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
+			Name:  "resources-test-with-opaque-int-with-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("10"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
+			Name:  "resources-test-with-opaque-int-without-request",
+			Image: "image",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					helper.OpaqueIntResourceName("A"):    resource.MustParse("10"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
 			Name:  "resources-request-limit-simple",
 			Image: "image",
 			Resources: api.ResourceRequirements{
@@ -3349,12 +3383,10 @@ func TestValidateContainers(t *testing.T) {
 				Requests: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
 				},
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3369,8 +3401,7 @@ func TestValidateContainers(t *testing.T) {
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
 				Limits: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):   resource.MustParse("10"),
-					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
+					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3670,6 +3701,91 @@ func TestValidateContainers(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"invalid opaque integer resource requirement: request must be <= limit": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
+					},
+					Limits: api.ResourceList{
+						helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"invalid fractional opaque integer resource in container request": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"invalid fractional opaque integer resource in container limit": {
+
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
+					},
+					Limits: api.ResourceList{
+						helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"invalid resource name without /": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName("my.resource"): resource.MustParse("10"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"invalid resource name with one /": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName("my.org/resource"): resource.MustParse("10"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"invalid resource name with more than one /": {
+			{
+				Name:  "abc-123",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName("my.org/resource/foo"): resource.MustParse("10"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
 			},
 		},
 	}
@@ -4424,54 +4540,6 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec(nil),
 		},
-		{ // valid opaque integer resources for init container
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{
-					{
-						Name:            "valid-opaque-int",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
-							},
-							Limits: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
-							},
-						},
-						TerminationMessagePolicy: "File",
-					},
-				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
-		{ // valid opaque integer resources for regular container
-			ObjectMeta: metav1.ObjectMeta{Name: "valid-opaque-int", Namespace: "ns"},
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				Containers: []api.Container{
-					{
-						Name:            "valid-opaque-int",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("10"),
-							},
-							Limits: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("20"),
-							},
-						},
-						TerminationMessagePolicy: "File",
-					},
-				},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
 	}
 	for _, pod := range successCases {
 		if errs := ValidatePod(&pod); len(errs) != 0 {
@@ -5042,127 +5110,6 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 				Spec: validPodSpec(nil),
-			},
-		},
-		"invalid opaque integer resource requirement: request must be <= limit": {
-			expectedError: "must be greater than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
-			spec: api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:            "invalid",
-							Image:           "image",
-							ImagePullPolicy: "IfNotPresent",
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
-								},
-								Limits: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
-								},
-							},
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		"invalid fractional opaque integer resource in container request": {
-			expectedError: "must be an integer",
-			spec: api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:            "invalid",
-							Image:           "image",
-							ImagePullPolicy: "IfNotPresent",
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
-								},
-							},
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		"invalid fractional opaque integer resource in init container request": {
-			expectedError: "must be an integer",
-			spec: api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{
-							Name:            "invalid",
-							Image:           "image",
-							ImagePullPolicy: "IfNotPresent",
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
-								},
-							},
-						},
-					},
-					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		"invalid fractional opaque integer resource in container limit": {
-			expectedError: "must be an integer",
-			spec: api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:            "invalid",
-							Image:           "image",
-							ImagePullPolicy: "IfNotPresent",
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
-								},
-								Limits: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
-								},
-							},
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
-			},
-		},
-		"invalid fractional opaque integer resource in init container limit": {
-			expectedError: "must be an integer",
-			spec: api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-				Spec: api.PodSpec{
-					InitContainers: []api.Container{
-						{
-							Name:            "invalid",
-							Image:           "image",
-							ImagePullPolicy: "IfNotPresent",
-							Resources: api.ResourceRequirements{
-								Requests: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
-								},
-								Limits: api.ResourceList{
-									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
-								},
-							},
-						},
-					},
-					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-				},
 			},
 		},
 		"mirror-pod present without nodeName": {
@@ -7228,16 +7175,6 @@ func TestValidateNode(t *testing.T) {
 				Name:   "abc",
 				Labels: validSelector,
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7246,15 +7183,6 @@ func TestValidateNode(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7262,15 +7190,6 @@ func TestValidateNode(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node1",
-			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
@@ -7302,15 +7221,6 @@ func TestValidateNode(t *testing.T) {
 							}`,
 				},
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7328,13 +7238,6 @@ func TestValidateNode(t *testing.T) {
 				Name:   "",
 				Labels: validSelector,
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7344,12 +7247,6 @@ func TestValidateNode(t *testing.T) {
 				Name:   "abc-123",
 				Labels: invalidSelector,
 			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7358,12 +7255,6 @@ func TestValidateNode(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
 				Labels: validSelector,
-			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-				},
 			},
 		},
 		"missing-taint-key": {
@@ -7390,15 +7281,6 @@ func TestValidateNode(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node2",
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 				// Add a taint with a bad value to a node
@@ -7409,15 +7291,6 @@ func TestValidateNode(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 				// Add a taint with an empty effect to a node
@@ -7427,15 +7300,6 @@ func TestValidateNode(t *testing.T) {
 		"invalid-taint-effect": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dedicated-node3",
-			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{
-					{Type: api.NodeExternalIP, Address: "something"},
-				},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
 			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
@@ -7471,13 +7335,6 @@ func TestValidateNode(t *testing.T) {
 							}`,
 				},
 			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
-				},
-			},
 			Spec: api.NodeSpec{
 				ExternalID: "external",
 			},
@@ -7504,13 +7361,6 @@ func TestValidateNode(t *testing.T) {
 							        }
 							    ]
 							}`,
-				},
-			},
-			Status: api.NodeStatus{
-				Addresses: []api.NodeAddress{},
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
