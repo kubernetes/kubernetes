@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/emicklei/go-restful-swagger12"
+	swagger "github.com/emicklei/go-restful-swagger12"
 	ejson "github.com/exponent-io/jsonpath"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,6 +33,7 @@ import (
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 )
 
+// InvalidTypeError records information about an invalid type.
 type InvalidTypeError struct {
 	ExpectedKind reflect.Kind
 	ObservedKind reflect.Kind
@@ -43,6 +44,7 @@ func (i *InvalidTypeError) Error() string {
 	return fmt.Sprintf("expected type %s, for field %s, got %s", i.ExpectedKind.String(), i.FieldName, i.ObservedKind.String())
 }
 
+// NewInvalidTypeError returns an instance of NewInvalidTypeError.
 func NewInvalidTypeError(expected reflect.Kind, observed reflect.Kind, fieldName string) error {
 	return &InvalidTypeError{expected, observed, fieldName}
 }
@@ -60,14 +62,18 @@ type Schema interface {
 	ValidateBytes(data []byte) error
 }
 
+// NullSchema always validates bytes.
 type NullSchema struct{}
 
+// ValidateBytes never fails for NullSchema.
 func (NullSchema) ValidateBytes(data []byte) error { return nil }
 
+// NoDoubleKeySchema is a schema that disallows double keys.
 type NoDoubleKeySchema struct{}
 
+// ValidateBytes validates bytes.
 func (NoDoubleKeySchema) ValidateBytes(data []byte) error {
-	var list []error = nil
+	var list []error
 	if err := validateNoDuplicateKeys(data, "metadata", "labels"); err != nil {
 		list = append(list, err)
 	}
@@ -107,17 +113,18 @@ func validateNoDuplicateKeys(data []byte, path ...string) error {
 		case ejson.KeyString:
 			if seen[string(t)] {
 				return fmt.Errorf("duplicate key: %s", string(t))
-			} else {
-				seen[string(t)] = true
 			}
+			seen[string(t)] = true
 		}
 	}
 }
 
+// ConjunctiveSchema encapsulates a schema list.
 type ConjunctiveSchema []Schema
 
+// ValidateBytes validates bytes per a ConjunctiveSchema.
 func (c ConjunctiveSchema) ValidateBytes(data []byte) error {
-	var list []error = nil
+	var list []error
 	schemas := []Schema(c)
 	for ix := range schemas {
 		if err := schemas[ix].ValidateBytes(data); err != nil {
@@ -127,11 +134,13 @@ func (c ConjunctiveSchema) ValidateBytes(data []byte) error {
 	return utilerrors.NewAggregate(list)
 }
 
+// SwaggerSchema is a schema based on an OpenAPI spec.
 type SwaggerSchema struct {
 	api      swagger.ApiDeclaration
 	delegate Schema // For delegating to other api groups
 }
 
+// NewSwaggerSchemaFromBytes creates an instance of SwaggerSchema from bytes.
 func NewSwaggerSchemaFromBytes(data []byte, factory Schema) (Schema, error) {
 	schema := &SwaggerSchema{}
 	err := json.Unmarshal(data, &schema.api)
@@ -201,6 +210,7 @@ func (s *SwaggerSchema) validateItems(items interface{}) []error {
 	return allErrs
 }
 
+// ValidateBytes validates bytes in a SwaggerSchema.
 func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	var obj interface{}
 	out, err := yaml.ToJSON(data)
@@ -240,6 +250,7 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
+// ValidateObject returns no errors for a valid object.
 func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName string) []error {
 	allErrs := []error{}
 	models := s.api.Models
@@ -249,13 +260,13 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	// s.api only has schema for 1 api version (the parent object type's version).
 	// e.g. an extensions/v1beta1 Template embedding a /v1 Service requires the schema for the extensions/v1beta1
 	// api to delegate to the schema for the /v1 api.
-	// Only do this for !ok objects so that cross ApiVersion vendored types take precedence.
+	// Only do this for !ok objects so that cross APIVersion vendored types take precedence.
 	if !ok && s.delegate != nil {
 		fields, mapOk := obj.(map[string]interface{})
 		if !mapOk {
 			return append(allErrs, fmt.Errorf("field %s for %s: expected object of type map[string]interface{}, but the actual type is %T", fieldName, typeName, obj))
 		}
-		if delegated, err := s.delegateIfDifferentApiVersion(&unstructured.Unstructured{Object: fields}); delegated {
+		if delegated, err := s.delegateIfDifferentAPIVersion(&unstructured.Unstructured{Object: fields}); delegated {
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -322,13 +333,13 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 	return allErrs
 }
 
-// delegateIfDifferentApiVersion delegates the validation of an object if its ApiGroup does not match the
+// delegateIfDifferentAPIVersion delegates the validation of an object if its ApiGroup does not match the
 // current SwaggerSchema.
 // First return value is true if the validation was delegated (by a different ApiGroup SwaggerSchema)
 // Second return value is the result of the delegated validation if performed.
-func (s *SwaggerSchema) delegateIfDifferentApiVersion(obj *unstructured.Unstructured) (bool, error) {
-	// Never delegate objects in the same ApiVersion or we will get infinite recursion
-	if !s.isDifferentApiVersion(obj) {
+func (s *SwaggerSchema) delegateIfDifferentAPIVersion(obj *unstructured.Unstructured) (bool, error) {
+	// Never delegate objects in the same APIVersion or we will get infinite recursion
+	if !s.isDifferentAPIVersion(obj) {
 		return false, nil
 	}
 
@@ -342,9 +353,9 @@ func (s *SwaggerSchema) delegateIfDifferentApiVersion(obj *unstructured.Unstruct
 	return true, s.delegate.ValidateBytes(m)
 }
 
-// isDifferentApiVersion Returns true if obj lives in a different ApiVersion than the SwaggerSchema does.
-// The SwaggerSchema will not be able to process objects in different ApiVersions unless they are vendored.
-func (s *SwaggerSchema) isDifferentApiVersion(obj *unstructured.Unstructured) bool {
+// isDifferentAPIVersion Returns true if obj lives in a different APIVersion than the SwaggerSchema does.
+// The SwaggerSchema will not be able to process objects in different APIVersions unless they are vendored.
+func (s *SwaggerSchema) isDifferentAPIVersion(obj *unstructured.Unstructured) bool {
 	groupVersion := obj.GetAPIVersion()
 	return len(groupVersion) > 0 && s.api.ApiVersion != groupVersion
 }
