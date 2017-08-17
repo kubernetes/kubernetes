@@ -130,6 +130,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
+	cmd.Flags().Bool("include-uninitialized", false, "If present, list uninitialized resource(s).")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful retrieval.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
@@ -195,6 +196,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	export := cmdutil.GetFlagBool(cmd, "export")
+	includeUninitialized := cmdutil.GetFlagBool(cmd, "include-uninitialized")
 
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
@@ -212,6 +214,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
 			ExportParam(export).
+			IncludeUninitialized(includeUninitialized).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Latest().
@@ -301,6 +304,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
 		ExportParam(export).
+		IncludeUninitialized(includeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
