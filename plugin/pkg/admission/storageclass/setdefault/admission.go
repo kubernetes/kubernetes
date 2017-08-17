@@ -59,7 +59,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&claimDefaulterP
 // newPlugin creates a new admission plugin.
 func newPlugin() *claimDefaulterPlugin {
 	return &claimDefaulterPlugin{
-		Handler: admission.NewHandler(admission.Create),
+		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
@@ -77,17 +77,61 @@ func (a *claimDefaulterPlugin) Validate() error {
 	return nil
 }
 
-// Admit sets the default value of a PersistentVolumeClaim's storage class, in case the user did
-// not provide a value.
+// Admit does two things:
+// 1. sets the default value of a PersistentVolumeClaim's storage class, in case
+// the user did not provide a value.
 //
-// 1.  Find available StorageClasses.
-// 2.  Figure which is the default
-// 3.  Write to the PVClaim
+// 2. prevents from having two default storage classes.
 func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
-	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
+	if a.GetResource().GroupResource() == api.Resource("persistentvolumeclaims") {
+		return c.admitPeristentVolumeClaim(a)
+	}
+	if a.GetResource().GroupResource() == storage.Resource("storageclasses") {
+		return c.admitStorageClass(a)
+	}
+	return nil
+}
+
+func (c *claimDefaulterPlugin) admitStorageClass(a admission.Attributes) error {
+	if len(a.GetSubresource()) != 0 {
+		return nil
+	}
+	class, ok := a.GetObject().(*storage.StorageClass)
+	// if we can't convert then we don't handle this object so just return
+	if !ok {
 		return nil
 	}
 
+	if !storageutil.IsDefaultAnnotation(class.ObjectMeta) {
+		// this class is not default
+		return nil
+	}
+
+	defaultClass, err := getDefaultClass(c.lister)
+	if err != nil {
+		return admission.NewForbidden(a, err)
+	}
+
+	if defaultClass == nil {
+		// No default class is set, creating a new one is OK
+		return nil
+	}
+
+	if defaultClass.Name == class.Name {
+		// There is only one default class and it's the admitted one -> OK
+		return nil
+	}
+
+	return fmt.Errorf("multiple default storage classes are forbidden, %q is the other default one", defaultClass.Name)
+}
+
+// 1.  Find available StorageClasses.
+// 2.  Figure which is the default
+// 3.  Write to the PVClaim
+func (c *claimDefaulterPlugin) admitPeristentVolumeClaim(a admission.Attributes) error {
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
 	if len(a.GetSubresource()) != 0 {
 		return nil
 	}
