@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"text/template"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -261,8 +262,9 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
-	// TODO: Don't wait forever here
-	apiclient.WaitForAPI(client)
+	if err := apiclient.WaitForAPI(client, 30*time.Minute); err != nil {
+		return err
+	}
 
 	// PHASE 4: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
