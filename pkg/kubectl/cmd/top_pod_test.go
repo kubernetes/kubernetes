@@ -84,6 +84,13 @@ func TestTopPod(t *testing.T) {
 			namespaces:   []string{testNS},
 			containers:   true,
 		},
+		{
+			name:            "sort",
+			flags:           map[string]string{"all-namespaces": "true", "sort-by": "cpu"},
+			expectedPath:    topPathPrefix + "/pods",
+			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
+			listsNamespaces: true,
+		},
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
