@@ -126,7 +126,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringSliceP("selector", "l", []string{}, "Selector (label query) to filter on, supports '=', '==', and '!='. You can also use multiple flag options like -l label1=label1 -l label2=label2, but it will be aggregated to a comma separated selector")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
@@ -165,7 +165,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return nil
 	}
 
-	selector := cmdutil.GetFlagString(cmd, "selector")
+	allSelectors := cmdutil.GetFlagStringSlice(cmd, "selector")
+	selector := strings.Join(allSelectors, ",")
+
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	builder, err := f.NewUnstructuredBuilder(true)
