@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -583,34 +582,6 @@ func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Po
 			},
 		},
 	})
-}
-
-// Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
-	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
-				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
-				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
-				// that it would always be not nil, this would cause a rare race condition.
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
-				}
-				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
-				}
-				if scheduledCondition.Reason == "Unschedulable" {
-					notScheduledPods = append(notScheduledPods, pod)
-				}
-			}
-		}
-	}
-	return
 }
 
 func getRequestedCPU(pod v1.Pod) int64 {
