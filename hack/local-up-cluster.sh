@@ -588,14 +588,14 @@ function start_controller_manager {
 
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
-    mkdir -p ${POD_MANIFEST_PATH} || true
+    mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
 
-    mkdir -p /var/lib/kubelet
+    mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
