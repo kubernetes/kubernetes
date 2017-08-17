@@ -88,16 +88,18 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 	var allErrs field.ErrorList
 	for _, groupResource := range groupResources {
 		// The empty string represents the core API group.
-		if len(groupResource.Group) == 0 {
-			continue
+		if len(groupResource.Group) != 0 {
+			// Group names must be lower case and be valid DNS subdomains.
+			// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
+			// rbac.authorization.k8s.io is the valid one
+			if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
+			}
 		}
 
-		// Group names must be lower case and be valid DNS subdomains.
-		// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
-		// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
-		// rbac.authorization.k8s.io is the valid one
-		if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
+		if len(groupResource.ResourceNames) > 0 && len(groupResource.Resources) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNames"), groupResource.ResourceNames, "using resourceNames requires at least one resource"))
 		}
 	}
 	return allErrs

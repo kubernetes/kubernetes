@@ -102,6 +102,12 @@ func TestValidatePolicy(t *testing.T) {
 				"/metrics",
 			},
 		},
+		{ // ResourceNames without Resources
+			Level:      audit.LevelMetadata,
+			Verbs:      []string{"get"},
+			Resources:  []audit.GroupResources{{ResourceNames: []string{"leader"}}},
+			Namespaces: []string{"kube-system"},
+		},
 	}
 	errorCases := []audit.Policy{}
 	for _, rule := range invalidRules {
