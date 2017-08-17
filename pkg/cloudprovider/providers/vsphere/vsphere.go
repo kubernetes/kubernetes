@@ -391,18 +391,22 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	}
 	vm, err := vs.getVMByName(ctx, nodeName)
 	if err != nil {
+		if vclib.IsNotFound(err) {
+			return "", cloudprovider.InstanceNotFound
+		}
 		glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeNameToVMName(nodeName), err)
 		return "", err
 	}
-	nodeExist, err := vm.Exists(ctx)
+	isActive, err := vm.IsActive(ctx)
 	if err != nil {
-		glog.Errorf("Failed to check whether node %q exist. err: %+v.", nodeNameToVMName(nodeName), err)
+		glog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeNameToVMName(nodeName), err)
 		return "", err
 	}
-	if nodeExist {
+	if isActive {
 		return "/" + vm.InventoryPath, nil
 	}
-	return "", cloudprovider.InstanceNotFound
+
+	return "", fmt.Errorf("The node %q is not active", nodeNameToVMName(nodeName))
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -494,6 +498,12 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		}
 		vm, err := vs.getVMByName(ctx, nodeName)
 		if err != nil {
+			// If node doesn't exist, disk is already detached from node.
+			if vclib.IsNotFound(err) {
+				glog.Infof("Node %q does not exist, disk %s is already detached from node.", nodeNameToVMName(nodeName), volPath)
+				return nil
+			}
+
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeNameToVMName(nodeName), err)
 			return err
 		}
@@ -530,22 +540,15 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		}
 		vm, err := vs.getVMByName(ctx, nodeName)
 		if err != nil {
+			if vclib.IsNotFound(err) {
+				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
+				// make the disk as detached and return false without error.
+				return false, nil
+			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}
-		nodeExist, err := vm.Exists(ctx)
-		if err != nil {
-			glog.Errorf("Failed to check whether node %q exist. err: %+v", vSphereInstance, err)
-			return false, err
-		}
-		if !nodeExist {
-			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q is powered off",
-				volPath,
-				vSphereInstance)
-			return false, fmt.Errorf("DiskIsAttached failed to determine whether disk %q is still attached: node %q is powered off",
-				volPath,
-				vSphereInstance)
-		}
+
 		attached, err := vm.IsDiskAttached(ctx, volPath)
 		if err != nil {
 			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached on node %q",
@@ -584,22 +587,19 @@ func (vs *VSphere) DisksAreAttached(volPaths []string, nodeName k8stypes.NodeNam
 		}
 		vm, err := vs.getVMByName(ctx, nodeName)
 		if err != nil {
+			if vclib.IsNotFound(err) {
+				glog.Warningf("Node %q does not exist, vsphere CP will assume all disks %v are not attached to it.", nodeName, volPaths)
+				// make all the disks as detached and return false without error.
+				attached := make(map[string]bool)
+				for _, volPath := range volPaths {
+					attached[volPath] = false
+				}
+				return attached, nil
+			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return nil, err
 		}
-		nodeExist, err := vm.Exists(ctx)
-		if err != nil {
-			glog.Errorf("Failed to check whether node %q exist. err: %+v", vSphereInstance, err)
-			return nil, err
-		}
-		if !nodeExist {
-			glog.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
-				volPaths,
-				vSphereInstance)
-			return nil, fmt.Errorf("DisksAreAttached failed to determine whether disks %v are still attached: node %q does not exist",
-				volPaths,
-				vSphereInstance)
-		}
+
 		for _, volPath := range volPaths {
 			result, err := vm.IsDiskAttached(ctx, volPath)
 			if err == nil {
