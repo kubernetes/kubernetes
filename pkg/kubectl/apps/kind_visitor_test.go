@@ -74,21 +74,13 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	It("should Visit Job iff the Kind is a Job", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "Job",
-			Group: "apps",
+			Group: "batch",
 		}
 		Expect(kind.Accept(visitor)).ShouldNot(HaveOccurred())
 		Expect(visitor.visits).To(Equal(map[string]int{
 			"Job": 1,
 		}))
 
-		kind = apps.GroupKindElement{
-			Kind:  "Job",
-			Group: "extensions",
-		}
-		Expect(kind.Accept(visitor)).ShouldNot(HaveOccurred())
-		Expect(visitor.visits).To(Equal(map[string]int{
-			"Job": 2,
-		}))
 	})
 
 	It("should Visit Pod iff the Kind is a Pod", func() {
@@ -134,20 +126,11 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 	It("should Visit ReplicaSet iff the Kind is a ReplicaSet", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "ReplicaSet",
-			Group: "apps",
-		}
-		Expect(kind.Accept(visitor)).ShouldNot(HaveOccurred())
-		Expect(visitor.visits).To(Equal(map[string]int{
-			"ReplicaSet": 1,
-		}))
-
-		kind = apps.GroupKindElement{
-			Kind:  "ReplicaSet",
 			Group: "extensions",
 		}
 		Expect(kind.Accept(visitor)).ShouldNot(HaveOccurred())
 		Expect(visitor.visits).To(Equal(map[string]int{
-			"ReplicaSet": 2,
+			"ReplicaSet": 1,
 		}))
 	})
 
