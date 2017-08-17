@@ -70,8 +70,8 @@ type Resource struct {
 	StorageOverlay int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
-	AllowedPodNumber   int
-	OpaqueIntResources map[v1.ResourceName]int64
+	AllowedPodNumber  int
+	ExtendedResources map[v1.ResourceName]int64
 }
 
 // New creates a Resource from ResourceList
@@ -102,8 +102,8 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourceStorageOverlay:
 			r.StorageOverlay += rQuant.Value()
 		default:
-			if v1helper.IsOpaqueIntResourceName(rName) {
-				r.AddOpaque(rName, rQuant.Value())
+			if v1helper.IsExtendedResourceName(rName) {
+				r.AddExtended(rName, rQuant.Value())
 			}
 		}
 	}
@@ -118,7 +118,7 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
 		v1.ResourceStorageScratch: *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
 	}
-	for rName, rQuant := range r.OpaqueIntResources {
+	for rName, rQuant := range r.ExtendedResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
 	}
 	return result
@@ -133,25 +133,25 @@ func (r *Resource) Clone() *Resource {
 		StorageOverlay:   r.StorageOverlay,
 		StorageScratch:   r.StorageScratch,
 	}
-	if r.OpaqueIntResources != nil {
-		res.OpaqueIntResources = make(map[v1.ResourceName]int64)
-		for k, v := range r.OpaqueIntResources {
-			res.OpaqueIntResources[k] = v
+	if r.ExtendedResources != nil {
+		res.ExtendedResources = make(map[v1.ResourceName]int64)
+		for k, v := range r.ExtendedResources {
+			res.ExtendedResources[k] = v
 		}
 	}
 	return res
 }
 
-func (r *Resource) AddOpaque(name v1.ResourceName, quantity int64) {
-	r.SetOpaque(name, r.OpaqueIntResources[name]+quantity)
+func (r *Resource) AddExtended(name v1.ResourceName, quantity int64) {
+	r.SetExtended(name, r.ExtendedResources[name]+quantity)
 }
 
-func (r *Resource) SetOpaque(name v1.ResourceName, quantity int64) {
+func (r *Resource) SetExtended(name v1.ResourceName, quantity int64) {
 	// Lazily allocate opaque integer resource map.
-	if r.OpaqueIntResources == nil {
-		r.OpaqueIntResources = map[v1.ResourceName]int64{}
+	if r.ExtendedResources == nil {
+		r.ExtendedResources = map[v1.ResourceName]int64{}
 	}
-	r.OpaqueIntResources[name] = quantity
+	r.ExtendedResources[name] = quantity
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -306,11 +306,11 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.StorageOverlay += res.StorageOverlay
 	n.requestedResource.StorageScratch += res.StorageScratch
-	if n.requestedResource.OpaqueIntResources == nil && len(res.OpaqueIntResources) > 0 {
-		n.requestedResource.OpaqueIntResources = map[v1.ResourceName]int64{}
+	if n.requestedResource.ExtendedResources == nil && len(res.ExtendedResources) > 0 {
+		n.requestedResource.ExtendedResources = map[v1.ResourceName]int64{}
 	}
-	for rName, rQuant := range res.OpaqueIntResources {
-		n.requestedResource.OpaqueIntResources[rName] += rQuant
+	for rName, rQuant := range res.ExtendedResources {
+		n.requestedResource.ExtendedResources[rName] += rQuant
 	}
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
@@ -361,11 +361,11 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
 			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
-			if len(res.OpaqueIntResources) > 0 && n.requestedResource.OpaqueIntResources == nil {
-				n.requestedResource.OpaqueIntResources = map[v1.ResourceName]int64{}
+			if len(res.ExtendedResources) > 0 && n.requestedResource.ExtendedResources == nil {
+				n.requestedResource.ExtendedResources = map[v1.ResourceName]int64{}
 			}
-			for rName, rQuant := range res.OpaqueIntResources {
-				n.requestedResource.OpaqueIntResources[rName] -= rQuant
+			for rName, rQuant := range res.ExtendedResources {
+				n.requestedResource.ExtendedResources[rName] -= rQuant
 			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
