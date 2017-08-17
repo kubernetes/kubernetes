@@ -25,6 +25,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/api"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
@@ -75,6 +76,12 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 }
 
 func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
+	if !api.Registry.IsEnabledVersion(gvk.GroupVersion()) {
+		// if we don't have this in our scheme, just skip
+		// validation because its an object we don't recognize
+		return nil
+	}
+
 	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
 		return []error{fmt.Errorf("unknown object type %#v", gvk)}
