@@ -148,7 +148,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
 	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
-	printer, err := f.PrinterWithOptions(o.PrintOpts, false)
+	printer, err := f.PrinterWithOptions(o.PrintOpts, false, nil)
 	if err != nil {
 		return err
 	}

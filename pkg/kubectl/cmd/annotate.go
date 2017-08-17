@@ -110,7 +110,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	// to an api server.
 	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	}, true)
+	}, true, nil)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()

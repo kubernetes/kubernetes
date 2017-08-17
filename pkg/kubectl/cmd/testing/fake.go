@@ -352,11 +352,7 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
-func (f *FakeFactory) VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -673,11 +669,7 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
-func (f *fakeAPIFactory) VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -782,7 +774,7 @@ func (f *fakeAPIFactory) PrintObject(printOpts *printers.PrintOptions, isLocal b
 		return err
 	}
 
-	printer, err := f.VersionedPrinterWithOptions(printOpts, isLocal, mapping)
+	printer, err := f.PrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err
 	}

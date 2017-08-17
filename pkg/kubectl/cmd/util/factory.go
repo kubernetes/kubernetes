@@ -238,11 +238,10 @@ type ObjectMappingFactory interface {
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
 	// PrinterWithOptions returns the standard printer for the given set of options.
-	PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error)
-	// VersionedPrinterWithOptions returns a printer suitable for displaying versioned resources.
-	// Returns a versioned printer if the resulting standard printer is generic.
-	// Returns an error if the given RESTMapping is nil or has an empty groupversion.
-	VersionedPrinterWithOptions(printOpts *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
+	// Returns a printer suitable for displaying versioned resources if both a RESTMapping
+	// is passed and the resulting printer for the given set of options is generic.
+	// Returns an error if the given RESTMapping contains an empty GroupVersion.
+	PrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given a set of *printers.PrintOptions to modify the output format
 	PrintObject(printOpts *printers.PrintOptions, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintSuccess prints message after finishing mutating operations

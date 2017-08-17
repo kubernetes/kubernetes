@@ -134,7 +134,7 @@ func (o *ViewOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOu
 	}
 
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
-	printer, err := f.PrinterWithOptions(printOpts, false)
+	printer, err := f.PrinterWithOptions(printOpts, false, nil)
 	if err != nil {
 		return err
 	}

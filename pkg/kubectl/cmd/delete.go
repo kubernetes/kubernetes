@@ -119,7 +119,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	validArgs, argAliases := []string{}, []string{}
 	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	}, true)
+	}, true, nil)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()

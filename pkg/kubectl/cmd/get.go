@@ -105,7 +105,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	validArgs, argAliases := []string{}, []string{}
 	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	}, true)
+	}, true, nil)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
@@ -236,7 +236,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		printOpts := cmdutil.ExtractCmdPrintOptions(cmd)
 		printOpts.WithNamespace = allNamespaces
 
-		printer, err := f.VersionedPrinterWithOptions(printOpts, false, mapping)
+		printer, err := f.PrinterWithOptions(printOpts, false, mapping)
 		if err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, err := f.PrinterWithOptions(&printers.PrintOptions{}, false)
+	printer, err := f.PrinterWithOptions(&printers.PrintOptions{}, false, nil)
 	if err != nil {
 		return err
 	}
@@ -452,7 +452,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			mapping = infos[ix].Mapping
 			original = infos[ix].Object
 		}
-		if shouldGetNewVersionedPrinter(printer, lastMapping, mapping) {
+		if shouldGetNewPrinter(printer, lastMapping, mapping) {
 			if printer != nil {
 				w.Flush()
 			}
@@ -465,7 +465,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping, printOpts)
 			}
 
-			printer, err = f.VersionedPrinterWithOptions(printOpts, false, mapping)
+			if mapping == nil {
+				err := fmt.Errorf("no serialization format found")
+				if !errs.Has(err.Error()) {
+					errs.Insert(err.Error())
+					allErrs = append(allErrs, err)
+				}
+			}
+
+			printer, err = f.PrinterWithOptions(printOpts, false, mapping)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -551,7 +559,7 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "its an experimental feature.")
 }
 
-func shouldGetNewVersionedPrinter(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
+func shouldGetNewPrinter(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
 }
 

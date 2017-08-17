@@ -46,7 +46,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 	var err error
@@ -64,28 +64,23 @@ func (f *ring2Factory) PrinterWithOptions(options *printers.PrintOptions, isLoca
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return printerWithOptions(mapper, typer, encoder, decoders, options)
-}
-
-func (f *ring2Factory) VersionedPrinterWithOptions(options *printers.PrintOptions, isLocal bool, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
-	printer, err := f.PrinterWithOptions(options, isLocal)
+	printer, err := printerWithOptions(mapper, typer, encoder, decoders, options)
 	if err != nil {
 		return nil, err
 	}
-	if !printer.IsGeneric() {
-		return printer, nil
+
+	// if a mapping was given and the printer is generic,
+	// attempt to compose printer in a printers.VersionedPrinter
+	if printer.IsGeneric() && mapping != nil {
+		version := mapping.GroupVersionKind.GroupVersion()
+		if version.Empty() {
+			return nil, fmt.Errorf("no serialization format found")
+		}
+
+		return printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion()), nil
 	}
 
-	// Make sure we output versioned data for generic printers
-	if mapping == nil {
-		return nil, fmt.Errorf("no serialization format found")
-	}
-	version := mapping.GroupVersionKind.GroupVersion()
-	if version.Empty() {
-		return nil, fmt.Errorf("no serialization format found")
-	}
-
-	return printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion()), nil
+	return printer, nil
 }
 
 func (f *ring2Factory) PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
@@ -135,7 +130,7 @@ func (f *ring2Factory) PrintObject(printOpts *printers.PrintOptions, isLocal boo
 		return err
 	}
 
-	printer, err := f.VersionedPrinterWithOptions(printOpts, isLocal, mapping)
+	printer, err := f.PrinterWithOptions(printOpts, isLocal, mapping)
 	if err != nil {
 		return err
 	}

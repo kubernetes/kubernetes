@@ -91,7 +91,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	// to an api server.
 	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	}, true)
+	}, true, nil)
 
 	cmdutil.CheckErr(err)
 	if p != nil {
@@ -129,8 +129,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
-
-	printer, err := f.PrinterWithOptions(o.PrintOpts, o.Local)
+	printer, err := f.PrinterWithOptions(o.PrintOpts, o.Local, nil)
 	if err != nil {
 		return err
 	}

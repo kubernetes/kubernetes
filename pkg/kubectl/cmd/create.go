@@ -119,7 +119,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer) error {
 	o.PrintOpts = cmdutil.ExtractCmdPrintOptions(cmd)
 
-	printer, err := f.PrinterWithOptions(o.PrintOpts, false)
+	printer, err := f.PrinterWithOptions(o.PrintOpts, false, nil)
 	if err != nil {
 		return err
 	}

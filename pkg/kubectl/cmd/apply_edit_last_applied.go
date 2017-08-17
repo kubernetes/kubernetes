@@ -68,7 +68,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 	validArgs, argAliases := []string{}, []string{}
 	p, err := f.PrinterWithOptions(&printers.PrintOptions{
 		ColumnLabels: []string{},
-	}, true)
+	}, true, nil)
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
