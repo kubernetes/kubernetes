@@ -22,10 +22,10 @@ import (
 	"io"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
@@ -36,15 +36,15 @@ import (
 )
 
 type TopPodOptions struct {
-	ResourceName    string
-	Namespace       string
-	Selector        string
-	AllNamespaces   bool
-	PrintContainers bool
-	PodClient       coreclient.PodsGetter
-	HeapsterOptions HeapsterTopOptions
-	Client          *metricsutil.HeapsterMetricsClient
-	Printer         *metricsutil.TopCmdPrinter
+	ResourceName     string
+	Namespace        string
+	Selector         string
+	AllNamespaces    bool
+	PrintContainers  bool
+	KubernetesClient *kubernetes.Clientset
+	HeapsterOptions  HeapsterTopOptions
+	Client           *metricsutil.HeapsterMetricsClient
+	Printer          *metricsutil.TopCmdPrinter
 }
 
 const metricsCreationDelay = 2 * time.Minute
@@ -116,7 +116,10 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
-	o.PodClient = clientset.Core()
+	o.KubernetesClient, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
 	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.Core(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
 	o.Printer = metricsutil.NewTopCmdPrinter(out)
 	return nil
@@ -157,7 +160,7 @@ func (o TopPodOptions) RunTopPod() error {
 
 func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	if len(o.ResourceName) > 0 {
-		pod, err := o.PodClient.Pods(o.Namespace).Get(o.ResourceName, metav1.GetOptions{})
+		pod, err := o.KubernetesClient.CoreV1().Pods(o.Namespace).Get(o.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -165,7 +168,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 			return err
 		}
 	} else {
-		pods, err := o.PodClient.Pods(o.Namespace).List(metav1.ListOptions{
+		pods, err := o.KubernetesClient.CoreV1().Pods(o.Namespace).List(metav1.ListOptions{
 			LabelSelector: selector.String(),
 		})
 		if err != nil {
@@ -183,7 +186,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	return errors.New("metrics not available yet")
 }
 
-func checkPodAge(pod *api.Pod) error {
+func checkPodAge(pod *apiv1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())

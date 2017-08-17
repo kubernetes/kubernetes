@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -58,6 +59,34 @@ type ClientCache struct {
 	// argument evaluation
 	discoveryClientFactory DiscoveryClientFactory
 	discoveryClient        discovery.DiscoveryInterface
+
+	kubernetesClientLoader KubernetesClientCache
+}
+
+// kubernetesClientLoader provides a new kubernetes.Clientset
+type KubernetesClientCache struct {
+	// once makes sure the client is only initialized once
+	once sync.Once
+	// client is the cached client value
+	client *kubernetes.Clientset
+	// err is the cached error value
+	err error
+}
+
+// KubernetesClientSet returns a new kubernetes.Clientset.  It will cache the value
+// the first time it is called and return the cached value on subsequent calls.
+// If an error is encountered the first time KubernetesClientSet is called,
+// the error will be cached.
+func (c *ClientCache) KubernetesClientSet(requiredVersion *schema.GroupVersion) (*kubernetes.Clientset, error) {
+	c.kubernetesClientLoader.once.Do(func() {
+		config, err := c.ClientConfigForVersion(requiredVersion)
+		if err != nil {
+			c.kubernetesClientLoader.err = err
+			return
+		}
+		c.kubernetesClientLoader.client, c.kubernetesClientLoader.err = kubernetes.NewForConfig(config)
+	})
+	return c.kubernetesClientLoader.client, c.kubernetesClientLoader.err
 }
 
 // also looks up the discovery client.  We can't do this during init because the flags won't have been set
