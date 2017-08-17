@@ -114,7 +114,9 @@ func TestNodeDeleted(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
-	cloudNodeController.Run()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go cloudNodeController.Run(stopCh)
 
 	select {
 	case <-fnh.DeleteWaitChan:
@@ -555,7 +557,9 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 
-	cloudNodeController.Run()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go cloudNodeController.Run(stopCh)
 
 	<-time.After(2 * time.Second)
 
@@ -663,7 +667,9 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		t.Errorf("Node status unexpectedly updated")
 	}
 
-	cloudNodeController.Run()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go cloudNodeController.Run(stopCh)
 
 	<-time.After(2 * time.Second)
 

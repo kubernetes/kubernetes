@@ -217,7 +217,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		s.NodeMonitorPeriod.Duration,
 		s.NodeStatusUpdateFrequency.Duration)
 
-	nodeController.Run()
+	go nodeController.Run(stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
