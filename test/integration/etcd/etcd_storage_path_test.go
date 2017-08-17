@@ -168,6 +168,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/replicasets/etcdstoragepathtestnamespace/rs2",
 		expectedGVK:      gvkP("extensions", "v1beta1", "ReplicaSet"),
 	},
+	gvr("apps", "v1beta2", "controllerrevisions"): {
+		stub:             `{"metadata":{"name":"crs2"},"data":{"name":"abc","namespace":"default","creationTimestamp":null,"Spec":{"Replicas":0,"Selector":{"matchLabels":{"foo":"bar"}},"Template":{"creationTimestamp":null,"labels":{"foo":"bar"},"Spec":{"Volumes":null,"InitContainers":null,"Containers":null,"RestartPolicy":"Always","TerminationGracePeriodSeconds":null,"ActiveDeadlineSeconds":null,"DNSPolicy":"ClusterFirst","NodeSelector":null,"ServiceAccountName":"","AutomountServiceAccountToken":null,"NodeName":"","SecurityContext":null,"ImagePullSecrets":null,"Hostname":"","Subdomain":"","Affinity":null,"SchedulerName":"","Tolerations":null,"HostAliases":null}},"VolumeClaimTemplates":null,"ServiceName":""},"Status":{"ObservedGeneration":null,"Replicas":0}},"revision":0}`,
+		expectedEtcdPath: "/registry/controllerrevisions/etcdstoragepathtestnamespace/crs2",
+		expectedGVK:      gvkP("apps", "v1beta1", "ControllerRevision"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
