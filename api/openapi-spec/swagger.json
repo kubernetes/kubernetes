@@ -64235,6 +64235,10 @@
      "provisioner": {
       "description": "Provisioner indicates the type of the provisioner.",
       "type": "string"
+     },
+     "reclaimPolicy": {
+      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
+      "type": "string"
      }
     },
     "x-kubernetes-group-version-kind": [
@@ -64306,6 +64310,10 @@
      },
      "provisioner": {
       "description": "Provisioner indicates the type of the provisioner.",
+      "type": "string"
+     },
+     "reclaimPolicy": {
+      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
       "type": "string"
      }
     },

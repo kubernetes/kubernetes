@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	reflect "reflect"
@@ -57,6 +58,15 @@ func (in *StorageClass) DeepCopyInto(out *StorageClass) {
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
+		}
+	}
+	if in.ReclaimPolicy != nil {
+		in, out := &in.ReclaimPolicy, &out.ReclaimPolicy
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(core_v1.PersistentVolumeReclaimPolicy)
+			**out = **in
 		}
 	}
 	return

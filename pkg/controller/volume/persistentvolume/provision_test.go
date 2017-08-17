@@ -31,6 +31,7 @@ var class1Parameters = map[string]string{
 var class2Parameters = map[string]string{
 	"param2": "value2",
 }
+var deleteReclaimPolicy = v1.PersistentVolumeReclaimDelete
 var storageClasses = []*storage.StorageClass{
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -41,8 +42,9 @@ var storageClasses = []*storage.StorageClass{
 			Name: "gold",
 		},
 
-		Provisioner: mockPluginName,
-		Parameters:  class1Parameters,
+		Provisioner:   mockPluginName,
+		Parameters:    class1Parameters,
+		ReclaimPolicy: &deleteReclaimPolicy,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -51,8 +53,9 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "silver",
 		},
-		Provisioner: mockPluginName,
-		Parameters:  class2Parameters,
+		Provisioner:   mockPluginName,
+		Parameters:    class2Parameters,
+		ReclaimPolicy: &deleteReclaimPolicy,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -61,8 +64,9 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "external",
 		},
-		Provisioner: "vendor.com/my-volume",
-		Parameters:  class1Parameters,
+		Provisioner:   "vendor.com/my-volume",
+		Parameters:    class1Parameters,
+		ReclaimPolicy: &deleteReclaimPolicy,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -71,8 +75,9 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "unknown-internal",
 		},
-		Provisioner: "kubernetes.io/unknown",
-		Parameters:  class1Parameters,
+		Provisioner:   "kubernetes.io/unknown",
+		Parameters:    class1Parameters,
+		ReclaimPolicy: &deleteReclaimPolicy,
 	},
 }
 

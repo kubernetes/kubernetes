@@ -17,10 +17,20 @@ limitations under the License.
 package fuzzer
 
 import (
+	fuzz "github.com/google/gofuzz"
+
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // Funcs returns the fuzzer functions for the storage api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{}
+	return []interface{}{
+		func(obj *storage.StorageClass, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			reclamationPolicies := []api.PersistentVolumeReclaimPolicy{api.PersistentVolumeReclaimDelete, api.PersistentVolumeReclaimRetain}
+			obj.ReclaimPolicy = &reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
+		},
+	}
 }
