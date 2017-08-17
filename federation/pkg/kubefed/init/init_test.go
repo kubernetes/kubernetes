@@ -109,6 +109,7 @@ func TestInitFederation(t *testing.T) {
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
 		isRBACAPIAvailable           bool
+		tolerations                  string
 	}{
 		{
 			federation:            "union",
@@ -126,6 +127,7 @@ func TestInitFederation(t *testing.T) {
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
 			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+			tolerations:           "key1=value1:NoExecute",
 		},
 		{
 			federation:           "union",
@@ -246,7 +248,7 @@ func TestInitFederation(t *testing.T) {
 			tc.etcdImage = defaultEtcdImage
 		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.tolerations)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -621,7 +623,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, tolerationsString string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -889,6 +891,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
+	tolerations, err := marshallingTolerations(tolerationsString)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling --tolerations: %v", err)
+	}
+	v1Tolerations := convertApiTolerationsToV1Tolerations(tolerations)
+
 	apiserver := &v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -953,6 +961,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					Tolerations: v1Tolerations,
 				},
 			},
 		},
@@ -1061,6 +1070,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					Tolerations: v1Tolerations,
 				},
 			},
 		},
@@ -1590,4 +1600,17 @@ func addCoreDNSServerAnnotationTest(deployment *v1beta1.Deployment, dnsZoneName,
 	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
 	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
 	return deployment, nil
+}
+
+func convertApiTolerationsToV1Tolerations(apiTolerations []api.Toleration) []v1.Toleration {
+	v1Tolerations := []v1.Toleration{}
+	for _, toleration := range apiTolerations {
+		tmpv1toleration := v1.Toleration{}
+		tmpv1toleration.Key = toleration.Key
+		tmpv1toleration.Value = toleration.Value
+		tmpv1toleration.Effect = v1.TaintEffect(toleration.Effect)
+		tmpv1toleration.Operator = v1.TolerationOperator(toleration.Operator)
+		v1Tolerations = append(v1Tolerations)
+	}
+	return v1Tolerations
 }
