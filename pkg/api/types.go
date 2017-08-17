@@ -754,6 +754,10 @@ type FlexVolumeSource struct {
 	// scripts.
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Defaults to true. SELinuxRelabel controls relabeling of the mounted volume and allows
+	// turning this off for filesystems that don't support this functionality. e.g. fuse based filesystems
+	// +optional
+	SELinuxRelabel *bool
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional

@@ -2121,6 +2121,15 @@ func (in *FlexVolumeSource) DeepCopyInto(out *FlexVolumeSource) {
 			(*out)[key] = val
 		}
 	}
+	if in.SELinuxRelabel != nil {
+		in, out := &in.SELinuxRelabel, &out.SELinuxRelabel
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	return
 }
 

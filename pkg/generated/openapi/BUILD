@@ -9,6 +9,8 @@ openapi_library(
     name = "go_default_library",
     srcs = ["doc.go"],
     openapi_targets = [
+        "_output/dockerized/go/src/github.com/miekg/coredns/vendor/k8s.io/client-go/1.5/pkg/runtime",
+        "_output/dockerized/go/src/github.com/miekg/coredns/vendor/k8s.io/client-go/1.5/pkg/watch/versioned",
         "federation/apis/federation/v1beta1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",

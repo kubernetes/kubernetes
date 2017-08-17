@@ -2114,6 +2114,15 @@ func (in *FlexVolumeSource) DeepCopyInto(out *FlexVolumeSource) {
 			**out = **in
 		}
 	}
+	if in.SELinuxRelabel != nil {
+		in, out := &in.SELinuxRelabel, &out.SELinuxRelabel
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.Options != nil {
 		in, out := &in.Options, &out.Options
 		*out = make(map[string]string, len(*in))

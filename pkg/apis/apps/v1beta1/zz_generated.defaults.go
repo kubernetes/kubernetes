@@ -52,6 +52,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
 		}
+		if a.VolumeSource.FlexVolume != nil {
+			v1.SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
+		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
 			for j := range a.VolumeSource.DownwardAPI.Items {
@@ -192,6 +195,9 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 		}
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+		}
+		if a.VolumeSource.FlexVolume != nil {
+			v1.SetDefaults_FlexVolumeSource(a.VolumeSource.FlexVolume)
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)

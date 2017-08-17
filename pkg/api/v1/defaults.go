@@ -369,3 +369,10 @@ func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 		obj.FSType = "xfs"
 	}
 }
+
+func SetDefaults_FlexVolumeSource(obj *v1.FlexVolumeSource) {
+	if obj.SELinuxRelabel == nil {
+		obj.SELinuxRelabel = new(bool)
+		*obj.SELinuxRelabel = true
+	}
+}

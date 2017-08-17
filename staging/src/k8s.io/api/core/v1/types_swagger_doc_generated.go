@@ -553,12 +553,13 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_FlexVolumeSource = map[string]string{
-	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
-	"driver":    "Driver is the name of the driver to use for this volume.",
-	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
-	"secretRef": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
-	"readOnly":  "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"options":   "Optional: Extra command options if any.",
+	"":               "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+	"driver":         "Driver is the name of the driver to use for this volume.",
+	"fsType":         "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
+	"secretRef":      "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
+	"readOnly":       "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+	"options":        "Optional: Extra command options if any.",
+	"seLinuxRelabel": "Optional: Defaults to true. SELinuxRelabel controls relabeling of the mounted volume and allows turning this off for filesystems that don't support this functionality. e.g. fuse based filesystems",
 }
 
 func (FlexVolumeSource) SwaggerDoc() map[string]string {

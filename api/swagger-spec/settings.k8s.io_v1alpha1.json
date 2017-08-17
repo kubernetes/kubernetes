@@ -1910,6 +1910,10 @@
      "options": {
       "type": "object",
       "description": "Optional: Extra command options if any."
+     },
+     "seLinuxRelabel": {
+      "type": "boolean",
+      "description": "Optional: Defaults to true. SELinuxRelabel controls relabeling of the mounted volume and allows turning this off for filesystems that don't support this functionality. e.g. fuse based filesystems"
      }
     }
    },

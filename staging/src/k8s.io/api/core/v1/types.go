@@ -932,6 +932,10 @@ type FlexVolumeSource struct {
 	// Optional: Extra command options if any.
 	// +optional
 	Options map[string]string `json:"options,omitempty" protobuf:"bytes,5,rep,name=options"`
+	// Optional: Defaults to true. SELinuxRelabel controls relabeling of the mounted volume and allows
+	// turning this off for filesystems that don't support this functionality. e.g. fuse based filesystems
+	// +optional
+	SELinuxRelabel *bool `json:"seLinuxRelabel,omitempty" protobuf:"varint,6,opt,name=seLinuxRelabel"`
 }
 
 // Represents a Persistent Disk resource in AWS.

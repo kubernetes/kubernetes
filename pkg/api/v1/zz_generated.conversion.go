@@ -1625,6 +1625,7 @@ func autoConvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *v1.FlexVolumeSo
 	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	out.ReadOnly = in.ReadOnly
 	out.Options = *(*map[string]string)(unsafe.Pointer(&in.Options))
+	out.SELinuxRelabel = (*bool)(unsafe.Pointer(in.SELinuxRelabel))
 	return nil
 }
 
@@ -1637,6 +1638,7 @@ func autoConvert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeS
 	out.Driver = in.Driver
 	out.FSType = in.FSType
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
+	out.SELinuxRelabel = (*bool)(unsafe.Pointer(in.SELinuxRelabel))
 	out.ReadOnly = in.ReadOnly
 	out.Options = *(*map[string]string)(unsafe.Pointer(&in.Options))
 	return nil
@@ -3061,7 +3063,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *v1.
 	out.CephFS = (*api.CephFSVolumeSource)(unsafe.Pointer(in.CephFS))
 	out.FC = (*api.FCVolumeSource)(unsafe.Pointer(in.FC))
 	out.Flocker = (*api.FlockerVolumeSource)(unsafe.Pointer(in.Flocker))
-	out.FlexVolume = (*api.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = new(api.FlexVolumeSource)
+		if err := Convert_v1_FlexVolumeSource_To_api_FlexVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	out.AzureFile = (*api.AzureFileVolumeSource)(unsafe.Pointer(in.AzureFile))
 	out.VsphereVolume = (*api.VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
@@ -3088,7 +3098,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.RBD = (*v1.RBDVolumeSource)(unsafe.Pointer(in.RBD))
 	out.Quobyte = (*v1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.ISCSI = (*v1.ISCSIVolumeSource)(unsafe.Pointer(in.ISCSI))
-	out.FlexVolume = (*v1.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = new(v1.FlexVolumeSource)
+		if err := Convert_api_FlexVolumeSource_To_v1_FlexVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	out.Cinder = (*v1.CinderVolumeSource)(unsafe.Pointer(in.Cinder))
 	out.CephFS = (*v1.CephFSVolumeSource)(unsafe.Pointer(in.CephFS))
 	out.FC = (*v1.FCVolumeSource)(unsafe.Pointer(in.FC))
@@ -5133,7 +5151,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *v1.VolumeSource, out *a
 	out.Glusterfs = (*api.GlusterfsVolumeSource)(unsafe.Pointer(in.Glusterfs))
 	out.PersistentVolumeClaim = (*api.PersistentVolumeClaimVolumeSource)(unsafe.Pointer(in.PersistentVolumeClaim))
 	out.RBD = (*api.RBDVolumeSource)(unsafe.Pointer(in.RBD))
-	out.FlexVolume = (*api.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = new(api.FlexVolumeSource)
+		if err := Convert_v1_FlexVolumeSource_To_api_FlexVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	out.Cinder = (*api.CinderVolumeSource)(unsafe.Pointer(in.Cinder))
 	out.CephFS = (*api.CephFSVolumeSource)(unsafe.Pointer(in.CephFS))
 	out.Flocker = (*api.FlockerVolumeSource)(unsafe.Pointer(in.Flocker))
@@ -5170,7 +5196,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.PersistentVolumeClaim = (*v1.PersistentVolumeClaimVolumeSource)(unsafe.Pointer(in.PersistentVolumeClaim))
 	out.RBD = (*v1.RBDVolumeSource)(unsafe.Pointer(in.RBD))
 	out.Quobyte = (*v1.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
-	out.FlexVolume = (*v1.FlexVolumeSource)(unsafe.Pointer(in.FlexVolume))
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = new(v1.FlexVolumeSource)
+		if err := Convert_api_FlexVolumeSource_To_v1_FlexVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FlexVolume = nil
+	}
 	out.Cinder = (*v1.CinderVolumeSource)(unsafe.Pointer(in.Cinder))
 	out.CephFS = (*v1.CephFSVolumeSource)(unsafe.Pointer(in.CephFS))
 	out.Flocker = (*v1.FlockerVolumeSource)(unsafe.Pointer(in.Flocker))
