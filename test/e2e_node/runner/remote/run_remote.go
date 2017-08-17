@@ -208,11 +208,15 @@ func main() {
 				images = []string{imageConfig.Image}
 			}
 			for _, image := range images {
+				metadata := imageConfig.Metadata
+				if len(strings.TrimSpace(*instanceMetadata)) > 0 {
+					metadata += "," + *instanceMetadata
+				}
 				gceImage := internalGCEImage{
 					image:     image,
 					imageDesc: imageConfig.ImageDesc,
 					project:   imageConfig.Project,
-					metadata:  getImageMetadata(imageConfig.Metadata),
+					metadata:  getImageMetadata(metadata),
 					machine:   imageConfig.Machine,
 					tests:     imageConfig.Tests,
 					resources: imageConfig.Resources,
