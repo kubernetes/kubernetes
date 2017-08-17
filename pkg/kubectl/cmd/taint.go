@@ -106,7 +106,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
 	cmd.Flags().BoolVar(&options.all, "all", false, "Select all nodes in the cluster")
 	return cmd
