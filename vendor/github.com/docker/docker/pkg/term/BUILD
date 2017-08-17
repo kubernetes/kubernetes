@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -25,6 +20,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
@@ -48,4 +44,5 @@ filegroup(
         "//vendor/github.com/docker/docker/pkg/term/windows:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

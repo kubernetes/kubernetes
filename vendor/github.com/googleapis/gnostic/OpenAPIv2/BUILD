@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -11,12 +6,19 @@ go_library(
         "OpenAPIv2.go",
         "OpenAPIv2.pb.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes/any:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
+)
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["OpenAPIv2.proto"],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -30,10 +32,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["OpenAPIv2.proto"],
     visibility = ["//visibility:public"],
 )

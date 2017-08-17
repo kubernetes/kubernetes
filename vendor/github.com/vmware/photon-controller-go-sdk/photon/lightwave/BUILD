@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -17,6 +12,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/vmware/photon-controller-go-sdk/SSPI:go_default_library",
@@ -36,4 +32,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -23,6 +18,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
@@ -50,4 +46,5 @@ filegroup(
         "//vendor/github.com/coreos/etcd/wal/walpb:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
