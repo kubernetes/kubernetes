@@ -57,7 +57,7 @@ openapi_library(
         "k8s.io/client-go/pkg/version",
         "k8s.io/code-generator/test/apis/testgroup/v1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
-        "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1",
+        "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
         "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
     ],
 )

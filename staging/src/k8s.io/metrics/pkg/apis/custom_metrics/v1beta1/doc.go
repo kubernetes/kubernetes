@@ -18,4 +18,4 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/custom_metrics
 // +k8s:openapi-gen=true
 
-package v1alpha1
+package v1beta1
