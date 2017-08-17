@@ -504,14 +504,6 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 		result.Add(container.Resources.Requests)
 	}
 
-	// Account for storage requested by emptydir volumes
-	// If the storage medium is memory, should exclude the size
-	for _, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
-			result.StorageScratch += vol.EmptyDir.SizeLimit.Value()
-		}
-	}
-
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		for rName, rQuantity := range container.Resources.Requests {
@@ -520,6 +512,10 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				if mem := rQuantity.Value(); mem > result.Memory {
 					result.Memory = mem
 				}
+			case v1.ResourceEphemeralStorage:
+				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
+					result.EphemeralStorage = ephemeralStorage
+				}
 			case v1.ResourceCPU:
 				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
 					result.MilliCPU = cpu
@@ -527,10 +523,6 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 			case v1.ResourceNvidiaGPU:
 				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
 					result.NvidiaGPU = gpu
-				}
-			case v1.ResourceStorageOverlay:
-				if overlay := rQuantity.Value(); overlay > result.StorageOverlay {
-					result.StorageOverlay = overlay
 				}
 			default:
 				if v1helper.IsExtendedResourceName(rName) {
@@ -572,7 +564,7 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
 	}
-	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && podRequest.StorageOverlay == 0 && podRequest.StorageScratch == 0 && len(podRequest.ExtendedResources) == 0 {
+	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 && podRequest.EphemeralStorage == 0 && len(podRequest.ExtendedResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
@@ -587,20 +579,8 @@ func PodFitsResources(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.No
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
 	}
 
-	scratchSpaceRequest := podRequest.StorageScratch
-	if allocatable.StorageOverlay == 0 {
-		scratchSpaceRequest += podRequest.StorageOverlay
-		//scratchSpaceRequest += nodeInfo.RequestedResource().StorageOverlay
-		nodeScratchRequest := nodeInfo.RequestedResource().StorageOverlay + nodeInfo.RequestedResource().StorageScratch
-		if allocatable.StorageScratch < scratchSpaceRequest+nodeScratchRequest {
-			predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageScratch, scratchSpaceRequest, nodeScratchRequest, allocatable.StorageScratch))
-		}
-
-	} else if allocatable.StorageScratch < scratchSpaceRequest+nodeInfo.RequestedResource().StorageScratch {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageScratch, scratchSpaceRequest, nodeInfo.RequestedResource().StorageScratch, allocatable.StorageScratch))
-	}
-	if allocatable.StorageOverlay > 0 && allocatable.StorageOverlay < podRequest.StorageOverlay+nodeInfo.RequestedResource().StorageOverlay {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceStorageOverlay, podRequest.StorageOverlay, nodeInfo.RequestedResource().StorageOverlay, allocatable.StorageOverlay))
+	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
+		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, nodeInfo.RequestedResource().EphemeralStorage, allocatable.EphemeralStorage))
 	}
 
 	for rName, rQuant := range podRequest.ExtendedResources {
