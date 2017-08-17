@@ -47,7 +47,7 @@ type AggregatorOptions struct {
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
 
-	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server wtih
+	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server with
 	// If it is not set, the in cluster config is used
 	CoreAPIKubeconfig string
 
