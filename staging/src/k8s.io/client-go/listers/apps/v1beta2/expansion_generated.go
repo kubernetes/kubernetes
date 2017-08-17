@@ -26,30 +26,6 @@ type ControllerRevisionListerExpansion interface{}
 // ControllerRevisionNamespaceLister.
 type ControllerRevisionNamespaceListerExpansion interface{}
 
-// DaemonSetListerExpansion allows custom methods to be added to
-// DaemonSetLister.
-type DaemonSetListerExpansion interface{}
-
-// DaemonSetNamespaceListerExpansion allows custom methods to be added to
-// DaemonSetNamespaceLister.
-type DaemonSetNamespaceListerExpansion interface{}
-
-// DeploymentListerExpansion allows custom methods to be added to
-// DeploymentLister.
-type DeploymentListerExpansion interface{}
-
-// DeploymentNamespaceListerExpansion allows custom methods to be added to
-// DeploymentNamespaceLister.
-type DeploymentNamespaceListerExpansion interface{}
-
-// ReplicaSetListerExpansion allows custom methods to be added to
-// ReplicaSetLister.
-type ReplicaSetListerExpansion interface{}
-
-// ReplicaSetNamespaceListerExpansion allows custom methods to be added to
-// ReplicaSetNamespaceLister.
-type ReplicaSetNamespaceListerExpansion interface{}
-
 // ScaleListerExpansion allows custom methods to be added to
 // ScaleLister.
 type ScaleListerExpansion interface{}
@@ -57,11 +33,3 @@ type ScaleListerExpansion interface{}
 // ScaleNamespaceListerExpansion allows custom methods to be added to
 // ScaleNamespaceLister.
 type ScaleNamespaceListerExpansion interface{}
-
-// StatefulSetListerExpansion allows custom methods to be added to
-// StatefulSetLister.
-type StatefulSetListerExpansion interface{}
-
-// StatefulSetNamespaceListerExpansion allows custom methods to be added to
-// StatefulSetNamespaceLister.
-type StatefulSetNamespaceListerExpansion interface{}
