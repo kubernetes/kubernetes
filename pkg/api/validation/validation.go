@@ -2402,6 +2402,28 @@ func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	return allErrors
 }
 
+func toResourceNames(resources api.ResourceList) []api.ResourceName {
+	result := []api.ResourceName{}
+	for resourceName := range resources {
+		result = append(result, resourceName)
+	}
+	return result
+}
+
+func toSet(resourceNames []api.ResourceName) sets.String {
+	result := sets.NewString()
+	for _, resourceName := range resourceNames {
+		result.Insert(string(resourceName))
+	}
+	return result
+}
+
+func toContainerResourcesSet(ctr *api.Container) sets.String {
+	resourceNames := toResourceNames(ctr.Resources.Requests)
+	resourceNames = append(resourceNames, toResourceNames(ctr.Resources.Limits)...)
+	return toSet(resourceNames)
+}
+
 // validateContainersOnlyForPod does additional validation for containers on a pod versus a pod template
 // it only does additive validation of fields not covered in validateContainers
 func validateContainersOnlyForPod(containers []api.Container, fldPath *field.Path) field.ErrorList {
@@ -2428,6 +2450,21 @@ func ValidatePod(pod *api.Pod) field.ErrorList {
 
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		hugePageResources := sets.NewString()
+		for i := range pod.Spec.Containers {
+			resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+			for resourceStr := range resourceSet {
+				if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+					hugePageResources.Insert(resourceStr)
+				}
+			}
+		}
+		if len(hugePageResources) > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
+		}
+	}
 
 	return allErrs
 }
@@ -3925,6 +3962,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		if resourceName == api.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
 		}
+		if helper.IsHugePageResourceName(resourceName) && !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+			allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
+		}
+
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))

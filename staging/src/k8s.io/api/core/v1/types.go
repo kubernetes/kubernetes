@@ -3759,6 +3759,8 @@ const (
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 	// Default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
+	// Name prefix for huge page resources (alpha).
+	ResourceHugePagesPrefix = "hugepages-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

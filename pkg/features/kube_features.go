@@ -157,6 +157,12 @@ const (
 	//
 	// Alternative container-level CPU affinity policies.
 	CPUManager utilfeature.Feature = "CPUManager"
+
+	// owner: @derekwaynecarr
+	// alpha: v1.8
+	//
+	// Enable pods to consume pre-allocated huge pages of varying page sizes
+	HugePages utilfeature.Feature = "HugePages"
 )
 
 func init() {
@@ -180,6 +186,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
+	HugePages:                                   {Default: false, PreRelease: utilfeature.Alpha},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
