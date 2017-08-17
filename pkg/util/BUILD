@@ -64,3 +64,10 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
+
+sh_test(
+    name = "verify-util-pkg",
+    size = "small",
+    srcs = ["verify-util-pkg.sh"],
+    data = glob(["*.go"]),
+)
