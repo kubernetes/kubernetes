@@ -490,14 +490,17 @@ func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) 
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
-	// Setup the node
-	if err := cm.setupNode(activePods); err != nil {
-		return err
-	}
+
 	// Ensure that node allocatable configuration is valid.
 	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
 	}
+
+	// Setup the node
+	if err := cm.setupNode(activePods); err != nil {
+		return err
+	}
+
 	// Don't run a background thread if there are no ensureStateFuncs.
 	hasEnsureStateFuncs := false
 	for _, cont := range cm.systemContainers {

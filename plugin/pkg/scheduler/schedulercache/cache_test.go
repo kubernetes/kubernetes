@@ -109,9 +109,9 @@ func TestAssumePodScheduled(t *testing.T) {
 		pods: []*v1.Pod{testPods[4]},
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
-				MilliCPU:           100,
-				Memory:             500,
-				OpaqueIntResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 3},
+				MilliCPU:          100,
+				Memory:            500,
+				ExtendedResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 3},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 100,
@@ -125,9 +125,9 @@ func TestAssumePodScheduled(t *testing.T) {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
 		wNodeInfo: &NodeInfo{
 			requestedResource: &Resource{
-				MilliCPU:           300,
-				Memory:             1524,
-				OpaqueIntResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 8},
+				MilliCPU:          300,
+				Memory:            1524,
+				ExtendedResources: map[v1.ResourceName]int64{"pod.alpha.kubernetes.io/opaque-int-resource-oir-foo": 8},
 			},
 			nonzeroRequest: &Resource{
 				MilliCPU: 300,

@@ -28,6 +28,7 @@ import (
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
@@ -46,12 +47,13 @@ import (
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
 func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 
-	if err := createTLSSecrets(cfg, client); err != nil {
-		return err
-	}
-
-	if err := createOpaqueSecrets(cfg, client); err != nil {
-		return err
+	if features.Enabled(cfg.FeatureFlags, features.StoreCertsInSecrets) {
+		if err := createTLSSecrets(cfg, client); err != nil {
+			return err
+		}
+		if err := createOpaqueSecrets(cfg, client); err != nil {
+			return err
+		}
 	}
 
 	for _, componentName := range kubeadmconstants.MasterComponents {

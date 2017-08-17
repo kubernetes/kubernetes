@@ -445,10 +445,7 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
-	objCopy, err := api.Scheme.Copy(obj)
-	if err != nil {
-		return nil, beforeJSON, types.MergePatchType, err
-	}
+	objCopy := obj.DeepCopyObject()
 	accessor := meta.NewAccessor()
 	annotations, err := accessor.Annotations(objCopy)
 	if err != nil {

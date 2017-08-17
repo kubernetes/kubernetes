@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ const (
 	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ScaleSpec describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
@@ -37,7 +36,6 @@ type ScaleSpec struct {
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ScaleStatus represents the current status of a scale subresource.
 type ScaleStatus struct {
 	// actual number of observed instances of the scaled object.
@@ -61,7 +59,6 @@ type ScaleStatus struct {
 // +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta `json:",inline"`
@@ -81,7 +78,6 @@ type Scale struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
@@ -118,7 +114,6 @@ const (
 	ParallelPodManagement = "Parallel"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
@@ -151,7 +146,6 @@ const (
 	OnDeleteStatefulSetStrategyType = "OnDelete"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
 	// Partition indicates the ordinal at which the StatefulSet should be
@@ -161,7 +155,6 @@ type RollingUpdateStatefulSetStrategy struct {
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// replicas is the desired number of replicas of the given Template.
@@ -224,7 +217,6 @@ type StatefulSetSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,8,opt,name=revisionHistoryLimit"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
@@ -263,7 +255,6 @@ type StatefulSetStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -275,7 +266,6 @@ type StatefulSetList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
@@ -292,7 +282,6 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
@@ -345,7 +334,6 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
@@ -371,7 +359,6 @@ const (
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
@@ -402,7 +389,6 @@ type RollingUpdateDeployment struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
@@ -458,7 +444,6 @@ const (
 	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
@@ -477,7 +462,6 @@ type DeploymentCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -489,7 +473,7 @@ type DeploymentList struct {
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
+// DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
 	// +optional
@@ -514,7 +498,6 @@ const (
 	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // Spec to control the desired behavior of daemon set rolling update.
 type RollingUpdateDaemonSet struct {
 	// The maximum number of DaemonSet pods that can be unavailable during the
@@ -535,7 +518,6 @@ type RollingUpdateDaemonSet struct {
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
 	// A label query over pods that are managed by the daemon set.
@@ -570,7 +552,6 @@ type DaemonSetSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
 	// The number of nodes that are running at least 1
@@ -622,7 +603,6 @@ type DaemonSetStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
@@ -660,7 +640,6 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -676,7 +655,6 @@ type DaemonSetList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
@@ -703,7 +681,6 @@ type ReplicaSet struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -717,7 +694,6 @@ type ReplicaSetList struct {
 	Items []ReplicaSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ReplicaSetSpec is the specification of a ReplicaSet.
 type ReplicaSetSpec struct {
 	// Replicas is the number of desired replicas.
@@ -747,7 +723,6 @@ type ReplicaSetSpec struct {
 	Template v1.PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
 	// Replicas is the most recently oberved number of replicas.
@@ -787,7 +762,6 @@ const (
 	ReplicaSetReplicaFailure ReplicaSetConditionType = "ReplicaFailure"
 )
 
-// WIP: This is not ready to be used and we plan to make breaking changes to it.
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetCondition struct {
 	// Type of replica set condition.

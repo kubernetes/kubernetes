@@ -25,6 +25,8 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/features"
@@ -237,7 +239,8 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode)
+	// TODO: switch to beta
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)
 	}

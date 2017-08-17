@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/apis/audit/validation"
 	"k8s.io/apiserver/pkg/audit"
 
@@ -38,16 +39,10 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 		return nil, fmt.Errorf("failed to read file path %q: %+v", filePath, err)
 	}
 
-	policyVersioned := &auditv1alpha1.Policy{}
-
-	decoder := audit.Codecs.UniversalDecoder(auditv1alpha1.SchemeGroupVersion)
-	if err := runtime.DecodeInto(decoder, policyDef, policyVersioned); err != nil {
-		return nil, fmt.Errorf("failed decoding file %q: %v", filePath, err)
-	}
-
 	policy := &auditinternal.Policy{}
-	if err := audit.Scheme.Convert(policyVersioned, policy, nil); err != nil {
-		return nil, fmt.Errorf("failed converting policy: %v", err)
+	decoder := audit.Codecs.UniversalDecoder(auditv1beta1.SchemeGroupVersion, auditv1alpha1.SchemeGroupVersion)
+	if err := runtime.DecodeInto(decoder, policyDef, policy); err != nil {
+		return nil, fmt.Errorf("failed decoding file %q: %v", filePath, err)
 	}
 
 	if err := validation.ValidatePolicy(policy); err != nil {

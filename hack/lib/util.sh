@@ -484,10 +484,12 @@ kube::util::godep_restored() {
 kube::util::ensure_clean_working_dir() {
   while ! git diff HEAD --exit-code &>/dev/null; do
     echo -e "\nUnexpected dirty working directory:\n"
-    git status -s | sed 's/^/  /'
-    if ! tty -s; then
+    if tty -s; then
+        git status -s
+    else
+        git diff -a # be more verbose in log files without tty
         exit 1
-    fi
+    fi | sed 's/^/  /'
     echo -e "\nCommit your changes in another terminal and then continue here by pressing enter."
     read
   done 1>&2

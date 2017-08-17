@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -28,6 +23,7 @@ go_library(
         "tcpip.go",
         "transport.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/crypto/curve25519:go_default_library",
         "//vendor/golang.org/x/crypto/ed25519:go_default_library",
@@ -48,4 +44,5 @@ filegroup(
         "//vendor/golang.org/x/crypto/ssh/terminal:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

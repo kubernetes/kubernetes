@@ -31,7 +31,7 @@ func NewCmdMarkMaster() *cobra.Command {
 	var kubeConfigFile string
 	cmd := &cobra.Command{
 		Use:     "mark-master <node-name>",
-		Short:   "Create KubeConfig files from given credentials.",
+		Short:   "Mark a node as master.",
 		Aliases: []string{"markmaster"},
 		RunE: func(_ *cobra.Command, args []string) error {
 			err := validateExactArgNumber(args, []string{"node-name"})

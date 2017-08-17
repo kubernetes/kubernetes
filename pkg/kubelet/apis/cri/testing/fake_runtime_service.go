@@ -55,6 +55,18 @@ type FakeRuntimeService struct {
 	Sandboxes  map[string]*FakePodSandbox
 }
 
+func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	for id, c := range r.Containers {
+		if c.SandboxID == sandboxID && c.Metadata.Name == name && c.Metadata.Attempt == attempt {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("container (name, attempt, sandboxID)=(%q, %d, %q) not found", name, attempt, sandboxID)
+}
+
 func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
 	r.Lock()
 	defer r.Unlock()

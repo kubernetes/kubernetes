@@ -62,6 +62,10 @@
     "description": "API at /apis/batch/v1"
    },
    {
+    "path": "/apis/batch/v1beta1",
+    "description": "API at /apis/batch/v1beta1"
+   },
+   {
     "path": "/apis/batch/v2alpha1",
     "description": "API at /apis/batch/v2alpha1"
    },

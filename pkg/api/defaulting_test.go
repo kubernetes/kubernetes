@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/gofuzz"
 
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 type orderedGroupVersionKinds []schema.GroupVersionKind
@@ -42,14 +40,6 @@ func (o orderedGroupVersionKinds) Len() int      { return len(o) }
 func (o orderedGroupVersionKinds) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o orderedGroupVersionKinds) Less(i, j int) bool {
 	return o[i].String() < o[j].String()
-}
-
-func TestVerifyDefaulting(t *testing.T) {
-	job := &batchv2alpha1.JobTemplate{}
-	k8s_batchv2alpha1.SetObjectDefaults_JobTemplate(job)
-	if job.Template.Spec.Template.Spec.DNSPolicy != apiv1.DNSClusterFirst {
-		t.Errorf("unexpected defaulting: %#v", job)
-	}
 }
 
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
@@ -90,10 +80,11 @@ func TestDefaulting(t *testing.T) {
 		{Group: "autoscaling", Version: "v2alpha1", Kind: "HorizontalPodAutoscalerList"}:          {},
 		{Group: "batch", Version: "v1", Kind: "Job"}:                                              {},
 		{Group: "batch", Version: "v1", Kind: "JobList"}:                                          {},
+		{Group: "batch", Version: "v1beta1", Kind: "CronJob"}:                                     {},
+		{Group: "batch", Version: "v1beta1", Kind: "CronJobList"}:                                 {},
+		{Group: "batch", Version: "v1beta1", Kind: "JobTemplate"}:                                 {},
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}:                                    {},
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJobList"}:                                {},
-		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                        {},
-		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                                    {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},

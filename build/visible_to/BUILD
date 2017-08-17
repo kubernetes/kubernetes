@@ -47,6 +47,9 @@ package_group(
 package_group(
     name = "COMMON_testing",
     packages = [
+        "//hack",
+        "//hack/lib",
+        "//hack/make-rules",
         "//test/e2e",
         "//test/e2e/framework",
         "//test/e2e/kubectl",
@@ -66,6 +69,13 @@ package_group(
         "//federation/pkg/kubefed/init",
         "//federation/pkg/kubefed/testing",
         "//federation/pkg/kubefed/util",
+    ],
+)
+
+package_group(
+    name = "cluster",
+    packages = [
+        "//cluster/...",
     ],
 )
 
@@ -360,6 +370,16 @@ package_group(
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/proxy",
+    ],
+)
+
+package_group(
+    name = "pkg_kubectl_validation_CONSUMERS",
+    packages = [
+        "//pkg/kubectl",
+        "//pkg/kubectl/cmd/testing",
+        "//pkg/kubectl/cmd/util",
+        "//pkg/kubectl/resource",
     ],
 )
 

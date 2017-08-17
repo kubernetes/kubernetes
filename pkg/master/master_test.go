@@ -120,7 +120,9 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 // their various strategies properly wired up. This surfaced as a bug where strategies defined Export functions, but
 // they were never used outside of unit tests because the export strategies were not assigned inside the Store.
 func TestLegacyRestStorageStrategies(t *testing.T) {
-	_, _, masterCfg, _ := newMaster(t)
+	_, etcdserver, masterCfg, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
 	storageProvider := corerest.LegacyRESTStorageProvider{
 		StorageFactory:       masterCfg.StorageFactory,
 		ProxyTransport:       masterCfg.ProxyTransport,
@@ -154,7 +156,9 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 }
 
 func TestCertificatesRestStorageStrategies(t *testing.T) {
-	_, _, masterCfg, _ := newMaster(t)
+	_, etcdserver, masterCfg, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
 	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
 

@@ -42,6 +42,8 @@ import (
 	fakeautoscalingv2alpha1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2alpha1/fake"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	fakebatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1/fake"
+	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	fakebatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1/fake"
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	fakebatchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -182,6 +184,11 @@ func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
 // Batch retrieves the BatchV1Client
 func (c *Clientset) Batch() batchv1.BatchV1Interface {
 	return &fakebatchv1.FakeBatchV1{Fake: &c.Fake}
+}
+
+// BatchV1beta1 retrieves the BatchV1beta1Client
+func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
+	return &fakebatchv1beta1.FakeBatchV1beta1{Fake: &c.Fake}
 }
 
 // BatchV2alpha1 retrieves the BatchV2alpha1Client

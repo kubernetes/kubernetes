@@ -21,14 +21,88 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/ghodss/yaml"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
+	apiProjectedSecret = `- name: k8s
+    projected:
+      sources:
+      - secret:
+          items:
+          - key: tls.crt
+            path: ca.crt
+          - key: tls.key
+            path: ca.key
+          name: ca
+      - secret:
+          items:
+          - key: tls.crt
+            path: apiserver.crt
+          - key: tls.key
+            path: apiserver.key
+          name: apiserver
+      - secret:
+          items:
+          - key: tls.crt
+            path: apiserver-kubelet-client.crt
+          - key: tls.key
+            path: apiserver-kubelet-client.key
+          name: apiserver-kubelet-client
+      - secret:
+          items:
+          - key: tls.crt
+            path: sa.pub
+          - key: tls.key
+            path: sa.key
+          name: sa
+      - secret:
+          items:
+          - key: tls.crt
+            path: front-proxy-ca.crt
+          name: front-proxy-ca
+      - secret:
+          items:
+          - key: tls.crt
+            path: front-proxy-client.crt
+          - key: tls.key
+            path: front-proxy-client.key
+          name: front-proxy-client`
+
+	controllerManagerProjectedSecret = `- name: k8s
+    projected:
+      sources:
+      - secret:
+          name: controller-manager.conf
+      - secret:
+          items:
+          - key: tls.crt
+            path: ca.crt
+          - key: tls.key
+            path: ca.key
+          name: ca
+      - secret:
+          items:
+          - key: tls.key
+            path: sa.key
+          name: sa`
+
+	schedulerProjectedSecret = `- name: k8s
+    projected:
+      sources:
+      - secret:
+          name: scheduler.conf`
+
+	hostPathVol = `- hostPath:
+      path: /etc/kubernetes
+    name: k8s`
+
 	testAPIServerPod = `
 apiVersion: v1
 kind: Pod
@@ -92,49 +166,7 @@ spec:
       name: pki
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          items:
-          - key: tls.crt
-            path: ca.crt
-          - key: tls.key
-            path: ca.key
-          name: ca
-      - secret:
-          items:
-          - key: tls.crt
-            path: apiserver.crt
-          - key: tls.key
-            path: apiserver.key
-          name: apiserver
-      - secret:
-          items:
-          - key: tls.crt
-            path: apiserver-kubelet-client.crt
-          - key: tls.key
-            path: apiserver-kubelet-client.key
-          name: apiserver-kubelet-client
-      - secret:
-          items:
-          - key: tls.crt
-            path: sa.pub
-          - key: tls.key
-            path: sa.key
-          name: sa
-      - secret:
-          items:
-          - key: tls.crt
-            path: front-proxy-ca.crt
-          name: front-proxy-ca
-      - secret:
-          items:
-          - key: tls.crt
-            path: front-proxy-client.crt
-          - key: tls.key
-            path: front-proxy-client.key
-          name: front-proxy-client
+  %s
   - hostPath:
       path: /etc/ssl/certs
     name: certs
@@ -213,49 +245,7 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              items:
-              - key: tls.crt
-                path: ca.crt
-              - key: tls.key
-                path: ca.key
-              name: ca
-          - secret:
-              items:
-              - key: tls.crt
-                path: apiserver.crt
-              - key: tls.key
-                path: apiserver.key
-              name: apiserver
-          - secret:
-              items:
-              - key: tls.crt
-                path: apiserver-kubelet-client.crt
-              - key: tls.key
-                path: apiserver-kubelet-client.key
-              name: apiserver-kubelet-client
-          - secret:
-              items:
-              - key: tls.crt
-                path: sa.pub
-              - key: tls.key
-                path: sa.key
-              name: sa
-          - secret:
-              items:
-              - key: tls.crt
-                path: front-proxy-ca.crt
-              name: front-proxy-ca
-          - secret:
-              items:
-              - key: tls.crt
-                path: front-proxy-client.crt
-              - key: tls.key
-                path: front-proxy-client.key
-              name: front-proxy-client
+      %s
       - hostPath:
           path: /etc/ssl/certs
         name: certs
@@ -319,23 +309,7 @@ spec:
       name: pki
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          name: controller-manager.conf
-      - secret:
-          items:
-          - key: tls.crt
-            path: ca.crt
-          - key: tls.key
-            path: ca.key
-          name: ca
-      - secret:
-          items:
-          - key: tls.key
-            path: sa.key
-          name: sa
+  %s
   - hostPath:
       path: /etc/ssl/certs
     name: certs
@@ -400,23 +374,7 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              name: controller-manager.conf
-          - secret:
-              items:
-              - key: tls.crt
-                path: ca.crt
-              - key: tls.key
-                path: ca.key
-              name: ca
-          - secret:
-              items:
-              - key: tls.key
-                path: sa.key
-              name: sa
+      %s
       - hostPath:
           path: /etc/ssl/certs
         name: certs
@@ -470,11 +428,7 @@ spec:
       readOnly: true
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          name: scheduler.conf
+  %s
 status: {}
 `
 
@@ -523,11 +477,7 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              name: scheduler.conf
+      %s
   updateStrategy: {}
 status:
   currentNumberScheduled: 0
@@ -537,26 +487,67 @@ status:
 `
 )
 
+var (
+	testAPIServerSecretsPod  = fmt.Sprintf(testAPIServerPod, apiProjectedSecret)
+	testAPIServerSecretsDS   = fmt.Sprintf(testAPIServerDaemonSet, indentString(apiProjectedSecret, 4))
+	testAPIServerHostPathPod = fmt.Sprintf(testAPIServerPod, hostPathVol)
+	testAPIServerHostPathDS  = fmt.Sprintf(testAPIServerDaemonSet, indentString(hostPathVol, 4))
+
+	testSchedulerSecretsPod  = fmt.Sprintf(testSchedulerPod, schedulerProjectedSecret)
+	testSchedulerSecretsDS   = fmt.Sprintf(testSchedulerDaemonSet, indentString(schedulerProjectedSecret, 4))
+	testSchedulerHostPathPod = fmt.Sprintf(testSchedulerPod, hostPathVol)
+	testSchedulerHostPathDS  = fmt.Sprintf(testSchedulerDaemonSet, indentString(hostPathVol, 4))
+
+	testControllerManagerSecretsPod  = fmt.Sprintf(testControllerManagerPod, controllerManagerProjectedSecret)
+	testControllerManagerSecretsDS   = fmt.Sprintf(testControllerManagerDaemonSet, indentString(controllerManagerProjectedSecret, 4))
+	testControllerManagerHostPathPod = fmt.Sprintf(testControllerManagerPod, hostPathVol)
+	testControllerManagerHostPathDS  = fmt.Sprintf(testControllerManagerDaemonSet, indentString(hostPathVol, 4))
+)
+
 func TestBuildDaemonSet(t *testing.T) {
 	var tests = []struct {
-		component string
-		podBytes  []byte
-		dsBytes   []byte
+		component         string
+		podBytes          []byte
+		dsBytes           []byte
+		selfHostedSecrets bool
 	}{
+		// vols as secrets
 		{
-			component: kubeadmconstants.KubeAPIServer,
-			podBytes:  []byte(testAPIServerPod),
-			dsBytes:   []byte(testAPIServerDaemonSet),
+			component:         kubeadmconstants.KubeAPIServer,
+			podBytes:          []byte(testAPIServerSecretsPod),
+			dsBytes:           []byte(testAPIServerSecretsDS),
+			selfHostedSecrets: true,
 		},
 		{
-			component: kubeadmconstants.KubeControllerManager,
-			podBytes:  []byte(testControllerManagerPod),
-			dsBytes:   []byte(testControllerManagerDaemonSet),
+			component:         kubeadmconstants.KubeControllerManager,
+			podBytes:          []byte(testControllerManagerSecretsPod),
+			dsBytes:           []byte(testControllerManagerSecretsDS),
+			selfHostedSecrets: true,
 		},
 		{
-			component: kubeadmconstants.KubeScheduler,
-			podBytes:  []byte(testSchedulerPod),
-			dsBytes:   []byte(testSchedulerDaemonSet),
+			component:         kubeadmconstants.KubeScheduler,
+			podBytes:          []byte(testSchedulerSecretsPod),
+			dsBytes:           []byte(testSchedulerSecretsDS),
+			selfHostedSecrets: true,
+		},
+		// hostPath vols
+		{
+			component:         kubeadmconstants.KubeAPIServer,
+			podBytes:          []byte(testAPIServerHostPathPod),
+			dsBytes:           []byte(testAPIServerHostPathDS),
+			selfHostedSecrets: false,
+		},
+		{
+			component:         kubeadmconstants.KubeControllerManager,
+			podBytes:          []byte(testControllerManagerHostPathPod),
+			dsBytes:           []byte(testControllerManagerHostPathDS),
+			selfHostedSecrets: false,
+		},
+		{
+			component:         kubeadmconstants.KubeScheduler,
+			podBytes:          []byte(testSchedulerHostPathPod),
+			dsBytes:           []byte(testSchedulerHostPathDS),
+			selfHostedSecrets: false,
 		},
 	}
 
@@ -566,10 +557,13 @@ func TestBuildDaemonSet(t *testing.T) {
 
 		podSpec, err := loadPodSpecFromFile(tempFile)
 		if err != nil {
-			t.Fatalf("couldn't load the specified Pod")
+			t.Fatalf("couldn't load the specified Pod: %v", err)
 		}
 
-		cfg := &kubeadmapi.MasterConfiguration{}
+		cfg := &kubeadmapi.MasterConfiguration{
+			FeatureFlags: map[string]bool{string(features.StoreCertsInSecrets): rt.selfHostedSecrets},
+		}
+
 		ds := buildDaemonSet(cfg, rt.component, podSpec)
 		dsBytes, err := yaml.Marshal(ds)
 		if err != nil {
@@ -577,7 +571,7 @@ func TestBuildDaemonSet(t *testing.T) {
 		}
 
 		if !bytes.Equal(dsBytes, rt.dsBytes) {
-			t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
+			t.Errorf("failed TestBuildDaemonSet for name=%s (secrets=%t):\nexpected:\n%s\nsaw:\n%s", rt.component, rt.selfHostedSecrets, rt.dsBytes, dsBytes)
 		}
 	}
 }
@@ -656,4 +650,19 @@ func createTempFileWithContent(content []byte) (string, error) {
 		return "", fmt.Errorf("cannot close temporary file: %v", err)
 	}
 	return tempFile.Name(), nil
+}
+
+func indentString(input string, count int) string {
+	output := ""
+	lines := strings.Split(input, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			output += strings.Repeat(" ", count)
+		}
+		output += line
+		if i < len(lines)-1 {
+			output += "\n"
+		}
+	}
+	return output
 }

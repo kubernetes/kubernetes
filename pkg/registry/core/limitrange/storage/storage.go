@@ -30,7 +30,7 @@ type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
+// NewREST returns a RESTStorage object that will work against limitranges.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
 		Copier:                   api.Scheme,
