@@ -70,12 +70,16 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
-	if len(strings.Split(value, "/")) == 1 {
-		if !helper.IsStandardContainerResourceName(value) {
-			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
-		}
+
+	// Container resources must be one of:
+	// - A known resource in the `*kubernetes.io/` namespace.
+	// - An extended resource (not in the `*kubernetes.io/` namespace.
+	// - An opaque integer resource [DEPRECATED] (TODO: Remove following deprecation)
+	if !helper.IsStandardContainerResourceName(value) &&
+		!v1helper.IsExtendedResourceName(v1.ResourceName(value)) {
+		return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers or fully qualified"))
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
@@ -121,8 +125,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource type or fully qualified"))
 		}
 	}
-
-	return field.ErrorList{}
+	return allErrs
 }
 
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
