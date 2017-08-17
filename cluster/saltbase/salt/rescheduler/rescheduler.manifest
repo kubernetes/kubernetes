@@ -16,7 +16,7 @@ spec:
   - image: gcr.io/google-containers/rescheduler:v0.3.1
     name: rescheduler
     volumeMounts:
-    - mountPath: /var/log/rescheduler.log
+    - mountPath: /var/log/rescheduler
       name: logfile
       readOnly: false
     # TODO: Make resource requirements depend on the size of the cluster
@@ -28,8 +28,8 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - '/rescheduler --running-in-cluster=false 1>>/var/log/rescheduler.log 2>&1'
+    - '/rescheduler --running-in-cluster=false --log_dir=/var/log/rescheduler --logtostderr=false'
   volumes:
   - hostPath:
-      path: /var/log/rescheduler.log
+      path: /var/log/rescheduler
     name: logfile
