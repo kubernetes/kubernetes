@@ -190,6 +190,11 @@ func (in *GroupResources) DeepCopyInto(out *GroupResources) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ResourceNames != nil {
+		in, out := &in.ResourceNames, &out.ResourceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

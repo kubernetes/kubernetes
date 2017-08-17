@@ -136,6 +136,7 @@ func Convert_audit_EventList_To_v1beta1_EventList(in *audit.EventList, out *Even
 func autoConvert_v1beta1_GroupResources_To_audit_GroupResources(in *GroupResources, out *audit.GroupResources, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
 	return nil
 }
 
@@ -147,6 +148,7 @@ func Convert_v1beta1_GroupResources_To_audit_GroupResources(in *GroupResources, 
 func autoConvert_audit_GroupResources_To_v1beta1_GroupResources(in *audit.GroupResources, out *GroupResources, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
 	return nil
 }
 
