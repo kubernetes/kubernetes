@@ -23,10 +23,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	stringsutil "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -56,7 +58,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -275,14 +277,52 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	if err != nil {
 		return err
 	}
-	// If the directory is a mountpoint with medium memory, there is no
+	// If the directory is a mountpoint with medium hugepages, there is no
 	// work to do since we are already in the desired state.
 	if isMnt && medium == mediumHugepages {
 		return nil
 	}
 
+	pageSizeMountOption, err := getPageSizeMountOptionFromPod(ed.pod)
+	if err != nil {
+		return err
+	}
+
 	glog.V(3).Infof("pod %v: mounting hugepages for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{})
+	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{pageSizeMountOption})
+}
+
+// getPageSizeMountOptionFromPod retrieves pageSize mount option from Pod's resources
+// and validates pageSize options in all containers of given Pod.
+func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
+	pageSizeFound := false
+	pageSize := resource.Quantity{}
+	// In some rare cases init containers can also consume Huge pages.
+	containers := append(pod.Spec.Containers, pod.Spec.InitContainers...)
+	for _, container := range containers {
+		// We can take request because limit and requests must match.
+		for requestName := range container.Resources.Requests {
+			if v1helper.IsHugePageResourceName(requestName) {
+				currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
+				if err != nil {
+					return "", err
+				}
+				// PageSize for all volumes in a POD are equal, except for the first one discovered.
+				if pageSizeFound && pageSize.Cmp(currentPageSize) != 0 {
+					return "", fmt.Errorf("multiple pageSizes for huge pages in a single PodSpec")
+				}
+				pageSize = currentPageSize
+				pageSizeFound = true
+			}
+		}
+	}
+
+	if !pageSizeFound {
+		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages.")
+	}
+
+	return fmt.Sprintf("pageSize=%s", pageSize.String()), nil
+
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.
@@ -383,7 +423,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, strings.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

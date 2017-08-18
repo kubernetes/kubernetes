@@ -2757,6 +2757,28 @@ func TestValidateVolumes(t *testing.T) {
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
+
+	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
+	hugePagesCase := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumHugePages}}
+
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
+		t.Errorf("Unexpected error when HugePages feature is enabled.")
+	}
+
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
+		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
+	}
+
 }
 
 func TestAlphaHugePagesIsolation(t *testing.T) {
