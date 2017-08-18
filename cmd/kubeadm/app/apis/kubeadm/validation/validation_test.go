@@ -289,6 +289,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "0.0.0.0",
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -302,6 +305,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
+				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "0.0.0.0",
 				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
@@ -317,6 +323,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "0.0.0.0",
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -325,11 +334,32 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				CertificatesDir: "/some/other/cert/dir",
 				Token:           "abcdef.0123456789abcdef",
 			}, false},
+		{"invalid kube-proxy bind address",
+			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "5.6.7",
+				},
+				AuthorizationModes: []string{"Node", "RBAC"},
+				Networking: kubeadm.Networking{
+					ServiceSubnet: "10.96.0.1/12",
+					DNSDomain:     "cluster.local",
+				},
+				CertificatesDir: "/some/other/cert/dir",
+				Token:           "abcdef.0123456789abcdef",
+				NodeName:        nodename,
+			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
+				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "0.0.0.0",
 				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
@@ -345,6 +375,9 @@ func TestValidateMasterConfiguration(t *testing.T) {
 				API: kubeadm.API{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
+				},
+				KubeProxy: kubeadm.KubeProxy{
+					BindAddress: "::0",
 				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{

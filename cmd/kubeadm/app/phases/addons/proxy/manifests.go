@@ -27,7 +27,7 @@ metadata:
   labels:
     app: kube-proxy
 data:
-  kubeconfig.conf: |
+  kubeconfig.conf: |-
     apiVersion: v1
     kind: Config
     clusters:
@@ -46,6 +46,12 @@ data:
     - name: default
       user:
         tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  config.conf: |-
+    apiVersion: componentconfig/v1alpha1
+    kind: KubeProxyConfiguration
+    bindAddress: {{ .BindAddress }}
+    clientConnection:
+      kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
 `
 
 	// KubeProxyDaemonSet is the proxy DaemonSet manifest
@@ -74,7 +80,7 @@ spec:
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
+        - --config=/var/lib/kube-proxy/config.conf
         {{ .ClusterCIDR }}
         securityContext:
           privileged: true

@@ -31,6 +31,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
 			obj.API.AdvertiseAddress = "foo"
+			obj.KubeProxy.BindAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationModes = []string{"foo"}
