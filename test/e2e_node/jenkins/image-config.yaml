@@ -19,4 +19,4 @@ images:
   cos-beta:
     image_regex: cos-beta-60-9592-70-0 # docker 1.13.1
     project: cos-cloud
-    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
+    metadata: "user-data<test/e2e_node/jenkins/cos-init-live-restore.yaml,gci-update-strategy=update_disabled"
