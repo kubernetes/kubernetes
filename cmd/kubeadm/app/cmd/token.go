@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -36,6 +37,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/api"
@@ -46,6 +48,7 @@ import (
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	var kubeConfigFile string
+	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
 		Short: "Manage bootstrap tokens.",
@@ -86,6 +89,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
 		"kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+	tokenCmd.PersistentFlags().BoolVar(&dryRun,
+		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
 	var usages []string
 	var tokenDuration time.Duration
@@ -106,7 +111,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) != 0 {
 				token = args[0]
 			}
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
 			// TODO: remove this warning in 1.9
@@ -136,7 +141,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all Bootstrap Tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
 			err = RunListTokens(out, errW, client)
@@ -158,7 +163,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form [%q]", tokenutil.TokenIDRegexpString))
 			}
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
 			err = RunDeleteToken(out, client, args[0])
@@ -337,4 +342,16 @@ func getSecretString(secret *v1.Secret, key string) string {
 		return string(val)
 	}
 	return ""
+}
+
+func getClientset(file string, dryRun bool) (clientset.Interface, error) {
+	if dryRun {
+		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
+		if err != nil {
+			return nil, err
+		}
+		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
+	}
+	client, err := kubeconfigutil.ClientSetFromFile(file)
+	return client, err
 }
