@@ -17,6 +17,8 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,19 +27,25 @@ import (
 )
 
 const (
-	msocket = "/tmp/server.sock"
+	msocketName = "/tmp/server.sock"
 )
 
 func TestNewManagerImpl(t *testing.T) {
+	wd, _ := os.Getwd()
+	socket := path.Join(wd, msocketName)
+
 	_, err := NewManagerImpl("", func(n string, a, u, r []*pluginapi.Device) {})
 	require.Error(t, err)
 
-	_, err = NewManagerImpl(msocket, func(n string, a, u, r []*pluginapi.Device) {})
+	_, err = NewManagerImpl(socket, func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	_, err := NewManagerImpl(msocket, func(n string, a, u, r []*pluginapi.Device) {})
+	wd, _ := os.Getwd()
+	socket := path.Join(wd, msocketName)
+
+	_, err := NewManagerImpl(socket, func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
 }
 

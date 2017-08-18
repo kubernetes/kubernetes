@@ -17,6 +17,8 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -25,11 +27,14 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-const (
-	socket = "/tmp/mock.sock"
+var (
+	esocketName = "mock.sock"
 )
 
 func TestNewEndpoint(t *testing.T) {
+	wd, _ := os.Getwd()
+	socket := path.Join(wd, esocketName)
+
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
@@ -39,6 +44,9 @@ func TestNewEndpoint(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	wd, _ := os.Getwd()
+	socket := path.Join(wd, esocketName)
+
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
@@ -62,6 +70,9 @@ func TestList(t *testing.T) {
 }
 
 func TestListAndWatch(t *testing.T) {
+	wd, _ := os.Getwd()
+	socket := path.Join(wd, esocketName)
+
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 		{ID: "AnotherDeviceId", Health: pluginapi.Healthy},
