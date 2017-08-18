@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -84,7 +83,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	if !ok {
 		return nil, nil, false, fmt.Errorf("not an event")
 	}
-	return labels.Set(event.Labels), EventToSelectableFields(event), event.Initializers != nil, nil
+	return labels.Set(event.Labels), api.EventToSelectableFields(event), event.Initializers != nil, nil
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
@@ -93,22 +92,4 @@ func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionP
 		Field:    field,
 		GetAttrs: GetAttrs,
 	}
-}
-
-// EventToSelectableFields returns a field set that represents the object
-func EventToSelectableFields(event *api.Event) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&event.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		"involvedObject.kind":            event.InvolvedObject.Kind,
-		"involvedObject.namespace":       event.InvolvedObject.Namespace,
-		"involvedObject.name":            event.InvolvedObject.Name,
-		"involvedObject.uid":             string(event.InvolvedObject.UID),
-		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
-		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
-		"type":                           event.Type,
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

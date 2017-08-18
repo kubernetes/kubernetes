@@ -20,7 +20,6 @@ package replicationcontroller
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -29,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -148,22 +146,13 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// ControllerToSelectableFields returns a field set that represents the object.
-func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&controller.ObjectMeta, true)
-	controllerSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
-}
-
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, nil, false, fmt.Errorf("given object is not a replication controller.")
 	}
-	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), rc.Initializers != nil, nil
+	return labels.Set(rc.ObjectMeta.Labels), api.ControllerToSelectableFields(rc), rc.Initializers != nil, nil
 }
 
 // MatchController is the filter used by the generic etcd backend to route
