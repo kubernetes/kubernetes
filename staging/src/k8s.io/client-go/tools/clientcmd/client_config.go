@@ -140,6 +140,14 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		clientConfig.Timeout = timeout
 	}
 
+	if configClusterInfo.ConnectionTimeout != "" {
+		connectionTimeout, err := ParseTimeout(configClusterInfo.ConnectionTimeout)
+		if err != nil {
+			return nil, err
+		}
+		clientConfig.ConnectionTimeout = connectionTimeout
+	}
+
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
 		u.RawQuery = ""
 		u.Fragment = ""

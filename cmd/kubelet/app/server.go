@@ -582,6 +582,10 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 		return nil, err
 	}
 
+	if clientConfig.ConnectionTimeout == 0 {
+		clientConfig.ConnectionTimeout = 7 * time.Second
+	}
+
 	clientConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)

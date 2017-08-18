@@ -70,6 +70,8 @@ type Cluster struct {
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
 	// +optional
 	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
+	// ConnectionTimeout specifies the maximum interval data may remain unacknowledged by an apiserver before the connection is considered dead and is forcefully closed. Defaults to 7s.
+	ConnectionTimeout string `json:"connection-timeout,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`

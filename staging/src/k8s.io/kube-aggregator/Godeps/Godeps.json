@@ -247,6 +247,10 @@
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
 		},
 		{
+			"ImportPath": "github.com/obeattie/tcp-failfast",
+			"Rev": "4e177a235cc8cf7c124319a8c14d3ff46df5a7db"
+		},
+		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
 		},
@@ -281,6 +285,10 @@
 		{
 			"ImportPath": "github.com/prometheus/procfs/xfs",
 			"Rev": "65c1f6f8f0fc1e2185eb9863a3bc751496404259"
+		},
+		{
+			"ImportPath": "github.com/songgao/water",
+			"Rev": "99d07fc117afd4d997bc5ebca77c241644ffe24a"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
@@ -340,6 +348,14 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows",
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows/registry",
 			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
 		},
 		{
