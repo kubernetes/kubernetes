@@ -274,7 +274,8 @@ func TestNewPodControllerRef(t *testing.T) {
 
 func TestCreateApplyRevision(t *testing.T) {
 	set := newStatefulSet(1)
-	revision, err := newRevision(set, 1)
+	set.Status.CollisionCount = new(int32)
+	revision, err := newRevision(set, 1, set.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +290,7 @@ func TestCreateApplyRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoredRevision, err := newRevision(restoredSet, 2)
+	restoredRevision, err := newRevision(restoredSet, 2, restoredSet.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
