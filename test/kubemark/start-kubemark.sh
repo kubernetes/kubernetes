@@ -144,6 +144,9 @@ EOF
 }
 
 # Copy all the necessary resource files (scripts/configs/manifests) to the master.
+# Kubemark_changes: We need 'kubelet' on kubemark master as Ubuntu won't come with 
+# preinstalled kubelet, so copying locally built kubelet executable to kubemark master.
+# This can be later changed to installing kubelet itself on kubemark master.
 function copy-resource-files-to-master {
   copy-files \
     "${SERVER_BINARY_TAR}" \
@@ -158,6 +161,7 @@ function copy-resource-files-to-master {
     "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
     "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
     "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
+    "/root/kubelet" \
     "kubernetes@${MASTER_NAME}":/home/kubernetes/
   echo "Copied server binary, master startup scripts, configs and resource manifests to master."
 }
@@ -203,6 +207,19 @@ function create-and-upload-hollow-node-image {
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
 }
 
+#Kubemark_changes:  Kubeadm does not know how to authenticate with GCR, configure authentication to GCR
+# using a short-lived access token.
+function AuthenticateWithGCR {
+  # Create the docker-registry secret
+  "${KUBECTL}" --namespace=kubemark create secret docker-registry gcr \
+    --docker-server=https://gcr.io \
+    --docker-username=oauth2accesstoken \
+    --docker-password="$(gcloud auth print-access-token)" \
+    --docker-email=shivram.srivastava@gmail.com
+  # Patch the default service account with ImagePullSecrets
+  "${KUBECTL}" --namespace=kubemark patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "gcr"}]}'
+}
 # Generate secret and configMap for the hollow-node pods to work, prepare
 # manifests of the hollow-node and heapster replication controllers from
 # templates, and finally create these resources through kubectl.
@@ -298,6 +315,8 @@ current-context: kubemark-context")
     --from-literal=kubeproxy.kubeconfig="${KUBEPROXY_KUBECONFIG_CONTENTS}" \
     --from-literal=heapster.kubeconfig="${HEAPSTER_KUBECONFIG_CONTENTS}" \
     --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}"
+  # Kubemark_changes: Authentication with the GCR.  
+  AuthenticateWithGCR
 
   # Create addon pods.
   mkdir -p "${RESOURCE_DIRECTORY}/addons"

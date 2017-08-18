@@ -49,9 +49,14 @@ function create-master-instance-with-resources {
 
   # Override the master image project to cos-cloud for COS images staring with `cos` string prefix.
   DEFAULT_GCI_PROJECT=google-containers
-  if [[ "${GCI_VERSION}" == "cos"* ]]; then
-      DEFAULT_GCI_PROJECT=cos-cloud
+# Kubemark_changes: Commented below lines to avoid cos image on kubemark master.
+#  if [[ "${GCI_VERSION}" == "cos"* ]]; then
+#      DEFAULT_GCI_PROJECT=cos-cloud
+#  fi
+  if [[ "${GCI_VERSION}" == "ubuntu"* ]]; then
+      DEFAULT_GCI_PROJECT=ubuntu-os-gke-cloud
   fi
+
   MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
 
   run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
@@ -88,8 +93,9 @@ function create-master-instance-with-resources {
 
 # Command to be executed is '$1'.
 # No. of retries is '$2' (if provided) or 1 (default).
+# Kubemark_changes: Modified ssh command to login as kubernetes user.
 function execute-cmd-on-master-with-retries() {
-  RETRIES="${2:-1}" run-gcloud-compute-with-retries ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="$1"
+  RETRIES="${2:-1}" run-gcloud-compute-with-retries ssh kubernetes@"${MASTER_NAME}" --ssh-key-file="~/.ssh/google_compute_engine" --zone="${ZONE}" --project="${PROJECT}" --command="$1"
 }
 
 function copy-files() {
