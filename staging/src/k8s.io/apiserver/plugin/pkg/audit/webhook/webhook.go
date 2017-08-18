@@ -26,8 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -147,33 +145,17 @@ func newBatchWebhook(configFile string, groupVersions []schema.GroupVersion) (*b
 		return nil, err
 	}
 
-	c := conversion.NewCloner()
-	for _, f := range metav1.GetGeneratedDeepCopyFuncs() {
-		if err := c.RegisterGeneratedDeepCopyFunc(f); err != nil {
-			return nil, fmt.Errorf("registering meta deep copy method: %v", err)
-		}
-	}
-	for _, f := range auditinternal.GetGeneratedDeepCopyFuncs() {
-		if err := c.RegisterGeneratedDeepCopyFunc(f); err != nil {
-			return nil, fmt.Errorf("registering audit deep copy method: %v", err)
-		}
-	}
-
 	return &batchBackend{
 		w:            w,
 		buffer:       make(chan *auditinternal.Event, defaultBatchBufferSize),
 		maxBatchSize: defaultBatchMaxSize,
 		maxBatchWait: defaultBatchMaxWait,
-		cloner:       c,
 		shutdownCh:   make(chan struct{}),
 	}, nil
 }
 
 type batchBackend struct {
 	w *webhook.GenericWebhook
-
-	// Cloner is used to deep copy events as they are buffered.
-	cloner *conversion.Cloner
 
 	// Channel to buffer events in memory before sending them on the webhook.
 	buffer chan *auditinternal.Event
