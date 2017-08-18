@@ -2487,8 +2487,15 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 			continue
 		}
 
-		// TODO: Should this be an error?
-		glog.Warningf("Found multiple subnets in AZ %q; making arbitrary choice between subnets %q and %q", az, *existing.SubnetId, *subnet.SubnetId)
+		// If we have two subnets for the same AZ we arbitrarily choose the one that is first lexicographically.
+		// TODO: Should this be an error.
+		if strings.Compare(*existing.SubnetId, *subnet.SubnetId) > 0 {
+			glog.Warningf("Found multiple subnets in AZ %q; choosing %q between subnets %q and %q", az, *subnet.SubnetId, *existing.SubnetId, *subnet.SubnetId)
+			subnetsByAZ[az] = subnet
+			continue
+		}
+
+		glog.Warningf("Found multiple subnets in AZ %q; choosing %q between subnets %q and %q", az, *existing.SubnetId, *existing.SubnetId, *subnet.SubnetId)
 		continue
 	}
 
