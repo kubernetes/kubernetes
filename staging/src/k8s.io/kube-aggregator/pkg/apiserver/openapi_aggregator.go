@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	aggregatorUser      = "system:aggregator"
-	specDownloadTimeout = 60 * time.Second
-	localDelegateName   = ""
+	aggregatorUser                = "system:aggregator"
+	specDownloadTimeout           = 60 * time.Second
+	LocalDelegateChainNamePattern = "k8s_internal_local_delegation_chain_%d"
 )
 
 type openAPIAggregator struct {
@@ -76,14 +76,23 @@ func (s *openAPIAggregator) addLocalSpec(spec *spec.Swagger, name string) {
 	}
 }
 
-func buildAndRegisterOpenAPIAggregator(delegateHandler http.Handler, webServices []*restful.WebService, config *common.Config, pathHandler common.PathHandler, contextMapper request.RequestContextMapper) (s *openAPIAggregator, err error) {
+func buildAndRegisterOpenAPIAggregator(delegateHandlers []http.Handler, webServices []*restful.WebService,
+	config *common.Config, pathHandler common.PathHandler, contextMapper request.RequestContextMapper) (s *openAPIAggregator, err error) {
+	if len(delegateHandlers) < 1 {
+		return nil, fmt.Errorf("There should be at least one delegateAPIServer in the chain.")
+	}
 	s = &openAPIAggregator{
 		openAPISpecs:  map[string]*openAPISpecInfo{},
 		contextMapper: contextMapper,
 	}
 
-	if err = s.LoadAndAddLocalSpec(delegateHandler, localDelegateName, []string{}); err != nil {
-		return nil, err
+	for i, chain := range delegateHandlers {
+		pathFilter := []string{"/apis/"}
+		// do not filter paths for the first spec. Use it as a base for merging.
+		if i == 0 {
+			pathFilter = []string{}
+		}
+		s.LoadAndAddLocalSpec(chain, fmt.Sprintf(LocalDelegateChainNamePattern, i), pathFilter)
 	}
 
 	// Build Aggregator's spec
@@ -96,6 +105,7 @@ func buildAndRegisterOpenAPIAggregator(delegateHandler http.Handler, webServices
 	// is the source of truth for all non-api endpoints.
 	aggregator.FilterSpecByPaths(aggregatorOpenAPISpec, []string{"/apis/"})
 
+	// Reserving non-name spec for aggregator's Spec.
 	s.addLocalSpec(aggregatorOpenAPISpec, "")
 
 	// Build initial spec to serve.
@@ -168,7 +178,8 @@ func sortByPriority(specs []openAPISpecInfo) {
 
 // buildOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe.
 func (s *openAPIAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err error) {
-	localDelegateSpec, exists := s.openAPISpecs[localDelegateName]
+	firstDelegateName := fmt.Sprintf(LocalDelegateChainNamePattern, 0)
+	localDelegateSpec, exists := s.openAPISpecs[firstDelegateName]
 	if !exists {
 		return nil, fmt.Errorf("localDelegate spec is missing")
 	}
@@ -178,7 +189,7 @@ func (s *openAPIAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err 
 	}
 	specs := []openAPISpecInfo{}
 	for serviceName, specInfo := range s.openAPISpecs {
-		if serviceName == localDelegateName {
+		if serviceName == firstDelegateName {
 			continue
 		}
 		specs = append(specs, openAPISpecInfo{specInfo.apiService, specInfo.spec})

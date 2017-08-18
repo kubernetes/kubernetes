@@ -145,7 +145,14 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+// delegationChain is the list of all delegations. The first one in the list will be used to delegate all unknown traffic
+// and the rest is being used to aggregate OpenAPI spec.
+func (c completedConfig) NewWithDelegate(delegationChain []genericapiserver.DelegationTarget) (*APIAggregator, error) {
+	if len(delegationChain) < 1 {
+		return nil, fmt.Errorf("There should be at least one delegateAPIServer in the delegationChain.")
+	}
+	delegationTarget := delegationChain[0]
+
 	// Prevent generic API server to install OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
 	openApiConfig := c.Config.GenericConfig.OpenAPIConfig
@@ -222,8 +229,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	})
 
 	if openApiConfig != nil {
+		delegationHandlers := []http.Handler{}
+		for _, delegate := range delegationChain {
+			delegationHandlers = append(delegationHandlers, delegate.UnprotectedHandler())
+		}
 		s.openAPIAggregator, err = buildAndRegisterOpenAPIAggregator(
-			s.delegateHandler,
+			delegationHandlers,
 			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
 			openApiConfig,
 			s.GenericAPIServer.Handler.NonGoRestfulMux,
