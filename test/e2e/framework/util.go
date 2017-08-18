@@ -3892,6 +3892,23 @@ func WaitForControllerManagerUp() error {
 	return fmt.Errorf("waiting for controller-manager timed out")
 }
 
+// Returns cluster size (number of ready Nodes excluding Master Node).
+func ClusterSize(c clientset.Interface) (int, error) {
+	nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+		"spec.unschedulable": "false",
+	}.AsSelector().String()})
+	if err != nil {
+		Logf("Failed to list nodes: %v", err)
+		return 0, err
+	}
+
+	// Filter out not-ready nodes.
+	FilterNodes(nodes, func(node v1.Node) bool {
+		return IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
+	})
+	return len(nodes.Items), nil
+}
+
 // WaitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.
 // By cluster size we mean number of Nodes excluding Master Node.
 func WaitForClusterSize(c clientset.Interface, size int, timeout time.Duration) error {

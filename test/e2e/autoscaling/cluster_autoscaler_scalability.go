@@ -19,6 +19,7 @@ package autoscaling
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -159,8 +160,11 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 	It("should scale up twice [Feature:ClusterAutoscalerScalability2]", func() {
 		perNodeReservation := int(float64(memCapacityMb) * 0.95)
 		replicasPerNode := 10
-		additionalNodes1 := int(0.7 * maxNodes)
-		additionalNodes2 := int(0.25 * maxNodes)
+		additionalNodes1 := int(math.Ceil(0.7 * maxNodes))
+		additionalNodes2 := int(math.Ceil(0.25 * maxNodes))
+		if additionalNodes1+additionalNodes2 > maxNodes {
+			additionalNodes2 = maxNodes - additionalNodes1
+		}
 
 		replicas1 := additionalNodes1 * replicasPerNode
 		replicas2 := additionalNodes2 * replicasPerNode
@@ -168,7 +172,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		glog.Infof("cores per node: %v", coresPerNode)
 
 		// saturate cluster
-		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount, nodeCount*perNodeReservation, true, memoryReservationTimeout)
+		initialReplicas := nodeCount
+		reservationCleanup := ReserveMemory(f, "some-pod", initialReplicas, nodeCount*perNodeReservation, true, memoryReservationTimeout)
 		defer reservationCleanup()
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
@@ -179,10 +184,10 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		expectedResult := createClusterPredicates(nodeCount + additionalNodes1)
 		config := createScaleUpTestConfig(nodeCount, nodeCount, rcConfig, expectedResult)
 
-		epsilon := 0.05
-
 		// run test #1
-		testCleanup1 := simpleScaleUpTestWithEpsilon(f, config, epsilon)
+		tolerateUnreadyNodes := additionalNodes1 / 20
+		tolerateUnreadyPods := (initialReplicas + replicas1) / 20
+		testCleanup1 := simpleScaleUpTestWithTolerance(f, config, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup1()
 
 		glog.Infof("Scaled up once")
@@ -193,7 +198,9 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		config2 := createScaleUpTestConfig(nodeCount+additionalNodes1, nodeCount+additionalNodes2, rcConfig2, expectedResult2)
 
 		// run test #2
-		testCleanup2 := simpleScaleUpTestWithEpsilon(f, config2, epsilon)
+		tolerateUnreadyNodes = maxNodes / 20
+		tolerateUnreadyPods = (initialReplicas + replicas1 + replicas2) / 20
+		testCleanup2 := simpleScaleUpTestWithTolerance(f, config2, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup2()
 
 		glog.Infof("Scaled up twice")
@@ -201,7 +208,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 	It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func() {
 		perNodeReservation := int(float64(memCapacityMb) * 0.7)
-		replicas := int(float64(maxNodes) * 0.7)
+		replicas := int(math.Ceil(maxNodes * 0.7))
 		totalNodes := maxNodes
 
 		// resize cluster to totalNodes
@@ -215,7 +222,9 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		rcConfig := reserveMemoryRCConfig(f, "some-pod", replicas, replicas*perNodeReservation, largeScaleUpTimeout)
 		expectedResult := createClusterPredicates(totalNodes)
 		config := createScaleUpTestConfig(totalNodes, totalNodes, rcConfig, expectedResult)
-		testCleanup := simpleScaleUpTestWithEpsilon(f, config, 0.1)
+		tolerateUnreadyNodes := totalNodes / 10
+		tolerateUnreadyPods := replicas / 10
+		testCleanup := simpleScaleUpTestWithTolerance(f, config, tolerateUnreadyNodes, tolerateUnreadyPods)
 		defer testCleanup()
 
 		// check if empty nodes are scaled down
@@ -321,6 +330,41 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		Expect(len(nodes.Items)).Should(Equal(totalNodes))
 	})
 
+	Specify("CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]", func() {
+		// Start a number of pods saturating existing nodes.
+		perNodeReservation := int(float64(memCapacityMb) * 0.80)
+		replicasPerNode := 10
+		initialPodReplicas := nodeCount * replicasPerNode
+		initialPodsTotalMemory := nodeCount * perNodeReservation
+		reservationCleanup := ReserveMemory(f, "initial-pod", initialPodReplicas, initialPodsTotalMemory, true /* wait for pods to run */, memoryReservationTimeout)
+		defer reservationCleanup()
+		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
+
+		// Configure a number of unschedulable pods.
+		unschedulableMemReservation := memCapacityMb * 2
+		unschedulablePodReplicas := 1000
+		totalMemReservation := unschedulableMemReservation * unschedulablePodReplicas
+		timeToWait := 5 * time.Minute
+		podsConfig := reserveMemoryRCConfig(f, "unschedulable-pod", unschedulablePodReplicas, totalMemReservation, timeToWait)
+		framework.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, podsConfig.Name)
+
+		// Ensure that no new nodes have been added so far.
+		Expect(framework.ClusterSize(f.ClientSet)).To(Equal(nodeCount))
+
+		// Start a number of schedulable pods to ensure CA reacts.
+		additionalNodes := maxNodes - nodeCount
+		replicas := additionalNodes * replicasPerNode
+		totalMemory := additionalNodes * perNodeReservation
+		rcConfig := reserveMemoryRCConfig(f, "extra-pod", replicas, totalMemory, largeScaleUpTimeout)
+		expectedResult := createClusterPredicates(nodeCount + additionalNodes)
+		config := createScaleUpTestConfig(nodeCount, initialPodReplicas, rcConfig, expectedResult)
+
+		// Test that scale up happens, allowing 1000 unschedulable pods not to be scheduled.
+		testCleanup := simpleScaleUpTestWithTolerance(f, config, 0, unschedulablePodReplicas)
+		defer testCleanup()
+	})
+
 })
 
 func makeUnschedulable(f *framework.Framework, nodes []v1.Node) error {
@@ -350,24 +394,24 @@ func anyKey(input map[string]int) string {
 	return ""
 }
 
-func simpleScaleUpTestWithEpsilon(f *framework.Framework, config *scaleUpTestConfig, epsilon float64) func() error {
+func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestConfig, tolerateMissingNodeCount int, tolerateMissingPodCount int) func() error {
 	// resize cluster to start size
 	// run rc based on config
 	By(fmt.Sprintf("Running RC %v from config", config.extraPods.Name))
 	start := time.Now()
 	framework.ExpectNoError(framework.RunRC(*config.extraPods))
 	// check results
-	if epsilon > 0 && epsilon < 1 {
+	if tolerateMissingNodeCount > 0 {
 		// Tolerate some number of nodes not to be created.
-		minExpectedNodeCount := int(float64(config.expectedResult.nodes) - epsilon*float64(config.expectedResult.nodes))
+		minExpectedNodeCount := config.expectedResult.nodes - tolerateMissingNodeCount
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= minExpectedNodeCount }, scaleUpTimeout))
 	} else {
 		framework.ExpectNoError(framework.WaitForClusterSize(f.ClientSet, config.expectedResult.nodes, scaleUpTimeout))
 	}
 	glog.Infof("cluster is increased")
-	if epsilon > 0 && epsilon < 0 {
-		framework.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, int(epsilon*float64(config.extraPods.Replicas)+1)))
+	if tolerateMissingPodCount > 0 {
+		framework.ExpectNoError(waitForCaPodsReadyInNamespace(f, f.ClientSet, tolerateMissingPodCount))
 	} else {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	}
@@ -378,7 +422,7 @@ func simpleScaleUpTestWithEpsilon(f *framework.Framework, config *scaleUpTestCon
 }
 
 func simpleScaleUpTest(f *framework.Framework, config *scaleUpTestConfig) func() error {
-	return simpleScaleUpTestWithEpsilon(f, config, 0)
+	return simpleScaleUpTestWithTolerance(f, config, 0, 0)
 }
 
 func reserveMemoryRCConfig(f *framework.Framework, id string, replicas, megabytes int, timeout time.Duration) *testutils.RCConfig {
