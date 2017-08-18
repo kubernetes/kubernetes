@@ -279,6 +279,7 @@ pkg/kubelet/server/portforward
 pkg/kubelet/server/remotecommand
 pkg/kubelet/server/stats
 pkg/kubelet/server/streaming
+pkg/kubelet/stats
 pkg/kubelet/status
 pkg/kubelet/status/testing
 pkg/kubelet/sysctl
