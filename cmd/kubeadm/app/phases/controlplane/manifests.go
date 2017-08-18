@@ -28,6 +28,7 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -159,7 +160,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	}
 
 	command := []string{"kube-apiserver"}
-	command = append(command, staticpodutil.GetExtraParameters(cfg.APIServerExtraArgs, defaultArguments)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
 
 	// Check if the user decided to use an external etcd cluster
@@ -206,7 +207,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	}
 
 	command := []string{"kube-controller-manager"}
-	command = append(command, staticpodutil.GetExtraParameters(cfg.ControllerManagerExtraArgs, defaultArguments)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
 
 	if cfg.CloudProvider != "" {
 		command = append(command, "--cloud-provider="+cfg.CloudProvider)
@@ -234,7 +235,7 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	}
 
 	command := []string{"kube-scheduler"}
-	command = append(command, staticpodutil.GetExtraParameters(cfg.SchedulerExtraArgs, defaultArguments)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.SchedulerExtraArgs)...)
 	return command
 }
 

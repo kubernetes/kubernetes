@@ -43,6 +43,20 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 	return nil
 }
 
+// CreateOrUpdateSecret creates a Secret if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
+func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
+	if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Create(secret); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("unable to create secret: %v", err)
+		}
+
+		if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(secret); err != nil {
+			return fmt.Errorf("unable to update secret: %v", err)
+		}
+	}
+	return nil
+}
+
 // CreateOrUpdateServiceAccount creates a ServiceAccount if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAccount) error {
 	if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(sa); err != nil {
