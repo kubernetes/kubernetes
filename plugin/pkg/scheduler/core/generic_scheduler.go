@@ -74,7 +74,7 @@ type genericScheduler struct {
 	equivalenceCache      *EquivalenceCache
 	predicates            map[string]algorithm.FitPredicate
 	priorityMetaProducer  algorithm.MetadataProducer
-	predicateMetaProducer algorithm.MetadataProducer
+	predicateMetaProducer algorithm.PredicateMetadataProducer
 	prioritizers          []algorithm.PriorityConfig
 	extenders             []algorithm.SchedulerExtender
 	pods                  algorithm.PodLister
@@ -188,7 +188,7 @@ func findNodesThatFit(
 	nodes []*v1.Node,
 	predicateFuncs map[string]algorithm.FitPredicate,
 	extenders []algorithm.SchedulerExtender,
-	metadataProducer algorithm.MetadataProducer,
+	metadataProducer algorithm.PredicateMetadataProducer,
 	ecache *EquivalenceCache,
 ) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
@@ -253,7 +253,7 @@ func findNodesThatFit(
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate,
+func podFitsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate,
 	ecache *EquivalenceCache) (bool, []algorithm.PredicateFailureReason, error) {
 	var (
 		equivalenceHash  uint64
@@ -450,7 +450,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 	nodes []*v1.Node,
 	predicates map[string]algorithm.FitPredicate,
-	metadataProducer algorithm.MetadataProducer,
+	metadataProducer algorithm.PredicateMetadataProducer,
 ) map[string][]*v1.Pod {
 
 	nodeNameToPods := map[string][]*v1.Pod{}
@@ -483,7 +483,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 // NOTE: This function assumes that it is never called if "pod" cannot be scheduled
 // due to pod affinity, node affinity, or node anti-affinity reasons. None of
 // these predicates can be satisfied by removing more pods from the node.
-func selectVictimsOnNode(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo, fitPredicates map[string]algorithm.FitPredicate) ([]*v1.Pod, bool) {
+func selectVictimsOnNode(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo, fitPredicates map[string]algorithm.FitPredicate) ([]*v1.Pod, bool) {
 	higherPriority := func(pod1, pod2 interface{}) bool {
 		return util.GetPodPriority(pod1.(*v1.Pod)) > util.GetPodPriority(pod2.(*v1.Pod))
 	}
@@ -567,7 +567,7 @@ func NewGenericScheduler(
 	cache schedulercache.Cache,
 	eCache *EquivalenceCache,
 	predicates map[string]algorithm.FitPredicate,
-	predicateMetaProducer algorithm.MetadataProducer,
+	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
 	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
