@@ -489,7 +489,26 @@ assemble-docker-flags
 DOCKER_REGISTRY="gcr.io/google_containers"
 load-docker-images
 
+# Kubemark_changes: Install kubectl and copy kubelet.
+#sudo apt-get update && sudo apt-get install -y apt-transport-https
+#sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+#sudo cat <<EOF >/etc/apt/sources.list.d/kubernetes.list
+#deb http://apt.kubernetes.io/ kubernetes-xenial main
+#EOF
+#sudo apt-get update
+#sudo apt-get install -y kubelet
+
+if ! type "kubelet" > /dev/null; then
+  echo "Kubelet is not installed, so copying binary manually"
+fi
+
+cp $KUBE_ROOT/kubelet /usr/bin/kubelet
+curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
 # Start kubelet as a supervisord process and master components as pods.
+
 start-kubelet
 start-kubemaster-component "etcd"
 if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
@@ -497,6 +516,7 @@ if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
 fi
 start-kubemaster-component "kube-apiserver"
 start-kubemaster-component "kube-controller-manager"
+# Kubemark_changes: Commented below line to stop default scheduler to start in Kubemark master.
 start-kubemaster-component "kube-scheduler"
 start-kubemaster-component "kube-addon-manager"
 

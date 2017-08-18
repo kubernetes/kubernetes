@@ -31,7 +31,9 @@ NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
-MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-$(get-master-disk-size)}
+# Kubemark_changes: Hardcoded disk size to 20GB
+#MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-$(get-master-disk-size)}
+MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
 MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
@@ -73,11 +75,16 @@ fi
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170627}
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-59-9460-64-0}
+# Kubemark_changes: Changed kubemark master image and project.
+#GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-59-9460-64-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-ubuntu-gke-1604-xenial-v20170420-1}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
-MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
-NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+#MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
+MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-ubuntu-os-gke-cloud}
+NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+#NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
+#NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-ubuntu-os-gke-cloud}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
@@ -121,7 +128,8 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 #   stackdriver    - Heapster, Google Cloud Monitoring (schema container), and Google Cloud Logging
 #   googleinfluxdb - Enable influxdb and google (except GCM)
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
+# Kubemark_changes: Commented below line to try heapster with new scheduler(not necessarily needed).
+# ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}"
 
 # One special node out of NUM_NODES would be created of this type if specified.
 # Useful for scheduling heapster in large clusters with nodes of small size.

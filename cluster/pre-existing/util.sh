@@ -41,8 +41,10 @@ function detect-project() {
 }
 
 function create-certs {
-  rm /tmp/kubeconfig
-
+  # Kubemark_changes: Delete kubeconfig if only exists.
+  if [ -e "/tmp/kubeconfig" ]; then
+    rm /tmp/kubeconfig
+  fi
   execute-cmd-on-pre-existing-master-with-retries "sudo cat /etc/kubernetes/admin.conf" > /tmp/kubeconfig
   CA_CERT_BASE64=$(cat /tmp/kubeconfig | grep certificate-authority | awk '{print $2}' | head -n 1)
   KUBELET_CERT_BASE64=$(cat /tmp/kubeconfig | grep client-certificate-data | awk '{print $2}' | head -n 1)
