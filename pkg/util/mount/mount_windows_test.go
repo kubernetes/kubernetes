@@ -27,3 +27,17 @@ func TestGetAvailableDriveLetter(t *testing.T) {
 		t.Errorf("getAvailableDriveLetter failed : %v", err)
 	}
 }
+
+func TestNormalizeWindowsPath(t *testing.T) {
+	path := `/var/lib/kubelet/pods/146f8428-83e7-11e7-8dd4-000d3a31dac4/volumes/kubernetes.io~azure-disk`
+	normalizedPath := normalizeWindowsPath(path)
+	if normalizedPath != `c:\var\lib\kubelet\pods\146f8428-83e7-11e7-8dd4-000d3a31dac4\volumes\kubernetes.io~azure-disk` {
+		t.Errorf("normizeWindowsPath test failed, normalizedPath : %q", normalizedPath)
+	}
+
+	path = `/`
+	normalizedPath = normalizeWindowsPath(path)
+	if normalizedPath != `c:\` {
+		t.Errorf("normizeWindowsPath test failed, normalizedPath : %q", normalizedPath)
+	}
+}

@@ -34,9 +34,7 @@ type Mounter struct {
 }
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	if !strings.HasPrefix(target, "c:") && !strings.HasPrefix(target, "C:") {
-		target = "c:" + target
-	}
+	target = normalizeWindowsPath(target)
 
 	if source == "tmpfs" {
 		glog.Infof("windowsMount: mounting source (%q), target (%q)\n, with options (%q)", source, target, options)
@@ -79,6 +77,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 
 func (mounter *Mounter) Unmount(target string) error {
 	glog.Infof("windowsMount: Unmount target (%q)", target)
+	target = normalizeWindowsPath(target)
 	ex := exec.New()
 	if output, err := ex.Command("cmd", "/c", "rmdir", target).CombinedOutput(); err != nil {
 		return fmt.Errorf("rmdir failed: %v, output: %q", err, string(output))
@@ -140,4 +139,13 @@ func getAvailableDriveLetter() (string, error) {
 		return "", fmt.Errorf("windowsMount: there is no available drive letter now")
 	}
 	return string(output)[:1], nil
+}
+
+func normalizeWindowsPath(path string) string {
+	normalizedPath := path
+	if strings.HasPrefix(path, "/") {
+		normalizedPath = "c:" + normalizedPath
+	}
+
+	return strings.Replace(normalizedPath, "/", "\\", -1)
 }
