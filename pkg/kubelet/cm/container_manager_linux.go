@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -552,23 +551,10 @@ func (cm *containerManagerImpl) setFsCapacity() error {
 	if err != nil {
 		return fmt.Errorf("Fail to get rootfs information %v", err)
 	}
-	hasDedicatedImageFs, _ := cm.cadvisorInterface.HasDedicatedImageFs()
-	var imagesfs cadvisorapiv2.FsInfo
-	if hasDedicatedImageFs {
-		imagesfs, err = cm.cadvisorInterface.ImagesFsInfo()
-		if err != nil {
-			return fmt.Errorf("Fail to get imagefs information %v", err)
-		}
-	}
 
 	cm.Lock()
-	for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
 		cm.capacity[rName] = rCap
-	}
-	if hasDedicatedImageFs {
-		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
-			cm.capacity[rName] = rCap
-		}
 	}
 	cm.Unlock()
 	return nil

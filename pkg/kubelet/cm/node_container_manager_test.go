@@ -316,17 +316,17 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 		invalidConfiguration bool
 	}{
 		{
-			kubeReserved:   getScratchResourceList("100Mi"),
-			systemReserved: getScratchResourceList("50Mi"),
-			capacity:       getScratchResourceList("500Mi"),
+			kubeReserved:   getEphemeralStorageResourceList("100Mi"),
+			systemReserved: getEphemeralStorageResourceList("50Mi"),
+			capacity:       getEphemeralStorageResourceList("500Mi"),
 		},
 		{
-			kubeReserved:   getScratchResourceList("10Gi"),
-			systemReserved: getScratchResourceList("10Gi"),
+			kubeReserved:   getEphemeralStorageResourceList("10Gi"),
+			systemReserved: getEphemeralStorageResourceList("10Gi"),
 			hardThreshold: evictionapi.ThresholdValue{
 				Quantity: &storageEvictionThreshold,
 			},
-			capacity:             getScratchResourceList("20Gi"),
+			capacity:             getEphemeralStorageResourceList("20Gi"),
 			invalidConfiguration: true,
 		},
 	}
@@ -359,12 +359,12 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 	}
 }
 
-// getScratchResourceList returns a ResourceList with the
-// specified scratch storage resource values
-func getScratchResourceList(storage string) v1.ResourceList {
+// getEphemeralStorageResourceList returns a ResourceList with the
+// specified ephemeral storage resource values
+func getEphemeralStorageResourceList(storage string) v1.ResourceList {
 	res := v1.ResourceList{}
 	if storage != "" {
-		res[v1.ResourceStorageScratch] = resource.MustParse(storage)
+		res[v1.ResourceEphemeralStorage] = resource.MustParse(storage)
 	}
 	return res
 }

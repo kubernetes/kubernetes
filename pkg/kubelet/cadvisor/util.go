@@ -35,18 +35,9 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 	return c
 }
 
-func StorageScratchCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
 	c := v1.ResourceList{
-		v1.ResourceStorageScratch: *resource.NewQuantity(
-			int64(info.Capacity),
-			resource.BinarySI),
-	}
-	return c
-}
-
-func StorageOverlayCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
-	c := v1.ResourceList{
-		v1.ResourceStorageOverlay: *resource.NewQuantity(
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(
 			int64(info.Capacity),
 			resource.BinarySI),
 	}

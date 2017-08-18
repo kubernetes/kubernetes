@@ -564,11 +564,7 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			// capacity for every node status request
 			initialCapacity := kl.containerManager.GetCapacity()
 			if initialCapacity != nil {
-				node.Status.Capacity[v1.ResourceStorageScratch] = initialCapacity[v1.ResourceStorageScratch]
-				imageCapacity, ok := initialCapacity[v1.ResourceStorageOverlay]
-				if ok {
-					node.Status.Capacity[v1.ResourceStorageOverlay] = imageCapacity
-				}
+				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
 			}
 		}
 	}
