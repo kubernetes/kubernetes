@@ -174,7 +174,7 @@ message DaemonSetStatus {
   // uses this field as a collision avoidance mechanism when it needs to
   // create the name for the newest ControllerRevision.
   // +optional
-  optional int64 collisionCount = 9;
+  optional int32 collisionCount = 9;
 }
 
 // DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
@@ -318,7 +318,7 @@ message DeploymentStatus {
   // field as a collision avoidance mechanism when it needs to create the name for the
   // newest ReplicaSet.
   // +optional
-  optional int64 collisionCount = 8;
+  optional int32 collisionCount = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
@@ -672,7 +672,7 @@ message StatefulSetStatus {
   // uses this field as a collision avoidance mechanism when it needs to create the name for the
   // newest ControllerRevision.
   // +optional
-  optional int64 collisionCount = 9;
+  optional int32 collisionCount = 9;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
