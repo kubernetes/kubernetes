@@ -113,6 +113,9 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
+
+	// register all admission plugins
+	RegisterAllAdmissionPlugins(s.Admission.Plugins)
 	// Set the default for admission plugins names
 	s.Admission.PluginNames = []string{"AlwaysAdmit"}
 	return &s
