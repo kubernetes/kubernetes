@@ -129,6 +129,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                       {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                          {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                               {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                           {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))

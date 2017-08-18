@@ -36,6 +36,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -90,7 +91,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
 func NewServiceAccount() *serviceAccount {
 	return &serviceAccount{
-		Handler: admission.NewHandler(admission.Create),
+		Handler: admission.NewHandler(admission.Create, admission.Update),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
 		LimitSecretReferences: false,
 		// Auto mount service account API token secrets
@@ -140,6 +141,15 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 	pod, ok := obj.(*api.Pod)
 	if !ok {
+		return nil
+	}
+
+	updateInitialized, err := util.IsUpdatingInitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if updateInitialized {
+		// related pod spec fields are immutable after the pod is initialized
 		return nil
 	}
 

@@ -176,6 +176,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if interactive && replicas != 1 {
 		return cmdutil.UsageErrorf(cmd, "-i/--stdin requires that replicas is 1, found %d", replicas)
 	}
+	if cmdutil.GetFlagBool(cmd, "expose") && len(cmdutil.GetFlagString(cmd, "port")) == 0 {
+		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
+	}
 
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
@@ -536,11 +539,6 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
 	}
 	names := generator.ParamNames()
-
-	port := cmdutil.GetFlagString(cmd, "port")
-	if len(port) == 0 {
-		return nil, fmt.Errorf("--port must be set when exposing a service")
-	}
 
 	params := map[string]interface{}{}
 	for key, value := range paramsIn {

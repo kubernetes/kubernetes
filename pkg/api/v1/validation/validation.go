@@ -46,16 +46,6 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
-		// Check that request <= limit.
-		requestQuantity, exists := requirements.Requests[resourceName]
-		if exists {
-			// Ensure overcommit is allowed for the resource if request != limit
-			if quantity.Cmp(requestQuantity) != 0 && !v1helper.IsOvercommitAllowed(resourceName) {
-				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", resourceName)))
-			} else if quantity.Cmp(requestQuantity) < 0 {
-				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
-			}
-		}
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
@@ -63,6 +53,19 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
+
+		// Check that request <= limit.
+		limitQuantity, exists := requirements.Limits[resourceName]
+		if exists {
+			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
+			if quantity.Cmp(limitQuantity) != 0 && !v1helper.IsOvercommitAllowed(resourceName) {
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s limit", resourceName)))
+			} else if quantity.Cmp(limitQuantity) > 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
+			}
+		} else if resourceName == v1.ResourceNvidiaGPU {
+			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", v1.ResourceNvidiaGPU)))
+		}
 	}
 
 	return allErrs

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strconv"
 	"text/template"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -72,7 +72,7 @@ var (
 		You can now join any number of machines by running the following on each node
 		as root:
 
-		  kubeadm join --token {{.Token}} {{.MasterIP}}:{{.MasterPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
+		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
 
 		`)))
 )
@@ -261,8 +261,9 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
-	// TODO: Don't wait forever here
-	apiclient.WaitForAPI(client)
+	if err := apiclient.WaitForAPI(client, 30*time.Minute); err != nil {
+		return err
+	}
 
 	// PHASE 4: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
@@ -327,6 +328,9 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Load the CA certificate from so we can pin its public key
 	caCert, err := pkiutil.TryLoadCertFromDisk(i.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+
+	// Generate the Master host/port pair used by initDoneTempl
+	masterHostPort, err := kubeadmutil.GetMasterHostPort(i.cfg)
 	if err != nil {
 		return err
 	}
@@ -336,8 +340,7 @@ func (i *Init) Run(out io.Writer) error {
 		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
 		"Token":          i.cfg.Token,
 		"CAPubKeyPin":    pubkeypin.Hash(caCert),
-		"MasterIP":       i.cfg.API.AdvertiseAddress,
-		"MasterPort":     strconv.Itoa(int(i.cfg.API.BindPort)),
+		"MasterHostPort": masterHostPort,
 	}
 	if i.skipTokenPrint {
 		ctx["Token"] = "<value withheld>"

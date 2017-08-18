@@ -16,7 +16,10 @@ limitations under the License.
 
 package storage
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -46,6 +49,11 @@ type StorageClass struct {
 	// 512, with a cumulative max size of 256K
 	// +optional
 	Parameters map[string]string
+
+	// reclaimPolicy is the reclaim policy that dynamically provisioned
+	// PersistentVolumes of this storage class are created with
+	// +optional
+	ReclaimPolicy *api.PersistentVolumeReclaimPolicy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1beta2
 
+// ControllerRevisionListerExpansion allows custom methods to be added to
+// ControllerRevisionLister.
+type ControllerRevisionListerExpansion interface{}
+
+// ControllerRevisionNamespaceListerExpansion allows custom methods to be added to
+// ControllerRevisionNamespaceLister.
+type ControllerRevisionNamespaceListerExpansion interface{}
+
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface{}

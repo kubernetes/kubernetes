@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package servicecatalog
 
 import (
 	"reflect"
@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("PodPreset", func() {
+var _ = SIGDescribe("PodPreset", func() {
 	f := framework.NewDefaultFramework("podpreset")
 
 	var podClient *framework.PodClient

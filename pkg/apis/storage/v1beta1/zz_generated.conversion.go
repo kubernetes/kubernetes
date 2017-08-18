@@ -21,9 +21,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	unsafe "unsafe"
 )
@@ -47,6 +49,7 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.Storag
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
+	out.ReclaimPolicy = (*api.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	return nil
 }
 
@@ -59,6 +62,7 @@ func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.Storag
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
+	out.ReclaimPolicy = (*v1.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	return nil
 }
 
