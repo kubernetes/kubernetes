@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -604,6 +605,15 @@ func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
 }
 
 func (d *glusterfsVolumeDeleter) Delete() error {
+
+	pvSpec := d.spec.Spec
+	retainPolicy := string(api.PersistentVolumeReclaimRetain)
+	reclaimPolicy := string(pvSpec.PersistentVolumeReclaimPolicy)
+	if reclaimPolicy == retainPolicy {
+		glog.V(1).Infof("glusterfs: [%v] PV retained successfully ", pvSpec.ClaimRef.Name)
+		return nil
+	}
+
 	glog.V(2).Infof("glusterfs: delete volume: %s ", d.glusterfsMounter.path)
 	volumeName := d.glusterfsMounter.path
 	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
@@ -648,7 +658,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	glog.V(2).Infof("glusterfs: volume %s deleted successfully", volumeName)
 
 	//Deleter takes endpoint and endpointnamespace from pv spec.
-	pvSpec := d.spec.Spec
+
 	var dynamicEndpoint, dynamicNamespace string
 	if pvSpec.ClaimRef == nil {
 		glog.Errorf("glusterfs: ClaimRef is nil")
@@ -681,7 +691,16 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
-	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", p.options)
+
+	recyclePolicy := string(api.PersistentVolumeReclaimRecycle)
+	requestedPolicy := string(p.options.PersistentVolumeReclaimPolicy)
+
+	if requestedPolicy == recyclePolicy {
+		glog.V(4).Infof("glusterfs: requested PV reclaim policy['recycle'] is not supported, supported policies :[delete/retain]")
+		return nil, fmt.Errorf("glusterfs: requested PV reclaim policy['recycle'] is not supported, supported policies :[delete/retain]")
+
+	}
+	glog.V(4).Infof("glusterfs: Provision VolumeOptions %v", p.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
 	if err != nil {
