@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"time"
@@ -144,7 +144,7 @@ const (
 // - lack of eviction of tolerating pods from a tainted node,
 // - delayed eviction of short-tolerating pod from a tainted node,
 // - lack of eviction of short-tolerating pod after taint removal.
-var _ = framework.KubeDescribe("NoExecuteTaintManager [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string

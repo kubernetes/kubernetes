@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "e2e_test.go",
-        "taints_test.go",
-    ],
+    srcs = ["e2e_test.go"],
     library = ":go_default_library",
     deps = [
         "//test/e2e/apimachinery:go_default_library",
@@ -30,16 +27,6 @@ go_test(
         "//test/e2e/scheduling:go_default_library",
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
-        "//test/utils:go_default_library",
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
