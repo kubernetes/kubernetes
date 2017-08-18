@@ -108,9 +108,9 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 
 	if _, err := os.Stat(rootPath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("rootDirectory %q does not exist", rootPath)
+			glog.Warningf("rootDirectory %q does not exist", rootPath)
 		} else {
-			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
+			glog.Warningf("failed to Stat %q: %v", rootPath, err)
 		}
 	}
 
