@@ -114,6 +114,11 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 				return
 			}
 
+			if scope.TableConvertor == nil {
+				err = newNotAcceptableError("scope.TableConvertor is nil")
+				scope.err(err, w, req)
+				return
+			}
 			table, err := scope.TableConvertor.ConvertToTable(ctx, result, opts)
 			if err != nil {
 				scope.err(err, w, req)

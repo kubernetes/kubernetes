@@ -537,7 +537,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Typer:           a.group.Typer,
 		UnsafeConvertor: a.group.UnsafeConvertor,
 
-		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
