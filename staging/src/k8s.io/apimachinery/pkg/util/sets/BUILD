@@ -33,7 +33,7 @@ go_genrule(
         "string.go",
     ],
     cmd = """
-$(location //vendor/k8s.io/kube-gen/cmd/set-gen) \
+$(location //vendor/k8s.io/code-generator/cmd/set-gen) \
     --input-dirs ./vendor/k8s.io/apimachinery/pkg/util/sets/types \
     --output-base $$(dirname $$(dirname $(location :byte.go))) \
     --go-header-file $(location //hack/boilerplate:boilerplate.go.txt) \
@@ -43,7 +43,7 @@ $(location //vendor/k8s.io/kube-gen/cmd/set-gen) \
         "//vendor/k8s.io/apimachinery/pkg/util/sets/types:go_default_library",
     ],
     tools = [
-        "//vendor/k8s.io/kube-gen/cmd/set-gen",
+        "//vendor/k8s.io/code-generator/cmd/set-gen",
     ],
 )
 
