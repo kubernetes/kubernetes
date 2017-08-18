@@ -44,7 +44,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Status.ObservedGeneration = new(int64)
 			}
 			if s.Status.CollisionCount == nil {
-				s.Status.CollisionCount = new(int64)
+				s.Status.CollisionCount = new(int32)
 			}
 		},
 	}

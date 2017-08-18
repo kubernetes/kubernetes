@@ -55087,7 +55087,7 @@
      "collisionCount": {
       "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "conditions": {
       "description": "Represents the latest available observations of a deployment's current state.",
@@ -55355,7 +55355,7 @@
      "collisionCount": {
       "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "currentReplicas": {
       "description": "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
@@ -55583,7 +55583,7 @@
      "collisionCount": {
       "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "currentNumberScheduled": {
       "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
@@ -55794,7 +55794,7 @@
      "collisionCount": {
       "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "conditions": {
       "description": "Represents the latest available observations of a deployment's current state.",
@@ -56221,7 +56221,7 @@
      "collisionCount": {
       "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "currentReplicas": {
       "description": "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
@@ -62440,7 +62440,7 @@
      "collisionCount": {
       "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "currentNumberScheduled": {
       "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
@@ -62693,7 +62693,7 @@
      "collisionCount": {
       "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
       "type": "integer",
-      "format": "int64"
+      "format": "int32"
      },
      "conditions": {
       "description": "Represents the latest available observations of a deployment's current state.",

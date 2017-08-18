@@ -192,7 +192,7 @@ type StatefulSetStatus struct {
 	// uses this field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ControllerRevision.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

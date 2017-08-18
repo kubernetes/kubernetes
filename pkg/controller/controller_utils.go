@@ -1030,14 +1030,14 @@ func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs 
 }
 
 // ComputeHash returns a hash value calculated from pod template and a collisionCount to avoid hash collision
-func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int64) uint32 {
+func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) uint32 {
 	podTemplateSpecHasher := fnv.New32a()
 	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
 
 	// Add collisionCount in the hash if it exists.
 	if collisionCount != nil {
 		collisionCountBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(collisionCountBytes, uint64(*collisionCount))
+		binary.LittleEndian.PutUint32(collisionCountBytes, uint32(*collisionCount))
 		podTemplateSpecHasher.Write(collisionCountBytes)
 	}
 

@@ -378,7 +378,7 @@ func autoConvert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *v1bet
 	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
-	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
@@ -396,7 +396,7 @@ func autoConvert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *exten
 	out.UpdatedNumberScheduled = in.UpdatedNumberScheduled
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
-	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
@@ -621,7 +621,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *v1b
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]extensions.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
@@ -638,7 +638,7 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
 	out.Conditions = *(*[]v1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
-	out.CollisionCount = (*int64)(unsafe.Pointer(in.CollisionCount))
+	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 

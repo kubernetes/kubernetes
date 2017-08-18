@@ -95,7 +95,7 @@ func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorL
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
 	if isDecremented(ds.Status.CollisionCount, oldDS.Status.CollisionCount) {
-		value := int64(0)
+		value := int32(0)
 		if ds.Status.CollisionCount != nil {
 			value = *ds.Status.CollisionCount
 		}
@@ -311,7 +311,7 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
 	if status.CollisionCount != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(*status.CollisionCount, fldPath.Child("collisionCount"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
 	}
 	msg := "cannot be greater than status.replicas"
 	if status.UpdatedReplicas > status.Replicas {
@@ -342,7 +342,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
 	if isDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
-		value := int64(0)
+		value := int32(0)
 		if update.Status.CollisionCount != nil {
 			value = *update.Status.CollisionCount
 		}
@@ -352,7 +352,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 }
 
 // TODO: Move in "k8s.io/kubernetes/pkg/api/validation"
-func isDecremented(update, old *int64) bool {
+func isDecremented(update, old *int32) bool {
 	if update == nil && old != nil {
 		return true
 	}

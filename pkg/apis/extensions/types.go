@@ -345,7 +345,7 @@ type DeploymentStatus struct {
 	// field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ReplicaSet.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 type DeploymentConditionType string
@@ -519,7 +519,7 @@ type DaemonSetStatus struct {
 	// uses this field as a collision avoidance mechanism when it needs to
 	// create the name for the newest ControllerRevision.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 // +genclient
