@@ -142,11 +142,21 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 	ginkgo.It("should ingest system logs from all nodes", func() {
 		withLogProviderForScope(f, systemScope, func(p *sdLogProvider) {
-			ginkgo.By("Waiting for some system logs to ingest")
-			nodeIds := utils.GetNodeIds(f.ClientSet)
-			c := utils.NewLogChecker(p, utils.UntilFirstEntry, utils.JustTimeout, nodeIds...)
-			err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
-			framework.ExpectNoError(err)
+			ginkgo.By("Waiting for some kubelet logs to be ingested from each node", func() {
+				nodeIds := utils.GetNodeIds(f.ClientSet)
+				log := fmt.Sprintf("projects/%s/logs/kubelet", framework.TestContext.CloudConfig.ProjectID)
+				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
+				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("Waiting for some docker logs to be ingested from each node", func() {
+				nodeIds := utils.GetNodeIds(f.ClientSet)
+				log := fmt.Sprintf("projects/%s/logs/docker", framework.TestContext.CloudConfig.ProjectID)
+				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
+				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
+				framework.ExpectNoError(err)
+			})
 		})
 	})
 })
