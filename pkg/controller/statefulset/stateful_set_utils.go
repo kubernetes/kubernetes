@@ -101,6 +101,32 @@ func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
+// getHostname is copied from the endpoints controller.
+// We need to handle Pods that only set the field,
+// in case they were created by 1.7.x before a master rollback.
+func getHostname(pod *v1.Pod) string {
+	if len(pod.Spec.Hostname) > 0 {
+		return pod.Spec.Hostname
+	}
+	if pod.Annotations != nil {
+		return pod.Annotations[podapi.PodHostnameAnnotation]
+	}
+	return ""
+}
+
+// getSubdomain is copied from the endpoints controller.
+// We need to handle Pods that only set the field,
+// in case they were created by 1.7.x before a master rollback.
+func getSubdomain(pod *v1.Pod) string {
+	if len(pod.Spec.Subdomain) > 0 {
+		return pod.Spec.Subdomain
+	}
+	if pod.Annotations != nil {
+		return pod.Annotations[podapi.PodSubdomainAnnotation]
+	}
+	return ""
+}
+
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
 func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	parent, ordinal := getParentNameAndOrdinal(pod)
@@ -108,9 +134,8 @@ func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
 		pod.Namespace == set.Namespace &&
-		pod.Annotations != nil &&
-		pod.Annotations[podapi.PodHostnameAnnotation] == pod.Name &&
-		pod.Annotations[podapi.PodSubdomainAnnotation] == set.Spec.ServiceName
+		getHostname(pod) == pod.Name &&
+		getSubdomain(pod) == set.Spec.ServiceName
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
@@ -189,6 +214,15 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Annotations[podapi.PodSubdomainAnnotation] = set.Spec.ServiceName
 }
 
+// initIdentity sets the identity fields on a new Pod.
+func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
+	updateIdentity(set, pod)
+	// Set these immutable fields only on initial Pod creation, not updates.
+	// Set hostname/subdomain in preparation for removal of the annotations.
+	pod.Spec.Hostname = pod.Name
+	pod.Spec.Subdomain = set.Spec.ServiceName
+}
+
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady, and if the init
 // annotation has not explicitly disabled the Pod from being ready.
 func isRunningAndReady(pod *v1.Pod) bool {
@@ -249,7 +283,7 @@ func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, newControllerRef(set))
 	pod.Name = getPodName(set, ordinal)
-	updateIdentity(set, pod)
+	initIdentity(set, pod)
 	updateStorage(set, pod)
 	return pod
 }
