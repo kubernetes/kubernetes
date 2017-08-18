@@ -113,7 +113,7 @@ type GenericAPIServer struct {
 	Serializer runtime.NegotiatedSerializer
 
 	// "Outputs"
-	// Handler holdes the handlers being used by this API server
+	// Handler holds the handlers being used by this API server
 	Handler *APIServerHandler
 
 	// listedPathProvider is a lister which provides the set of paths to show at /
