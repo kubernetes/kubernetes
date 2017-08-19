@@ -343,7 +343,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Wrote upload to %s", UploadFile)
 	result["output"] = UploadFile
 	w.WriteHeader(http.StatusCreated)
-	bytes, err := json.Marshal(result)
+	bytes, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(bytes))
 }
 
