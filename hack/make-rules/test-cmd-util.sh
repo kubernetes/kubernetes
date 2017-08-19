@@ -173,6 +173,9 @@ function cleanup()
   kube::etcd::cleanup
   rm -rf "${KUBE_TEMP}"
 
+  local junit_dir="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
+  echo "junit report dir:" ${junit_dir}
+
   kube::log::status "Clean up complete"
 }
 
