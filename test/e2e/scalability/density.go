@@ -582,7 +582,7 @@ var _ = SIGDescribe("Density", func() {
 							var startTime metav1.Time
 							for _, cs := range p.Status.ContainerStatuses {
 								if cs.State.Running != nil {
-									if startTime.Before(cs.State.Running.StartedAt) {
+									if startTime.Before(&cs.State.Running.StartedAt) {
 										startTime = cs.State.Running.StartedAt
 									}
 								}

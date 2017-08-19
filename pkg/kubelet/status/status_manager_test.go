@@ -214,7 +214,7 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 		t.Errorf("StartTime should not be zero")
 	}
 	expected := now.Rfc3339Copy()
-	if !finalStatus.StartTime.Equal(expected) {
+	if !finalStatus.StartTime.Equal(&expected) {
 		t.Errorf("Expected %v, but got %v", expected, finalStatus.StartTime)
 	}
 }
@@ -244,7 +244,7 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
-	if newReadyCondition.LastTransitionTime.Before(oldReadyCondition.LastTransitionTime) {
+	if newReadyCondition.LastTransitionTime.Before(&oldReadyCondition.LastTransitionTime) {
 		t.Errorf("Unexpected: new transition time %s, is before old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
 	}
 }
@@ -283,7 +283,7 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
-	if !oldReadyCondition.LastTransitionTime.Equal(newReadyCondition.LastTransitionTime) {
+	if !oldReadyCondition.LastTransitionTime.Equal(&newReadyCondition.LastTransitionTime) {
 		t.Errorf("Unexpected: new transition time %s, is not equal to old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
 	}
 }
