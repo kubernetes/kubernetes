@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -79,22 +80,43 @@ func TestComponentProbe(t *testing.T) {
 
 func TestComponentPod(t *testing.T) {
 	var tests = []struct {
-		n string
+		name     string
+		expected v1.Pod
 	}{
 		{
-			n: "foo",
+			name: "foo",
+			expected: v1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "foo",
+					Namespace:   "kube-system",
+					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/critical-pod": ""},
+					Labels:      map[string]string{"component": "foo", "tier": "control-plane"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+						},
+					},
+					HostNetwork: true,
+					Volumes:     []v1.Volume{},
+				},
+			},
 		},
 	}
 
 	for _, rt := range tests {
-		c := v1.Container{Name: rt.n}
-		v := []v1.Volume{}
-		actual := ComponentPod(c, v)
-		if actual.ObjectMeta.Name != rt.n {
+		c := v1.Container{Name: rt.name}
+		actual := ComponentPod(c, []v1.Volume{})
+		if !reflect.DeepEqual(rt.expected, actual) {
 			t.Errorf(
-				"failed componentPod:\n\texpected: %s\n\t  actual: %s",
-				rt.n,
-				actual.ObjectMeta.Name,
+				"failed componentPod:\n\texpected: %v\n\t  actual: %v",
+				rt.expected,
+				actual,
 			)
 		}
 	}
