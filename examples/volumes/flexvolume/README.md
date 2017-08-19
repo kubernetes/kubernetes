@@ -1,1 +1,1 @@
-This file has moved to [https://github.com/kubernetes/examples/blob/master/staging/volumes/flexvolume/README.md](https://github.com/kubernetes/examples/blob/master/staging/volumes/flexvolume/README.md)
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md)
