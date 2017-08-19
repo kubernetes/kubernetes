@@ -54,6 +54,7 @@ http_file(
     url = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz",
 )
 
+# TODO(dixudx): update the sha and tag (to v8) when the image get pushed
 docker_pull(
     name = "debian-iptables-amd64",
     digest = "sha256:bc20977ac38abfb43071b4c61c4b7edb30af894c05eb06758dd61d05118d2842",
