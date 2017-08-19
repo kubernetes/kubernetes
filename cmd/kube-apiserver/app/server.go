@@ -172,7 +172,9 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	}
 	aggregatorConfig.ProxyTransport = proxyTransport
 	aggregatorConfig.ServiceResolver = serviceResolver
-	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
+	aggregatorServer, err := createAggregatorServer(aggregatorConfig,
+		[]genericapiserver.DelegationTarget{kubeAPIServer.GenericAPIServer, apiExtensionsServer.GenericAPIServer},
+		apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err

@@ -185,6 +185,8 @@ var EmptyDelegate = emptyDelegate{
 	requestContextMapper: apirequest.NewRequestContextMapper(),
 }
 
+var EmptyDelegateChain = []DelegationTarget{EmptyDelegate}
+
 type emptyDelegate struct {
 	requestContextMapper apirequest.RequestContextMapper
 }
