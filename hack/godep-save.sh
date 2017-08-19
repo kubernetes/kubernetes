@@ -22,11 +22,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+kube::golang::setup_env
 kube::util::ensure_single_dir_gopath
 kube::util::ensure_godep_version v79
 kube::util::ensure_no_staging_repos_in_gopath
 
-if [ -e "${KUBE_ROOT}/vendor" -o -e "${KUBE_ROOT}/Godeps" ]; then
+if [ -e "vendor" -o -e "Godeps" ]; then
   echo "The directory vendor/ or Godeps/ exists. Remove them before running godep-save.sh" 1>&2
   exit 1
 fi
@@ -40,21 +41,19 @@ REQUIRED_BINS=(
   "./..."
 )
 
-pushd "${KUBE_ROOT}" > /dev/null
-  echo "Running godep save. This will take around 15 minutes."
-  GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep save "${REQUIRED_BINS[@]}"
+echo "Running godep save. This will take around 15 minutes."
+GOPATH="${GOPATH}:$(pwd)/staging" godep save "${REQUIRED_BINS[@]}"
 
-  # create a symlink in vendor directory pointing to the staging client. This
-  # let other packages use the staging client as if it were vendored.
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
-   if [ ! -e "vendor/k8s.io/${repo}" ]; then
-     ln -s "../../staging/src/k8s.io/${repo}" "vendor/k8s.io/${repo}"
-   fi
-  done
-popd > /dev/null
+# create a symlink in vendor directory pointing to the staging client. This
+# let other packages use the staging client as if it were vendored.
+for repo in $(ls staging/src/k8s.io); do
+  if [ ! -e "vendor/k8s.io/${repo}" ]; then
+    ln -s "../../staging/src/k8s.io/${repo}" "vendor/k8s.io/${repo}"
+  fi
+done
 
 # Workaround broken symlink in docker repo because godep copies the link, but not the target
-rm -rf ${KUBE_ROOT}/vendor/github.com/docker/docker/project/
+rm -rf vendor/github.com/docker/docker/project/
 
 echo
 echo "Don't forget to run:"

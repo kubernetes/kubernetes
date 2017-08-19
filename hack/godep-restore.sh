@@ -22,8 +22,10 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+kube::golang::setup_env
+
 kube::util::ensure_godep_version v79
 
 kube::log::status "Starting to download all kubernetes godeps. This takes a while"
-GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep restore "$@"
+GOPATH="${GOPATH}:$(pwd)/staging" godep restore "$@"
 kube::log::status "Download finished"
