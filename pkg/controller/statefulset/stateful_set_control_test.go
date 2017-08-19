@@ -465,14 +465,15 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1beta1().ControllerRevisions().Informer().HasSynced,
 		)
+		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
-			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i])
+			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
 		}
 		revisions, err := ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
 		revisions, err = ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
@@ -480,20 +481,20 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if len(revisions) != test.expectedCount {
 			t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
 		}
-		if test.err && err != nil {
+		if test.err && err == nil {
 			t.Errorf("%s: expected error", test.name)
 		}
 		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
 			t.Errorf("%s: for current want %v got %v", test.name, test.expectedCurrent, current)
 		}
 		if !test.err && !history.EqualRevision(update, test.expectedUpdate) {
-			t.Errorf("%s: for current want %v got %v", test.name, test.expectedUpdate, update)
+			t.Errorf("%s: for update want %v got %v", test.name, test.expectedUpdate, update)
 		}
 		if !test.err && test.expectedCurrent != nil && current != nil && test.expectedCurrent.Revision != current.Revision {
 			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedCurrent.Revision, current.Revision)
 		}
 		if !test.err && test.expectedUpdate != nil && update != nil && test.expectedUpdate.Revision != update.Revision {
-			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
+			t.Errorf("%s: for update revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
 		}
 	}
 
@@ -508,14 +509,17 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	}
 
 	set := newStatefulSet(3)
+	set.Status.CollisionCount = new(int32)
 	rev0 := newRevisionOrDie(set, 1)
 	set1 := copySet(set)
 	set1.Spec.Template.Spec.Containers[0].Image = "foo"
 	set1.Status.CurrentRevision = rev0.Name
+	set1.Status.CollisionCount = new(int32)
 	rev1 := newRevisionOrDie(set1, 2)
 	set2 := copySet(set1)
 	set2.Spec.Template.Labels["new"] = "label"
 	set2.Status.CurrentRevision = rev0.Name
+	set2.Status.CollisionCount = new(int32)
 	rev2 := newRevisionOrDie(set2, 3)
 	tests := []testcase{
 		{
@@ -2097,7 +2101,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 }
 
 func newRevisionOrDie(set *apps.StatefulSet, revision int64) *apps.ControllerRevision {
-	rev, err := newRevision(set, revision)
+	rev, err := newRevision(set, revision, set.Status.CollisionCount)
 	if err != nil {
 		panic(err)
 	}

@@ -1449,7 +1449,7 @@ func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
 			return false, nil
 		}
 		framework.Logf(spew.Sprintf("deployment status: %#v", d.Status))
-		return d.Status.CollisionCount != nil && *d.Status.CollisionCount == int64(1), nil
+		return d.Status.CollisionCount != nil && *d.Status.CollisionCount == int32(1), nil
 	}); err != nil {
 		framework.Failf("Failed to increment collision counter for deployment %q: %v", deploymentName, err)
 	}

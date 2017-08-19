@@ -27,10 +27,10 @@ kube::golang::setup_env
 #
 # Note: these must be before the main script call because the later calls the sub-project's
 #       update-codegen.sh scripts. We wouldn't see any error on changes then.
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/kube-gen/hack/verify-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/kube-aggregator/hack/verify-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/metrics/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/verify-codegen.sh
 
 "${KUBE_ROOT}/hack/update-codegen.sh" --verify-only

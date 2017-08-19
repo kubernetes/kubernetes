@@ -6000,13 +6000,13 @@ func (x *DeploymentStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.CollisionCount == nil {
-					x.CollisionCount = new(int64)
+					x.CollisionCount = new(int32)
 				}
 				yym19 := z.DecBinary()
 				_ = yym19
 				if false {
 				} else {
-					*((*int64)(x.CollisionCount)) = int64(r.DecodeInt(64))
+					*((*int32)(x.CollisionCount)) = int32(r.DecodeInt(32))
 				}
 			}
 		default:
@@ -6194,13 +6194,13 @@ func (x *DeploymentStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder)
 		}
 	} else {
 		if x.CollisionCount == nil {
-			x.CollisionCount = new(int64)
+			x.CollisionCount = new(int32)
 		}
 		yym36 := z.DecBinary()
 		_ = yym36
 		if false {
 		} else {
-			*((*int64)(x.CollisionCount)) = int64(r.DecodeInt(64))
+			*((*int32)(x.CollisionCount)) = int32(r.DecodeInt(32))
 		}
 	}
 	for {
@@ -8424,13 +8424,13 @@ func (x *DaemonSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				}
 			} else {
 				if x.CollisionCount == nil {
-					x.CollisionCount = new(int64)
+					x.CollisionCount = new(int32)
 				}
 				yym21 := z.DecBinary()
 				_ = yym21
 				if false {
 				} else {
-					*((*int64)(x.CollisionCount)) = int64(r.DecodeInt(64))
+					*((*int32)(x.CollisionCount)) = int32(r.DecodeInt(32))
 				}
 			}
 		default:
@@ -8640,13 +8640,13 @@ func (x *DaemonSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) 
 		}
 	} else {
 		if x.CollisionCount == nil {
-			x.CollisionCount = new(int64)
+			x.CollisionCount = new(int32)
 		}
 		yym40 := z.DecBinary()
 		_ = yym40
 		if false {
 		} else {
-			*((*int64)(x.CollisionCount)) = int64(r.DecodeInt(64))
+			*((*int32)(x.CollisionCount)) = int32(r.DecodeInt(32))
 		}
 	}
 	for {

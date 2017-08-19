@@ -38,6 +38,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/docker/docker/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

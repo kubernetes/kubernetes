@@ -196,9 +196,11 @@ func (o *ImageOptions) Run() error {
 								continue
 							}
 						}
-						spec.Containers[i].Image = resolved
-						// Perform updates
-						transformed = true
+						if spec.Containers[i].Image != resolved {
+							spec.Containers[i].Image = resolved
+							// Perform updates
+							transformed = true
+						}
 					}
 				}
 				// Add a new container if not found

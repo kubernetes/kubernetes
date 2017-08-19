@@ -30,6 +30,7 @@ var (
 
 // LogEntry represents a log entry, received from the logging backend.
 type LogEntry struct {
+	LogName     string
 	TextPayload string
 	JSONPayload map[string]interface{}
 }

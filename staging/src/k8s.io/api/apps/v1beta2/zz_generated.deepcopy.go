@@ -327,7 +327,7 @@ func (in *DaemonSetStatus) DeepCopyInto(out *DaemonSetStatus) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(int64)
+			*out = new(int32)
 			**out = **in
 		}
 	}
@@ -519,7 +519,7 @@ func (in *DeploymentStatus) DeepCopyInto(out *DeploymentStatus) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(int64)
+			*out = new(int32)
 			**out = **in
 		}
 	}
@@ -974,7 +974,7 @@ func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(int64)
+			*out = new(int32)
 			**out = **in
 		}
 	}

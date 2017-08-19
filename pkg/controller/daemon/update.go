@@ -368,7 +368,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			return nil, getErr
 		}
 		if currDS.Status.CollisionCount == nil {
-			currDS.Status.CollisionCount = new(int64)
+			currDS.Status.CollisionCount = new(int32)
 		}
 		*currDS.Status.CollisionCount++
 		_, updateErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).UpdateStatus(currDS)

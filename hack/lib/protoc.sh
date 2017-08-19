@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 function kube::protoc::generate_proto() {
   kube::golang::setup_env
   local bins=(
-    vendor/k8s.io/kube-gen/cmd/go-to-protobuf/protoc-gen-gogo
+    vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
   )
   make -C "${KUBE_ROOT}" WHAT="${bins[*]}"
 

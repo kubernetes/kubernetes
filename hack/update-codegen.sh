@@ -24,9 +24,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BUILD_TARGETS=(
-  vendor/k8s.io/kube-gen/cmd/client-gen
-  vendor/k8s.io/kube-gen/cmd/lister-gen
-  vendor/k8s.io/kube-gen/cmd/informer-gen
+  vendor/k8s.io/code-generator/cmd/client-gen
+  vendor/k8s.io/code-generator/cmd/lister-gen
+  vendor/k8s.io/code-generator/cmd/informer-gen
 )
 make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
@@ -122,8 +122,8 @@ ${informergen} \
 # You may add additional calls of code generators like set-gen above.
 
 # call generation on sub-project for now
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/kube-gen/hack/update-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
-KUBEGEN_PKG=./vendor/k8s.io/kube-gen vendor/k8s.io/metrics/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh
