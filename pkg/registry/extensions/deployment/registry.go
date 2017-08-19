@@ -21,6 +21,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
@@ -30,6 +31,7 @@ import (
 // Registry is an interface for things that know how to store Deployments.
 type Registry interface {
 	ListDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*extensions.DeploymentList, error)
+	WatchDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error)
 	CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
 	UpdateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error)
@@ -55,6 +57,10 @@ func (s *storage) ListDeployments(ctx genericapirequest.Context, options *metain
 		return nil, err
 	}
 	return obj.(*extensions.DeploymentList), err
+}
+
+func (s *storage) WatchDeployments(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetDeployment(ctx genericapirequest.Context, deploymentID string, options *metav1.GetOptions) (*extensions.Deployment, error) {
