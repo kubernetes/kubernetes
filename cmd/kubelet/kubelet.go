@@ -93,6 +93,9 @@ func main() {
 
 	// use kubeletServer to construct the default KubeletDeps
 	kubeletDeps, err := app.UnsecuredDependencies(kubeletServer)
+	if err != nil {
+		die(err)
+	}
 
 	// add the kubelet config controller to kubeletDeps
 	kubeletDeps.KubeletConfigController = kubeletConfigController
