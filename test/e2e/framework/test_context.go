@@ -301,4 +301,8 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		t.Host = defaultHost
 	}
+	// Reset the cluster IP range flag to CLUSTER_IP_RANGE env var, if defined.
+	if clusterIPRange := os.Getenv("CLUSTER_IP_RANGE"); clusterIPRange != "" {
+		t.CloudConfig.ClusterIPRange = clusterIPRange
+	}
 }
