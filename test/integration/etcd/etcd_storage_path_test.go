@@ -434,10 +434,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvr("componentconfig", "v1alpha1", "kubeproxyconfigurations"),     // not stored in etcd
 	// --
 
-	// k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1
-	gvr("kubeletconfig", "v1alpha1", "kubeletconfigurations"), // not stored in etcd
-	// --
-
 	// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
 	gvr("extensions", "v1beta1", "deploymentrollbacks"),          // used to rollback deployment, not stored in etcd
 	gvr("extensions", "v1beta1", "replicationcontrollerdummies"), // not stored in etcd
