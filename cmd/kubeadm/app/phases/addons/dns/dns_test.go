@@ -90,7 +90,7 @@ func TestCompileManifests(t *testing.T) {
 		expected bool
 	}{
 		{
-			manifest: KubeDNSDeployment,
+			manifest: v170AndAboveKubeDNSDeployment,
 			data: struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",

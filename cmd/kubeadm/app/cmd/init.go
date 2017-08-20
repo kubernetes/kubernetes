@@ -308,7 +308,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
+	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client, k8sVersion); err != nil {
 		return err
 	}
 
