@@ -1116,7 +1116,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		return nil
 	}
 
-	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
+	if loadbalancer != nil && loadbalancer.VipPortID != "" {
 		portID := loadbalancer.VipPortID
 		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
