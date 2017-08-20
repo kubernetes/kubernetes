@@ -1281,6 +1281,9 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 		lb.opts.SubnetId = subnetID
 	}
 
+	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lb.opts.FloatingNetworkId)
+	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
+
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not supported in openstack v1 load balancers")
@@ -1404,9 +1407,9 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 
 	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
 
-	if lb.opts.FloatingNetworkId != "" {
+	if floatingPool != "" {
 		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lb.opts.FloatingNetworkId,
+			FloatingNetworkID: floatingPool,
 			PortID:            vip.PortID,
 		}
 		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
@@ -1492,7 +1495,7 @@ func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Ser
 		return err
 	}
 
-	if lb.opts.FloatingNetworkId != "" && vip != nil {
+	if vip != nil && vip.PortID != "" {
 		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
 		if err != nil && !isNotFound(err) {
 			return err
