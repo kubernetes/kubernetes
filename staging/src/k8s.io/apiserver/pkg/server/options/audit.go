@@ -81,7 +81,7 @@ type AuditWebhookOptions struct {
 func NewAuditOptions() *AuditOptions {
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{Mode: pluginwebhook.ModeBatch},
-		LogOptions:     AuditLogOptions{Format: pluginlog.FormatLegacy},
+		LogOptions:     AuditLogOptions{Format: pluginlog.FormatJson},
 	}
 }
 

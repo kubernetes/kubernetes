@@ -133,7 +133,7 @@ func TestAddFlagsFlag(t *testing.T) {
 				MaxAge:     11,
 				MaxBackups: 12,
 				MaxSize:    13,
-				Format:     "legacy",
+				Format:     "json",
 			},
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
 				Mode:       "blocking",
