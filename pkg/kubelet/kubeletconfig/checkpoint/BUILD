@@ -15,8 +15,8 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
@@ -40,12 +40,14 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )

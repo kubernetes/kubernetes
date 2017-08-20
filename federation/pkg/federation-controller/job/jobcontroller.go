@@ -468,12 +468,12 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 			for _, condition := range currentLjob.Status.Conditions {
 				if condition.Type == batchv1.JobComplete {
 					if fedStatusCompleteCondition == nil ||
-						fedStatusCompleteCondition.LastTransitionTime.Before(condition.LastTransitionTime) {
+						fedStatusCompleteCondition.LastTransitionTime.Before(&condition.LastTransitionTime) {
 						fedStatusCompleteCondition = &condition
 					}
 				} else if condition.Type == batchv1.JobFailed {
 					if fedStatusFailedCondition == nil ||
-						fedStatusFailedCondition.LastTransitionTime.Before(condition.LastTransitionTime) {
+						fedStatusFailedCondition.LastTransitionTime.Before(&condition.LastTransitionTime) {
 						fedStatusFailedCondition = &condition
 					}
 				}
@@ -484,7 +484,7 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 				}
 			}
 			if currentLjob.Status.CompletionTime != nil {
-				if fedStatus.CompletionTime == nil || fedStatus.CompletionTime.Before(*currentLjob.Status.CompletionTime) {
+				if fedStatus.CompletionTime == nil || fedStatus.CompletionTime.Before(currentLjob.Status.CompletionTime) {
 					fedStatus.CompletionTime = currentLjob.Status.CompletionTime
 				}
 			}
