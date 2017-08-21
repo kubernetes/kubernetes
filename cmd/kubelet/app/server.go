@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/certificate"
@@ -188,20 +189,30 @@ func checkPermissions() error {
 	return nil
 }
 
-func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfiguration) {
-	tmp := kubeletconfigv1alpha1.KubeletConfiguration{}
-	api.Scheme.Convert(kc, &tmp, nil)
-	cz.Set(tmp)
+func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfiguration) error {
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return err
+	}
+	versioned := kubeletconfigv1alpha1.KubeletConfiguration{}
+	if err := scheme.Convert(kc, &versioned, nil); err != nil {
+		return err
+	}
+	cz.Set(versioned)
+	return nil
 }
 
-func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) (*configz.Config, error) {
+func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) error {
 	cz, err := configz.New("kubeletconfig")
-	if err == nil {
-		setConfigz(cz, kc)
-	} else {
+	if err != nil {
 		glog.Errorf("unable to register configz: %s", err)
+		return err
 	}
-	return cz, err
+	if err := setConfigz(cz, kc); err != nil {
+		glog.Errorf("unable to register config: %s", err)
+		return err
+	}
+	return nil
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
@@ -250,7 +261,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	// Register current configuration with /configz endpoint
-	_, err = initConfigz(&s.KubeletConfiguration)
+	err = initConfigz(&s.KubeletConfiguration)
 	if err != nil {
 		glog.Errorf("unable to register KubeletConfiguration with configz, error: %v", err)
 	}
@@ -756,7 +767,8 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(flags *options.KubeletFlags,
+func BootstrapKubeletConfigController(
+	flags *options.KubeletFlags,
 	defaultConfig *kubeletconfiginternal.KubeletConfiguration) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
@@ -777,7 +789,10 @@ func BootstrapKubeletConfigController(flags *options.KubeletFlags,
 	}
 
 	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
+	kubeletConfigController, err := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
+	}
 	kubeletConfig, err := kubeletConfigController.Bootstrap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)

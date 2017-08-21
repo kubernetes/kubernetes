@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -259,13 +259,17 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Uses GenerateName.
 func makeKubeletConfigMap(internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
-	externalKC := &kubeletconfigv1alpha1.KubeletConfiguration{}
-	api.Scheme.Convert(internalKC, externalKC, nil)
-
-	encoder, err := newJSONEncoder(kubeletconfig.GroupName)
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	framework.ExpectNoError(err)
 
-	data, err := runtime.Encode(encoder, externalKC)
+	versioned := &kubeletconfigv1alpha1.KubeletConfiguration{}
+	err = scheme.Convert(internalKC, versioned, nil)
+	framework.ExpectNoError(err)
+
+	encoder, err := newKubeletConfigJSONEncoder()
+	framework.ExpectNoError(err)
+
+	data, err := runtime.Encode(encoder, versioned)
 	framework.ExpectNoError(err)
 
 	cmap := &v1.ConfigMap{
@@ -274,7 +278,6 @@ func makeKubeletConfigMap(internalKC *kubeletconfig.KubeletConfiguration) *v1.Co
 			"kubelet": string(data),
 		},
 	}
-
 	return cmap
 }
 
@@ -310,21 +313,18 @@ func logKubeletMetrics(metricKeys ...string) {
 	}
 }
 
-func newJSONEncoder(groupName string) (runtime.Encoder, error) {
-	// encode to json
+func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
+	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+
 	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
-
-	versions := api.Registry.EnabledVersionsForGroup(groupName)
-	if len(versions) == 0 {
-		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
-	}
-
-	// the "best" version supposedly comes first in the list returned from api.Registry.EnabledVersionsForGroup
-	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
+	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
