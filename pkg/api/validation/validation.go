@@ -3060,18 +3060,10 @@ func ValidateService(service *api.Service) field.ErrorList {
 		targetPorts[key] = true
 	}
 
-	// Validate SourceRange field and annotation
-	_, ok := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
-	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
-		var fieldPath *field.Path
-		var val string
-		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
-			fieldPath = specPath.Child("LoadBalancerSourceRanges")
-			val = fmt.Sprintf("%v", service.Spec.LoadBalancerSourceRanges)
-		} else {
-			fieldPath = field.NewPath("metadata", "annotations").Key(api.AnnotationLoadBalancerSourceRangesKey)
-			val = service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
-		}
+	// Validate SourceRanges field
+	if len(service.Spec.LoadBalancerSourceRanges) > 0 {
+		fieldPath := specPath.Child("LoadBalancerSourceRanges")
+		val := fmt.Sprintf("%v", service.Spec.LoadBalancerSourceRanges)
 		if service.Spec.Type != api.ServiceTypeLoadBalancer {
 			allErrs = append(allErrs, field.Invalid(fieldPath, "", "may only be used when `type` is 'LoadBalancer'"))
 		}
