@@ -395,7 +395,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quoybte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
@@ -465,7 +465,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	}
 
 	if len(apiServer) == 0 {
-		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
 	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.host.GetKubeClient())
