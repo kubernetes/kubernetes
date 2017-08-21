@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright YEAR The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -735,7 +735,7 @@ func (m *DeviceRuntimeSpec) MarshalTo(dAtA []byte) (int, error) {
 		i += copy(dAtA[i:], m.ID)
 	}
 	if len(m.Envs) > 0 {
-		for k := range m.Envs {
+		for k, _ := range m.Envs {
 			dAtA[i] = 0x12
 			i++
 			v := m.Envs[k]
@@ -1100,7 +1100,7 @@ func (this *DeviceRuntimeSpec) String() string {
 		return "nil"
 	}
 	keysForEnvs := make([]string, 0, len(this.Envs))
-	for k := range this.Envs {
+	for k, _ := range this.Envs {
 		keysForEnvs = append(keysForEnvs, k)
 	}
 	github_com_gogo_protobuf_sortkeys.Strings(keysForEnvs)
