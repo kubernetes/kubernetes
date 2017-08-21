@@ -361,7 +361,6 @@ func MarkdownOptions(input []byte, renderer Renderer, opts Options) []byte {
 
 	// register inline parsers
 	p.inlineCallback['*'] = emphasis
-	p.inlineCallback['_'] = emphasis
 	if extensions&EXTENSION_STRIKETHROUGH != 0 {
 		p.inlineCallback['~'] = emphasis
 	}
