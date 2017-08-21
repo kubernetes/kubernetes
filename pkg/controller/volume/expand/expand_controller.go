@@ -106,7 +106,7 @@ func NewExpandController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
 
 	expc.opExecutor = operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -185,7 +185,7 @@ func CreateVolumeSpec(
 	return volume.NewSpecFromPersistentVolume(clonedPV, false), nil
 }
 
-// Impelementing VolumeHost interface
+// Implementing VolumeHost interface
 func (expc *expandController) GetPluginDir(pluginName string) string {
 	return ""
 }
