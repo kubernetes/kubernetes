@@ -67,7 +67,60 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
+	cmd.Run(cmd, []string{})
+
+	// Check the presence of node names in the output.
+	result := buf.String()
+	for _, m := range metrics.Items {
+		if !strings.Contains(result, m.Name) {
+			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
+		}
+	}
+}
+
+func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
+	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
+	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
+
+	initTestErrorHandler(t)
+	metrics, nodes := testNodeMetricsData()
+	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
+	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
+
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == expectedMetricsPath && m == "GET":
+				body, err := marshallBody(metrics)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			case p == expectedNodePath && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+
+	opts := &TopNodeOptions{
+		HeapsterOptions: HeapsterTopOptions{
+			Namespace: "custom-namespace",
+			Scheme:    "https",
+			Service:   "custom-heapster-service",
+		},
+	}
+	cmd := NewCmdTopNode(f, opts, buf)
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -116,7 +169,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Run(cmd, []string{expectedMetrics.Name})
 
 	// Check the presence of node names in the output.
@@ -176,7 +229,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdTopNode(f, buf)
+	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Flags().Set("selector", label)
 	cmd.Run(cmd, []string{})
 
