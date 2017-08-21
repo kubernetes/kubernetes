@@ -60,12 +60,12 @@ type ClientCache struct {
 	discoveryClientFactory DiscoveryClientFactory
 	discoveryClient        discovery.DiscoveryInterface
 
-	kubernetesClientCache KubernetesClientCache
+	kubernetesClientCache kubernetesClientCache
 }
 
-// KubernetesClientCache creates a new kubernetes.Clientset one time
+// kubernetesClientCache creates a new kubernetes.Clientset one time
 // and then returns the result for all future requests
-type KubernetesClientCache struct {
+type kubernetesClientCache struct {
 	// once makes sure the client is only initialized once
 	once sync.Once
 	// client is the cached client value
