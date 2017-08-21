@@ -26,8 +26,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
@@ -66,15 +66,9 @@ func TestNewConfigMapCheckpoint(t *testing.T) {
 }
 
 func TestConfigMapCheckpointUID(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	cases := []string{"", "uid", "376dfb73-56db-11e7-a01e-42010a800002"}
 	for _, uidIn := range cases {
 		cpt := &configMapCheckpoint{
-			kubeletCodecs,
 			&apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{UID: types.UID(uidIn)},
 			},
@@ -88,16 +82,11 @@ func TestConfigMapCheckpointUID(t *testing.T) {
 }
 
 func TestConfigMapCheckpointParse(t *testing.T) {
-	kubeletScheme, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	// get the built-in default configuration
 	external := &kubeletconfigv1alpha1.KubeletConfiguration{}
-	kubeletScheme.Default(external)
+	api.Scheme.Default(external)
 	defaultConfig := &kubeletconfig.KubeletConfiguration{}
-	err = kubeletScheme.Convert(external, defaultConfig, nil)
+	err := api.Scheme.Convert(external, defaultConfig, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +123,7 @@ apiVersion: kubeletconfig/v1alpha1`}}, defaultConfig, ""},
 			"kubelet": `{"kind":"KubeletConfiguration","apiVersion":"kubeletconfig/v1alpha1"}`}}, defaultConfig, ""},
 	}
 	for _, c := range cases {
-		cpt := &configMapCheckpoint{kubeletCodecs, c.cm}
+		cpt := &configMapCheckpoint{c.cm}
 		kc, err := cpt.Parse()
 		if utiltest.SkipRest(t, c.desc, err, c.err) {
 			continue
@@ -147,11 +136,6 @@ apiVersion: kubeletconfig/v1alpha1`}}, defaultConfig, ""},
 }
 
 func TestConfigMapCheckpointEncode(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	// only one case, based on output from the existing encoder, and since
 	// this is hard to test (key order isn't guaranteed), we should probably
 	// just stick to this test case and mostly rely on the round-trip test.
@@ -162,7 +146,7 @@ func TestConfigMapCheckpointEncode(t *testing.T) {
 	}{
 		// we expect Checkpoints to be encoded as a json representation of the underlying API object
 		{"one-key",
-			&configMapCheckpoint{kubeletCodecs, &apiv1.ConfigMap{
+			&configMapCheckpoint{&apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "one-key"},
 				Data:       map[string]string{"one": ""}}},
 			`{"kind":"ConfigMap","apiVersion":"v1","metadata":{"name":"one-key","creationTimestamp":null},"data":{"one":""}}
@@ -182,11 +166,6 @@ func TestConfigMapCheckpointEncode(t *testing.T) {
 }
 
 func TestConfigMapCheckpointRoundTrip(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	cases := []struct {
 		desc      string
 		cpt       *configMapCheckpoint
@@ -194,7 +173,7 @@ func TestConfigMapCheckpointRoundTrip(t *testing.T) {
 	}{
 		// empty data
 		{"empty data",
-			&configMapCheckpoint{kubeletCodecs, &apiv1.ConfigMap{
+			&configMapCheckpoint{&apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "empty-data-sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 					UID:  "uid",
@@ -203,7 +182,7 @@ func TestConfigMapCheckpointRoundTrip(t *testing.T) {
 			""},
 		// two keys
 		{"two keys",
-			&configMapCheckpoint{kubeletCodecs, &apiv1.ConfigMap{
+			&configMapCheckpoint{&apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "two-keys-sha256-2bff03d6249c8a9dc9a1436d087c124741361ccfac6615b81b67afcff5c42431",
 					UID:  "uid",
@@ -212,7 +191,7 @@ func TestConfigMapCheckpointRoundTrip(t *testing.T) {
 			""},
 		// missing uid
 		{"missing uid",
-			&configMapCheckpoint{kubeletCodecs, &apiv1.ConfigMap{
+			&configMapCheckpoint{&apiv1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "two-keys-sha256-2bff03d6249c8a9dc9a1436d087c124741361ccfac6615b81b67afcff5c42431",
 					UID:  "",

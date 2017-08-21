@@ -30,7 +30,7 @@ import (
 type Checkpoint interface {
 	// UID returns the UID of the config source object behind the Checkpoint
 	UID() string
-	// Parse extracts the KubeletConfiguration from the checkpoint, applies defaults, and converts to the internal type
+	// Parse parses the checkpoint into the internal KubeletConfiguration type
 	Parse() (*kubeletconfig.KubeletConfiguration, error)
 	// Encode returns a []byte representation of the config source object behind the Checkpoint
 	Encode() ([]byte, error)
@@ -56,7 +56,6 @@ func DecodeCheckpoint(data []byte) (Checkpoint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert decoded object into a v1 ConfigMap, error: %v", err)
 	}
-
 	return NewConfigMapCheckpoint(cm)
 }
 

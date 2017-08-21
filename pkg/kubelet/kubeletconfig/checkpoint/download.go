@@ -113,6 +113,7 @@ func (r *remoteConfigMap) UID() string {
 
 func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, string, error) {
 	var reason string
+
 	uid := string(r.source.ConfigMapRef.UID)
 
 	utillog.Infof("attempting to download ConfigMap with UID %q", uid)
@@ -130,14 +131,8 @@ func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, stri
 		return nil, reason, fmt.Errorf(reason)
 	}
 
-	checkpoint, err := NewConfigMapCheckpoint(cm)
-	if err != nil {
-		reason = fmt.Sprintf("invalid downloaded object")
-		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
-	}
-
 	utillog.Infof("successfully downloaded ConfigMap with UID %q", uid)
-	return checkpoint, "", nil
+	return &configMapCheckpoint{cm}, "", nil
 }
 
 func (r *remoteConfigMap) Encode() ([]byte, error) {

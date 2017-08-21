@@ -756,8 +756,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(
-	flags *options.KubeletFlags,
+func BootstrapKubeletConfigController(flags *options.KubeletFlags,
 	defaultConfig *kubeletconfiginternal.KubeletConfiguration) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
@@ -778,10 +777,7 @@ func BootstrapKubeletConfigController(
 	}
 
 	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController, err := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
-	}
+	kubeletConfigController := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
 	kubeletConfig, err := kubeletConfigController.Bootstrap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)

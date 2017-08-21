@@ -89,10 +89,7 @@ func main() {
 	}
 
 	// construct a KubeletServer from kubeletFlags and kubeletConfig
-	kubeletServer := &options.KubeletServer{
-		KubeletFlags:         *kubeletFlags,
-		KubeletConfiguration: *kubeletConfig,
-	}
+	kubeletServer := &options.KubeletServer{KubeletFlags: *kubeletFlags, KubeletConfiguration: *kubeletConfig}
 
 	// use kubeletServer to construct the default KubeletDeps
 	kubeletDeps, err := app.UnsecuredDependencies(kubeletServer)
