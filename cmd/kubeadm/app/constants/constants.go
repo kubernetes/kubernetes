@@ -116,6 +116,9 @@ const (
 	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
 	// TODO: This should be changed in the v1.8 dev cycle to a node-BT-specific group instead of the generic Bootstrap Token group that is used now
 	NodeBootstrapTokenAuthGroup = "system:bootstrappers"
+
+	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
+	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
 )
 
 var (
