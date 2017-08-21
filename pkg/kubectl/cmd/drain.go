@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/util/json"
 	"math"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -119,7 +120,7 @@ var (
 
 	uncordon_example = templates.Examples(i18n.T(`
 		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`))
+		kubectl uncordon foo`))
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -166,10 +167,10 @@ var (
 
 	drain_example = templates.Examples(i18n.T(`
 		# Drain node "foo", even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet on it.
-		$ kubectl drain foo --force
+		kubectl drain foo --force
 
 		# As above, but abort if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet, and use a grace period of 15 minutes.
-		$ kubectl drain foo --grace-period=900`))
+		kubectl drain foo --grace-period=900`))
 )
 
 func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

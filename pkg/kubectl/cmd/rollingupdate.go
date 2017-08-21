@@ -57,8 +57,7 @@ var (
 		# Update pods of frontend-v1 using JSON data passed into stdin.
 		cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 
-		# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the
-		# name of the replication controller.
+		# Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the name of the replication controller.
 		kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
 
 		# Update the pods of frontend by just changing the image, and keeping the old name.

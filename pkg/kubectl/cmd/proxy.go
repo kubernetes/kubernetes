@@ -41,21 +41,16 @@ var (
 		the remote kubernetes API Server port, except for the path matching the static content path.`))
 
 	proxyExample = templates.Examples(i18n.T(`
-		# To proxy all of the kubernetes api and nothing else, use:
+		# To proxy all of the kubernetes api and nothing else
+		kubectl proxy --api-prefix=/
 
-		    $ kubectl proxy --api-prefix=/
-
-		# To proxy only part of the kubernetes api and also some static files:
-
-		    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
-
-		# The above lets you 'curl localhost:8001/api/v1/pods'.
+		# To proxy only part of the kubernetes api and also some static files
+		# This lets you 'curl localhost:8001/api/v1/pods'.
+		kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
 
 		# To proxy the entire kubernetes api at a different root, use:
-
-		    $ kubectl proxy --api-prefix=/custom/
-
-		# The above lets you 'curl localhost:8001/custom/api/v1/pods'
+		# This lets you 'curl localhost:8001/custom/api/v1/pods'
+		kubectl proxy --api-prefix=/custom/
 
 		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
