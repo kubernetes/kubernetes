@@ -119,7 +119,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		for _, node := range nodeList.Items {
 			framework.Logf("Node: %v", node)
-			podCapacity, found := node.Status.Capacity["pods"]
+			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
 		}
@@ -145,6 +145,78 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Name:   podName,
 			Labels: map[string]string{"name": "additional"},
 		}), podName, false)
+		verifyResult(cs, podsNeededForSaturation, 1, ns)
+	})
+
+	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
+	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
+	// It is so because we need to have precise control on what's running in the cluster.
+	It("validates local ephemeral storage resource limits of pods that are allowed to run [Conformance]", func() {
+		nodeMaxAllocatable := int64(0)
+
+		nodeToAllocatableMap := make(map[string]int64)
+		for _, node := range nodeList.Items {
+			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
+			Expect(found).To(Equal(true))
+			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
+			if nodeMaxAllocatable < allocatable.MilliValue() {
+				nodeMaxAllocatable = allocatable.MilliValue()
+			}
+		}
+		framework.WaitForStableCluster(cs, masterNodes)
+
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, pod := range pods.Items {
+			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
+			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+				framework.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
+			}
+		}
+
+		var podsNeededForSaturation int
+
+		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
+
+		framework.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
+		for name, leftAllocatable := range nodeToAllocatableMap {
+			framework.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
+			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
+		}
+
+		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster local ephemeral resource and trying to start another one", podsNeededForSaturation))
+
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are saturated
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
+				*initPausePod(f, pausePodConfig{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+						},
+					},
+				}), true, framework.Logf))
+		}
+		podName := "additional-pod"
+		conf := pausePodConfig{
+			Name:   podName,
+			Labels: map[string]string{"name": "additional"},
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+				},
+			},
+		}
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
@@ -525,6 +597,14 @@ func getRequestedCPU(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
 		result += container.Resources.Requests.Cpu().MilliValue()
+	}
+	return result
+}
+
+func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
+	var result int64
+	for _, container := range pod.Spec.Containers {
+		result += container.Resources.Requests.StorageEphemeral().MilliValue()
 	}
 	return result
 }
