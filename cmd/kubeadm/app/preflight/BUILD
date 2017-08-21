@@ -17,6 +17,8 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/initsystem:go_default_library",
+        "//pkg/util/version:go_default_library",
+        "//pkg/version:go_default_library",
         "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
