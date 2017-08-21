@@ -46,6 +46,7 @@ const (
 type Interface interface {
 	ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error)
 	InspectContainer(id string) (*dockertypes.ContainerJSON, error)
+	InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error)
 	CreateContainer(dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error)
 	StartContainer(id string) error
 	StopContainer(id string, timeout time.Duration) error
@@ -66,6 +67,7 @@ type Interface interface {
 	AttachToContainer(string, dockertypes.ContainerAttachOptions, StreamOptions) error
 	ResizeContainerTTY(id string, height, width uint) error
 	ResizeExecTTY(id string, height, width uint) error
+	GetContainerStats(id string) (*dockertypes.StatsJSON, error)
 }
 
 // Get a *dockerapi.Client, either using the endpoint passed in, or using

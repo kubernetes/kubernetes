@@ -73,6 +73,15 @@ func (in instrumentedInterface) InspectContainer(id string) (*dockertypes.Contai
 	return out, err
 }
 
+func (in instrumentedInterface) InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error) {
+	const operation = "inspect_container_withsize"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.InspectContainerWithSize(id)
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
@@ -250,4 +259,13 @@ func (in instrumentedInterface) ResizeContainerTTY(id string, height, width uint
 	err := in.client.ResizeContainerTTY(id, height, width)
 	recordError(operation, err)
 	return err
+}
+
+func (in instrumentedInterface) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
+	const operation = "stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.client.GetContainerStats(id)
+	recordError(operation, err)
+	return out, err
 }
