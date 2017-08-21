@@ -49378,6 +49378,22 @@
       "rbacAuthorization_v1"
      ],
      "operationId": "readRbacAuthorizationV1ClusterRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -49852,6 +49868,22 @@
       "rbacAuthorization_v1"
      ],
      "operationId": "readRbacAuthorizationV1ClusterRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -50334,6 +50366,22 @@
       "rbacAuthorization_v1"
      ],
      "operationId": "readRbacAuthorizationV1NamespacedRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -50824,6 +50872,22 @@
       "rbacAuthorization_v1"
      ],
      "operationId": "readRbacAuthorizationV1NamespacedRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -52651,6 +52715,22 @@
       "rbacAuthorization_v1alpha1"
      ],
      "operationId": "readRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -53125,6 +53205,22 @@
       "rbacAuthorization_v1alpha1"
      ],
      "operationId": "readRbacAuthorizationV1alpha1ClusterRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -53607,6 +53703,22 @@
       "rbacAuthorization_v1alpha1"
      ],
      "operationId": "readRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -54097,6 +54209,22 @@
       "rbacAuthorization_v1alpha1"
      ],
      "operationId": "readRbacAuthorizationV1alpha1NamespacedRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -55924,6 +56052,22 @@
       "rbacAuthorization_v1beta1"
      ],
      "operationId": "readRbacAuthorizationV1beta1ClusterRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -56398,6 +56542,22 @@
       "rbacAuthorization_v1beta1"
      ],
      "operationId": "readRbacAuthorizationV1beta1ClusterRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -56880,6 +57040,22 @@
       "rbacAuthorization_v1beta1"
      ],
      "operationId": "readRbacAuthorizationV1beta1NamespacedRoleBinding",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -57370,6 +57546,22 @@
       "rbacAuthorization_v1beta1"
      ],
      "operationId": "readRbacAuthorizationV1beta1NamespacedRole",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+       "name": "export",
+       "in": "query"
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",

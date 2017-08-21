@@ -13,6 +13,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
+        "//pkg/registry/rbac:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/policybased:go_default_library",
         "//pkg/registry/rbac/clusterrole/storage:go_default_library",
