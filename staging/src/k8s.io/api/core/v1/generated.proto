@@ -4048,7 +4048,6 @@ message Volume {
 
   // VolumeSource represents the location and type of the mounted volume.
   // If not specified, the Volume is implied to be an EmptyDir.
-  // This implied behavior is deprecated and will be removed in a future version.
   optional VolumeSource volumeSource = 2;
 }
 
