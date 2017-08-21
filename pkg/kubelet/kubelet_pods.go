@@ -87,9 +87,9 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
-// makeDevices determines the devices for the given container.
+// makeGPUDevices determines the devices for the given container.
 // Experimental.
-func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+func (kl *Kubelet) makeGPUDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
 	if container.Resources.Limits.NvidiaGPU().IsZero() {
 		return nil, nil
 	}
@@ -104,6 +104,22 @@ func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecont
 		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
 	}
 
+	return devices, nil
+}
+
+// makeBlockVolumes maps the raw block devices specified in the path of the container
+// Experimental
+func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.DeviceInfo, error) {
+	var devices []kubecontainer.DeviceInfo
+	for _, device := range container.VolumeDevices {
+		vol, ok := podVolumes[device.Name]
+		if !ok || vol.BlockVolumeMapper == nil {
+			continue
+		}
+		if vol.BlockVolumeMapper.GetVolumeMode() == v1.PersistentVolumeBlock {
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: vol.BlockVolumeMapper.GetVolumePath(), PathInContainer: device.DevicePath, Permissions: "mrw"})
+		}
+	}
 	return devices, nil
 }
 
@@ -364,10 +380,13 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices, err = kl.makeDevices(pod, container)
+	opts.Devices, err = kl.makeGPUDevices(pod, container)
 	if err != nil {
 		return nil, false, err
 	}
+
+	blkVolumes, err := kl.makeBlockVolumes(pod, container, volumes)
+	opts.Devices = append(opts.Devices, blkVolumes...)
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
