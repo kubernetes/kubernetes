@@ -84,7 +84,7 @@ func resolvePairedBrackets(s *isolatingRunSequence) {
 		dirEmbed = R
 	}
 	p.locateBrackets(s.p.pairTypes, s.p.pairValues)
-	p.resolveBrackets(dirEmbed)
+	p.resolveBrackets(dirEmbed, s.p.initialTypes)
 }
 
 type bracketPairer struct {
@@ -125,6 +125,8 @@ func (p *bracketPairer) matchOpener(pairValues []rune, opener, closer int) bool 
 	return pairValues[p.indexes[opener]] == pairValues[p.indexes[closer]]
 }
 
+const maxPairingDepth = 63
+
 // locateBrackets locates matching bracket pairs according to BD16.
 //
 // This implementation uses a linked list instead of a stack, because, while
@@ -136,11 +138,17 @@ func (p *bracketPairer) locateBrackets(pairTypes []bracketType, pairValues []run
 	for i, index := range p.indexes {
 
 		// look at the bracket type for each character
-		switch pairTypes[index] {
-		case bpNone:
+		if pairTypes[index] == bpNone || p.codesIsolatedRun[i] != ON {
 			// continue scanning
-
+			continue
+		}
+		switch pairTypes[index] {
 		case bpOpen:
+			// check if maximum pairing depth reached
+			if p.openers.Len() == maxPairingDepth {
+				p.openers.Init()
+				return
+			}
 			// remember opener location, most recent first
 			p.openers.PushFront(i)
 
@@ -270,7 +278,7 @@ func (p *bracketPairer) classBeforePair(loc bracketPair) Class {
 }
 
 // assignBracketType implements rule N0 for a single bracket pair.
-func (p *bracketPairer) assignBracketType(loc bracketPair, dirEmbed Class) {
+func (p *bracketPairer) assignBracketType(loc bracketPair, dirEmbed Class, initialTypes []Class) {
 	// rule "N0, a", inspect contents of pair
 	dirPair := p.classifyPairContent(loc, dirEmbed)
 
@@ -295,13 +303,33 @@ func (p *bracketPairer) assignBracketType(loc bracketPair, dirEmbed Class) {
 	// direction
 
 	// set the bracket types to the type found
+	p.setBracketsToType(loc, dirPair, initialTypes)
+}
+
+func (p *bracketPairer) setBracketsToType(loc bracketPair, dirPair Class, initialTypes []Class) {
 	p.codesIsolatedRun[loc.opener] = dirPair
 	p.codesIsolatedRun[loc.closer] = dirPair
+
+	for i := loc.opener + 1; i < loc.closer; i++ {
+		index := p.indexes[i]
+		if initialTypes[index] != NSM {
+			break
+		}
+		p.codesIsolatedRun[i] = dirPair
+	}
+
+	for i := loc.closer + 1; i < len(p.indexes); i++ {
+		index := p.indexes[i]
+		if initialTypes[index] != NSM {
+			break
+		}
+		p.codesIsolatedRun[i] = dirPair
+	}
 }
 
 // resolveBrackets implements rule N0 for a list of pairs.
-func (p *bracketPairer) resolveBrackets(dirEmbed Class) {
+func (p *bracketPairer) resolveBrackets(dirEmbed Class, initialTypes []Class) {
 	for _, loc := range p.pairPositions {
-		p.assignBracketType(loc, dirEmbed)
+		p.assignBracketType(loc, dirEmbed, initialTypes)
 	}
 }
