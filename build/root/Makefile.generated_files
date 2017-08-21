@@ -222,7 +222,7 @@ RUN_GEN_DEEPCOPY =                                                          \
                 --v $(KUBE_VERBOSE)                                         \
                 --logtostderr                                               \
                 -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-                --bounding-dirs $(PRJ_SRC_PATH),,"k8s.io/api"               \
+                --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"                \
                 -O $(DEEPCOPY_BASENAME)                                     \
                 "$$@";                                                      \
         fi                                                                  \
@@ -503,15 +503,15 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
 # How to regenerate open-api code.  This emits a single file for all results.
 $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
 	function run_gen_openapi() {                                                        \
-        ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
-            --v $(KUBE_VERBOSE)                                                         \
-            --logtostderr                                                               \
-            -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
-            -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-            -O $(OPENAPI_BASENAME)                                                      \
-            "$$@";                                                                      \
-    };                                                                                  \
-    run_gen_openapi
+	    ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+	        --v $(KUBE_VERBOSE)                                                         \
+	        --logtostderr                                                               \
+	        -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+	        -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+	        -O $(OPENAPI_BASENAME)                                                      \
+	        "$$@";                                                                      \
+	};                                                                                  \
+	run_gen_openapi
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
