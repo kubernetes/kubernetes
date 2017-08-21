@@ -983,12 +983,18 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		}
 
 		for _, macID := range strings.Split(macs, "\n") {
+			if macID == "" {
+				continue
+			}
 			macPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
 			internalIPs, err := c.metadata.GetMetadata(macPath)
 			if err != nil {
 				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", macPath, err)
 			}
 			for _, internalIP := range strings.Split(internalIPs, "\n") {
+				if internalIP == "" {
+					continue
+				}
 				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
 			}
 		}
@@ -1043,20 +1049,18 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 	// handle internal network interfaces
 	for _, networkInterface := range instance.NetworkInterfaces {
 		// skip network interfaces that are not currently in use
-		if isNilOrEmpty(networkInterface.Status) || *networkInterface.Status != ec2.NetworkInterfaceStatusInUse {
+		if aws.StringValue(networkInterface.Status) != ec2.NetworkInterfaceStatusInUse {
 			continue
 		}
 
 		for _, internalIP := range networkInterface.PrivateIpAddresses {
-			if !isNilOrEmpty(internalIP.PrivateIpAddress) {
-				ipAddress := *internalIP.PrivateIpAddress
+			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
 				ip := net.ParseIP(ipAddress)
 				if ip == nil {
-					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
+					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
 				}
 				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
 			}
-
 		}
 	}
 
