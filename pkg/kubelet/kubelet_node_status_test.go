@@ -687,6 +687,12 @@ func TestRegisterWithApiServer(t *testing.T) {
 			Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
+	kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() == "status" {
+			return true, nil, nil
+		}
+		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+	})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
@@ -737,13 +743,14 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonConflict},
 	}
 
-	newNode := func(cmad bool, externalID string) *v1.Node {
+	newNode := func(cmad bool, externalID string, kernelVersion string) *v1.Node {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: testKubeletHostname,
-					kubeletapis.LabelOS:       goruntime.GOOS,
-					kubeletapis.LabelArch:     goruntime.GOARCH,
+					kubeletapis.LabelHostname:      testKubeletHostname,
+					kubeletapis.LabelOS:            goruntime.GOOS,
+					kubeletapis.LabelArch:          goruntime.GOARCH,
+					kubeletapis.LabelKernelVersion: kernelVersion,
 				},
 			},
 			Spec: v1.NodeSpec{
@@ -760,18 +767,19 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 	}
 
 	cases := []struct {
-		name            string
-		newNode         *v1.Node
-		existingNode    *v1.Node
-		createError     error
-		getError        error
-		patchError      error
-		deleteError     error
-		expectedResult  bool
-		expectedActions int
-		testSavedNode   bool
-		savedNodeIndex  int
-		savedNodeCMAD   bool
+		name               string
+		newNode            *v1.Node
+		existingNode       *v1.Node
+		createError        error
+		getError           error
+		patchError         error
+		deleteError        error
+		expectedResult     bool
+		expectedActions    int
+		testSavedNode      bool
+		savedNodeIndex     int
+		savedNodeCMAD      bool
+		savedKernelVersion string
 	}{
 		{
 			name:            "success case - new node",
@@ -781,17 +789,17 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "success case - existing node - no change in CMAD",
-			newNode:         newNode(true, "a"),
+			newNode:         newNode(true, "a", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true, "a", ""),
 			expectedResult:  true,
 			expectedActions: 2,
 		},
 		{
 			name:            "success case - existing node - CMAD disabled",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false, "a", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true, "a", ""),
 			expectedResult:  true,
 			expectedActions: 3,
 			testSavedNode:   true,
@@ -800,9 +808,9 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "success case - existing node - CMAD enabled",
-			newNode:         newNode(true, "a"),
+			newNode:         newNode(true, "a", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
+			existingNode:    newNode(false, "a", ""),
 			expectedResult:  true,
 			expectedActions: 3,
 			testSavedNode:   true,
@@ -810,23 +818,32 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			savedNodeCMAD:   true,
 		},
 		{
+			name:               "success case - kernel version changed",
+			newNode:            newNode(false, "b", "4.12.0"),
+			createError:        alreadyExists,
+			existingNode:       newNode(false, "b", "4.4.0-92-generic"),
+			expectedResult:     true,
+			expectedActions:    3,
+			savedKernelVersion: "4.12.0",
+		},
+		{
 			name:            "success case - external ID changed",
-			newNode:         newNode(false, "b"),
+			newNode:         newNode(false, "b", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
+			existingNode:    newNode(false, "a", ""),
 			expectedResult:  false,
 			expectedActions: 3,
 		},
 		{
 			name:            "create failed",
-			newNode:         newNode(false, "b"),
+			newNode:         newNode(false, "b", ""),
 			createError:     conflict,
 			expectedResult:  false,
 			expectedActions: 1,
 		},
 		{
 			name:            "get existing node failed",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false, "a", ""),
 			createError:     alreadyExists,
 			getError:        conflict,
 			expectedResult:  false,
@@ -834,18 +851,18 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "update existing node failed",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false, "a", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true, "a", ""),
 			patchError:      conflict,
 			expectedResult:  false,
 			expectedActions: 3,
 		},
 		{
 			name:            "delete existing node failed",
-			newNode:         newNode(false, "b"),
+			newNode:         newNode(false, "b", ""),
 			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
+			existingNode:    newNode(false, "a", ""),
 			deleteError:     conflict,
 			expectedResult:  false,
 			expectedActions: 3,
@@ -907,6 +924,9 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
 			assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
+
+			actualKernelVersion, _ := savedNode.Labels[kubeletapis.LabelKernelVersion]
+			assert.Equal(t, tc.savedKernelVersion, actualKernelVersion, "test [%s]", tc.name)
 		}
 	}
 }

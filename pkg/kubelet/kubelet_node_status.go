@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
@@ -171,6 +172,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		kubeletapis.LabelInstanceType,
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
+		kubeletapis.LabelKernelVersion,
 	}
 
 	var needsUpdate bool = false
@@ -226,9 +228,10 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				kubeletapis.LabelHostname: kl.hostname,
-				kubeletapis.LabelOS:       goruntime.GOOS,
-				kubeletapis.LabelArch:     goruntime.GOARCH,
+				kubeletapis.LabelHostname:      kl.hostname,
+				kubeletapis.LabelOS:            goruntime.GOOS,
+				kubeletapis.LabelArch:          goruntime.GOARCH,
+				kubeletapis.LabelKernelVersion: kl.getKernelVersion(),
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -361,6 +364,21 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 	kl.setNodeStatus(node)
 
 	return node, nil
+}
+
+// get kernel version for the node label.
+func (kl *Kubelet) getKernelVersion() string {
+	verinfo, err := kl.cadvisor.VersionInfo()
+	if err != nil {
+		return ""
+	}
+
+	if errs := validation.IsValidLabelValue(verinfo.KernelVersion); len(errs) != 0 {
+		glog.Errorf("failed to add kernel version to label: %q: %v", verinfo.KernelVersion, strings.Join(errs, ";"))
+		return ""
+	}
+
+	return verinfo.KernelVersion
 }
 
 // syncNodeStatus should be called periodically from a goroutine.

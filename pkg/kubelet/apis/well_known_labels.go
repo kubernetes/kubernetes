@@ -23,8 +23,9 @@ const (
 
 	LabelInstanceType = "beta.kubernetes.io/instance-type"
 
-	LabelOS   = "beta.kubernetes.io/os"
-	LabelArch = "beta.kubernetes.io/arch"
+	LabelOS            = "beta.kubernetes.io/os"
+	LabelArch          = "beta.kubernetes.io/arch"
+	LabelKernelVersion = "kubernetes.io/kernel-version"
 )
 
 // When the --failure-domains scheduler flag is not specified,
