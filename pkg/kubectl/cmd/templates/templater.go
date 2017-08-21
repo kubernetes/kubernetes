@@ -211,10 +211,10 @@ func flagsUsages(f *flag.FlagSet) string {
 		if flag.Hidden {
 			return
 		}
-		format := "--%s=%s: %s\n"
+		format := "--%s=%s:\n\t\t%s\n\n"
 
 		if flag.Value.Type() == "string" {
-			format = "--%s='%s': %s\n"
+			format = "--%s='%s':\n\t\t%s\n\n"
 		}
 
 		if len(flag.Shorthand) > 0 {
