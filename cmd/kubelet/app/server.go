@@ -383,9 +383,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
-	// Setup event recorder if required.
-	makeEventRecorder(&s.KubeletConfiguration, kubeDeps, nodeName)
-
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
 			glog.Infof("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
