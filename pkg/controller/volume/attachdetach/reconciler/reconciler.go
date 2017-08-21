@@ -254,7 +254,8 @@ func (rc *reconciler) reconcile() {
 				nodes := rc.actualStateOfWorld.GetNodesForVolume(volumeToAttach.VolumeName)
 				if len(nodes) > 0 {
 					if !volumeToAttach.MultiAttachErrorReported {
-						simpleMsg, detailedMsg := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
+						contextMsg := fmt.Sprintf("attached node %v", nodes)
+						simpleMsg, detailedMsg := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another", contextMsg)
 						for _, pod := range volumeToAttach.ScheduledPods {
 							rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
 						}
