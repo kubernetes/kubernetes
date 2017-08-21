@@ -47,8 +47,12 @@ type FakeUpdateBalancerCall struct {
 
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type FakeCloud struct {
-	Exists        bool
-	Err           error
+	Exists bool
+	Err    error
+
+	ExistsByProviderID bool
+	ErrByProviderID    error
+
 	Calls         []string
 	Addresses     []v1.NodeAddress
 	ExtID         map[types.NodeName]string
@@ -232,6 +236,12 @@ func (f *FakeCloud) InstanceType(instance types.NodeName) (string, error) {
 func (f *FakeCloud) InstanceTypeByProviderID(providerID string) (string, error) {
 	f.addCall("instance-type-by-provider-id")
 	return f.InstanceTypes[types.NodeName(providerID)], nil
+}
+
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+func (f *FakeCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	f.addCall("instance-exists-by-provider-id")
+	return f.ExistsByProviderID, f.ErrByProviderID
 }
 
 // List is a test-spy implementation of Instances.List.

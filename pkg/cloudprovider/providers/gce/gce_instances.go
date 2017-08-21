@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -149,6 +150,11 @@ func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
 		return "", err
 	}
 	return strconv.FormatUint(inst.ID, 10), nil
+}
+
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.

@@ -376,6 +376,11 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	return vs.InstanceID(nodeName)
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	if vs.localInstanceID == nodeNameToVMName(nodeName) {

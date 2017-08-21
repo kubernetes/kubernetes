@@ -110,6 +110,11 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 	return srv.ID, nil
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {
