@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1beta2
 
+type ControllerRevisionExpansion interface{}
+
 type DaemonSetExpansion interface{}
 
 type DeploymentExpansion interface{}

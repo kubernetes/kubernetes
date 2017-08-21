@@ -50,10 +50,10 @@ func (o overlappingStatefulSets) Len() int { return len(o) }
 func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o overlappingStatefulSets) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -288,7 +288,7 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 // The Revision of the returned ControllerRevision is set to revision. If the returned error is nil, the returned
 // ControllerRevision is valid. StatefulSet revisions are stored as patches that re-apply the current state of set
 // to a new StatefulSet using a strategic merge patch to replace the saved state of the new StatefulSet.
-func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevision, error) {
+func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(set)
 	if err != nil {
 		return nil, err
@@ -301,7 +301,8 @@ func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevisio
 		controllerKind,
 		selector,
 		runtime.RawExtension{Raw: patch},
-		revision)
+		revision,
+		collisionCount)
 	if err != nil {
 		return nil, err
 	}

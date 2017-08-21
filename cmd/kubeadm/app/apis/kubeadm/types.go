@@ -17,7 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,8 +114,4 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool
-}
-
-func (cfg *MasterConfiguration) GetMasterEndpoint() string {
-	return fmt.Sprintf("https://%s:%d", cfg.API.AdvertiseAddress, cfg.API.BindPort)
 }

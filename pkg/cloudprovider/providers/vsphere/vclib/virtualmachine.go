@@ -188,9 +188,9 @@ func (vm *VirtualMachine) GetResourcePool(ctx context.Context) (*object.Resource
 	return object.NewResourcePool(vm.Client(), vmMoList[0].ResourcePool.Reference()), nil
 }
 
-// Exists checks if the VM exists.
-// Returns false if VM doesn't exist or VM is in powerOff state.
-func (vm *VirtualMachine) Exists(ctx context.Context) (bool, error) {
+// IsActive checks if the VM is active.
+// Returns true if VM is in poweredOn state.
+func (vm *VirtualMachine) IsActive(ctx context.Context) (bool, error) {
 	vmMoList, err := vm.Datacenter.GetVMMoList(ctx, []*VirtualMachine{vm}, []string{"summary"})
 	if err != nil {
 		glog.Errorf("Failed to get VM Managed object with property summary. err: +%v", err)
@@ -199,11 +199,7 @@ func (vm *VirtualMachine) Exists(ctx context.Context) (bool, error) {
 	if vmMoList[0].Summary.Runtime.PowerState == ActivePowerState {
 		return true, nil
 	}
-	if vmMoList[0].Summary.Config.Template == false {
-		glog.Warningf("VM is not in %s state", ActivePowerState)
-	} else {
-		glog.Warningf("VM is a template")
-	}
+
 	return false, nil
 }
 

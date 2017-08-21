@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"github.com/gophercloud/gophercloud/pagination"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,36 +46,6 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(1).Info("Claiming to support Instances")
 
 	return &Instances{compute}, true
-}
-
-func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
-	glog.V(4).Infof("openstack List(%v) called", name_filter)
-
-	opts := servers.ListOpts{
-		Name:   name_filter,
-		Status: "ACTIVE",
-	}
-	pager := servers.List(i.compute, opts)
-
-	ret := make([]types.NodeName, 0)
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		sList, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		for i := range sList {
-			ret = append(ret, mapServerToNodeName(&sList[i]))
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(3).Infof("Found %v instances matching %v: %v",
-		len(ret), name_filter, ret)
-
-	return ret, nil
 }
 
 // Implementation of Instances.CurrentNodeName

@@ -21,7 +21,7 @@ set -o pipefail
 SCRIPT_PACKAGE=k8s.io/sample-apiserver
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
 SCRIPT_BASE=${SCRIPT_ROOT}/../..
-KUBEGEN_PKG=${KUBEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/kube-gen 2>/dev/null || echo k8s.io/kube-gen)}
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo k8s.io/code-generator)}
 
 clientgen="${PWD}/client-gen-binary"
 listergen="${PWD}/lister-gen"
@@ -47,20 +47,20 @@ function generate_group() {
   )
 
   echo "Building client-gen"
-  go build -o "${clientgen}" ${KUBEGEN_PKG}/cmd/client-gen
+  go build -o "${clientgen}" ${CODEGEN_PKG}/cmd/client-gen
 
   echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${CLIENT_PKG}"
   ${clientgen} --input-base ${APIS_PKG} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${SCRIPT_BASE}
   ${clientgen} --clientset-name="clientset" --input-base ${APIS_PKG} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG}/clientset_generated --output-base=${SCRIPT_BASE}
   
   echo "Building lister-gen"
-  go build -o "${listergen}" ${KUBEGEN_PKG}/cmd/lister-gen
+  go build -o "${listergen}" ${CODEGEN_PKG}/cmd/lister-gen
 
   echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${LISTERS_PKG}"
   ${listergen} --input-dirs ${APIS_PKG}/${GROUP_NAME} --input-dirs ${APIS_PKG}/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SCRIPT_BASE}
 
   echo "Building informer-gen"
-  go build -o "${informergen}" ${KUBEGEN_PKG}/cmd/informer-gen
+  go build -o "${informergen}" ${CODEGEN_PKG}/cmd/informer-gen
 
   echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${INFORMERS_PKG}"
   ${informergen} \

@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/conversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -40,10 +39,6 @@ import (
 
 const (
 	AutoRegisterManagedLabel = "kube-aggregator.kubernetes.io/automanaged"
-)
-
-var (
-	cloner = conversion.NewCloner()
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for

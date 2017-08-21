@@ -53,7 +53,7 @@ const (
 // - validates configuration
 // - monitors for potential crash-loops caused by new configurations
 // - tracks the last-known-good configuration, and rolls-back to last-known-good when necessary
-// For more information, see the proposal: https://github.com/kubernetes/kubernetes/pull/29459
+// For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/dynamic-kubelet-configuration.md
 type Controller struct {
 	// dynamicConfig, if true, indicates that we should sync config from the API server
 	dynamicConfig bool
@@ -90,12 +90,19 @@ type Controller struct {
 // If the `initConfigDir` is an empty string, skips trying to load the init config.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig *kubeletconfig.KubeletConfiguration) *Controller {
+func NewController(initConfigDir string,
+	dynamicConfigDir string,
+	defaultConfig *kubeletconfig.KubeletConfiguration) (*Controller, error) {
+	var err error
+
 	fs := utilfs.DefaultFs{}
 
 	var initLoader configfiles.Loader
 	if len(initConfigDir) > 0 {
-		initLoader = configfiles.NewFSLoader(fs, initConfigDir)
+		initLoader, err = configfiles.NewFSLoader(fs, initConfigDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 	dynamicConfig := false
 	if len(dynamicConfigDir) > 0 {
@@ -120,7 +127,7 @@ func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig 
 		badConfigTracker:    badconfig.NewFsTracker(fs, filepath.Join(dynamicConfigDir, badConfigTrackingDir, kubeletVersion)),
 		startupTracker:      startups.NewFsTracker(fs, filepath.Join(dynamicConfigDir, startupTrackingDir, kubeletVersion)),
 		initLoader:          initLoader,
-	}
+	}, nil
 }
 
 // Bootstrap attempts to return a valid KubeletConfiguration based on the configuration of the Controller,

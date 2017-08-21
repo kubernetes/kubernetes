@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
@@ -52,7 +53,12 @@ func (d *disallowFlunder) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	flunderName := a.GetName()
+	metaAccessor, err := meta.Accessor(a.GetObject())
+	if err != nil {
+		return err
+	}
+	flunderName := metaAccessor.GetName()
+
 	fischers, err := d.lister.List(labels.Everything())
 	if err != nil {
 		return err

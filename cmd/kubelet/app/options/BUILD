@@ -12,11 +12,10 @@ go_library(
         "options.go",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/install:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/util/taints:go_default_library",

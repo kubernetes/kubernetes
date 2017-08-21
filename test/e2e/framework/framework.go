@@ -43,6 +43,7 @@ import (
 	clientreporestclient "k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubemark"
@@ -71,6 +72,7 @@ type Framework struct {
 
 	InternalClientset *internalclientset.Clientset
 	StagingClient     *staging.Clientset
+	AggregatorClient  *aggregatorclient.Clientset
 	ClientPool        dynamic.ClientPool
 
 	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
@@ -194,6 +196,8 @@ func (f *Framework) BeforeEach() {
 		f.ClientSet, err = clientset.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.InternalClientset, err = internalclientset.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		clientRepoConfig := getClientRepoConfig(config)
 		f.StagingClient, err = staging.NewForConfig(clientRepoConfig)

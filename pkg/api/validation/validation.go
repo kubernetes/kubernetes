@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -2734,8 +2735,10 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	allErrs = append(allErrs, validateOnlyAddedTolerations(newPod.Spec.Tolerations, oldPod.Spec.Tolerations, specPath.Child("tolerations"))...)
 
 	if !apiequality.Semantic.DeepEqual(mungedPod.Spec, oldPod.Spec) {
+		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		//TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		allErrs = append(allErrs, field.Forbidden(specPath, "pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)"))
+		specDiff := diff.ObjectDiff(mungedPod.Spec, oldPod.Spec)
+		allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than `spec.containers[*].image`, `spec.initContainers[*].image`, `spec.activeDeadlineSeconds` or `spec.tolerations` (only additions to existing tolerations)\n%v", specDiff)))
 	}
 
 	return allErrs
@@ -3358,6 +3361,12 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
+	// Opaque integer resources (OIR) deprecation began in v1.8
+	// TODO: Remove warning after OIR deprecation cycle.
+	if helper.IsOpaqueIntResourceName(api.ResourceName(value)) {
+		glog.Errorf("DEPRECATION WARNING! Opaque integer resources are deprecated starting with v1.8: %s", value)
+	}
+
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
@@ -3712,16 +3721,6 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
-		// Check that request <= limit.
-		requestQuantity, exists := requirements.Requests[resourceName]
-		if exists {
-			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
-			if resourceName == api.ResourceNvidiaGPU && quantity.Cmp(requestQuantity) != 0 {
-				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceNvidiaGPU)))
-			} else if quantity.Cmp(requestQuantity) < 0 {
-				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
-			}
-		}
 		if resourceName == api.ResourceStorageOverlay && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceStorageOverlay field disabled by feature-gate for ResourceRequirements"))
 		}
@@ -3732,6 +3731,19 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
+
+		// Check that request <= limit.
+		limitQuantity, exists := requirements.Limits[resourceName]
+		if exists {
+			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
+			if quantity.Cmp(limitQuantity) != 0 && !helper.IsOvercommitAllowed(resourceName) {
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceNvidiaGPU)))
+			} else if quantity.Cmp(limitQuantity) > 0 {
+				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
+			}
+		} else if resourceName == api.ResourceNvidiaGPU {
+			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", api.ResourceNvidiaGPU)))
+		}
 	}
 
 	return allErrs

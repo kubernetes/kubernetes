@@ -85,7 +85,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper request.Reques
 				username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
 				if !groupsSpecified {
 					// if groups aren't specified for a service account, we know the groups because its a fixed mapping.  Add them
-					groups = serviceaccount.MakeGroupNames(impersonationRequest.Namespace, impersonationRequest.Name)
+					groups = serviceaccount.MakeGroupNames(impersonationRequest.Namespace)
 				}
 
 			case v1.SchemeGroupVersion.WithKind("User").GroupKind():

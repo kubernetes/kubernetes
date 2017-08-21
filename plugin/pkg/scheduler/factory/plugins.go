@@ -72,10 +72,10 @@ var (
 	schedulerFactoryMutex sync.Mutex
 
 	// maps that hold registered algorithm types
-	fitPredicateMap          = make(map[string]FitPredicateFactory)
-	mandatoryFitPredicateMap = make(map[string]FitPredicateFactory)
-	priorityFunctionMap      = make(map[string]PriorityConfigFactory)
-	algorithmProviderMap     = make(map[string]AlgorithmProviderConfig)
+	fitPredicateMap        = make(map[string]FitPredicateFactory)
+	mandatoryFitPredicates = sets.NewString()
+	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
+	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
 	priorityMetadataProducer  MetadataProducerFactory
@@ -107,7 +107,8 @@ func RegisterMandatoryFitPredicate(name string, predicate algorithm.FitPredicate
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	mandatoryFitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	fitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	mandatoryFitPredicates.Insert(name)
 	return name
 }
 
@@ -321,9 +322,9 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 		predicates[name] = factory(args)
 	}
 
-	// Always include required fit predicates.
-	for name, factory := range mandatoryFitPredicateMap {
-		if _, found := predicates[name]; !found {
+	// Always include mandatory fit predicates.
+	for name := range mandatoryFitPredicates {
+		if factory, found := fitPredicateMap[name]; found {
 			predicates[name] = factory(args)
 		}
 	}

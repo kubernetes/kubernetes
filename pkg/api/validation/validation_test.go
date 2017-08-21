@@ -3287,7 +3287,7 @@ func TestValidateContainers(t *testing.T) {
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3349,12 +3349,12 @@ func TestValidateContainers(t *testing.T) {
 				Requests: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3370,7 +3370,7 @@ func TestValidateContainers(t *testing.T) {
 				},
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):   resource.MustParse("10"),
-					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"): resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -3622,6 +3622,21 @@ func TestValidateContainers(t *testing.T) {
 						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("0"),
 					},
 					Limits: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
+		"Resource GPU invalid setting only request": {
+			{
+				Name:  "gpu-resource-request-limit",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
 						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
 						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
 						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
@@ -5045,7 +5060,7 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"invalid opaque integer resource requirement: request must be <= limit": {
-			expectedError: "must be greater than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
+			expectedError: "must be less than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
 			spec: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{

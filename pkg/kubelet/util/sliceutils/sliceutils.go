@@ -44,7 +44,7 @@ func (s PodsByCreationTime) Swap(i, j int) {
 }
 
 func (s PodsByCreationTime) Less(i, j int) bool {
-	return s[i].CreationTimestamp.Before(s[j].CreationTimestamp)
+	return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
 }
 
 // ByImageSize makes an array of images sortable by their size in descending

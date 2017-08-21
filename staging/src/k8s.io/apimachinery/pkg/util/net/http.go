@@ -108,7 +108,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	case RoundTripperWrapper:
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 
@@ -129,7 +129,7 @@ func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 	case RoundTripperWrapper:
 		return TLSClientConfig(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 

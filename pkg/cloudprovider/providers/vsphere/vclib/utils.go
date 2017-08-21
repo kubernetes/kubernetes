@@ -27,6 +27,21 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+// IsNotFound return true if err is NotFoundError or DefaultNotFoundError
+func IsNotFound(err error) bool {
+	_, ok := err.(*find.NotFoundError)
+	if ok {
+		return true
+	}
+
+	_, ok = err.(*find.DefaultNotFoundError)
+	if ok {
+		return true
+	}
+
+	return false
+}
+
 func getFinder(dc *Datacenter) *find.Finder {
 	finder := find.NewFinder(dc.Client(), true)
 	finder.SetDatacenter(dc.Datacenter)

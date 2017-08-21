@@ -106,7 +106,7 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -196,9 +196,11 @@ func (o *ImageOptions) Run() error {
 								continue
 							}
 						}
-						spec.Containers[i].Image = resolved
-						// Perform updates
-						transformed = true
+						if spec.Containers[i].Image != resolved {
+							spec.Containers[i].Image = resolved
+							// Perform updates
+							transformed = true
+						}
 					}
 				}
 				// Add a new container if not found

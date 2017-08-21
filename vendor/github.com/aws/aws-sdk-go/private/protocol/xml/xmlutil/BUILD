@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,6 +7,7 @@ go_library(
         "unmarshal.go",
         "xml_to_struct.go",
     ],
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library"],
 )
 
@@ -26,4 +22,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

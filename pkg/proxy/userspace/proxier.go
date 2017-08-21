@@ -583,7 +583,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if local, err := isLocalIP(portal.ip); err != nil {
+	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
 		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
 	} else if local {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
@@ -761,7 +761,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
-	if local, err := isLocalIP(portal.ip); err != nil {
+	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
 		el = append(el, fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err))
 	} else if local {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
@@ -830,23 +830,6 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 	}
 
 	return el
-}
-
-func isLocalIP(ip net.IP) (bool, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false, err
-	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false, err
-		}
-		if ip.Equal(intf) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // See comments in the *PortalArgs() functions for some details about why we

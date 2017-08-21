@@ -251,9 +251,9 @@ func (o byJobStartTime) Less(i, j int) bool {
 		return o[i].Status.StartTime != nil
 	}
 
-	if (*o[i].Status.StartTime).Equal(*o[j].Status.StartTime) {
+	if o[i].Status.StartTime.Equal(o[j].Status.StartTime) {
 		return o[i].Name < o[j].Name
 	}
 
-	return (*o[i].Status.StartTime).Before(*o[j].Status.StartTime)
+	return o[i].Status.StartTime.Before(o[j].Status.StartTime)
 }

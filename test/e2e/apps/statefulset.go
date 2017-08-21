@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -855,8 +856,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("getting scale subresource")
 			scale := framework.NewStatefulSetScale(ss)
-			scaleResult := &apps.Scale{}
-			err = c.AppsV1beta1().RESTClient().Get().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			scaleResult := &appsv1beta2.Scale{}
+			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -866,7 +867,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("updating a scale subresource")
 			scale.ResourceVersion = "" //unconditionally update to 2 replicas
 			scale.Spec.Replicas = 2
-			err = c.AppsV1beta1().RESTClient().Put().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			err = c.AppsV1beta2().RESTClient().Put().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}

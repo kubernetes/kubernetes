@@ -438,6 +438,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1_patch">v1.Patch</h3>
+<div class="paragraph">
+<p>Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.</p>
+</div>
+</div>
+<div class="sect2">
 <h3 id="_v1beta1_storageclasslist">v1beta1.StorageClassList</h3>
 <div class="paragraph">
 <p>StorageClassList is a collection of storage classes.</p>
@@ -491,12 +497,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tbody>
 </table>
 
-</div>
-<div class="sect2">
-<h3 id="_v1_patch">v1.Patch</h3>
-<div class="paragraph">
-<p>Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.</p>
-</div>
 </div>
 <div class="sect2">
 <h3 id="_v1_deleteoptions">v1.DeleteOptions</h3>
@@ -930,6 +930,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">reclaimPolicy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumereclaimpolicy">v1.PersistentVolumeReclaimPolicy</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1194,6 +1201,10 @@ When an object is created, the system will populate this list with the current s
 </tr>
 </tbody>
 </table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_persistentvolumereclaimpolicy">v1.PersistentVolumeReclaimPolicy</h3>
 
 </div>
 <div class="sect2">

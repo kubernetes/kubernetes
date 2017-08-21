@@ -30,6 +30,7 @@ go_library(
         "//cmd/kubeadm/app/phases/apiconfig:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/node:go_default_library",
+        "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",

@@ -1309,7 +1309,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
-		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,

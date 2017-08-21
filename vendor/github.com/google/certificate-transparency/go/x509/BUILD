@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -41,6 +36,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/certificate-transparency/go/asn1:go_default_library",
         "//vendor/github.com/google/certificate-transparency/go/x509/pkix:go_default_library",
@@ -61,4 +57,5 @@ filegroup(
         "//vendor/github.com/google/certificate-transparency/go/x509/pkix:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

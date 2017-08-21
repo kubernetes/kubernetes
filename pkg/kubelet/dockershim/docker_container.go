@@ -131,6 +131,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 			OpenStdin: config.Stdin,
 			StdinOnce: config.StdinOnce,
 			Tty:       config.Tty,
+			// Disable Docker's health check until we officially support it
+			// (https://github.com/kubernetes/kubernetes/issues/25829).
+			Healthcheck: &dockercontainer.HealthConfig{
+				Test: []string{"NONE"},
+			},
 		},
 		HostConfig: &dockercontainer.HostConfig{
 			Binds: generateMountBindings(config.GetMounts()),
