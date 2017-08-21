@@ -133,11 +133,6 @@ func getImageRef(client libdocker.Interface, image string) (string, error) {
 	return img.ID, nil
 }
 
-// ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
 func filterHTTPError(err error, image string) error {
 	// docker/docker/pull/11314 prints detailed error info for docker pull.
 	// When it hits 502, it returns a verbose html output including an inline svg,

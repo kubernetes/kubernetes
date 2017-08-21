@@ -1,5 +1,7 @@
+// +build !linux,!windows
+
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,11 +24,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
-// DockerService does not implement container stats.
-func (ds *dockerService) ContainerStats(string) (*runtimeapi.ContainerStats, error) {
-	return nil, fmt.Errorf("Not implemented")
-}
-
-func (ds *dockerService) ListContainerStats(*runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
-	return nil, fmt.Errorf("Not implemented")
+// ImageFsInfo returns information of the filesystem that is used to store images.
+func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+	return nil, fmt.Errorf("not implemented")
 }
