@@ -19,6 +19,7 @@ package vsphere
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1401,7 +1402,9 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions) (volumePath string
 
 			// Check if the VM exists in kubernetes cluster folder.
 			// The kubernetes cluster folder - vs.cfg.Global.WorkingDir is where all the nodes in the kubernetes cluster are created.
-			dummyVMFullName := DummyVMPrefixName + "-" + volumeOptions.Name
+			fnvHash := fnv.New32a()
+			fnvHash.Write([]byte(volumeOptions.Name))
+			dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 			vmRegex := vs.cfg.Global.WorkingDir + dummyVMFullName
 			dummyVM, err := f.VirtualMachine(ctx, vmRegex)
 			if err != nil {
