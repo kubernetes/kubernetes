@@ -37,10 +37,11 @@ import (
 )
 
 const (
-	largeResizeTimeout    = 10 * time.Minute
-	largeScaleUpTimeout   = 10 * time.Minute
-	largeScaleDownTimeout = 20 * time.Minute
-	minute                = 1 * time.Minute
+	memoryReservationTimeout = 5 * time.Minute
+	largeResizeTimeout       = 10 * time.Minute
+	largeScaleUpTimeout      = 10 * time.Minute
+	largeScaleDownTimeout    = 20 * time.Minute
+	minute                   = 1 * time.Minute
 
 	maxNodes = 1000
 )
@@ -135,7 +136,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		additionalReservation := additionalNodes * perNodeReservation
 
 		// saturate cluster
-		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount*2, nodeCount*perNodeReservation, true, scaleUpTimeout)
+		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount*2, nodeCount*perNodeReservation, true, memoryReservationTimeout)
 		defer reservationCleanup()
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
@@ -161,7 +162,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		glog.Infof("cores per node: %v", coresPerNode)
 
 		// saturate cluster
-		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount, nodeCount*perNodeReservation, true, scaleUpTimeout)
+		reservationCleanup := ReserveMemory(f, "some-pod", nodeCount, nodeCount*perNodeReservation, true, memoryReservationTimeout)
 		defer reservationCleanup()
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
