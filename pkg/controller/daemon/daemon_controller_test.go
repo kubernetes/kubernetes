@@ -121,11 +121,19 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 	}
 }
 
-func newRollbackStrategy() *extensions.DaemonSetUpdateStrategy {
+func newRollingUpdateStrategy() *extensions.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
 	return &extensions.DaemonSetUpdateStrategy{
 		Type:          extensions.RollingUpdateDaemonSetStrategyType,
 		RollingUpdate: &extensions.RollingUpdateDaemonSet{MaxUnavailable: &one},
+	}
+}
+
+func newSurgingRollingUpdateStrategy() *extensions.DaemonSetUpdateStrategy {
+	one := intstr.FromInt(1)
+	return &extensions.DaemonSetUpdateStrategy{
+		Type:                 extensions.SurgingRollingUpdateDaemonSetStrategyType,
+		SurgingRollingUpdate: &extensions.SurgingRollingUpdateDaemonSet{MaxSurge: &one},
 	}
 }
 
@@ -136,7 +144,7 @@ func newOnDeleteStrategy() *extensions.DaemonSetUpdateStrategy {
 }
 
 func updateStrategies() []*extensions.DaemonSetUpdateStrategy {
-	return []*extensions.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
+	return []*extensions.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollingUpdateStrategy(), newSurgingRollingUpdateStrategy()}
 }
 
 func newNode(name string, label map[string]string) *v1.Node {
@@ -349,7 +357,7 @@ func validateSyncDaemonSets(t *testing.T, manager *daemonSetsController, fakePod
 	}
 }
 
-func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *extensions.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes, expectedEvents int) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
@@ -542,6 +550,8 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
 		case extensions.RollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		case extensions.SurgingRollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -568,6 +578,8 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 		case extensions.OnDeleteDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
 		case extensions.RollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		case extensions.SurgingRollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
@@ -1338,6 +1350,8 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
 		case extensions.RollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		case extensions.SurgingRollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -1348,6 +1362,8 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		case extensions.OnDeleteDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 2)
 		case extensions.RollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 3)
+		case extensions.SurgingRollingUpdateDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 3)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
@@ -1766,6 +1782,8 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 			case extensions.OnDeleteDaemonSetStrategyType:
 				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 2)
 			case extensions.RollingUpdateDaemonSetStrategyType:
+				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
+			case extensions.SurgingRollingUpdateDaemonSetStrategyType:
 				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 3)
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
