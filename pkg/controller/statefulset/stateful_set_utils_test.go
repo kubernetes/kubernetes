@@ -80,11 +80,13 @@ func TestIdentityMatches(t *testing.T) {
 	}
 	pod = newStatefulSetPod(set, 1)
 	delete(pod.Annotations, podapi.PodHostnameAnnotation)
+	pod.Spec.Hostname = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no hostname")
 	}
 	pod = newStatefulSetPod(set, 1)
 	delete(pod.Annotations, podapi.PodSubdomainAnnotation)
+	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no subdomain")
 	}
@@ -139,6 +141,7 @@ func TestUpdateIdentity(t *testing.T) {
 	}
 	pod = newStatefulSetPod(set, 1)
 	delete(pod.Annotations, podapi.PodHostnameAnnotation)
+	pod.Spec.Hostname = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no hostname")
 	}
@@ -148,6 +151,7 @@ func TestUpdateIdentity(t *testing.T) {
 	}
 	pod = newStatefulSetPod(set, 1)
 	delete(pod.Annotations, podapi.PodSubdomainAnnotation)
+	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with no subdomain")
 	}
@@ -157,6 +161,8 @@ func TestUpdateIdentity(t *testing.T) {
 	}
 	pod = newStatefulSetPod(set, 1)
 	pod.Annotations = nil
+	pod.Spec.Hostname = ""
+	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod no annotations")
 	}
