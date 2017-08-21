@@ -120,10 +120,10 @@ type FakeAWSServices struct {
 	networkInterfacesPrivateIPs [][]string
 	networkInterfacesVpcIDs     []string
 
-	ec2                         *FakeEC2
-	elb                         *FakeELB
-	asg                         *FakeASG
-	metadata                    *FakeMetadata
+	ec2      *FakeEC2
+	elb      *FakeELB
+	asg      *FakeASG
+	metadata *FakeMetadata
 }
 
 func NewFakeAWSServices() *FakeAWSServices {
@@ -648,8 +648,8 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	instances := []*ec2.Instance{&instance}
 	awsCloud, awsServices := mockInstancesResp(&instance, instances)
 
-	awsServices.networkInterfacesMacs = []string{ "0a:26:89:f3:9c:f6", "0a:77:64:c4:6a:48" ,}
-	awsServices.networkInterfacesPrivateIPs = [][]string{ []string{"192.168.0.1"}, []string{"192.168.0.2"} ,}
+	awsServices.networkInterfacesMacs = []string{"0a:26:89:f3:9c:f6", "0a:77:64:c4:6a:48"}
+	awsServices.networkInterfacesPrivateIPs = [][]string{{"192.168.0.1"}, {"192.168.0.2"}}
 	addrs, err := awsCloud.NodeAddresses("")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
