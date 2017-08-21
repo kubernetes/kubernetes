@@ -133,6 +133,8 @@ type conversionFuncMap map[conversionPair]*types.Type
 
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
+	glog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
+
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
 	errorName := types.Ref("", "error").Name
 	buffer := &bytes.Buffer{}
@@ -147,22 +149,27 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			glog.Errorf("Function without signature: %#v", f)
 			continue
 		}
+		glog.V(8).Infof("Considering function %s", f.Name)
 		signature := f.Underlying.Signature
 		// Check whether the function is conversion function.
 		// Note that all of them have signature:
 		// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
 		if signature.Receiver != nil {
+			glog.V(8).Infof("%s has a receiver", f.Name)
 			continue
 		}
 		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
+			glog.V(8).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
 		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
+			glog.V(8).Infof("%s has wrong results", f.Name)
 			continue
 		}
 		inType := signature.Parameters[0]
 		outType := signature.Parameters[1]
 		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
+			glog.V(8).Infof("%s has wrong parameter types", f.Name)
 			continue
 		}
 		// Now check if the name satisfies the convention.
@@ -170,12 +177,15 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 		args := argsFromType(inType.Elem, outType.Elem)
 		sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
 		if f.Name.Name == buffer.String() {
+			glog.V(4).Infof("Found conversion function %s", f.Name)
 			key := conversionPair{inType.Elem, outType.Elem}
 			// We might scan the same package twice, and that's OK.
 			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
 				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s", key.inType, key.outType))
 			}
 			manualMap[key] = f
+		} else {
+			glog.V(8).Infof("%s has wrong name", f.Name)
 		}
 		buffer.Reset()
 	}
