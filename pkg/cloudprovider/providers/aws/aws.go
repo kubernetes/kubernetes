@@ -577,18 +577,6 @@ func stringPointerArray(orig []string) []*string {
 	return aws.StringSlice(orig)
 }
 
-// isNilOrEmpty returns true if the value is nil or ""
-// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether where possible)
-func isNilOrEmpty(s *string) bool {
-	return s == nil || *s == ""
-}
-
-// orEmpty returns the string value, or "" if the pointer is nil
-// Deprecated: prefer aws.StringValue
-func orEmpty(s *string) string {
-	return aws.StringValue(s)
-}
-
 func newEc2Filter(name string, values ...string) *ec2.Filter {
 	filter := &ec2.Filter{
 		Name: aws.String(name),
@@ -627,7 +615,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		}
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -679,7 +667,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		results = append(results, response.Volumes...)
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -1098,7 +1086,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	if instance == nil {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return orEmpty(instance.InstanceId), nil
+	return aws.StringValue(instance.InstanceId), nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
@@ -1112,7 +1100,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
 	}
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	return "/" + aws.StringValue(inst.Placement.AvailabilityZone) + "/" + aws.StringValue(inst.InstanceId), nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -2359,7 +2347,7 @@ func (c *Cloud) ensureSecurityGroup(name string, description string) (string, er
 			}
 			time.Sleep(1 * time.Second)
 		} else {
-			groupID = orEmpty(createResponse.GroupId)
+			groupID = aws.StringValue(createResponse.GroupId)
 			break
 		}
 	}
@@ -2914,13 +2902,13 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
+	err = c.ensureLoadBalancerInstances(aws.StringValue(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
 		glog.Warningf("Error registering instances with the load balancer: %q", err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, orEmpty(loadBalancer.DNSName))
+	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, aws.StringValue(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
 
@@ -2947,9 +2935,9 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.Lo
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 
-	if !isNilOrEmpty(lb.DNSName) {
+	if aws.StringValue(lb.DNSName) != "" {
 		var ingress v1.LoadBalancerIngress
-		ingress.Hostname = orEmpty(lb.DNSName)
+		ingress.Hostname = aws.StringValue(lb.DNSName)
 		status.Ingress = []v1.LoadBalancerIngress{ingress}
 	}
 
@@ -3035,17 +3023,17 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupID := ""
 	for _, securityGroup := range lb.SecurityGroups {
-		if isNilOrEmpty(securityGroup) {
+		if aws.StringValue(securityGroup) == "" {
 			continue
 		}
 		if loadBalancerSecurityGroupID != "" {
 			// We create LBs with one SG
-			glog.Warningf("Multiple security groups for load balancer: %q", orEmpty(lb.LoadBalancerName))
+			glog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
 		}
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", orEmpty(lb.LoadBalancerName))
+		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -3089,7 +3077,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		}
 
 		if securityGroup == nil {
-			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
+			glog.Warning("Ignoring instance without security group: ", aws.StringValue(instance.InstanceId))
 			continue
 		}
 		id := aws.StringValue(securityGroup.GroupId)
@@ -3205,7 +3193,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 				//We don't want to delete a security group that was defined in the Cloud Configurationn.
 				continue
 			}
-			if isNilOrEmpty(securityGroupID) {
+			if aws.StringValue(securityGroupID) == "" {
 				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
 			}
@@ -3321,7 +3309,7 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	}
 
 	for _, instance := range instances {
-		instanceID := orEmpty(instance.InstanceId)
+		instanceID := aws.StringValue(instance.InstanceId)
 		if instanceID == "" {
 			continue
 		}
