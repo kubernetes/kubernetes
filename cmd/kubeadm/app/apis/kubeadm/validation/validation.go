@@ -284,7 +284,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || strings.HasPrefix(f.Name, "skip-") {
+		if f.Name == "config" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" {
 			// "--skip-*" flags can be set with --config
 			return
 		}
