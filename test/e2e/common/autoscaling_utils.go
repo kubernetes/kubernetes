@@ -80,7 +80,9 @@ type ResourceConsumer struct {
 	name                     string
 	controllerName           string
 	kind                     string
-	framework                *framework.Framework
+	nsName                   string
+	clientSet                clientset.Interface
+	internalClientset        *internalclientset.Clientset
 	cpu                      chan int
 	mem                      chan int
 	customMetric             chan int
@@ -99,15 +101,15 @@ func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
 
-func NewDynamicResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
-	return newResourceConsumer(name, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, f)
+func NewDynamicResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientSet, internalClientset)
 }
 
 // TODO this still defaults to replication controller
-func NewStaticResourceConsumer(name string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
-	return newResourceConsumer(name, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
-		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, f)
+func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+	return newResourceConsumer(name, nsName, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
+		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientSet, internalClientset)
 }
 
 /*
@@ -117,15 +119,17 @@ initMemoryTotal argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func newResourceConsumer(name, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, f *framework.Framework) *ResourceConsumer {
+func newResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 
-	runServiceAndWorkloadForResourceConsumer(f.ClientSet, f.InternalClientset, f.Namespace.Name, name, kind, replicas, cpuLimit, memLimit)
+	runServiceAndWorkloadForResourceConsumer(clientSet, internalClientset, nsName, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
 		controllerName:           name + "-ctrl",
 		kind:                     kind,
-		framework:                f,
+		nsName:                   nsName,
+		clientSet:                clientSet,
+		internalClientset:        internalClientset,
 		cpu:                      make(chan int),
 		mem:                      make(chan int),
 		customMetric:             make(chan int),
@@ -231,14 +235,14 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 }
 
 func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
+	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
 	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeCPU").
@@ -259,14 +263,14 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 
 // sendConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
+	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
 	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeMem").
@@ -287,14 +291,14 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
 func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.framework.ClientSet, rc.framework.ClientSet.Core().RESTClient().Post())
+	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
 	framework.ExpectNoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
 	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		req := proxyRequest.Namespace(rc.framework.Namespace.Name).
+		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
 			Suffix("BumpMetric").
@@ -316,21 +320,21 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
 	case KindRC:
-		replicationController, err := rc.framework.ClientSet.Core().ReplicationControllers(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
+		replicationController, err := rc.clientSet.Core().ReplicationControllers(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
 		return int(replicationController.Status.ReadyReplicas)
 	case KindDeployment:
-		deployment, err := rc.framework.ClientSet.Extensions().Deployments(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
+		deployment, err := rc.clientSet.Extensions().Deployments(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
 		return int(deployment.Status.ReadyReplicas)
 	case KindReplicaSet:
-		rs, err := rc.framework.ClientSet.Extensions().ReplicaSets(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
+		rs, err := rc.clientSet.Extensions().ReplicaSets(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
 			framework.Failf(rsIsNil)
@@ -398,10 +402,10 @@ func (rc *ResourceConsumer) CleanUp() {
 	time.Sleep(10 * time.Second)
 	kind, err := kindOf(rc.kind)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, kind, rc.framework.Namespace.Name, rc.name))
-	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.name, nil))
-	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, api.Kind("ReplicationController"), rc.framework.Namespace.Name, rc.controllerName))
-	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.controllerName, nil))
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, kind, rc.nsName, rc.name))
+	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.name, nil))
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
+	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.controllerName, nil))
 }
 
 func kindOf(kind string) (schema.GroupKind, error) {
@@ -512,7 +516,7 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 	hpa := &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
-			Namespace: rc.framework.Namespace.Name,
+			Namespace: rc.nsName,
 		},
 		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
@@ -524,11 +528,11 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	hpa, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	hpa, errHPA := rc.clientSet.Autoscaling().HorizontalPodAutoscalers(rc.nsName).Create(hpa)
 	framework.ExpectNoError(errHPA)
 	return hpa
 }
 
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
-	rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(autoscalerName, nil)
+	rc.clientSet.Autoscaling().HorizontalPodAutoscalers(rc.nsName).Delete(autoscalerName, nil)
 }
