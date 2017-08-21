@@ -75,7 +75,6 @@ type Topologies struct {
 }
 
 // NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
-// If the topologyKey is empty, check if the two nodes have any of the default topologyKeys, and have same corresponding label value.
 func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
 	return NodesHaveSameTopologyKey(nodeA, nodeB, topologyKey)
 }
