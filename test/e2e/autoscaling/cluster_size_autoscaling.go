@@ -144,7 +144,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			}
 			break
 		}
-		glog.Infof("Made nodes schedulable again in %v", time.Now().Sub(s).String())
+		glog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
 	It("shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]", func() {
