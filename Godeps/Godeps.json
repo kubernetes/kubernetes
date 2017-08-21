@@ -98,7 +98,7 @@
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
-			"Rev": "1d91351acdc1cb2f2c995864674b754134b86ca7"
+			"Rev": "bb23615498cded5e105af4ce27de75b089cbe851"
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
