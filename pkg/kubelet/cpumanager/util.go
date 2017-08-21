@@ -25,114 +25,170 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
-func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
-	result := cpuset.NewCPUSet()
+type cpuAccumulator struct {
+	topo          *topology.CPUTopology
+	details       topology.CPUDetails
+	numCPUsNeeded int
+	result        cpuset.CPUSet
+}
 
-	if numCPUs == 0 {
-		return result, nil
+func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) *cpuAccumulator {
+	return &cpuAccumulator{
+		topo:          topo,
+		details:       topo.CPUtopoDetails.KeepOnly(availableCPUs),
+		numCPUsNeeded: numCPUs,
+		result:        cpuset.NewCPUSet(),
 	}
-	if numCPUs > availableCPUs.Size() {
+}
+
+func (a *cpuAccumulator) take(cpus cpuset.CPUSet) {
+	a.result = a.result.Union(cpus)
+	a.details = a.details.KeepOnly(a.details.CPUs().Difference(a.result))
+	a.numCPUsNeeded -= cpus.Size()
+}
+
+// Returns true if the supplied socket is fully available in `topoDetails`.
+func (a *cpuAccumulator) isSocketFree(socketID int) bool {
+	return a.details.CPUsInSocket(socketID).Size() == a.topo.CPUsPerSocket()
+}
+
+// Returns true if the supplied core is fully available in `topoDetails`.
+func (a *cpuAccumulator) isCoreFree(coreID int) bool {
+	return a.details.CPUsInCore(coreID).Size() == a.topo.CPUsPerCore()
+}
+
+// Returns free socket IDs as a slice sorted by:
+// - socket ID, ascending.
+func (a *cpuAccumulator) freeSockets() []int {
+	return a.details.Sockets().Filter(a.isSocketFree).AsSlice()
+}
+
+// Returns core IDs as a slice sorted by:
+// - the number of whole available cores on the socket, ascending
+// - socket ID, ascending
+// - core ID, ascending
+func (a *cpuAccumulator) freeCores() []int {
+	socketIDs := a.details.Sockets().AsSlice()
+	sort.Slice(socketIDs,
+		func(i, j int) bool {
+			iCores := a.details.CoresInSocket(socketIDs[i]).Filter(a.isCoreFree)
+			jCores := a.details.CoresInSocket(socketIDs[j]).Filter(a.isCoreFree)
+			return iCores.Size() < jCores.Size() || socketIDs[i] < socketIDs[j]
+		})
+
+	coreIDs := []int{}
+	for _, s := range socketIDs {
+		coreIDs = append(coreIDs, a.details.CoresInSocket(s).Filter(a.isCoreFree).AsSlice()...)
+	}
+	return coreIDs
+}
+
+// Returns CPU IDs as a slice sorted by:
+// - socket affinity with result
+// - number of CPUs available on the same sockett
+// - number of CPUs available on the same core
+// - socket ID.
+// - core ID.
+func (a *cpuAccumulator) freeCPUs() []int {
+	result := []int{}
+	cores := a.details.Cores().AsSlice()
+
+	sort.Slice(
+		cores,
+		func(i, j int) bool {
+			iCore := cores[i]
+			jCore := cores[j]
+
+			iCPUs := a.topo.CPUtopoDetails.CPUsInCore(iCore).AsSlice()
+			jCPUs := a.topo.CPUtopoDetails.CPUsInCore(jCore).AsSlice()
+
+			iSocket := a.topo.CPUtopoDetails[iCPUs[0]].SocketID
+			jSocket := a.topo.CPUtopoDetails[jCPUs[0]].SocketID
+
+			// Compute the number of CPUs in the result reside on the same socket
+			// as each core.
+			iSocketColoScore := a.topo.CPUtopoDetails.CPUsInSocket(iSocket).Intersection(a.result).Size()
+			jSocketColoScore := a.topo.CPUtopoDetails.CPUsInSocket(jSocket).Intersection(a.result).Size()
+
+			// Compute the number of available CPUs available on the same socket
+			// as each core.
+			iSocketFreeScore := a.details.CPUsInSocket(iSocket).Size()
+			jSocketFreeScore := a.details.CPUsInSocket(jSocket).Size()
+
+			// Compute the number of available CPUs on each core.
+			iCoreFreeScore := a.details.CPUsInCore(iCore).Size()
+			jCoreFreeScore := a.details.CPUsInCore(jCore).Size()
+
+			return iSocketColoScore > jSocketColoScore ||
+				iSocketFreeScore < jSocketFreeScore ||
+				iCoreFreeScore < jCoreFreeScore ||
+				iSocket < jSocket ||
+				iCore < jCore
+		})
+
+	// For each core, append sorted CPU IDs to result.
+	for _, core := range cores {
+		result = append(result, a.details.CPUsInCore(core).AsSlice()...)
+	}
+	return result
+}
+
+func (a *cpuAccumulator) needs(n int) bool {
+	return a.numCPUsNeeded >= n
+}
+
+func (a *cpuAccumulator) isSatisfied() bool {
+	return a.numCPUsNeeded < 1
+}
+
+func (a *cpuAccumulator) isFailed() bool {
+	return a.numCPUsNeeded > a.details.CPUs().Size()
+}
+
+func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+	acc := newCPUAccumulator(topo, availableCPUs, numCPUs)
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	if acc.isFailed() {
 		return nil, fmt.Errorf("not enough cpus available to satisfy request")
 	}
 
 	// Algorithm: topology-aware best-fit
-	CPUsPerCore := topo.NumCPUs / topo.NumCores
-	CPUsPerSocket := topo.NumCPUs / topo.NumSockets
-	topoDetails := topo.CPUtopoDetails.KeepOnly(availableCPUs)
-
-	// Auxilliary closure to update intermediate results:
-	// - Adds cpus to result
-	// - Recalculates availableCPUs
-	// - Prunes topoDetails
-	// - decrements numCPUs
-	take := func(cpus cpuset.CPUSet) {
-		result = result.Union(cpus)
-		availableCPUs = availableCPUs.Difference(result)
-		topoDetails = topoDetails.KeepOnly(availableCPUs)
-		numCPUs -= cpus.Size()
-	}
-
-	// Returns true if the supplied socket is fully available in
-	// `topoDetails`.
-	isFullSocket := func(socketID int) bool {
-		return topoDetails.CPUsInSocket(socketID).Size() == CPUsPerSocket
-	}
-
-	// Returns true if the supplied core is fully available in
-	// `topoDetails`.
-	isFullCore := func(coreID int) bool {
-		return topoDetails.CPUsInCore(coreID).Size() == CPUsPerCore
-	}
-
-	// 1. Acquire whole sockets, if available and the container requires
-	//    at least a socket's-worth of CPUs.
-	for _, s := range topoDetails.Sockets().Filter(isFullSocket).AsSlice() {
-		if numCPUs >= CPUsPerSocket {
+	// 1. Acquire whole sockets, if available and the container requires at
+	//    least a socket's-worth of CPUs.
+	for _, s := range acc.freeSockets() {
+		if acc.needs(acc.topo.CPUsPerSocket()) {
 			glog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
-			take(topoDetails.CPUsInSocket(s))
-			if numCPUs < 1 {
-				return result, nil
+			acc.take(acc.details.CPUsInSocket(s))
+			if acc.isSatisfied() {
+				return acc.result, nil
 			}
 		}
 	}
 
-	// 2. Acquire whole cores, if available and the container requires
-	//    at least a core's-worth of CPUs.
-
-	// `socketIDs` are sorted by:
-	// - the number of whole available cores, ascending.
-	socketIDs := topoDetails.Sockets().AsSlice()
-	sort.Slice(socketIDs,
-		func(i, j int) bool {
-			iCores := topoDetails.CoresInSocket(socketIDs[i]).Filter(isFullCore)
-			jCores := topoDetails.CoresInSocket(socketIDs[j]).Filter(isFullCore)
-			return iCores.Size() < jCores.Size()
-		})
-
-	for _, s := range socketIDs {
-		sCores := topoDetails.CoresInSocket(s).Filter(isFullCore)
-		for _, core := range sCores.AsSlice() {
-			if numCPUs >= CPUsPerCore {
-				glog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", core)
-				take(topoDetails.CPUsInCore(core))
-				if numCPUs < 1 {
-					return result, nil
-				}
+	// 2. Acquire whole cores, if available and the container requires at least
+	//    a core's-worth of CPUs.
+	for _, c := range acc.freeCores() {
+		if acc.needs(acc.topo.CPUsPerCore()) {
+			glog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
+			acc.take(acc.details.CPUsInCore(c))
+			if acc.isSatisfied() {
+				return acc.result, nil
 			}
 		}
 	}
 
 	// 3. Acquire single threads, preferring to fill partially-allocated cores
-	//    on the same sockets as the whole cores we have already taken.
-
-	// `cpuIDs` are sorted by:
-	// - the number of available CPUs on the same core, ascending
-	// - the number of already assigned CPUs for this allocation on the
-	//   same socket, descending
-	cpuIDs := availableCPUs.AsSlice()
-	sort.Slice(cpuIDs,
-		func(i, j int) bool {
-			// Compute the number of CPUs on the same socket as i and j in
-			// the result.
-			iSocket := topo.CPUtopoDetails[cpuIDs[i]].SocketID
-			jSocket := topo.CPUtopoDetails[cpuIDs[j]].SocketID
-			iSocketScore := topo.CPUtopoDetails.CPUsInSocket(iSocket).Intersection(result).Size()
-			jSocketScore := topo.CPUtopoDetails.CPUsInSocket(jSocket).Intersection(result).Size()
-
-			// Compute the number of available CPUs on the same core as i and j.
-			iCoreScore := topoDetails.CPUsInCore(topoDetails[cpuIDs[i]].CoreID).Size()
-			jCoreScore := topoDetails.CPUsInCore(topoDetails[cpuIDs[j]].CoreID).Size()
-
-			return iSocketScore > jSocketScore || iCoreScore < jCoreScore || i < j
-		})
-
-	for _, cpu := range cpuIDs {
-		glog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", cpu)
-		if numCPUs > 0 {
-			take(cpuset.NewCPUSet(cpu))
+	//    on the same sockets as the whole cores we have already taken in this
+	//    allocation.
+	for _, c := range acc.freeCPUs() {
+		glog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
+		if acc.needs(1) {
+			acc.take(cpuset.NewCPUSet(c))
 		}
-		if numCPUs < 1 {
-			return result, nil
+		if acc.isSatisfied() {
+			return acc.result, nil
 		}
 	}
 

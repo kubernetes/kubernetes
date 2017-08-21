@@ -17,8 +17,6 @@ limitations under the License.
 package cpumanager
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
@@ -44,7 +42,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a cupset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
 // the main container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology) *staticPolicy {
 	return &staticPolicy{
 		topology: topology,
 	}
@@ -91,9 +89,6 @@ func (p *staticPolicy) UnregisterContainer(s state.State, containerID string) er
 
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, error) {
 	glog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
-	if numCPUs > s.GetDefaultCPUSet().Size() {
-		return cpuset.NewCPUSet(), fmt.Errorf("not enough cpus available to satisfy request")
-	}
 	result, err := takeByTopology(p.topology, s.GetDefaultCPUSet(), numCPUs)
 	if err != nil {
 		return nil, err

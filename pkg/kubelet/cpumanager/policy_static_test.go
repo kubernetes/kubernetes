@@ -39,9 +39,7 @@ type staticPolicyTest struct {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy := &staticPolicy{
-		topology: topoSingleSocketHT,
-	}
+	policy := NewStaticPolicy(topoSingleSocketHT)
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -51,9 +49,7 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
-	policy := &staticPolicy{
-		topology: topoSingleSocketHT,
-	}
+	policy := NewStaticPolicy(topoSingleSocketHT)
 
 	st := &mockState{
 		assignments:   map[string]cpuset.CPUSet{},
@@ -211,9 +207,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy := &staticPolicy{
-			topology: testCase.topo,
-		}
+		policy := NewStaticPolicy(testCase.topo)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -260,10 +254,14 @@ func TestStaticPolicyRegister(t *testing.T) {
 					testCase.description, testCase.containerID, st.assignments)
 			}
 		}
+
+		if st.defaultCPUSet.IsEmpty() && !policy.IsUnderPressure() {
+			t.Error("StaticPolicy IsUnderCPUPressure() error: Default CPU set is empty but policy reporting no CPU pressure")
+		}
 	}
 }
 
-func TestStaticPolicyUnRegister(t *testing.T) {
+func TestStaticPolicyUnregister(t *testing.T) {
 	testCases := []staticPolicyTest{
 		{
 			description: "SingleSocketHT, DeAllocOneContainer",
@@ -274,6 +272,17 @@ func TestStaticPolicyUnRegister(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(4, 5, 6, 7),
 			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			description: "SingleSocketHT, DeAllocOneContainer, BeginEmpty",
+			topo:        topoSingleSocketHT,
+			containerID: "fakeID1",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID1": cpuset.NewCPUSet(1, 2, 3),
+				"fakeID2": cpuset.NewCPUSet(4, 5, 6, 7),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(),
+			expCSet:         cpuset.NewCPUSet(1, 2, 3),
 		},
 		{
 			description: "SingleSocketHT, DeAllocTwoContainer",
@@ -299,9 +308,7 @@ func TestStaticPolicyUnRegister(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy := &staticPolicy{
-			topology: testCase.topo,
-		}
+		policy := NewStaticPolicy(testCase.topo)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
