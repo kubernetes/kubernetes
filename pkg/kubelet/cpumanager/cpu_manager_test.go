@@ -36,6 +36,7 @@ import (
 type mockState struct {
 	assignments   map[string]cpuset.CPUSet
 	defaultCPUSet cpuset.CPUSet
+	pressure      bool
 }
 
 func (s *mockState) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
@@ -54,6 +55,10 @@ func (s *mockState) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
 	return s.GetDefaultCPUSet()
 }
 
+func (s *mockState) GetPressure() bool {
+	return s.pressure
+}
+
 func (s *mockState) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	s.assignments[containerID] = cset
 }
@@ -64,6 +69,10 @@ func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
 
 func (s *mockState) Delete(containerID string) {
 	delete(s.assignments, containerID)
+}
+
+func (s *mockState) SetPressure(value bool) {
+	s.pressure = value
 }
 
 type mockPolicy struct {
@@ -84,10 +93,6 @@ func (p *mockPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1
 
 func (p *mockPolicy) UnregisterContainer(s state.State, containerID string) error {
 	return p.err
-}
-
-func (p *mockPolicy) IsUnderPressure() bool {
-	return p.underPressure
 }
 
 type mockRuntimeService struct {

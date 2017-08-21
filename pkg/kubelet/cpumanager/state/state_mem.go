@@ -24,6 +24,7 @@ import (
 type stateMemory struct {
 	assignments   map[string]cpuset.CPUSet
 	defaultCPUSet cpuset.CPUSet
+	pressure      bool
 }
 
 var _ State = &stateMemory{}
@@ -53,6 +54,10 @@ func (s *stateMemory) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
 	return s.GetDefaultCPUSet()
 }
 
+func (s *stateMemory) GetPressure() bool {
+	return s.pressure
+}
+
 func (s *stateMemory) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	s.assignments[containerID] = cset
 	glog.Infof("[cpumanager] updated desired cpuset (container id: %s, cpuset: \"%s\")", containerID, cset)
@@ -66,4 +71,12 @@ func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
 func (s *stateMemory) Delete(containerID string) {
 	delete(s.assignments, containerID)
 	glog.V(2).Infof("[cpumanager] deleted cpuset assignment (container id: %s)", containerID)
+}
+
+func (s *stateMemory) SetPressure(value bool) {
+	oldValue := s.pressure
+	s.pressure = value
+	if value != oldValue {
+		glog.Infof("[cpumanager] cpu pressure condition changed (value: %s", value)
+	}
 }

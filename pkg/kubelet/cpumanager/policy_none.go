@@ -51,7 +51,3 @@ func (p *nonePolicy) UnregisterContainer(s state.State, containerID string) erro
 	glog.Infof("[cpumanager] none policy: UnregisterContainer [%s]", containerID)
 	return nil
 }
-
-func (p *nonePolicy) IsUnderPressure() bool {
-	return false
-}

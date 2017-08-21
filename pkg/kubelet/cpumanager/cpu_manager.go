@@ -273,13 +273,13 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 }
 
 func (m *manager) IsUnderCPUPressure() bool {
-	return m.policy.IsUnderPressure()
+	return m.state.GetPressure()
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
 // Required for lifecycle.PodAdmitHandler interface
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	if !m.policy.IsUnderPressure() {
+	if !m.state.GetPressure() {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 

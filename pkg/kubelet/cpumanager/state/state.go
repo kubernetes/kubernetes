@@ -25,12 +25,14 @@ type Reader interface {
 	GetCPUSet(containerID string) (cpuset.CPUSet, bool)
 	GetDefaultCPUSet() cpuset.CPUSet
 	GetCPUSetOrDefault(containerID string) cpuset.CPUSet
+	GetPressure() bool
 }
 
 type writer interface {
 	SetCPUSet(containerID string, cpuset cpuset.CPUSet)
 	SetDefaultCPUSet(cpuset cpuset.CPUSet)
 	Delete(containerID string)
+	SetPressure(value bool)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

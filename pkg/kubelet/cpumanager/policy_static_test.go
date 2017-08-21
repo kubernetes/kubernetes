@@ -255,8 +255,8 @@ func TestStaticPolicyRegister(t *testing.T) {
 			}
 		}
 
-		if st.defaultCPUSet.IsEmpty() && !policy.IsUnderPressure() {
-			t.Error("StaticPolicy IsUnderCPUPressure() error: Default CPU set is empty but policy reporting no CPU pressure")
+		if st.defaultCPUSet.IsEmpty() && !st.GetPressure() {
+			t.Error("StaticPolicy CPU pressure error: Default CPU set is empty but policy reporting no CPU pressure")
 		}
 	}
 }
