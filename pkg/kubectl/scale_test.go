@@ -525,47 +525,53 @@ func TestValidateJob(t *testing.T) {
 	}
 }
 
-type ErrorDeployments struct {
+type ErrorScales struct {
 	extensionsclient.DeploymentInterface
+	extensionsclient.ScaleInterface
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorDeployments) Update(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+func (c *ErrorScales) Update(kind string, scale *extensions.Scale) (*extensions.Scale, error) {
 	switch {
 	case c.invalid:
-		return nil, kerrors.NewInvalid(api.Kind(deployment.Kind), deployment.Name, nil)
+		return nil, kerrors.NewInvalid(api.Kind(scale.GroupVersionKind().Kind), scale.Name, nil)
 	case c.conflict:
-		return nil, kerrors.NewConflict(api.Resource(deployment.Kind), deployment.Name, nil)
+		return nil, kerrors.NewConflict(api.Resource(scale.GroupVersionKind().Kind), scale.Name, nil)
 	}
 	return nil, errors.New("deployment update failure")
 }
 
-func (c *ErrorDeployments) Get(name string, options metav1.GetOptions) (*extensions.Deployment, error) {
-	return &extensions.Deployment{
-		Spec: extensions.DeploymentSpec{
+func (c *ErrorScales) Get(kind string, name string) (*extensions.Scale, error) {
+	return &extensions.Scale{
+		Spec: extensions.ScaleSpec{
 			Replicas: 0,
 		},
 	}, nil
 }
 
-type ErrorDeploymentClient struct {
+type ErrorScaleClient struct {
 	extensionsclient.DeploymentsGetter
+	extensionsclient.ScalesGetter
 	conflict bool
 	invalid  bool
 }
 
-func (c *ErrorDeploymentClient) Deployments(namespace string) extensionsclient.DeploymentInterface {
-	return &ErrorDeployments{
+func (c *ErrorScaleClient) Scales(namespace string) extensionsclient.ScaleInterface {
+	return &ErrorScales{
 		DeploymentInterface: c.DeploymentsGetter.Deployments(namespace),
+		ScaleInterface:      c.ScalesGetter.Scales(namespace),
 		invalid:             c.invalid,
 		conflict:            c.conflict,
 	}
 }
 
 func TestDeploymentScaleRetry(t *testing.T) {
-	fake := &ErrorDeploymentClient{DeploymentsGetter: fake.NewSimpleClientset().Extensions(), conflict: true}
-	scaler := &DeploymentScaler{fake}
+	fake := &ErrorScaleClient{
+		DeploymentsGetter: fake.NewSimpleClientset().Extensions(),
+		ScalesGetter:      fake.NewSimpleClientset().Extensions(),
+		conflict:          true}
+	scaler := &DeploymentScaler{fake, fake}
 	preconditions := &ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -596,9 +602,18 @@ func deployment() *extensions.Deployment {
 	}
 }
 
+func scales() *extensions.Scale {
+	return &extensions.Scale{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
+			Name:      "foo",
+		},
+	}
+}
+
 func TestDeploymentScale(t *testing.T) {
-	fake := fake.NewSimpleClientset(deployment())
-	scaler := DeploymentScaler{fake.Extensions()}
+	fake := fake.NewSimpleClientset(deployment(), scales())
+	scaler := DeploymentScaler{c: fake.Extensions(), d: fake.Extensions()}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -608,17 +623,20 @@ func TestDeploymentScale(t *testing.T) {
 	if len(actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", actions)
 	}
-	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetResource().GroupResource() != extensions.Resource("deployments") || action.GetName() != name {
-		t.Errorf("unexpected action: %v, expected get-replicationController %s", actions[0], name)
+	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetName() != name || action.GetSubresource() != "scale" {
+		t.Errorf("unexpected action: %v, expected get-deployment-scale %s", actions[0], name)
 	}
-	if action, ok := actions[1].(testcore.UpdateAction); !ok || action.GetResource().GroupResource() != extensions.Resource("deployments") || action.GetObject().(*extensions.Deployment).Spec.Replicas != int32(count) {
-		t.Errorf("unexpected action %v, expected update-deployment with replicas = %d", actions[1], count)
+	if action, ok := actions[1].(testcore.UpdateAction); !ok || action.GetObject().(*extensions.Scale).Spec.Replicas != int32(count) {
+		t.Errorf("unexpected action %v, expected update-deployment-scale with replicas = %d", actions[1], count)
 	}
 }
 
 func TestDeploymentScaleInvalid(t *testing.T) {
-	fake := &ErrorDeploymentClient{DeploymentsGetter: fake.NewSimpleClientset().Extensions(), invalid: true}
-	scaler := DeploymentScaler{fake}
+	fake := &ErrorScaleClient{
+		DeploymentsGetter: fake.NewSimpleClientset().Extensions(),
+		ScalesGetter:      fake.NewSimpleClientset(scales()).Extensions(),
+		invalid:           true}
+	scaler := DeploymentScaler{fake, fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -644,8 +662,17 @@ func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 		Spec: extensions.DeploymentSpec{
 			Replicas: 10,
 		},
-	})
-	scaler := DeploymentScaler{fake.Extensions()}
+	},
+		&extensions.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: metav1.NamespaceDefault,
+				Name:      "foo",
+			},
+			Spec: extensions.ScaleSpec{
+				Replicas: 10,
+			},
+		})
+	scaler := DeploymentScaler{fake.Extensions(), fake.Extensions()}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
@@ -655,16 +682,16 @@ func TestDeploymentScaleFailsPreconditions(t *testing.T) {
 	if len(actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 1 actions (get)", actions)
 	}
-	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetResource().GroupResource() != extensions.Resource("deployments") || action.GetName() != name {
-		t.Errorf("unexpected action: %v, expected get-deployment %s", actions[0], name)
+	if action, ok := actions[0].(testcore.GetAction); !ok || action.GetName() != name || action.GetSubresource() != "scale" {
+		t.Errorf("unexpected action: %v, expected get-scale %s", actions[0], name)
 	}
 }
 
-func TestValidateDeployment(t *testing.T) {
+func TestValidateScale(t *testing.T) {
 	zero, ten, twenty := int32(0), int32(10), int32(20)
 	tests := []struct {
 		preconditions ScalePrecondition
-		deployment    extensions.Deployment
+		scale         extensions.Scale
 		expectError   bool
 		test          string
 	}{
@@ -675,11 +702,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, ""},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: ten,
 				},
 			},
@@ -688,11 +715,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{0, ""},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: zero,
 				},
 			},
@@ -701,11 +728,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{-1, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: ten,
 				},
 			},
@@ -714,11 +741,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: ten,
 				},
 			},
@@ -727,11 +754,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: twenty,
 				},
 			},
@@ -740,7 +767,7 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "foo",
 				},
@@ -750,11 +777,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: ten,
 				},
 			},
@@ -763,11 +790,11 @@ func TestValidateDeployment(t *testing.T) {
 		},
 		{
 			preconditions: ScalePrecondition{10, "foo"},
-			deployment: extensions.Deployment{
+			scale: extensions.Scale{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "bar",
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: extensions.ScaleSpec{
 					Replicas: twenty,
 				},
 			},
@@ -776,7 +803,7 @@ func TestValidateDeployment(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := test.preconditions.ValidateDeployment(&test.deployment)
+		err := test.preconditions.ValidateScale(&test.scale)
 		if err != nil && !test.expectError {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
