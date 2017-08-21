@@ -405,6 +405,14 @@ type DaemonSetUpdateStrategy struct {
 	// See https://github.com/kubernetes/kubernetes/issues/35345
 	// +optional
 	RollingUpdate *RollingUpdateDaemonSet
+
+	// Surging rolling update config params. Present only if type = "SurgingRollingUpdate".
+	//---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be. Same as Deployment `strategy.rollingUpdate`.
+	// See https://github.com/kubernetes/kubernetes/issues/35345
+	// +optional
+	SurgingRollingUpdate *SurgingRollingUpdateDaemonSet
 }
 
 type DaemonSetUpdateStrategyType string
@@ -412,6 +420,10 @@ type DaemonSetUpdateStrategyType string
 const (
 	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
 	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
+
+	// Replace the old daemons by new ones using rolling update i.e replace them on each node one
+	// after the other, creating the new pod and then killing the old one.
+	SurgingRollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "SurgingRollingUpdate"
 
 	// Replace the old daemons only when it's killed
 	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
@@ -435,6 +447,22 @@ type RollingUpdateDaemonSet struct {
 	// all times during the update.
 	// +optional
 	MaxUnavailable intstr.IntOrString
+}
+
+// Spec to control the desired behavior of a daemon set surging rolling update.
+type SurgingRollingUpdateDaemonSet struct {
+	// The maximum number of DaemonSet pods that can be scheduled above the desired number of pods
+	// during the update. Value can be an absolute number (ex: 5) or a percentage of the total number
+	// of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from
+	// the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is
+	// set to 30%, at most 30% of the total number of nodes that should be running the daemon pod
+	// (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update
+	// starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are
+	// available it then stops the existing pods before proceeding onto other DaemonSet pods, thus
+	// ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all
+	// times during the update.
+	// +optional
+	MaxSurge intstr.IntOrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
