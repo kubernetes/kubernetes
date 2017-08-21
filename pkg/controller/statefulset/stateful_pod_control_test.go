@@ -393,34 +393,6 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlUpdatePodConflictFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	updatedPod := newStatefulSetPod(set, 0)
-	updatedPod.Spec.Hostname = "wrong"
-	indexer.Add(updatedPod)
-	podLister := corelisters.NewPodLister(indexer)
-	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-
-	})
-	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err == nil {
-		t.Error("Failed update did not return an error")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Pod update failed: got %d events, but want 1", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
-		t.Errorf("Found unexpected non-normal event %s", events[0])
-	}
-}
-
 func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
