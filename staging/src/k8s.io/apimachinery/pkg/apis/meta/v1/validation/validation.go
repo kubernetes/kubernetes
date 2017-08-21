@@ -77,6 +77,9 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	if options.GracePeriodSeconds != nil && *options.GracePeriodSeconds < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, "GracePeriodSeconds must be non-negative integer"))
+	}
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath(""), options, "OrphanDependents and DeletionPropagation cannot be both set"))
 	}

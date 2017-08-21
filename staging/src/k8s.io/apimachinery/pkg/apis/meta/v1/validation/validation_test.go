@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -89,6 +91,61 @@ func TestValidateLabels(t *testing.T) {
 			if !strings.Contains(errs[0].Detail, labelValueErrorCases[i].expect) {
 				t.Errorf("case[%d]: error details do not include %q: %q", i, labelValueErrorCases[i].expect, errs[0].Detail)
 			}
+		}
+	}
+}
+
+func TestValidateDeleteOptions(t *testing.T) {
+	var sucessGracePeriodSeconds int64 = 30
+	var sucessUID types.UID = "1234567890"
+	var sucessPropagationPolicy metav1.DeletionPropagation = "Orphan"
+	var sucessOrphanDependents bool = true
+	successCases := []metav1.DeleteOptions{
+		{
+			GracePeriodSeconds: &sucessGracePeriodSeconds,
+			Preconditions:      &metav1.Preconditions{UID: &sucessUID},
+			OrphanDependents:   nil,
+			PropagationPolicy:  &sucessPropagationPolicy,
+		},
+		{
+			GracePeriodSeconds: &sucessGracePeriodSeconds,
+			Preconditions:      &metav1.Preconditions{UID: &sucessUID},
+			OrphanDependents:   &sucessOrphanDependents,
+			PropagationPolicy:  nil,
+		},
+		{
+			GracePeriodSeconds: nil,
+			Preconditions:      &metav1.Preconditions{UID: &sucessUID},
+			OrphanDependents:   nil,
+			PropagationPolicy:  &sucessPropagationPolicy,
+		},
+	}
+	for i := range successCases {
+		errs := ValidateDeleteOptions(&successCases[i])
+		if len(errs) != 0 {
+			t.Errorf("case[%d] expected success, got %#v", i, errs)
+		}
+	}
+
+	var errGracePeriodSeconds int64 = -30
+	errorCases := []metav1.DeleteOptions{
+		{
+			GracePeriodSeconds: &sucessGracePeriodSeconds,
+			Preconditions:      &metav1.Preconditions{UID: &sucessUID},
+			OrphanDependents:   &sucessOrphanDependents,
+			PropagationPolicy:  &sucessPropagationPolicy,
+		},
+		{
+			GracePeriodSeconds: &errGracePeriodSeconds,
+			Preconditions:      &metav1.Preconditions{UID: &sucessUID},
+			OrphanDependents:   &sucessOrphanDependents,
+			PropagationPolicy:  nil,
+		},
+	}
+	for i := range errorCases {
+		errs := ValidateDeleteOptions(&errorCases[i])
+		if len(errs) == 0 {
+			t.Errorf("case[%d] expected error, got none", i)
 		}
 	}
 }
