@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -953,6 +954,145 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 		result := shouldPodBeInEndpoints(test.pod)
 		if result != test.expected {
 			t.Errorf("%s: expected : %t, got: %t", test.name, test.expected, result)
+		}
+	}
+}
+
+func TestPodToEndpointAddress(t *testing.T) {
+	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	ns := "test"
+	addPods(podStore, ns, 1, 1, 0)
+	pods := podStore.List()
+	if len(pods) != 1 {
+		t.Errorf("podStore size: expected: %d, got: %d", 1, len(pods))
+		return
+	}
+	pod := pods[0].(*v1.Pod)
+	epa := podToEndpointAddress(pod)
+	if epa.IP != pod.Status.PodIP {
+		t.Errorf("IP: expected: %s, got: %s", pod.Status.PodIP, epa.IP)
+	}
+	if *(epa.NodeName) != pod.Spec.NodeName {
+		t.Errorf("NodeName: expected: %s, got: %s", pod.Spec.NodeName, *(epa.NodeName))
+	}
+	if epa.TargetRef.Kind != "Pod" {
+		t.Errorf("TargetRef.Kind: expected: %s, got: %s", "Pod", epa.TargetRef.Kind)
+	}
+	if epa.TargetRef.Namespace != pod.ObjectMeta.Namespace {
+		t.Errorf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Namespace, epa.TargetRef.Namespace)
+	}
+	if epa.TargetRef.Name != pod.ObjectMeta.Name {
+		t.Errorf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.Name, epa.TargetRef.Name)
+	}
+	if epa.TargetRef.UID != pod.ObjectMeta.UID {
+		t.Errorf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.UID, epa.TargetRef.UID)
+	}
+	if epa.TargetRef.ResourceVersion != pod.ObjectMeta.ResourceVersion {
+		t.Errorf("TargetRef.Kind: expected: %s, got: %s", pod.ObjectMeta.ResourceVersion, epa.TargetRef.ResourceVersion)
+	}
+}
+
+func TestPodAddressChanged(t *testing.T) {
+	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	ns := "test"
+	addPods(podStore, ns, 1, 1, 0)
+	pods := podStore.List()
+	if len(pods) != 1 {
+		t.Errorf("podStore size: expected: %d, got: %d", 1, len(pods))
+		return
+	}
+	oldPod := pods[0].(*v1.Pod)
+	newPod := oldPod.DeepCopy()
+
+	if podAddressChanged(oldPod, newPod) {
+		t.Errorf("Expected address to be unchanged for copied pod")
+	}
+
+	newPod.Spec.NodeName = "changed"
+	if !podAddressChanged(oldPod, newPod) {
+		t.Errorf("Expected address to be changed for pod with NodeName changed")
+	}
+	newPod.Spec.NodeName = oldPod.Spec.NodeName
+
+	newPod.ObjectMeta.ResourceVersion = "changed"
+	if podAddressChanged(oldPod, newPod) {
+		t.Errorf("Expected address to be unchanged for pod with only ResourceVersion changed")
+	}
+	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
+
+	newPod.Status.PodIP = "1.2.3.1"
+	if !podAddressChanged(oldPod, newPod) {
+		t.Errorf("Expected address to be changed with pod IP address change")
+	}
+	newPod.Status.PodIP = oldPod.Status.PodIP
+
+	newPod.ObjectMeta.Name = "wrong-name"
+	if !podAddressChanged(oldPod, newPod) {
+		t.Errorf("Expected address to be changed with pod name change")
+	}
+	newPod.ObjectMeta.Name = oldPod.ObjectMeta.Name
+}
+
+func TestDetermineNeededServiceUpdates(t *testing.T) {
+	testCases := []struct {
+		name  string
+		a     sets.String
+		b     sets.String
+		union sets.String
+		xor   sets.String
+	}{
+		{
+			name:  "no services changed",
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("a", "b", "c"),
+			xor:   sets.NewString(),
+			union: sets.NewString("a", "b", "c"),
+		},
+		{
+			name:  "all old services removed, new services added",
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("d", "e", "f"),
+			xor:   sets.NewString("a", "b", "c", "d", "e", "f"),
+			union: sets.NewString("a", "b", "c", "d", "e", "f"),
+		},
+		{
+			name:  "all old services removed, no new services added",
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString(),
+			xor:   sets.NewString("a", "b", "c"),
+			union: sets.NewString("a", "b", "c"),
+		},
+		{
+			name:  "no old services, but new services added",
+			a:     sets.NewString(),
+			b:     sets.NewString("a", "b", "c"),
+			xor:   sets.NewString("a", "b", "c"),
+			union: sets.NewString("a", "b", "c"),
+		},
+		{
+			name:  "one service removed, one service added, two unchanged",
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("b", "c", "d"),
+			xor:   sets.NewString("a", "d"),
+			union: sets.NewString("a", "b", "c", "d"),
+		},
+		{
+			name:  "no services",
+			a:     sets.NewString(),
+			b:     sets.NewString(),
+			xor:   sets.NewString(),
+			union: sets.NewString(),
+		},
+	}
+	for _, testCase := range testCases {
+		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
+		if !retval.Equal(testCase.xor) {
+			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
+		}
+
+		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
+		if !retval.Equal(testCase.union) {
+			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
 		}
 	}
 }
