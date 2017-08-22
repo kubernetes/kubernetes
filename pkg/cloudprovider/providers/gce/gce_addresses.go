@@ -18,7 +18,6 @@ package gce
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/golang/glog"
 	computealpha "google.golang.org/api/compute/v0.alpha"
@@ -26,10 +25,11 @@ import (
 )
 
 func newAddressMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"address_" + request, region, unusedMetricLabel},
-	}
+	return newAddressMetricContextWithVersion(request, region, computeV1Version)
+}
+
+func newAddressMetricContextWithVersion(request, region, version string) *metricContext {
+	return newGenericMetricContext("address", request, region, unusedMetricLabel, version)
 }
 
 // ReserveGlobalAddress creates a global address.
@@ -74,7 +74,7 @@ func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) 
 
 // ReserveAlphaRegionAddress creates an Alpha, regional address.
 func (gce *GCECloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
-	mc := newAddressMetricContext("reserve", region)
+	mc := newAddressMetricContextWithVersion("reserve", region, computeAlphaVersion)
 	op, err := gce.serviceAlpha.Addresses.Insert(gce.projectID, region, addr).Do()
 	if err != nil {
 		return mc.Observe(err)
@@ -101,7 +101,7 @@ func (gce *GCECloud) GetRegionAddress(name, region string) (*compute.Address, er
 
 // GetAlphaRegionAddress returns the Alpha, regional address by name.
 func (gce *GCECloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
-	mc := newAddressMetricContext("get", region)
+	mc := newAddressMetricContextWithVersion("get", region, computeAlphaVersion)
 	v, err := gce.serviceAlpha.Addresses.Get(gce.projectID, region, name).Do()
 	return v, mc.Observe(err)
 }

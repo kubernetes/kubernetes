@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -85,10 +84,7 @@ type GCEDisk struct {
 }
 
 func newDiskMetricContext(request, zone string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"disk_" + request, unusedMetricLabel, zone},
-	}
+	return newGenericMetricContext("disk", request, unusedMetricLabel, zone, computeV1Version)
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {

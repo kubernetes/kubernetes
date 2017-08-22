@@ -17,17 +17,15 @@ limitations under the License.
 package gce
 
 import (
-	"time"
-
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newForwardingRuleMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"forwardingrule_" + request, region, unusedMetricLabel},
-	}
+	return newForwardingRuleMetricContextWithVersion(request, region, computeV1Version)
+}
+func newForwardingRuleMetricContextWithVersion(request, region, version string) *metricContext {
+	return newGenericMetricContext("forwardingrule", request, region, unusedMetricLabel, version)
 }
 
 // CreateGlobalForwardingRule creates the passed GlobalForwardingRule
@@ -88,7 +86,7 @@ func (gce *GCECloud) GetRegionForwardingRule(name, region string) (*compute.Forw
 
 // GetAlphaRegionForwardingRule returns the Alpha forwarding rule by name & region.
 func (gce *GCECloud) GetAlphaRegionForwardingRule(name, region string) (*computealpha.ForwardingRule, error) {
-	mc := newForwardingRuleMetricContext("get", region)
+	mc := newForwardingRuleMetricContextWithVersion("get", region, computeAlphaVersion)
 	v, err := gce.serviceAlpha.ForwardingRules.Get(gce.projectID, region, name).Do()
 	return v, mc.Observe(err)
 }
@@ -116,7 +114,7 @@ func (gce *GCECloud) CreateRegionForwardingRule(rule *compute.ForwardingRule, re
 // CreateAlphaRegionForwardingRule creates and returns an Alpha
 // forwarding fule in the given region.
 func (gce *GCECloud) CreateAlphaRegionForwardingRule(rule *computealpha.ForwardingRule, region string) error {
-	mc := newForwardingRuleMetricContext("create", region)
+	mc := newForwardingRuleMetricContextWithVersion("create", region, computeAlphaVersion)
 	op, err := gce.serviceAlpha.ForwardingRules.Insert(gce.projectID, region, rule).Do()
 	if err != nil {
 		return mc.Observe(err)

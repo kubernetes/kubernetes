@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -30,10 +29,7 @@ import (
 )
 
 func newRoutesMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"routes_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("routes", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
