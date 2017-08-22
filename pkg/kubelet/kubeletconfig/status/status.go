@@ -18,7 +18,6 @@ package status
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,8 +82,8 @@ type ConfigOKCondition interface {
 	Set(message, reason string, status apiv1.ConditionStatus)
 	// SetFailedSyncCondition sets the condition for when syncing Kubelet config fails
 	SetFailedSyncCondition(reason string)
-	// ClearFailedSyncCondition resets ConfigOKCondition to the correct condition for successfully syncing the kubelet config
-	ClearFailedSyncCondition(current string, lastKnownGood string, currentBadReason string, initConfig bool)
+	// ClearFailedSyncCondition clears the overlay from SetFailedSyncCondition
+	ClearFailedSyncCondition()
 	// Sync patches the current condition into the Node identified by `nodeName`
 	Sync(client clientset.Interface, nodeName string)
 }
@@ -95,6 +94,8 @@ type configOKCondition struct {
 	conditionMux sync.Mutex
 	// condition is the current ConfigOK node condition, which will be reported in the Node.status.conditions
 	condition *apiv1.NodeCondition
+	// failedSyncReason is sent in place of the usual reason when the Kubelet is failing to sync the remote config
+	failedSyncReason string
 	// pendingCondition; write to this channel to indicate that ConfigOK needs to be synced to the API server
 	pendingCondition chan bool
 }
@@ -142,44 +143,20 @@ func (c *configOKCondition) Set(message, reason string, status apiv1.ConditionSt
 // SetFailedSyncCondition updates the ConfigOK status to reflect that we failed to sync to the latest config because we couldn't figure out what
 // config to use (e.g. due to a malformed reference, a download failure, etc)
 func (c *configOKCondition) SetFailedSyncCondition(reason string) {
-	c.Set(c.condition.Message, fmt.Sprintf("failed to sync, desired config unclear, reason: %s", reason), apiv1.ConditionUnknown)
-}
-
-// ClearFailedSyncCondition resets ConfigOK to the correct condition for the config UIDs
-// `current` and `lastKnownGood`, depending on whether current is bad (non-empty `currentBadReason`)
-// and whether an init config exists (`initConfig` is true).
-func (c *configOKCondition) ClearFailedSyncCondition(current string,
-	lastKnownGood string,
-	currentBadReason string,
-	initConfig bool) {
-	// since our reason-check relies on c.condition we must manually take the lock and use c.unsafeSet instead of c.Set
 	c.conditionMux.Lock()
 	defer c.conditionMux.Unlock()
-	if strings.Contains(c.condition.Reason, "failed to sync, desired config unclear") {
-		// if we should report a "current is bad, rolled back" state
-		if len(currentBadReason) > 0 {
-			if len(current) == 0 {
-				if initConfig {
-					c.unsafeSet(LkgInitMessage, currentBadReason, apiv1.ConditionFalse)
-					return
-				}
-				c.unsafeSet(LkgDefaultMessage, currentBadReason, apiv1.ConditionFalse)
-				return
-			}
-			c.unsafeSet(fmt.Sprintf(LkgRemoteMessageFmt, lastKnownGood), currentBadReason, apiv1.ConditionFalse)
-			return
-		}
-		// if we should report a "current is ok" state
-		if len(current) == 0 {
-			if initConfig {
-				c.unsafeSet(CurInitMessage, CurInitOKReason, apiv1.ConditionTrue)
-				return
-			}
-			c.unsafeSet(CurDefaultMessage, CurDefaultOKReason, apiv1.ConditionTrue)
-			return
-		}
-		c.unsafeSet(fmt.Sprintf(CurRemoteMessageFmt, current), CurRemoteOKReason, apiv1.ConditionTrue)
-	}
+	// set the reason overlay and poke the sync worker to send the update
+	c.failedSyncReason = fmt.Sprintf("failed to sync, desired config unclear, reason: %s", reason)
+	c.pokeSyncWorker()
+}
+
+// ClearFailedSyncCondition removes the "failed to sync" reason overlay
+func (c *configOKCondition) ClearFailedSyncCondition() {
+	c.conditionMux.Lock()
+	defer c.conditionMux.Unlock()
+	// clear the reason overlay and poke the sync worker to send the update
+	c.failedSyncReason = ""
+	c.pokeSyncWorker()
 }
 
 // pokeSyncWorker notes that the ConfigOK condition needs to be synced to the API server
@@ -237,6 +214,16 @@ func (c *configOKCondition) Sync(client clientset.Interface, nodeName string) {
 		// we need to do this because the field will always be represented in the patch generated below, and this copy
 		// prevents nullifying the field during the patch operation
 		c.condition.LastTransitionTime = remote.LastTransitionTime
+	}
+
+	// overlay the failedSyncReason if necessary
+	var condition *apiv1.NodeCondition
+	if len(c.failedSyncReason) > 0 {
+		// get a copy of the condition before we edit it
+		condition = c.condition.DeepCopy()
+		condition.Reason = c.failedSyncReason
+	} else {
+		condition = c.condition
 	}
 
 	// generate the patch
