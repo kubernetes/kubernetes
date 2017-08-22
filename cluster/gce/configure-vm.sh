@@ -653,14 +653,15 @@ EOF
 
 # This should happen both on cluster initialization and node upgrades.
 #
-#  - Uses the CA_CERT and KUBE_PROXY_TOKEN to generate a kubeconfig file for
-#    the kube-proxy to securely connect to the apiserver.
+#  - When run as static pods, use the CA_CERT and KUBE_PROXY_TOKEN to generate a
+#    kubeconfig file for the kube-proxy to securely connect to the apiserver.
+#  - When run as a daemonset, generate a kubeconfig file specific to service account.
 function create-salt-kubeproxy-auth() {
   local -r kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+  local kubeconfig_content=""
   if [ ! -e "${kube_proxy_kubeconfig_file}" ]; then
-    mkdir -p /srv/salt-overlay/salt/kube-proxy
-    (umask 077;
-        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+      kubeconfig_content="\
 apiVersion: v1
 kind: Config
 users:
@@ -676,7 +677,33 @@ contexts:
     cluster: local
     user: kube-proxy
   name: service-account-context
-current-context: service-account-context
+current-context: service-account-context"
+    else
+      # Generate kubeconfig specific to service account.
+      kubeconfig_content="\
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://${KUBERNETES_MASTER_NAME}
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: default
+  name: default
+current-context: default
+users:
+- name: default
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token"
+    fi
+    mkdir -p /srv/salt-overlay/salt/kube-proxy
+    (umask 077;
+        cat > "${kube_proxy_kubeconfig_file}" <<EOF
+${kubeconfig_content}
 EOF
 )
   fi

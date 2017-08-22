@@ -164,10 +164,16 @@
   {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 {% endif -%}
 
-{% set node_labels = "" %}
-{% if pillar['node_labels'] is defined -%}
-  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
-{% endif -%}
+{% set kube_proxy_ds_label = "" %}
+{% if grains['roles'][0] != 'kubernetes-master' and pillar.get('kube_proxy_daemonset', '').lower() == 'true' %}
+  # Add kube-proxy daemonset label to node to avoid situation during cluster
+  # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+  {% set kube_proxy_ds_label = "beta.kubernetes.io/kube-proxy-ds-ready=true," %}
+{% endif %}
+{% set node_labels = kube_proxy_ds_label + pillar['node_labels'] %}
+{% if node_labels != "" %}
+  {% set node_labels="--node-labels=" + node_labels %}
+{% endif %}
 
 {% set node_taints = "" %}
 {% if pillar['node_taints'] is defined -%}
