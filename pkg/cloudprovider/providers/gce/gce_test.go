@@ -17,10 +17,15 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"golang.org/x/oauth2/google"
 	"reflect"
 	"strings"
 	"testing"
+
+	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
+	computev1 "google.golang.org/api/compute/v1"
 )
 
 func TestExtraKeyInConfig(t *testing.T) {
@@ -435,5 +440,55 @@ func TestGenerateCloudConfigs(t *testing.T) {
 		if !reflect.DeepEqual(cloudConfig, tc.cloudConfig) {
 			t.Errorf("Expecting cloud config: %v, but got %v", tc.cloudConfig, cloudConfig)
 		}
+	}
+}
+
+func TestConvertToV1Operation(t *testing.T) {
+	v1Op := getTestOperation()
+	enc, _ := v1Op.MarshalJSON()
+	var op interface{}
+	var alphaOp computealpha.Operation
+	var betaOp computebeta.Operation
+
+	if err := json.Unmarshal(enc, &alphaOp); err != nil {
+		t.Errorf("Failed to unmarshal operation: %v", err)
+	}
+
+	if err := json.Unmarshal(enc, &betaOp); err != nil {
+		t.Errorf("Failed to unmarshal operation: %v", err)
+	}
+
+	op = convertToV1Operation(&alphaOp)
+	if _, ok := op.(*computev1.Operation); ok {
+		if !reflect.DeepEqual(op, v1Op) {
+			t.Errorf("Failed to maintain consistency across conversion")
+		}
+	} else {
+		t.Errorf("Expect output to be type v1 operation, but got %v", op)
+	}
+
+	op = convertToV1Operation(&betaOp)
+	if _, ok := op.(*computev1.Operation); ok {
+		if !reflect.DeepEqual(op, v1Op) {
+			t.Errorf("Failed to maintain consistency across conversion")
+		}
+	} else {
+		t.Errorf("Expect output to be type v1 operation, but got %v", op)
+	}
+}
+
+func getTestOperation() *computev1.Operation {
+	return &computev1.Operation{
+		Name:        "test",
+		Description: "test",
+		Id:          uint64(12345),
+		Error: &computev1.OperationError{
+			Errors: []*computev1.OperationErrorErrors{
+				{
+					Code:    "555",
+					Message: "error",
+				},
+			},
+		},
 	}
 }
