@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conntrack.go",
+        "port.go",
         "utils.go",
     ],
     visibility = ["//visibility:public"],
@@ -20,6 +21,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "conntrack_test.go",
+        "port_test.go",
         "utils_test.go",
     ],
     library = ":go_default_library",
