@@ -25,6 +25,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+LOCAL_NODE_LABELS="${NODE_LABELS:-}"
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -80,6 +82,21 @@ function get-calico-typha-cpu {
   echo "${typha_cpu}"
 }
 
+# Prepare node labels specifically for master or node.
+function prepare-node-labels {
+  # Labels for node.
+  if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+      # Add kube-proxy daemonset label to node to avoid situation during cluster
+      # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+      if [[ -n "${LOCAL_NODE_LABELS:-}" ]]; then
+        LOCAL_NODE_LABELS="${LOCAL_NODE_LABELS},beta.kubernetes.io/kube-proxy-ds-ready=true"
+      else
+        LOCAL_NODE_LABELS="beta.kubernetes.io/kube-proxy-ds-ready=true"
+      fi
+    fi
+  fi
+}
 
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
@@ -921,8 +938,8 @@ function start-kubelet {
   if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
     flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
   fi
-  if [[ -n "${NODE_LABELS:-}" ]]; then
-    flags+=" --node-labels=${NODE_LABELS}"
+  if [[ -n "${LOCAL_NODE_LABELS:-}" ]]; then
+    flags+=" --node-labels=${LOCAL_NODE_LABELS}"
   fi
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
@@ -1003,11 +1020,13 @@ function prepare-log-file {
   chown root:root $1
 }
 
-# Starts kube-proxy pod.
-function start-kube-proxy {
-  echo "Start kube-proxy pod"
-  prepare-log-file /var/log/kube-proxy.log
-  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/kube-proxy.manifest"
+# Prepares parameters for kube-proxy manifest.
+# $1 source path of kube-proxy manifest.
+# $2 true for daemonset manifest; false for static pod. Default to false.
+function prepare-kube-proxy-manifest-variables {
+  local -r src_file=$1;
+  local -r is_daemonset_manifest=${2:-false}
+
   remove-salt-config-comments "${src_file}"
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
@@ -1027,7 +1046,12 @@ function start-kube-proxy {
   fi
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="env:\n    - name: KUBE_CACHE_MUTATION_DETECTOR\n    value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+    # Daemonset manifest needs a different indent.
+    if [ ${is_daemonset_manifest} = true ]; then
+      container_env="env:\n        - name: KUBE_CACHE_MUTATION_DETECTOR\n          value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+    else
+      container_env="env:\n    - name: KUBE_CACHE_MUTATION_DETECTOR\n      value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+    fi
   fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
@@ -1039,6 +1063,15 @@ function start-kube-proxy {
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
+}
+
+# Starts kube-proxy pod.
+function start-kube-proxy {
+  echo "Start kube-proxy pod"
+  prepare-log-file /var/log/kube-proxy.log
+  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/kube-proxy.manifest"
+  prepare-kube-proxy-manifest-variables "${src_file}"
+
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -1641,6 +1674,10 @@ function start-kube-addons {
   setup-addon-manifests "addons" "rbac"
 
   # Set up manifests of other addons.
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+    prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml" true
+    setup-addon-manifests "addons" "kube-proxy"
+  fi
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] || \
@@ -1898,6 +1935,7 @@ fi
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
 assemble-docker-flags
+prepare-node-labels
 start-kubelet
 
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -1912,7 +1950,9 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-lb-controller
   start-rescheduler
 else
-  start-kube-proxy
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    start-kube-proxy
+  fi
   # Kube-registry-proxy.
   if [[ "${ENABLE_CLUSTER_REGISTRY:-}" == "true" ]]; then
     start-kube-registry-proxy
