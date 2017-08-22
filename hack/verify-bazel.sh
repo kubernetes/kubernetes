@@ -20,6 +20,13 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+if [[ ! -f "${KUBE_ROOT}/vendor/BUILD" ]]; then
+  echo "${KUBE_ROOT}/vendor/BUILD does not exist."
+  echo
+  echo "Run ./hack/update-bazel.sh"
+  exit 1
+fi
+
 # Remove generated files prior to running kazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
