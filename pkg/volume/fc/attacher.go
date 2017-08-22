@@ -29,13 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 type fcAttacher struct {
 	host    volume.VolumeHost
 	manager diskManager
-	exe     exec.Interface
 }
 
 var _ volume.Attacher = &fcAttacher{}
@@ -46,7 +44,6 @@ func (plugin *fcPlugin) NewAttacher() (volume.Attacher, error) {
 	return &fcAttacher{
 		host:    plugin.host,
 		manager: &FCUtil{},
-		exe:     exec.New(),
 	}, nil
 }
 
@@ -126,7 +123,6 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 type fcDetacher struct {
 	mounter mount.Interface
 	manager diskManager
-	exe     exec.Interface
 }
 
 var _ volume.Detacher = &fcDetacher{}
@@ -135,7 +131,6 @@ func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
 		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 		manager: &FCUtil{},
-		exe:     exec.New(),
 	}, nil
 }
 
