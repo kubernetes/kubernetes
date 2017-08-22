@@ -68,6 +68,11 @@ const (
 	errorStatus  = "ERROR"
 
 	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
+
+	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
+	// to indicate that we want an internal loadbalancer service.
+	// If the value of ServiceAnnotationLoadBalancerInternal is false, it indicates that we want an external loadbalancer service. Default to true.
+	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
 )
 
 // LoadBalancer implementation for LBaaS v1
@@ -501,7 +506,7 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	return nil
 }
 
-func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loadbalancers.LoadBalancer, error) {
+func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, internalAnnotation bool) (*loadbalancers.LoadBalancer, error) {
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
@@ -509,7 +514,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loa
 	}
 
 	loadBalancerIP := service.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
+	if loadBalancerIP != "" && internalAnnotation {
 		createOpts.VipAddress = loadBalancerIP
 	}
 
@@ -626,6 +631,24 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
 	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
 
+	var internalAnnotation bool
+	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "true")
+	switch internal {
+	case "true":
+		glog.V(4).Infof("Ensure an internal loadbalancer service.")
+		internalAnnotation = true
+	case "false":
+		if len(floatingPool) != 0 {
+			glog.V(4).Infof("Ensure an external loadbalancer service.")
+			internalAnnotation = false
+		} else {
+			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when service.beta.kubernetes.io/openstack-internal-load-balancer is false")
+		}
+	default:
+		return nil, fmt.Errorf("unknow service.beta.kubernetes.io/openstack-internal-load-balancer annotation: %v, specify \"true\" or \"false\".",
+			internal)
+	}
+
 	// Check for TCP protocol on each port
 	// TODO: Convert all error messages to use an event recorder
 	for _, port := range ports {
@@ -661,7 +684,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			return nil, fmt.Errorf("Error getting loadbalancer %s: %v", name, err)
 		}
 		glog.V(2).Infof("Creating loadbalancer %s", name)
-		loadbalancer, err = lbaas.createLoadBalancer(apiService, name)
+		loadbalancer, err = lbaas.createLoadBalancer(apiService, name, internalAnnotation)
 		if err != nil {
 			// Unknown error, retry later
 			return nil, fmt.Errorf("Error creating loadbalancer %s: %v", name, err)
@@ -855,12 +878,18 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	if err != nil && err != ErrNotFound {
 		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
-	if floatIP == nil && floatingPool != "" {
+	if floatIP == nil && floatingPool != "" && !internalAnnotation {
 		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: floatingPool,
 			PortID:            portID,
 		}
+
+		loadBalancerIP := apiService.Spec.LoadBalancerIP
+		if loadBalancerIP != "" {
+			floatIPOpts.FloatingIP = loadBalancerIP
+		}
+
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
 			return nil, fmt.Errorf("Error creating LB floatingip %+v: %v", floatIPOpts, err)
@@ -1284,6 +1313,24 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lb.opts.FloatingNetworkId)
 	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
 
+	var internalAnnotation bool
+	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "true")
+	switch internal {
+	case "true":
+		glog.V(4).Infof("Ensure an internal loadbalancer service.")
+		internalAnnotation = true
+	case "false":
+		if len(floatingPool) != 0 {
+			glog.V(4).Infof("Ensure an external loadbalancer service.")
+			internalAnnotation = false
+		} else {
+			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when service.beta.kubernetes.io/openstack-internal-load-balancer is false")
+		}
+	default:
+		return nil, fmt.Errorf("unknow service.beta.kubernetes.io/openstack-internal-load-balancer annotation: %v, specify \"true\" or \"false\".",
+			internal)
+	}
+
 	ports := apiService.Spec.Ports
 	if len(ports) > 1 {
 		return nil, fmt.Errorf("multiple ports are not supported in openstack v1 load balancers")
@@ -1394,7 +1441,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	}
 
 	loadBalancerIP := apiService.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
+	if loadBalancerIP != "" && internalAnnotation {
 		createOpts.Address = loadBalancerIP
 	}
 
@@ -1407,11 +1454,17 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 
 	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
 
-	if floatingPool != "" {
+	if floatingPool != "" && !internalAnnotation {
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: floatingPool,
 			PortID:            vip.PortID,
 		}
+
+		loadBalancerIP := apiService.Spec.LoadBalancerIP
+		if loadBalancerIP != "" {
+			floatIPOpts.FloatingIP = loadBalancerIP
+		}
+
 		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
 		if err != nil {
 			return nil, fmt.Errorf("Error creating floatingip for openstack load balancer %s: %v", name, err)
