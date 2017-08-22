@@ -92,7 +92,7 @@ var _ = SIGDescribe("Networking", func() {
 	})
 
 	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
-	SIGDescribe("Granular Checks: Services [Slow]", func() {
+	Describe("Granular Checks: Services [Slow]", func() {
 
 		It("should function for pod-Service: http", func() {
 			config := framework.NewNetworkingTestConfig(f)
