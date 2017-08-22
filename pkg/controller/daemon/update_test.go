@@ -17,6 +17,7 @@ limitations under the License.
 package daemon
 
 import (
+	"strconv"
 	"testing"
 
 	apps "k8s.io/api/apps/v1beta2"
@@ -37,7 +38,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.Spec.TemplateGeneration++
+	increaseTemplateGeneration(t, ds)
 	manager.dsStore.Update(ds)
 
 	clearExpectations(t, manager, ds, podControl)
@@ -63,6 +64,18 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	clearExpectations(t, manager, ds, podControl)
 }
 
+func increaseTemplateGeneration(t *testing.T, ds *apps.DaemonSet) {
+	if ds.Annotations == nil {
+		ds.Annotations = map[string]string{apps.DeprecatedTemplateGeneration: "1"}
+	} else {
+		templateGeneration, err := getTemplateGeneration(ds)
+		if err != nil {
+			t.Errorf("failed to parse template generation %s: %v", ds.Annotations[apps.DeprecatedTemplateGeneration], err)
+		}
+		ds.Annotations[apps.DeprecatedTemplateGeneration] = strconv.FormatInt(templateGeneration+1, 10)
+	}
+}
+
 func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	ds := newDaemonSet("foo")
 	manager, podControl, _ := newTestController(ds)
@@ -76,7 +89,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.Spec.TemplateGeneration++
+	increaseTemplateGeneration(t, ds)
 	manager.dsStore.Update(ds)
 
 	// new pods are not ready numUnavailable == maxUnavailable
@@ -102,7 +115,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
 	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
-	ds.Spec.TemplateGeneration++
+	increaseTemplateGeneration(t, ds)
 	manager.dsStore.Update(ds)
 
 	// all old pods are unavailable so should be removed

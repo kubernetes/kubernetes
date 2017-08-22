@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -902,7 +903,11 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
-	template := util.CreatePodTemplate(ds.Spec.Template, ds.Spec.TemplateGeneration, hash)
+	templateGeneration, err := getTemplateGeneration(ds)
+	if err != nil {
+		return err
+	}
+	template := util.CreatePodTemplate(ds.Spec.Template, templateGeneration, hash)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
@@ -950,6 +955,18 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 		errors = append(errors, err)
 	}
 	return utilerrors.NewAggregate(errors)
+}
+
+func getTemplateGeneration(ds *apps.DaemonSet) (int64, error) {
+	templateGeneration := int64(0)
+	if templateGenerationStr, _ := ds.Annotations[apps.DeprecatedTemplateGeneration]; len(templateGenerationStr) > 0 {
+		var err error
+		templateGeneration, err = strconv.ParseInt(templateGenerationStr, 10, 64)
+		if err != nil {
+			return int64(0), fmt.Errorf("failed to parse DaemonSet templateGeneration %s: %v", templateGenerationStr, err)
+		}
+	}
+	return templateGeneration, nil
 }
 
 func storeDaemonSetStatus(dsClient clientgoapps.DaemonSetInterface, ds *apps.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
@@ -1031,7 +1048,11 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash 
 						numberAvailable++
 					}
 				}
-				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod, hash) {
+				templateGeneration, err := getTemplateGeneration(ds)
+				if err != nil {
+					return err
+				}
+				if util.IsPodUpdated(templateGeneration, pod, hash) {
 					updatedNumberScheduled++
 				}
 			}
