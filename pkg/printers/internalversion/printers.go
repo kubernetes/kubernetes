@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -432,6 +433,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
+
+	initializerConfigurationColumnDefinitions := []metav1alpha1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Initializers", Type: "integer", Description: admissionregistrationv1alpha1.InitializerConfiguration{}.SwaggerDoc()["initializers"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(initializerConfigurationColumnDefinitions, printInitializerConfiguration)
+	h.TableHandler(initializerConfigurationColumnDefinitions, printInitializerConfigurationList)
 
 	AddDefaultHandlers(h)
 }
@@ -1800,6 +1809,26 @@ func printControllerRevisionList(list *apps.ControllerRevisionList, options prin
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printControllerRevision(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printInitializerConfiguration(obj *admissionregistrationv1alpha1.InitializerConfiguration, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	row := metav1alpha1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, len(obj.Initializers), translateTimestamp(obj.CreationTimestamp))
+	return []metav1alpha1.TableRow{row}, nil
+}
+
+func printInitializerConfigurationList(list *admissionregistrationv1alpha1.InitializerConfigurationList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
+	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printInitializerConfiguration(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

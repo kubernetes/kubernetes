@@ -142,6 +142,10 @@ var ResourcesShortcutStatic = []ResourceShortcuts{
 		ShortForm: schema.GroupResource{Group: "extensions", Resource: "psp"},
 		LongForm:  schema.GroupResource{Group: "extensions", Resource: "podSecurityPolicies"},
 	},
+	{
+		ShortForm: schema.GroupResource{Group: "admissionregistration.k8s.io", Resource: "ic"},
+		LongForm:  schema.GroupResource{Group: "admissionregistration.k8s.io", Resource: "initializerconfiguration"},
+	},
 }
 
 // ResourceShortFormFor looks up for a short form of resource names.
