@@ -33,6 +33,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
+        "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/util/version:go_default_library",

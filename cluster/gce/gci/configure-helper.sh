@@ -653,7 +653,6 @@ clusters:
   cluster:
     server: https://${apiserver_address}
     certificate-authority: ${CA_CERT_BUNDLE_PATH}
-    server: https://${KUBERNETES_MASTER_NAME}
 contexts:
 - context:
     cluster: local

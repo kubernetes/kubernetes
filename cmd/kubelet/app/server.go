@@ -205,7 +205,7 @@ func initConfigz(kc *kubeletconfiginternal.KubeletConfiguration) (*configz.Confi
 }
 
 // makeEventRecorder sets up kubeDeps.Recorder if its nil. Its a no-op otherwise.
-func makeEventRecorder(s *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
+func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) {
 	if kubeDeps.Recorder != nil {
 		return
 	}
@@ -384,7 +384,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 	}
 
 	// Setup event recorder if required.
-	makeEventRecorder(&s.KubeletConfiguration, kubeDeps, nodeName)
+	makeEventRecorder(kubeDeps, nodeName)
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
@@ -616,7 +616,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		return err
 	}
 	// Setup event recorder if required.
-	makeEventRecorder(kubeCfg, kubeDeps, nodeName)
+	makeEventRecorder(kubeDeps, nodeName)
 
 	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
 	//                so that I could remove the associated fields from KubeletConfiginternal. I would
@@ -756,8 +756,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(
-	flags *options.KubeletFlags,
+func BootstrapKubeletConfigController(flags *options.KubeletFlags,
 	defaultConfig *kubeletconfiginternal.KubeletConfiguration) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
@@ -778,10 +777,7 @@ func BootstrapKubeletConfigController(
 	}
 
 	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController, err := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
-	}
+	kubeletConfigController := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
 	kubeletConfig, err := kubeletConfigController.Bootstrap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)

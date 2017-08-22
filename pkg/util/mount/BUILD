@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "exec.go",
         "fake.go",
         "mount.go",
         "mount_unsupported.go",
@@ -45,10 +46,7 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    deps = [
-        "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/exec/testing:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/utils/exec/testing:go_default_library"],
 )
 
 filegroup(

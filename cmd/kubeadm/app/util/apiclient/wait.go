@@ -88,3 +88,22 @@ func WaitForStaticPodToDisappear(client clientset.Interface, timeout time.Durati
 		return false, nil
 	})
 }
+
+// TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned
+func TryRunCommand(f func() error, failureThreshold uint8) error {
+	var numFailures uint8
+	return wait.PollImmediate(5*time.Second, 20*time.Minute, func() (bool, error) {
+		err := f()
+		if err != nil {
+			numFailures++
+			// If we've reached the maximum amount of failures, error out
+			if numFailures == failureThreshold {
+				return false, err
+			}
+			// Retry
+			return false, nil
+		}
+		// The last f() call was a success!
+		return true, nil
+	})
+}

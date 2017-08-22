@@ -224,7 +224,7 @@ type VolumeHost interface {
 	GetCloudProvider() cloudprovider.Interface
 
 	// Get mounter interface.
-	GetMounter() mount.Interface
+	GetMounter(pluginName string) mount.Interface
 
 	// Get writer interface for writing data to disk.
 	GetWriter() io.Writer
@@ -243,6 +243,9 @@ type VolumeHost interface {
 
 	// Returns a function that returns a configmap.
 	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+
+	// Returns an interface that should be used to execute any utilities in volume plugins
+	GetExec(pluginName string) mount.Exec
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)

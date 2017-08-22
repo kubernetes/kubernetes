@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -93,11 +92,6 @@ func TestRemoteConfigMapUID(t *testing.T) {
 }
 
 func TestRemoteConfigMapDownload(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	cm := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "name",
@@ -124,7 +118,7 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 		// successful download
 		{"object exists and reference is correct",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}},
-			&configMapCheckpoint{kubeletCodecs, cm}, ""},
+			&configMapCheckpoint{cm}, ""},
 	}
 
 	for _, c := range cases {

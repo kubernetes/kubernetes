@@ -17,8 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
@@ -41,8 +39,6 @@ func NewCmdMarkMaster() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			nodeName := args[0]
-			fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", nodeName)
-
 			return markmasterphase.MarkMaster(client, nodeName)
 		},
 	}

@@ -72,8 +72,10 @@ var (
 		kubectl top pod -l name=myLabel`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &TopPodOptions{}
+func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cobra.Command {
+	if options == nil {
+		options = &TopPodOptions{}
+	}
 
 	cmd := &cobra.Command{
 		Use:     "pod [NAME | -l label]",

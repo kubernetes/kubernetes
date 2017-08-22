@@ -705,7 +705,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		SchedulerCache: f.schedulerCache,
 		Ecache:         f.equivalencePodCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodeLister{f.nodeLister},
+		NodeLister:          &nodePredicateLister{f.nodeLister},
 		Algorithm:           algo,
 		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
@@ -720,12 +720,12 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}, nil
 }
 
-type nodeLister struct {
+type nodePredicateLister struct {
 	corelisters.NodeLister
 }
 
-func (n *nodeLister) List() ([]*v1.Node, error) {
-	return n.NodeLister.List(labels.Everything())
+func (n *nodePredicateLister) List() ([]*v1.Node, error) {
+	return n.ListWithPredicate(getNodeConditionPredicate())
 }
 
 func (f *ConfigFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
@@ -770,10 +770,11 @@ func (f *ConfigFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ControllerLister:  f.controllerLister,
 		ReplicaSetLister:  f.replicaSetLister,
 		StatefulSetLister: f.statefulSetLister,
-		NodeLister:        &nodeLister{f.nodeLister},
-		NodeInfo:          &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
-		PVInfo:            &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
-		PVCInfo:           &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
+		// All fit predicates only need to consider schedulable nodes.
+		NodeLister: &nodePredicateLister{f.nodeLister},
+		NodeInfo:   &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
+		PVInfo:     &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
+		PVCInfo:    &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
 		HardPodAffinitySymmetricWeight: f.hardPodAffinitySymmetricWeight,
 	}, nil
 }
@@ -790,6 +791,34 @@ func (f *ConfigFactory) getNextPod() *v1.Pod {
 
 func (f *ConfigFactory) ResponsibleForPod(pod *v1.Pod) bool {
 	return f.schedulerName == pod.Spec.SchedulerName
+}
+
+func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
+	return func(node *v1.Node) bool {
+		for i := range node.Status.Conditions {
+			cond := &node.Status.Conditions[i]
+			// We consider the node for scheduling only when its:
+			// - NodeReady condition status is ConditionTrue,
+			// - NodeOutOfDisk condition status is ConditionFalse,
+			// - NodeNetworkUnavailable condition status is ConditionFalse.
+			if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
+				glog.V(4).Infof("Ignoring node %v with %v condition status %v", node.Name, cond.Type, cond.Status)
+				return false
+			}
+		}
+		// Ignore nodes that are marked unschedulable
+		if node.Spec.Unschedulable {
+			glog.V(4).Infof("Ignoring node %v since it is unschedulable", node.Name)
+			return false
+		}
+		return true
+	}
 }
 
 // unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
