@@ -404,6 +404,21 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[i].Name)
 			return &status, nil
 		}
+		// Enforce the StatefulSet invariants - we do this without respect to the Pod's readiness so that the endpoints
+		// controller can be notified of identity changes if a Pod becomes unready due to a DNS inconsistency with respect
+		// to the Pods identity.
+		if !identityMatches(set, replicas[i]) || !storageMatches(set, replicas[i]) {
+			// Make a deep copy so we don't mutate the shared cache
+			copy, err := scheme.Scheme.DeepCopy(replicas[i])
+			if err != nil {
+				return &status, err
+			}
+			replica := copy.(*v1.Pod)
+			if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
+				return &status, err
+			}
+		}
+
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
@@ -414,19 +429,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Name,
 				replicas[i].Name)
 			return &status, nil
-		}
-		// Enforce the StatefulSet invariants
-		if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) {
-			continue
-		}
-		// Make a deep copy so we don't mutate the shared cache
-		copy, err := scheme.Scheme.DeepCopy(replicas[i])
-		if err != nil {
-			return &status, err
-		}
-		replica := copy.(*v1.Pod)
-		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
-			return &status, err
 		}
 	}
 

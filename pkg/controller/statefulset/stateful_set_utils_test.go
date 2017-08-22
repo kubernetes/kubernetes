@@ -128,6 +128,22 @@ func TestUpdateIdentity(t *testing.T) {
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to update the Pods namespace")
 	}
+	pod.Spec.Hostname = ""
+	pod.Spec.Subdomain = ""
+	updateIdentity(set, pod)
+	if pod.Spec.Hostname != pod.Name || pod.Spec.Subdomain != set.Spec.ServiceName {
+		t.Errorf("want hostame=%s subdomain=%s got hostname=%s subdomain=%s",
+			pod.Name,
+			set.Spec.ServiceName,
+			pod.Spec.Hostname,
+			set.Spec.ServiceName)
+	}
+	pod.Spec.Hostname = "foo"
+	pod.Spec.Subdomain = "bar"
+	updateIdentity(set, pod)
+	if pod.Spec.Hostname != "foo" || pod.Spec.Subdomain != "bar" {
+		t.Errorf("want hostame=foo subdomain=bar got hostname=%s subdomain=%s", pod.Spec.Hostname, set.Spec.ServiceName)
+	}
 }
 
 func TestUpdateStorage(t *testing.T) {
