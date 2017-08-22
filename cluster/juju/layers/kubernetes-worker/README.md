@@ -49,7 +49,7 @@ With the "registry" action that is part for the kubernetes-worker charm, you can
 
 Create the relevant authentication files. Let's say you want user `userA` to authenticate with the password `passwordA`. Then you'll do :
 
-    echo "userA:passwordA" > htpasswd-plain
+    echo -n "userA:passwordA" > htpasswd-plain
     htpasswd -c -b -B htpasswd userA passwordA
 
 (the `htpasswd` program comes with the `apache2-utils` package)
