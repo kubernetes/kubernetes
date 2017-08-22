@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -36,7 +38,12 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 	spec := GetEtcdPodSpec(cfg)
 
 	// writes etcd StaticPod to disk
-	return staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec)
+	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+		return err
+	}
+
+	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	return nil
 }
 
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current MasterConfiguration

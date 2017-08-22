@@ -196,7 +196,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	}
 
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
-	fmt.Printf("[init] Using Authorization mode: %v\n", cfg.AuthorizationModes)
+	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
 
 	// Warn about the limitations with the current cloudprovider solution.
 	if cfg.CloudProvider != "" {
@@ -276,7 +276,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 5: Set up the node bootstrap tokens
 	if !i.skipTokenPrint {
-		fmt.Printf("[token] Using token: %s\n", i.cfg.Token)
+		fmt.Printf("[bootstraptoken] Using token: %s\n", i.cfg.Token)
 	}
 
 	// Create the default node bootstrap token
