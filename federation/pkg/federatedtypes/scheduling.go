@@ -135,7 +135,7 @@ func initializeScheduleState(fedObj pkgruntime.Object, clusterNames []string) (m
 	for _, clusterName := range clusterNames {
 		replicaState := ReplicaScheduleState{
 			isSelected: false,
-			replicas:   0,
+			replicas:   int64(0),
 		}
 		if hpaControlled {
 			if isSelected(hpaSelectedClusters.Names, clusterName) {
@@ -237,10 +237,14 @@ func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster
 	var action ScheduleAction = ""
 	specReplicas := int32(0)
 	// If the cluster has been selected (isSelected = true; for example by hpa)
-	// and the obj does not get any replicas, then it should create one with
-	// 0 replicas (which can then be scaled by hpa in that cluster).
-	// On the other hand we keep the action as "unassigned" if this cluster was
-	// not selected, and let the sync controller decide what to do.
+	// and the obj does not get any replicas, then it should create a target obj with
+	// 1 replica (which can then be scaled by hpa in that cluster). We cannot set
+	// this to 0 replicas as if the hpa does not get cpu/metrics usage (which it
+	// cannot with 0 replicas), the replicas in this cluster wont scale.
+	// On the other hand, if this cluster was not selected (either by hpa logic or by
+	// the schedule logic here), we keep the action as "unassigned" and target obj replicas
+	// as 0, and let the sync controller decide what to do (which already has logic to
+	// handle this particular scenario)
 	if clusterScheduleState.isSelected {
 		specReplicas = int32(clusterScheduleState.replicas)
 		action = ActionAdd
@@ -260,14 +264,21 @@ func simpleSchedule(scheduleState map[string]*ReplicaScheduleState, key string, 
 	for clusterName, state := range scheduleState {
 		// Get and consider replicas only for those clusters which are selected by hpa.
 		if state.isSelected {
-			obj, exists, err := objectGetter(clusterName, key)
+			obj, _, err := objectGetter(clusterName, key)
 			if err != nil {
 				return nil, err
 			}
-			if !exists {
-				continue
-			}
+
 			state.replicas = reflect.ValueOf(obj).Elem().FieldByName("Spec").FieldByName("Replicas").Elem().Int()
+			// if the target object does not exist in this cluster, but hpa
+			// has selected it
+			// OR
+			// if a deployment exists and for some reason, replicas are 0, we give this
+			// target obj 1 replica so that hpa can scale it if needed.
+			if state.replicas <= int64(0) {
+				state.replicas = int64(1)
+			}
+
 		}
 	}
 
@@ -280,7 +291,7 @@ func schedule(planner *planner.Planner, obj pkgruntime.Object, key string, clust
 	scheduleResult, overflow := planner.Plan(replicas, clusterNames, currentReplicasPerCluster, estimatedCapacity, key)
 
 	// Ensure that all current clusters end up in the scheduling result.
-	// initialState, is preinitialized with all isSelected to false.
+	// initialState, is pre-initialized with isSelected set to to false for all clusters.
 	result := initialState
 	for clusterName := range currentReplicasPerCluster {
 		// We consider 0 replicas equaling to no need of creating a new object.

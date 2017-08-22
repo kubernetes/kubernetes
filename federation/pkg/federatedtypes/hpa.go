@@ -227,6 +227,8 @@ type hpaLists struct {
 	availableMin sets.String
 	// Stores names of those clusters which can offer max.
 	availableMax sets.String
+	// Stores names of those clusters which need max.
+	neededMax sets.String
 	// Stores names of those clusters which do not have hpa yet.
 	noHpa sets.String
 }
@@ -498,6 +500,7 @@ func updateStatus(fedHpa *autoscalingv1.HorizontalPodAutoscaler, newStatus hpaFe
 func (a *HpaAdapter) prepareForScheduling(currentObjs map[string]pkgruntime.Object) (hpaLists, replicaNums, map[string]*replicaNums) {
 	lists := hpaLists{
 		availableMax: sets.NewString(),
+		neededMax:    sets.NewString(),
 		availableMin: sets.NewString(),
 		noHpa:        sets.NewString(),
 	}
@@ -516,6 +519,8 @@ func (a *HpaAdapter) prepareForScheduling(currentObjs map[string]pkgruntime.Obje
 
 		if a.maxReplicasReducible(obj) {
 			lists.availableMax.Insert(cluster)
+		} else if a.maxReplicasNeeded(obj) {
+			lists.neededMax.Insert(cluster)
 		}
 		if a.minReplicasReducible(obj) {
 			lists.availableMin.Insert(cluster)
@@ -632,26 +637,26 @@ func reduceMaxReplicas(excessMax int32, availableMaxList sets.String, scheduled 
 // scheduled: schedule state which will be updated in place.
 func (a *HpaAdapter) distributeMaxReplicas(toDistributeMax int32, lists hpaLists, rdc replicaNums,
 	currentObjs map[string]pkgruntime.Object, scheduled map[string]*replicaNums) int32 {
-	for cluster, replicas := range scheduled {
-		if toDistributeMax == 0 {
-			break
-		}
-		if replicas == nil {
-			continue
-		}
-		if a.maxReplicasNeeded(currentObjs[cluster]) {
-			replicas.max++
-			if lists.availableMax.Len() > 0 {
-				popped, notEmpty := lists.availableMax.PopAny()
-				if notEmpty {
-					// Boundary checks have happened earlier in
-					// minReplicasReducible().
-					scheduled[popped].max--
-				}
+	// First we go through the pool of clusters which need max,
+	// and give replicas from those which offer max.
+	if lists.neededMax.Len() > 0 && lists.availableMax.Len() > 0 {
+		// we move only 1 replica per reconcile.
+		for _, cluster := range lists.neededMax.UnsortedList() {
+			popped, notEmpty := lists.availableMax.PopAny()
+			if notEmpty {
+				scheduled[popped].max--
+				scheduled[cluster].max++
+				toDistributeMax--
 			}
-			// Any which ways utilise available map replicas
-			toDistributeMax--
+			if lists.availableMax.Len() <= 0 {
+				break
+			}
 		}
+	}
+
+	// We might have exhausted all replicas already.
+	if toDistributeMax <= 0 {
+		return toDistributeMax
 	}
 
 	// If we have new clusters where we can  give our replicas,
@@ -695,15 +700,15 @@ func (a *HpaAdapter) distributeMaxReplicas(toDistributeMax int32, lists hpaLists
 					scheduled[cluster] = replicas
 				}
 				// First give away max from clusters offering them.
-				// This case especially helps getting hpa into newly joining
-				// clusters.
 				if lists.availableMax.Len() > 0 {
 					popped, notEmpty := lists.availableMax.PopAny()
 					if notEmpty {
-						// Boundary checks have happened earlier in
-						// minReplicasReducible().
-						replicas.max++
-						scheduled[popped].max--
+						if a.maxReplicasNeeded(currentObjs[cluster]) {
+							replicas.max++
+							scheduled[popped].max--
+						}
+						// If max replicas are not needed for this cluster, we retain the
+						// replica with the cluster which is offering max.
 						toDistributeMax--
 						continue
 					}
@@ -865,7 +870,8 @@ func isPristine(hpa *autoscalingv1.HorizontalPodAutoscaler) bool {
 // time since this hpa scaled. Its used to avoid fast thrashing.
 func (a *HpaAdapter) isScaleable(hpa *autoscalingv1.HorizontalPodAutoscaler) bool {
 	if hpa.Status.LastScaleTime == nil {
-		return false
+		// We consider the object to be scaleable if not scaled so far
+		return true
 	}
 	t := hpa.Status.LastScaleTime.Add(a.scaleForbiddenWindow)
 	if t.After(time.Now()) {
@@ -921,12 +927,27 @@ func (a *HpaAdapter) minReplicasReducible(obj pkgruntime.Object) bool {
 
 func (a *HpaAdapter) maxReplicasNeeded(obj pkgruntime.Object) bool {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
+
+	// There probably is no metric data available for this target.
+	// Or there is metric data but current usage is lesser then target.
+	// We need not increase replicas on this.
+	if (hpa.Status.CurrentCPUUtilizationPercentage != nil &&
+		hpa.Spec.TargetCPUUtilizationPercentage != nil &&
+		(*hpa.Status.CurrentCPUUtilizationPercentage <
+			*hpa.Spec.TargetCPUUtilizationPercentage)) ||
+		hpa.Status.DesiredReplicas == 0 {
+		return false
+	}
+
 	if !a.isScaleable(hpa) {
 		return false
 	}
 
-	if (hpa.Status.CurrentReplicas == hpa.Status.DesiredReplicas) &&
-		(hpa.Status.CurrentReplicas == hpa.Spec.MaxReplicas) {
+	// We don't compare CurrentReplicas to DesiredReplicas (rather then MaxReplicas)
+	// as behaviour observed on local hpa is sometimes such that current can go
+	// beyond max/desired, but desired replicas are always capped by max.
+	if (hpa.Status.CurrentReplicas >= hpa.Status.DesiredReplicas) &&
+		(hpa.Status.DesiredReplicas == hpa.Spec.MaxReplicas) {
 		return true
 	}
 	return false
