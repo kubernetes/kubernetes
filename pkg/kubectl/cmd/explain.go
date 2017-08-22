@@ -34,7 +34,7 @@ var (
 	explainLong = templates.LongDesc(`
 		Documentation of resources.
 
-		` + validResources)
+		%[1]s`)
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
@@ -49,7 +49,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   i18n.T("Documentation of resources"),
-		Long:    explainLong,
+		Long:    fmt.Sprintf(explainLong, f.ValidResourcesFromDiscoveryClient()),
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExplain(f, out, cmdErr, cmd, args)
@@ -65,7 +65,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintf(cmdErr, "You must specify the type of resource to explain. %s\n", validResources)
+		fmt.Fprintf(cmdErr, "You must specify the type of resource to explain. %s\n", f.ValidResourcesFromDiscoveryClient())
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {
