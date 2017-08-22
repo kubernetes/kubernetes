@@ -93,7 +93,8 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	notDevMnt, err := v.plugin.mounter.IsLikelyNotMountPoint(dir)
+	mounter := v.plugin.host.GetMounter(v.plugin.GetPluginName())
+	notDevMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Error(log("IsLikelyNotMountPoint test failed for dir %v", dir))
 		return err
@@ -186,21 +187,22 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
-	dev, _, err := mount.GetDeviceNameFromMount(v.plugin.mounter, dir)
+	mounter := v.plugin.host.GetMounter(v.plugin.GetPluginName())
+	dev, _, err := mount.GetDeviceNameFromMount(mounter, dir)
 	if err != nil {
 		glog.Errorf(log("failed to get reference count for volume: %s", dir))
 		return err
 	}
 
 	glog.V(4).Info(log("attempting to unmount %s", dir))
-	if err := util.UnmountPath(dir, v.plugin.mounter); err != nil {
+	if err := util.UnmountPath(dir, mounter); err != nil {
 		glog.Error(log("teardown failed while unmounting dir %s: %v ", dir, err))
 		return err
 	}
 	glog.V(4).Info(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
-	deviceBusy, err := v.plugin.mounter.DeviceOpened(dev)
+	deviceBusy, err := mounter.DeviceOpened(dev)
 	if err != nil {
 		glog.Error(log("teardown unable to get status for device %s: %v", dev, err))
 		return err
