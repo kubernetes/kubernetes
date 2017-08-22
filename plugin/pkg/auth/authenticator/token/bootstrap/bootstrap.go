@@ -136,7 +136,7 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 
 	return &user.DefaultInfo{
 		Name:   bootstrapapi.BootstrapUserPrefix + string(id),
-		Groups: []string{bootstrapapi.BootstrapGroup},
+		Groups: []string{bootstrapapi.BootstrapDefaultGroup},
 	}, true, nil
 }
 
