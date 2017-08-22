@@ -761,13 +761,15 @@ func shouldDeleteDependents(e *Store, accessor metav1.Object, options *metav1.De
 	return false
 }
 
-// deletionFinalizers returns the deletion finalizers we should set on the
-// object and a bool indicate they did or did not change.
+// deletionFinalizersForGarbageCollection analyzes the object and delete options
+// to determine whether the object is in need of finalization by the garbage
+// collector. If so, returns the set of deletion finalizers to apply and a bool
+// indicating whether the finalizer list has changed and is in need of updating.
 //
-// Because the finalizers created here are only cleared by the garbage
-// collector, deletionFinalizers always returns false when garbage collection is
-// disabled for the Store.
-func deletionFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
+// The finalizers returned are intended to be handled by the garbage collector.
+// If garbage collection is disabled for the store, this function returns false
+// to ensure finalizers aren't set which will never be cleared.
+func deletionFinalizersForGarbageCollection(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
 	if !e.EnableGarbageCollection {
 		return false, []string{}
 	}
@@ -858,7 +860,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 			if err != nil {
 				return nil, err
 			}
-			needsUpdate, newFinalizers := deletionFinalizers(e, existingAccessor, options)
+			needsUpdate, newFinalizers := deletionFinalizersForGarbageCollection(e, existingAccessor, options)
 			if needsUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
@@ -950,7 +952,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 
 	// Handle combinations of graceful deletion and finalization by issuing
 	// the correct updates.
-	shouldUpdateFinalizers, _ := deletionFinalizers(e, accessor, options)
+	shouldUpdateFinalizers, _ := deletionFinalizersForGarbageCollection(e, accessor, options)
 	// TODO: remove the check, because we support no-op updates now.
 	if graceful || pendingFinalizers || shouldUpdateFinalizers {
 		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
