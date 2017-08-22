@@ -992,7 +992,7 @@ func TestPodToEndpointAddress(t *testing.T) {
 	}
 }
 
-func TestPodAddressChanged(t *testing.T) {
+func TestPodChanged(t *testing.T) {
 	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	ns := "test"
 	addPods(podStore, ns, 1, 1, 0)
@@ -1004,33 +1004,40 @@ func TestPodAddressChanged(t *testing.T) {
 	oldPod := pods[0].(*v1.Pod)
 	newPod := oldPod.DeepCopy()
 
-	if podAddressChanged(oldPod, newPod) {
-		t.Errorf("Expected address to be unchanged for copied pod")
+	if podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be unchanged for copied pod")
 	}
 
 	newPod.Spec.NodeName = "changed"
-	if !podAddressChanged(oldPod, newPod) {
-		t.Errorf("Expected address to be changed for pod with NodeName changed")
+	if !podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be changed for pod with NodeName changed")
 	}
 	newPod.Spec.NodeName = oldPod.Spec.NodeName
 
 	newPod.ObjectMeta.ResourceVersion = "changed"
-	if podAddressChanged(oldPod, newPod) {
-		t.Errorf("Expected address to be unchanged for pod with only ResourceVersion changed")
+	if podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be unchanged for pod with only ResourceVersion changed")
 	}
 	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
 
 	newPod.Status.PodIP = "1.2.3.1"
-	if !podAddressChanged(oldPod, newPod) {
-		t.Errorf("Expected address to be changed with pod IP address change")
+	if !podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be changed with pod IP address change")
 	}
 	newPod.Status.PodIP = oldPod.Status.PodIP
 
 	newPod.ObjectMeta.Name = "wrong-name"
-	if !podAddressChanged(oldPod, newPod) {
-		t.Errorf("Expected address to be changed with pod name change")
+	if !podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be changed with pod name change")
 	}
 	newPod.ObjectMeta.Name = oldPod.ObjectMeta.Name
+
+	saveConditions := oldPod.Status.Conditions
+	oldPod.Status.Conditions = nil
+	if !podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be changed with pod readiness change")
+	}
+	oldPod.Status.Conditions = saveConditions
 }
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
