@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -103,7 +102,8 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 		glog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
-	if out, err := exec.New().Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
+	exec := plugin.host.GetExec(plugin.GetPluginName())
+	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
 		glog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
