@@ -142,10 +142,9 @@ func getAvailableDriveLetter() (string, error) {
 }
 
 func normalizeWindowsPath(path string) string {
-	normalizedPath := path
-	if strings.HasPrefix(path, "/") {
+	normalizedPath := strings.Replace(path, "/", "\\", -1)
+	if strings.HasPrefix(normalizedPath, "\\") {
 		normalizedPath = "c:" + normalizedPath
 	}
-
-	return strings.Replace(normalizedPath, "/", "\\", -1)
+	return normalizedPath
 }
