@@ -388,8 +388,13 @@ func (c *Converter) IsConversionIgnored(inType, outType reflect.Type) bool {
 }
 
 func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
-	_, found := c.conversionFuncs.fns[typePair{inType, outType}]
-	return found
+	if _, found := c.conversionFuncs.fns[typePair{inType, outType}]; found {
+		return true
+	}
+	if _, found := c.generatedConversionFuncs.fns[typePair{inType, outType}]; found {
+		return true
+	}
+	return false
 }
 
 func (c *Converter) ConversionFuncValue(inType, outType reflect.Type) (reflect.Value, bool) {

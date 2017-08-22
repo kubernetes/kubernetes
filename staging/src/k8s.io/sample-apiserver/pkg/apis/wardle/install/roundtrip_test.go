@@ -23,5 +23,5 @@ import (
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForAPIGroup(t, Install, nil)
+	roundtrip.RoundTripTestForAPIGroup(t, Install, nil, &roundtrip.Exceptions{})
 }

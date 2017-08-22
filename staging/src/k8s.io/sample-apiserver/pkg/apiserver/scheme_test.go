@@ -23,5 +23,5 @@ import (
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, nil)
+	roundtrip.RoundTripTestForScheme(t, Scheme, nil, &roundtrip.Exceptions{})
 }
