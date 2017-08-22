@@ -38,6 +38,6 @@ func (cm *containerManagerImpl) Start(_ *v1.Node, _ ActivePodsFunc) error {
 	return nil
 }
 
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &containerManagerImpl{}, nil
 }

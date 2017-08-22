@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -596,6 +595,15 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
 			}
 		}
+
+		initialCapacity := kl.containerManager.GetCapacity()
+		if initialCapacity != nil {
+			for k, v := range initialCapacity {
+				if v1helper.IsExtendedResourceName(k) {
+					node.Status.Capacity[k] = v
+				}
+			}
+		}
 	}
 
 	// Set Allocatable.
@@ -621,27 +629,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			value.Set(0)
 		}
 		node.Status.Allocatable[k] = value
-	}
-
-	hdlr := kl.containerManager.GetDevicePluginHandler()
-	if hdlr == nil {
-		return
-	}
-
-	for k, v := range hdlr.Devices() {
-		key := v1.ResourceName(v1.ResourceOpaqueIntPrefix + k)
-
-		var n int64
-		n = 0
-
-		for _, d := range v {
-			if d.Health == pluginapi.Unhealthy {
-				continue
-			}
-			n++
-		}
-
-		node.Status.Capacity[key] = *resource.NewQuantity(n, resource.DecimalSI)
 	}
 }
 

@@ -18,13 +18,13 @@ package deviceplugin
 
 import (
 	"fmt"
-	"strings"
 
+	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-// CloneDevice clones a pluginapi.Device
-func CloneDevice(d *pluginapi.Device) *pluginapi.Device {
+func cloneDevice(d *pluginapi.Device) *pluginapi.Device {
 	return &pluginapi.Device{
 		ID:     d.ID,
 		Health: d.Health,
@@ -36,41 +36,26 @@ func copyDevices(devs map[string]*pluginapi.Device) []*pluginapi.Device {
 	var clones []*pluginapi.Device
 
 	for _, d := range devs {
-		clones = append(clones, CloneDevice(d))
+		clones = append(clones, cloneDevice(d))
 	}
 
 	return clones
 }
 
-// GetDevice returns the Device if a boolean signaling if the device was found or not
-func GetDevice(d *pluginapi.Device, devs []*pluginapi.Device) (*pluginapi.Device, bool) {
-	name := DeviceKey(d)
-
-	for _, d := range devs {
-		if DeviceKey(d) != name {
-			continue
-		}
-
-		return d, true
-	}
-
-	return nil, false
-}
-
-// IsResourceNameValid returns an error if the resource is invalid,
+// IsResourceNameValid returns an error if the resource is invalid or is not an
+// extended resource name.
 func IsResourceNameValid(resourceName string) error {
 	if resourceName == "" {
-		return fmt.Errorf(pluginapi.ErrEmptyResourceName)
+		return fmt.Errorf(errEmptyResourceName)
 	}
-
-	if strings.ContainsAny(resourceName, pluginapi.InvalidChars) {
-		return fmt.Errorf(pluginapi.ErrInvalidResourceName)
+	if !IsDeviceName(v1.ResourceName(resourceName)) {
+		return fmt.Errorf(errInvalidResourceName)
 	}
-
 	return nil
 }
 
-// DeviceKey returns the Key of a device
-func DeviceKey(d *pluginapi.Device) string {
-	return d.ID
+// IsDeviceName returns whether the ResourceName points to an extended resource
+// name exported by a device plugin.
+func IsDeviceName(k v1.ResourceName) bool {
+	return v1helper.IsExtendedResourceName(k)
 }

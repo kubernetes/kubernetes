@@ -49,18 +49,18 @@ func TestNewManagerImplStart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, pluginSocket, serverSocket string, callback MonitorCallback) (Manager, *MockDevicePlugin) {
+func setup(t *testing.T, devs []*pluginapi.Device, pluginSocket, serverSocket string, callback MonitorCallback) (Manager, *Stub) {
 	m, err := NewManagerImpl(serverSocket, callback)
 	require.NoError(t, err)
 
-	p := NewMockDevicePlugin(devs, pluginSocket)
+	p := NewDevicePluginStub(devs, pluginSocket)
 	err = p.Start()
 	require.NoError(t, err)
 
 	return m, p
 }
 
-func cleanup(t *testing.T, m Manager, p *MockDevicePlugin) {
+func cleanup(t *testing.T, m Manager, p *Stub) {
 	p.Stop()
 	m.Stop()
 }

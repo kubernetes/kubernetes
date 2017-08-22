@@ -30,22 +30,4 @@ const (
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = DevicePluginPath + "kubelet.sock"
-
-	// InvalidChars are the characters that may not appear in a Vendor or Kind field
-	InvalidChars = "/ "
-
-	// ErrFailedToDialDevicePlugin is the error raised when the device plugin could not be
-	// reached on the registered socket
-	ErrFailedToDialDevicePlugin = "Failed to dial device plugin:"
-	// ErrUnsuportedVersion is the error raised when the device plugin uses an API version not
-	// supported by the Kubelet registry
-	ErrUnsuportedVersion = "Unsupported version"
-	// ErrDevicePluginAlreadyExists is the error raised when a device plugin with the
-	// same Resource Name tries to register itself
-	ErrDevicePluginAlreadyExists = "Another device plugin already registered this Resource Name"
-	// ErrInvalidResourceName is the error raised when a device plugin is registering
-	// itself with an invalid ResourceName
-	ErrInvalidResourceName = "The Resource Name is invalid"
-	// ErrEmptyResourceName is the error raised when the resource name field is empty
-	ErrEmptyResourceName = "Invalid Empty ResourceName"
 )

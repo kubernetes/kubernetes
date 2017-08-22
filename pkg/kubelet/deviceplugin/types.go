@@ -17,58 +17,54 @@ limitations under the License.
 package deviceplugin
 
 import (
-	"sync"
-
-	"google.golang.org/grpc"
-
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-// MonitorCallback is the function called when a device becomes
-// unhealthy (or healthy again)
-// Updated contains the most recent state of the Device
+// MonitorCallback is the function called when a device's health state changes,
+// or new devices are reported, or old devices are deleted.
+// Updated contains the most recent state of the Device.
 type MonitorCallback func(resourceName string, added, updated, deleted []*pluginapi.Device)
 
-// Manager manages the Device Plugins running on a machine
+// Manager manages all the Device Plugins running on a node.
 type Manager interface {
-	// Start starts the gRPC service
+	// Start starts the gRPC Registration service.
 	Start() error
 	// Devices is the map of devices that have registered themselves
 	// against the manager.
-	// The map key is the ResourceName of the device plugins
+	// The map key is the ResourceName of the device plugins.
 	Devices() map[string][]*pluginapi.Device
 
-	// Allocate is calls the gRPC Allocate on the device plugin
-	Allocate(string, []*pluginapi.Device) (*pluginapi.AllocateResponse, error)
+	// Allocate takes resourceName and list of device Ids, and calls the
+	// gRPC Allocate on the device plugin matching the resourceName.
+	Allocate(string, []string) (*pluginapi.AllocateResponse, error)
 
-	// Stop stops the manager
+	// Stop stops the manager.
 	Stop() error
 }
 
-// ManagerImpl is the structure in charge of managing Device Plugins
-type ManagerImpl struct {
-	socketname string
-	socketdir  string
-
-	Endpoints map[string]*endpoint // Key is ResourceName
-	mutex     sync.Mutex
-
-	callback MonitorCallback
-
-	server *grpc.Server
-}
-
+// TODO: evaluate whether we need these error definitions.
 const (
-	// ErrDevicePluginUnknown is the error raised when the device Plugin returned by Monitor is not know by the Device Plugin manager
-	ErrDevicePluginUnknown = "Manager does not have device plugin for device:"
-	// ErrDeviceUnknown is the error raised when the device returned by Monitor is not know by the Device Plugin manager
-	ErrDeviceUnknown = "Could not find device in it's Device Plugin's Device List:"
-	// ErrBadSocket is the error raised when the registry socket path is not absolute
-	ErrBadSocket = "Bad socketPath, must be an absolute path:"
-	// ErrRemoveSocket is the error raised when the registry could not remove the existing socket
-	ErrRemoveSocket = "Failed to remove socket while starting device plugin registry, with error"
-	// ErrListenSocket is the error raised when the registry could not listen on the socket
-	ErrListenSocket = "Failed to listen to socket while starting device plugin registry, with error"
-	// ErrListAndWatch is the error raised when ListAndWatch ended unsuccessfully
-	ErrListAndWatch = "ListAndWatch ended unexpectedly for device plugin %s with error %v"
+	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
+	// reached on the registered socket
+	errFailedToDialDevicePlugin = "failed to dial device plugin:"
+	// errUnsuportedVersion is the error raised when the device plugin uses an API version not
+	// supported by the Kubelet registry
+	errUnsuportedVersion = "unsupported API version by the Kubelet registry"
+	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
+	// same Resource Name tries to register itself
+	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"
+	// errInvalidResourceName is the error raised when a device plugin is registering
+	// itself with an invalid ResourceName
+	errInvalidResourceName = "the ResourceName is invalid"
+	// errEmptyResourceName is the error raised when the resource name field is empty
+	errEmptyResourceName = "invalid Empty ResourceName"
+
+	// errBadSocket is the error raised when the registry socket path is not absolute
+	errBadSocket = "bad socketPath, must be an absolute path:"
+	// errRemoveSocket is the error raised when the registry could not remove the existing socket
+	errRemoveSocket = "failed to remove socket while starting device plugin registry, with error"
+	// errListenSocket is the error raised when the registry could not listen on the socket
+	errListenSocket = "failed to listen to socket while starting device plugin registry, with error"
+	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully
+	errListAndWatch = "listAndWatch ended unexpectedly for device plugin %s with error %v"
 )

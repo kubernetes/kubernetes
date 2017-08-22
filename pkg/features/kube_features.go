@@ -73,11 +73,11 @@ const (
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
 
-	// owner: @vishh
+	// owner: @jiayingz
 	// alpha: v1.8
 	//
 	// Enables support for Device Plugins
-	// Only Nvidia GPUs are supported as of v1.8.
+	// Only Nvidia GPUs are tested as of v1.8.
 	DevicePlugins utilfeature.Feature = "DevicePlugins"
 
 	// owner: @gmarek

@@ -352,8 +352,13 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	useClusterFirstPolicy := false
+	opts, err := kl.containerManager.GetResources(pod, container, kl.GetActivePods())
+	if err != nil {
+		return nil, false, err
+	}
+
 	cgroupParent := kl.GetPodCgroupParent(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
+	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, false, err
@@ -364,19 +369,23 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices, err = kl.makeDevices(pod, container)
+	devices, err := kl.makeDevices(pod, container)
 	if err != nil {
 		return nil, false, err
 	}
+	opts.Devices = append(opts.Devices, devices...)
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
 		return nil, false, err
 	}
-	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
+	opts.Mounts = append(opts.Mounts, mounts...)
+
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
 		return nil, false, err
 	}
+	opts.Envs = append(opts.Envs, envs...)
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
 	// Docker for Windows has a bug where only directories can be mounted

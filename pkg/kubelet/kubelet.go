@@ -754,15 +754,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins) {
-		devicePluginHdlr, err := cm.NewDevicePluginHandler()
-		if err != nil {
-			return nil, err
-		}
-
-		klet.containerManager.SetDevicePluginHandler(devicePluginHdlr)
-
-	}
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
 	if len(kubeCfg.ExperimentalMounterPath) != 0 {

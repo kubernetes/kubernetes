@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
@@ -29,15 +30,27 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-// NewManagerImpl creates a new manager on the socket `socketPath` and can
-// rebuild state from devices and available []Device.
-// f is the callback that is called when a device becomes unhealthy
+// ManagerImpl is the structure in charge of managing Device Plugins.
+type ManagerImpl struct {
+	socketname string
+	socketdir  string
+
+	Endpoints map[string]*endpoint // Key is ResourceName
+	mutex     sync.Mutex
+
+	callback MonitorCallback
+
+	server *grpc.Server
+}
+
+// NewManagerImpl creates a new manager on the socket `socketPath`.
+// f is the callback that is called when a device becomes unhealthy.
 // socketPath is present for testing purposes in production this is pluginapi.KubeletSocket
 func NewManagerImpl(socketPath string, f MonitorCallback) (*ManagerImpl, error) {
 	glog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
-		return nil, fmt.Errorf(ErrBadSocket+" %v", socketPath)
+		return nil, fmt.Errorf(errBadSocket+" %v", socketPath)
 	}
 
 	dir, file := filepath.Split(socketPath)
@@ -50,6 +63,26 @@ func NewManagerImpl(socketPath string, f MonitorCallback) (*ManagerImpl, error) 
 	}, nil
 }
 
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		// TODO: skip checkpoint file and check for file type.
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Start starts the Device Plugin Manager
 func (m *ManagerImpl) Start() error {
 	glog.V(2).Infof("Starting Device Plugin manager")
@@ -57,14 +90,20 @@ func (m *ManagerImpl) Start() error {
 	socketPath := filepath.Join(m.socketdir, m.socketname)
 	os.MkdirAll(m.socketdir, 0755)
 
+	// Removes all stale sockets in m.socketdir. Device plugins can monitor
+	// this and use it as a signal to re-register with the new Kubelet.
+	if err := removeContents(m.socketdir); err != nil {
+		glog.Errorf("Fail to clean up stale contents under %s: %+v", m.socketdir, err)
+	}
+
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-		glog.Errorf(ErrRemoveSocket+" %+v", err)
+		glog.Errorf(errRemoveSocket+" %+v", err)
 		return err
 	}
 
 	s, err := net.Listen("unix", socketPath)
 	if err != nil {
-		glog.Errorf(ErrListenSocket+" %+v", err)
+		glog.Errorf(errListenSocket+" %+v", err)
 		return err
 	}
 
@@ -77,39 +116,33 @@ func (m *ManagerImpl) Start() error {
 }
 
 // Devices is the map of devices that are known by the Device
-// Plugin manager with the Kind of the devices as key
+// Plugin manager with the kind of the devices as key
 func (m *ManagerImpl) Devices() map[string][]*pluginapi.Device {
-	glog.V(2).Infof("Devices called")
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	devs := make(map[string][]*pluginapi.Device)
 	for k, e := range m.Endpoints {
-		glog.V(2).Infof("Endpoint: %+v: %+v", k, e)
-		e.mutex.Lock()
-		devs[k] = copyDevices(e.devices)
-		e.mutex.Unlock()
+		glog.V(3).Infof("Endpoint: %+v: %+v", k, e)
+		devs[k] = e.getDevices()
 	}
 
 	return devs
 }
 
-// Allocate is the call that you can use to allocate a set of Devices
-func (m *ManagerImpl) Allocate(resourceName string,
-	devs []*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+// Allocate is the call that you can use to allocate a set of devices
+// from the registered device plugins.
+func (m *ManagerImpl) Allocate(resourceName string, devs []string) (*pluginapi.AllocateResponse, error) {
 
 	if len(devs) == 0 {
 		return nil, nil
 	}
 
-	glog.Infof("Recieved request for devices %v for device plugin %s",
+	glog.V(3).Infof("Recieved allocation request for devices %v for device plugin %s",
 		devs, resourceName)
-
+	m.mutex.Lock()
 	e, ok := m.Endpoints[resourceName]
+	m.mutex.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("Unknown Device Plugin %s", resourceName)
 	}
@@ -117,45 +150,46 @@ func (m *ManagerImpl) Allocate(resourceName string,
 	return e.allocate(devs)
 }
 
-// Register registers a device plugin
+// Register registers a device plugin.
 func (m *ManagerImpl) Register(ctx context.Context,
 	r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
-
 	glog.V(2).Infof("Got request for Device Plugin %s", r.ResourceName)
-
 	if r.Version != pluginapi.Version {
-		return &pluginapi.Empty{},
-			fmt.Errorf(pluginapi.ErrUnsuportedVersion)
+		return &pluginapi.Empty{}, fmt.Errorf(errUnsuportedVersion)
 	}
 
 	if err := IsResourceNameValid(r.ResourceName); err != nil {
 		return &pluginapi.Empty{}, err
 	}
 
-	if _, ok := m.Endpoints[r.ResourceName]; ok {
-		return &pluginapi.Empty{},
-			fmt.Errorf(pluginapi.ErrDevicePluginAlreadyExists)
-	}
-
+	// TODO: for now, always accepts newest device plugin. Later may consider to
+	// add some policies here, e.g., verify whether an old device plugin with the
+	// same resource name is still alive to determine whether we want to accept
+	// the new registration.
 	go m.addEndpoint(r)
 
 	return &pluginapi.Empty{}, nil
 }
 
-// Stop is the function that can stop the gRPC server
+// Stop is the function that can stop the gRPC server.
 func (m *ManagerImpl) Stop() error {
 	for _, e := range m.Endpoints {
 		e.stop()
 	}
-
 	m.server.Stop()
-
 	return nil
 }
 
 func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
-	socketPath := filepath.Join(m.socketdir, r.Endpoint)
+	// Stops existing endpoint if there is any.
+	m.mutex.Lock()
+	old, ok := m.Endpoints[r.ResourceName]
+	m.mutex.Unlock()
+	if ok && old != nil {
+		old.stop()
+	}
 
+	socketPath := filepath.Join(m.socketdir, r.Endpoint)
 	e, err := newEndpoint(socketPath, r.ResourceName, m.callback)
 	if err != nil {
 		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
@@ -172,22 +206,15 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		e.listAndWatch(stream)
 
 		m.mutex.Lock()
-		e.mutex.Lock()
-
-		delete(m.Endpoints, r.ResourceName)
+		if old, ok := m.Endpoints[r.ResourceName]; ok && old == e {
+			delete(m.Endpoints, r.ResourceName)
+		}
 		glog.V(2).Infof("Unregistered endpoint %v", e)
-
-		e.mutex.Unlock()
 		m.mutex.Unlock()
 	}()
 
 	m.mutex.Lock()
-	e.mutex.Lock()
-
 	m.Endpoints[r.ResourceName] = e
 	glog.V(2).Infof("Registered endpoint %v", e)
-
-	e.mutex.Unlock()
 	m.mutex.Unlock()
-
 }

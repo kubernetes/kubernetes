@@ -25,7 +25,7 @@ import (
 )
 
 func TestCloneDevice(t *testing.T) {
-	d := CloneDevice(&pluginapi.Device{ID: "ADeviceId", Health: pluginapi.Healthy})
+	d := cloneDevice(&pluginapi.Device{ID: "ADeviceId", Health: pluginapi.Healthy})
 
 	require.Equal(t, d.ID, "ADeviceId")
 	require.Equal(t, d.Health, pluginapi.Healthy)
@@ -40,15 +40,14 @@ func TestCopyDevices(t *testing.T) {
 	require.Len(t, devs, 1)
 }
 
-func TestGetDevice(t *testing.T) {
-	devs := []*pluginapi.Device{
-		{ID: "ADeviceId", Health: pluginapi.Healthy},
-	}
-
-	_, ok := GetDevice(&pluginapi.Device{ID: "AnotherDeviceId"}, devs)
-	require.False(t, ok)
-
-	d, ok := GetDevice(&pluginapi.Device{ID: "ADeviceId"}, devs)
-	require.True(t, ok)
-	require.Equal(t, d, devs[0])
+func TestIsResourceName(t *testing.T) {
+	require.NotNil(t, IsResourceNameValid(""))
+	require.NotNil(t, IsResourceNameValid("cpu"))
+	require.NotNil(t, IsResourceNameValid("name1"))
+	require.NotNil(t, IsResourceNameValid("alpha.kubernetes.io/name1"))
+	require.NotNil(t, IsResourceNameValid("beta.kubernetes.io/name1"))
+	require.NotNil(t, IsResourceNameValid("kubernetes.io/name1"))
+	require.Nil(t, IsResourceNameValid("domain1.io/name1"))
+	require.Nil(t, IsResourceNameValid("alpha.domain1.io/name1"))
+	require.Nil(t, IsResourceNameValid("beta.domain1.io/name1"))
 }

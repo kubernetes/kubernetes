@@ -17,7 +17,6 @@ limitations under the License.
 package deviceplugin
 
 import (
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -32,8 +31,7 @@ var (
 )
 
 func TestNewEndpoint(t *testing.T) {
-	wd, _ := os.Getwd()
-	socket := path.Join(wd, esocketName)
+	socket := path.Join("/tmp", esocketName)
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -44,8 +42,7 @@ func TestNewEndpoint(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	wd, _ := os.Getwd()
-	socket := path.Join(wd, esocketName)
+	socket := path.Join("/tmp", esocketName)
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -70,8 +67,7 @@ func TestList(t *testing.T) {
 }
 
 func TestListAndWatch(t *testing.T) {
-	wd, _ := os.Getwd()
-	socket := path.Join(wd, esocketName)
+	socket := path.Join("/tmp", esocketName)
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -118,8 +114,8 @@ func TestListAndWatch(t *testing.T) {
 
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*MockDevicePlugin, *endpoint) {
-	p := NewMockDevicePlugin(devs, socket)
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *endpoint) {
+	p := NewDevicePluginStub(devs, socket)
 
 	err := p.Start()
 	require.NoError(t, err)
@@ -130,7 +126,7 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *MockDevicePlugin, e *endpoint) {
+func ecleanup(t *testing.T, p *Stub, e *endpoint) {
 	p.Stop()
 	e.stop()
 }
