@@ -206,6 +206,17 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 
 		It("should create a ScheduledJob", func() {
 			framework.SkipIfMissingResource(f.ClientPool, ScheduledJobGroupVersionResource, f.Namespace.Name)
+			serverVersion, err := c.Discovery().ServerVersion()
+			if err != nil {
+				framework.Failf("Failed to get server version: %v", err)
+			}
+			sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
+			if err != nil {
+				framework.Failf("Failed to parse server version: %v", err)
+			}
+			if !sv.LessThan(utilversion.MustParseSemantic("v1.8.0")) {
+				framework.Skipf("scheduledjob/v2alpha1 generator not supported on cluster starting in 1.8")
+			}
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
