@@ -215,7 +215,14 @@ func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 		}}
 }
 
-func podAddressChanged(oldPod, newPod *v1.Pod) bool {
+func podChanged(oldPod, newPod *v1.Pod) bool {
+	// If the pod's readiness has changed, the associated endpoint address
+	// will move from the unready endpoints set to the ready endpoints.
+	// So for the purposes of an endpoint, a readiness change on a pod
+	// means we have a changed pod.
+	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
+		return true
+	}
 	// Convert the pod to an EndpointAddress, clear inert fields,
 	// and see if they are the same.
 	newEndpointAddress := podToEndpointAddress(newPod)
@@ -257,7 +264,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	podChanged := podAddressChanged(oldPod, newPod)
+	podChangedFlag := podChanged(oldPod, newPod)
 
 	// Check if the pod labels have changed, indicating a possibe
 	// change in the service membership
@@ -268,7 +275,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 	}
 
 	// If both the pod and labels are unchanged, no update is needed
-	if !podChanged && !labelsChanged {
+	if !podChangedFlag && !labelsChanged {
 		return
 	}
 
@@ -284,7 +291,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 			utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
 			return
 		}
-		services = determineNeededServiceUpdates(oldServices, services, podChanged)
+		services = determineNeededServiceUpdates(oldServices, services, podChangedFlag)
 	}
 
 	for key := range services {
