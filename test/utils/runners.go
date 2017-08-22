@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -1218,11 +1219,11 @@ func (config *DaemonConfig) Run() error {
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",
 	}
-	daemon := &extensions.DaemonSet{
+	daemon := &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: nameLabel,
@@ -1239,7 +1240,7 @@ func (config *DaemonConfig) Run() error {
 		},
 	}
 
-	_, err := config.Client.Extensions().DaemonSets(config.Namespace).Create(daemon)
+	_, err := config.Client.AppsV1beta2().DaemonSets(config.Namespace).Create(daemon)
 	if err != nil {
 		return fmt.Errorf("Error creating DaemonSet %v: %v", config.Name, err)
 	}

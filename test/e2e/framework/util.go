@@ -51,6 +51,7 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
+	apps "k8s.io/api/apps/v1beta2"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -77,6 +78,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -2797,8 +2799,10 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
+	case appsinternal.Kind("DaemonSet"):
+		return c.AppsV1beta2().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
 		return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
@@ -2814,8 +2818,10 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+	case appsinternal.Kind("DaemonSet"):
+		return c.AppsV1beta2().DaemonSets(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().DaemonSets(ns).Delete(name, deleteOption)
 	case batchinternal.Kind("Job"):
 		return c.Batch().Jobs(ns).Delete(name, deleteOption)
 	default:
@@ -2830,6 +2836,8 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	case *extensions.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.Deployment:
+		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *apps.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *extensions.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
@@ -3089,10 +3097,10 @@ func WaitForPartialEvents(c clientset.Interface, ns string, objOrRef runtime.Obj
 	})
 }
 
-type updateDSFunc func(*extensions.DaemonSet)
+type updateDSFunc func(*apps.DaemonSet)
 
-func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *extensions.DaemonSet, err error) {
-	daemonsets := c.ExtensionsV1beta1().DaemonSets(namespace)
+func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *apps.DaemonSet, err error) {
+	daemonsets := c.AppsV1beta2().DaemonSets(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {

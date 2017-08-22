@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -282,7 +283,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
 			dtc.ClientSets[i%numberOfClients],
 			dtc.InternalClientsets[i%numberOfClients],
-			extensions.Kind("DaemonSet"),
+			apps.Kind("DaemonSet"),
 			dtc.DaemonConfigs[i].Namespace,
 			dtc.DaemonConfigs[i].Name,
 		))
