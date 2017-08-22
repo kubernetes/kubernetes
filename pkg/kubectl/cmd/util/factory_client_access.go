@@ -55,7 +55,7 @@ import (
 type ring0Factory struct {
 	flags            *pflag.FlagSet
 	clientConfig     clientcmd.ClientConfig
-	discoveryFactory DiscoveryClientFactory
+	discoveryFactory *discoveryFactory
 	clientCache      *ClientCache
 }
 
@@ -72,7 +72,7 @@ func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientA
 
 // NewClientAccessFactoryFromDiscovery allows an external caller to substitute a different discoveryFactory
 // Which allows for the client cache to be built in ring0, but still rely on a custom discovery client
-func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clientcmd.ClientConfig, discoveryFactory DiscoveryClientFactory) ClientAccessFactory {
+func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clientcmd.ClientConfig, discoveryFactory *discoveryFactory) ClientAccessFactory {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	clientCache := NewClientCache(clientConfig, discoveryFactory)
@@ -89,6 +89,7 @@ func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clie
 
 type discoveryFactory struct {
 	clientConfig clientcmd.ClientConfig
+	cacheDir     string
 }
 
 func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
@@ -96,6 +97,9 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.CacheDir = f.cacheDir
+
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -371,6 +375,8 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clientCache.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	flags.StringVar(&f.discoveryFactory.cacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
