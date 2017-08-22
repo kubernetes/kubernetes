@@ -124,6 +124,14 @@ func init() {
 		},
 	})
 	addControllerRole(rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "expand-controller"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},
 		Rules: []rbac.PolicyRule{
 			// the GC controller needs to run list/watches, selective gets, and updates against any resource
