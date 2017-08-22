@@ -94,6 +94,14 @@ func (self *Node) AddPerCoreCache(c Cache) {
 	}
 }
 
+type HugePagesInfo struct {
+	// huge page size (in kB)
+	PageSize uint64 `json:"page_size"`
+
+	// number of huge pages
+	NumPages uint64 `json:"num_pages"`
+}
+
 type DiskInfo struct {
 	// device name
 	Name string `json:"name"`
@@ -157,6 +165,9 @@ type MachineInfo struct {
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
+
+	// HugePages on this machine.
+	HugePages []HugePagesInfo `json:"hugepages"`
 
 	// The machine id
 	MachineID string `json:"machine_id"`
