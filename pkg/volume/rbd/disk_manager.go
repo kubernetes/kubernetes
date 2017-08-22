@@ -77,6 +77,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
 	}
+	glog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
 		volume.SetVolumeOwnership(&b, fsGroup)
