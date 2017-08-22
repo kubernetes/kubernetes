@@ -15,7 +15,7 @@ go_library(
     ],
     deps = [
         "//pkg/controller:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/deploymentv1beta1:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/upgrades:go_default_library",

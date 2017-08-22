@@ -68,7 +68,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"

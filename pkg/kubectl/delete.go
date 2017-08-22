@@ -37,7 +37,7 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 )
 
 const (

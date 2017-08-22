@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	testutils "k8s.io/kubernetes/test/utils"
 )

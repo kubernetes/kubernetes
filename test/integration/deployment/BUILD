@@ -15,7 +15,7 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
-        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/deploymentv1beta1:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],

@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,8 +121,8 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	}
 }
 
-func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
@@ -130,7 +130,7 @@ func newReplicaSet(name string, replicas int) *extensions.ReplicaSet {
 			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
@@ -427,7 +427,7 @@ func TestSortingActivePods(t *testing.T) {
 }
 
 func TestActiveReplicaSetsFiltering(t *testing.T) {
-	var replicaSets []*extensions.ReplicaSet
+	var replicaSets []*apps.ReplicaSet
 	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
 	replicaSets = append(replicaSets, nil)
 	replicaSets = append(replicaSets, newReplicaSet("foo", 1))
