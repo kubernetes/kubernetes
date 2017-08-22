@@ -149,6 +149,7 @@ var _ volume.PersistentVolumePlugin = &sioPlugin{}
 func (p *sioPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
+		api.ReadOnlyMany,
 	}
 }
 

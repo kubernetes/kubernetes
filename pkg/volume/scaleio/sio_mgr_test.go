@@ -99,7 +99,7 @@ func TestMgrCreateVolume(t *testing.T) {
 func TestMgrAttachVolume(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	device, err := mgr.AttachVolume("test-vol-0001")
+	device, err := mgr.AttachVolume("test-vol-0001", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,8 +111,8 @@ func TestMgrAttachVolume(t *testing.T) {
 func TestMgrAttachVolume_AlreadyAttached(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	mgr.AttachVolume("test-vol-0001")
-	dev, err := mgr.AttachVolume("test-vol-0001")
+	mgr.AttachVolume("test-vol-0001", false)
+	dev, err := mgr.AttachVolume("test-vol-0001", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,7 +124,8 @@ func TestMgrAttachVolume_AlreadyAttached(t *testing.T) {
 func TestMgrAttachVolume_VolumeNotFoundError(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	_, err := mgr.AttachVolume("test-vol-0002")
+	_, err := mgr.AttachVolume("test-vol-0002", false)
+
 	if err == nil {
 		t.Error("attachVolume should fail with volume not found error")
 	}
@@ -137,7 +138,7 @@ func TestMgrAttachVolume_WaitForAttachError(t *testing.T) {
 		c := mgr.client.(*fakeSio)
 		close(c.waitAttachCtrl)
 	}()
-	_, err := mgr.AttachVolume("test-vol-0001")
+	_, err := mgr.AttachVolume("test-vol-0001", false)
 	if err == nil {
 		t.Error("attachVolume should fail with attach timeout error")
 	}
@@ -146,7 +147,7 @@ func TestMgrAttachVolume_WaitForAttachError(t *testing.T) {
 func TestMgrDetachVolume(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	mgr.AttachVolume("test-vol-0001")
+	mgr.AttachVolume("test-vol-0001", false)
 	if err := mgr.DetachVolume("test-vol-0001"); err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestMgrDetachVolume(t *testing.T) {
 func TestMgrDetachVolume_VolumeNotFound(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	mgr.AttachVolume("test-vol-0001")
+	mgr.AttachVolume("test-vol-0001", false)
 	err := mgr.DetachVolume("test-vol-0002")
 	if err == nil {
 		t.Fatal("expected a volume not found failure")
@@ -181,7 +182,7 @@ func TestMgrDetachVolume_VolumeNotAttached(t *testing.T) {
 func TestMgrDetachVolume_VolumeAlreadyDetached(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	mgr.AttachVolume("test-vol-0001")
+	mgr.AttachVolume("test-vol-0001", false)
 	mgr.DetachVolume("test-vol-0001")
 	err := mgr.DetachVolume("test-vol-0001")
 	if err != nil {
@@ -192,7 +193,7 @@ func TestMgrDetachVolume_VolumeAlreadyDetached(t *testing.T) {
 func TestMgrDetachVolume_WaitForDetachError(t *testing.T) {
 	mgr := newTestMgr(t)
 	mgr.CreateVolume("test-vol-0001", 8*1024*1024)
-	mgr.AttachVolume("test-vol-0001")
+	mgr.AttachVolume("test-vol-0001", false)
 	err := mgr.DetachVolume("test-vol-0001")
 	if err != nil {
 		t.Error("detachVolume failed")
@@ -227,6 +228,7 @@ type fakeSio struct {
 	waitAttachCtrl chan struct{}
 	waitDetachCtrl chan struct{}
 	devs           map[string]string
+	isMultiMap     bool
 }
 
 func newFakeSio() *fakeSio {
@@ -261,7 +263,8 @@ func (f *fakeSio) CreateVolume(volName string, sizeGB int64) (*siotypes.Volume, 
 	return f.volume, nil
 }
 
-func (f *fakeSio) AttachVolume(id sioVolumeID) error {
+func (f *fakeSio) AttachVolume(id sioVolumeID, multiMaps bool) error {
+	f.isMultiMap = multiMaps
 	_, err := f.Volume(id)
 	if err != nil {
 		return err
