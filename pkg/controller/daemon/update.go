@@ -389,7 +389,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *apps.DaemonSet, nodeToD
 
 	for _, pods := range nodeToDaemonPods {
 		for _, pod := range pods {
-			templateGeneration, err := getTemplateGeneration(ds)
+			templateGeneration, err := GetTemplateGeneration(ds)
 			if err != nil {
 				return newPods, oldPods, err
 			}

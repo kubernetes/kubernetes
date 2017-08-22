@@ -903,7 +903,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
-	templateGeneration, err := getTemplateGeneration(ds)
+	templateGeneration, err := GetTemplateGeneration(ds)
 	if err != nil {
 		return err
 	}
@@ -957,7 +957,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	return utilerrors.NewAggregate(errors)
 }
 
-func getTemplateGeneration(ds *apps.DaemonSet) (int64, error) {
+func GetTemplateGeneration(ds *apps.DaemonSet) (int64, error) {
 	templateGeneration := int64(0)
 	if templateGenerationStr, _ := ds.Annotations[apps.DeprecatedTemplateGeneration]; len(templateGenerationStr) > 0 {
 		var err error
@@ -1048,7 +1048,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash 
 						numberAvailable++
 					}
 				}
-				templateGeneration, err := getTemplateGeneration(ds)
+				templateGeneration, err := GetTemplateGeneration(ds)
 				if err != nil {
 					return err
 				}

@@ -68,7 +68,7 @@ func increaseTemplateGeneration(t *testing.T, ds *apps.DaemonSet) {
 	if ds.Annotations == nil {
 		ds.Annotations = map[string]string{apps.DeprecatedTemplateGeneration: "1"}
 	} else {
-		templateGeneration, err := getTemplateGeneration(ds)
+		templateGeneration, err := GetTemplateGeneration(ds)
 		if err != nil {
 			t.Errorf("failed to parse template generation %s: %v", ds.Annotations[apps.DeprecatedTemplateGeneration], err)
 		}
