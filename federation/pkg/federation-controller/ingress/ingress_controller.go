@@ -256,8 +256,10 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			ingress := obj.(*extensionsv1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			orphanDependents := false
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			propagationPolicy := metav1.DeletePropagationForeground
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &metav1.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			})
 			return err
 		})
 

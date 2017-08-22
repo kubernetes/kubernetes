@@ -189,8 +189,12 @@ func newFederationSyncController(client federationclientset.Interface, adapter f
 		},
 		func(client kubeclientset.Interface, obj pkgruntime.Object) error {
 			qualifiedName := adapter.QualifiedName(obj)
-			orphanDependents := false
-			err := adapter.ClusterDelete(client, qualifiedName, &metav1.DeleteOptions{OrphanDependents: &orphanDependents})
+			// set PropagationPolicy default to Foreground
+			// TODO: make DeleteOptions optional, and support Background
+			propagationPolicy := metav1.DeletePropagationForeground
+			err := adapter.ClusterDelete(client, qualifiedName, &metav1.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			})
 			return err
 		})
 

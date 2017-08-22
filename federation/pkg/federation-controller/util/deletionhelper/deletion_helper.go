@@ -67,9 +67,11 @@ func NewDeletionHelper(
 // Ensures that the given object has both FinalizerDeleteFromUnderlyingClusters
 // and FinalizerOrphan finalizers.
 // We do this so that the controller is always notified when a federation resource is deleted.
-// If user deletes the resource with nil DeleteOptions or
-// DeletionOptions.OrphanDependents = true then the apiserver removes the orphan finalizer
-// and deletion helper does a cascading deletion.
+// If user deletes the resource with nil DeleteOptions or DeletionOptions.OrphanDependents = true,
+// then the federation controller manager just deletes federation resource.
+// if user deletes the resource with DeletionOptions.OrphanDependents = false,
+// then the federation apiserver removes the orphan finalizer and deletion helper
+// does a cascading deletion(deletes federation resource and cluster resources).
 // Otherwise, deletion helper just removes the federation resource and orphans
 // the corresponding resources in underlying clusters.
 // This method should be called before creating objects in underlying clusters.
