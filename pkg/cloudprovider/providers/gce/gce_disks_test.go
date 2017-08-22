@@ -96,7 +96,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	gceProjectId := "test-project"
 	gceRegion := "fake-region"
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate, featureGateErr := NewAlphaFeatureGate([]string{GCEDiskAlphaFeatureGate})
+	alphaFeatureGate, featureGateErr := NewAlphaFeatureGate([]string{AlphaFeatureGCEDisk})
 	if featureGateErr != nil {
 		t.Error(featureGateErr)
 	}
