@@ -261,7 +261,7 @@ func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
 
 func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("glusterfs: mount set up: %s %v %v", dir, !notMnt, err)
+	glog.V(4).Infof("glusterfs: mount setup: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -309,7 +309,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 	if err := os.MkdirAll(p, 0750); err != nil {
-		return fmt.Errorf("glusterfs: mkdir failed: %v", err)
+		return fmt.Errorf("glusterfs: Error creating directory %v: %v", p, err)
 	}
 
 	// adding log-level ERROR to remove noise
@@ -681,7 +681,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
-	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", p.options)
+	glog.V(4).Infof("glusterfs: Provision VolumeOptions %v", p.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
 	if err != nil {
@@ -711,7 +711,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 
 		glog.Errorf("glusterfs: create volume err: %v.", err)
-		return nil, fmt.Errorf("glusterfs: create volume err: %v", err)
+		return nil, fmt.Errorf("glusterfs: create volume error: %v", err)
 	}
 	pv := new(v1.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
