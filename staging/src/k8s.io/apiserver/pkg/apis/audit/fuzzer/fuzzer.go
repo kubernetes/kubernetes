@@ -28,6 +28,7 @@ import (
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(e *audit.Event, c fuzz.Continue) {
+			c.FuzzNoCustom(e)
 			switch c.RandBool() {
 			case true:
 				e.RequestObject = nil
