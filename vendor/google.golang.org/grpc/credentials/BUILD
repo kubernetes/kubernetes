@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "credentials.go",
         "credentials_util_go17.go",
-        "credentials_util_go18.go",
         "credentials_util_pre_go17.go",
     ],
     visibility = ["//visibility:public"],

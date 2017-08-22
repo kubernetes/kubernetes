@@ -5,15 +5,8 @@ go_library(
     srcs = [
         "idna.go",
         "punycode.go",
-        "tables.go",
-        "trie.go",
-        "trieval.go",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/text/secure/bidirule:go_default_library",
-        "//vendor/golang.org/x/text/unicode/norm:go_default_library",
-    ],
 )
 
 filegroup(

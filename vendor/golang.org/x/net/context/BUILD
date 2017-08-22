@@ -5,9 +5,7 @@ go_library(
     srcs = [
         "context.go",
         "go17.go",
-        "go19.go",
         "pre_go17.go",
-        "pre_go19.go",
     ],
     visibility = ["//visibility:public"],
 )

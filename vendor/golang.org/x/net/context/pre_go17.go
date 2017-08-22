@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// An emptyCtx is never canceled, has no values, and has no deadline. It is not
+// An emptyCtx is never canceled, has no values, and has no deadline.  It is not
 // struct{}, since vars of this type must have distinct addresses.
 type emptyCtx int
 
@@ -104,7 +104,7 @@ func propagateCancel(parent Context, child canceler) {
 }
 
 // parentCancelCtx follows a chain of parent references until it finds a
-// *cancelCtx. This function understands how each of the concrete types in this
+// *cancelCtx.  This function understands how each of the concrete types in this
 // package represents its parent.
 func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 	for {
@@ -134,14 +134,14 @@ func removeChild(parent Context, child canceler) {
 	p.mu.Unlock()
 }
 
-// A canceler is a context type that can be canceled directly. The
+// A canceler is a context type that can be canceled directly.  The
 // implementations are *cancelCtx and *timerCtx.
 type canceler interface {
 	cancel(removeFromParent bool, err error)
 	Done() <-chan struct{}
 }
 
-// A cancelCtx can be canceled. When canceled, it also cancels any children
+// A cancelCtx can be canceled.  When canceled, it also cancels any children
 // that implement canceler.
 type cancelCtx struct {
 	Context
@@ -193,8 +193,8 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 }
 
 // WithDeadline returns a copy of the parent context with the deadline adjusted
-// to be no later than d. If the parent's deadline is already earlier than d,
-// WithDeadline(parent, d) is semantically equivalent to parent. The returned
+// to be no later than d.  If the parent's deadline is already earlier than d,
+// WithDeadline(parent, d) is semantically equivalent to parent.  The returned
 // context's Done channel is closed when the deadline expires, when the returned
 // cancel function is called, or when the parent context's Done channel is
 // closed, whichever happens first.
@@ -226,8 +226,8 @@ func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 	return c, func() { c.cancel(true, Canceled) }
 }
 
-// A timerCtx carries a timer and a deadline. It embeds a cancelCtx to
-// implement Done and Err. It implements cancel by stopping its timer then
+// A timerCtx carries a timer and a deadline.  It embeds a cancelCtx to
+// implement Done and Err.  It implements cancel by stopping its timer then
 // delegating to cancelCtx.cancel.
 type timerCtx struct {
 	*cancelCtx
@@ -281,7 +281,7 @@ func WithValue(parent Context, key interface{}, val interface{}) Context {
 	return &valueCtx{parent, key, val}
 }
 
-// A valueCtx carries a key-value pair. It implements Value for that key and
+// A valueCtx carries a key-value pair.  It implements Value for that key and
 // delegates all other calls to the embedded Context.
 type valueCtx struct {
 	Context

@@ -17,7 +17,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/text/cases:go_default_library",
-        "//vendor/golang.org/x/text/language:go_default_library",
         "//vendor/golang.org/x/text/runes:go_default_library",
         "//vendor/golang.org/x/text/secure/bidirule:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
