@@ -7,7 +7,7 @@ for more details about setting up and using the Cluster Federation.
 
 # Building Kubernetes Cluster Federation
 
-Please see the [Kubernetes Development Guide](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/development.md)
+Please see the [Kubernetes Development Guide](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md)
 for initial setup. Once you have the development environment setup
 as explained in that guide, you also need to install [`jq`](https://stedolan.github.io/jq/download/)
 <!-- TODO(madhusudancs): Re-evaluate using jq even in the development
