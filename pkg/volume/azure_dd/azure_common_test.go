@@ -22,9 +22,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type fakeFileInfo struct {
@@ -119,26 +116,7 @@ func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
 }
 
 func TestIoHandler(t *testing.T) {
-	var fcmd fakeexec.FakeCmd
-	fcmd = fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// cat
-			func() ([]byte, error) {
-				return []byte("Msft    \nVirtual Disk \n"), nil
-			},
-			// cat
-			func() ([]byte, error) {
-				return []byte("Msft    \nVirtual Disk \n"), nil
-			},
-		},
-	}
-	fake := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	disk, err := findDiskByLun(lun, &fakeIOHandler{}, &fake)
+	disk, err := findDiskByLun(lun, &fakeIOHandler{})
 	// if no disk matches lun, exit
 	if disk != "/dev/"+devName || err != nil {
 		t.Errorf("no data disk found: disk %v err %v", disk, err)

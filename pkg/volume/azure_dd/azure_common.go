@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -213,13 +212,13 @@ func scsiHostRescan(io ioHandler) {
 	}
 }
 
-func findDiskByLun(lun int, io ioHandler, exe exec.Interface) (string, error) {
+func findDiskByLun(lun int, io ioHandler) (string, error) {
 	azureDisks := listAzureDiskPath(io)
-	return findDiskByLunWithConstraint(lun, io, exe, azureDisks)
+	return findDiskByLunWithConstraint(lun, io, azureDisks)
 }
 
 // finds a device mounted to "current" node
-func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azureDisks []string) (string, error) {
+func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (string, error) {
 	var err error
 	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
@@ -286,8 +285,8 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azur
 	return "", err
 }
 
-func formatIfNotFormatted(disk string, fstype string) {
-	notFormatted, err := diskLooksUnformatted(disk)
+func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
+	notFormatted, err := diskLooksUnformatted(disk, exec)
 	if err == nil && notFormatted {
 		args := []string{disk}
 		// Disk is unformatted so format it.
@@ -299,9 +298,8 @@ func formatIfNotFormatted(disk string, fstype string) {
 			args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", disk}
 		}
 		glog.Infof("azureDisk - Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", disk, fstype, args)
-		runner := exec.New()
-		cmd := runner.Command("mkfs."+fstype, args...)
-		_, err := cmd.CombinedOutput()
+
+		_, err := exec.Run("mkfs."+fstype, args...)
 		if err == nil {
 			// the disk has been formatted successfully try to mount it again.
 			glog.Infof("azureDisk - Disk successfully formatted (mkfs): %s - %s %s", fstype, disk, "tt")
@@ -316,12 +314,10 @@ func formatIfNotFormatted(disk string, fstype string) {
 	}
 }
 
-func diskLooksUnformatted(disk string) (bool, error) {
+func diskLooksUnformatted(disk string, exec mount.Exec) (bool, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
-	runner := exec.New()
-	cmd := runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := cmd.CombinedOutput()
+	dataOut, err := exec.Run("lsblk", args...)
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return false, err
