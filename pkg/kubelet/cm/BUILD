@@ -109,6 +109,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubelet/cm/cpuset:all-srcs",
         "//pkg/kubelet/cm/util:all-srcs",
     ],
     tags = ["automanaged"],
