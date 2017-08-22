@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -236,10 +235,10 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (b *glusterfsMounter) CanMount() error {
-	exe := exec.New()
+	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Command("/bin/ls", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
+		if _, err := exe.Run("/bin/ls", gciLinuxGlusterMountBinaryPath); err != nil {
 			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
