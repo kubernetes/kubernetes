@@ -26,14 +26,14 @@ import (
 )
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "statefulsets"}] {
 		return false, nil
 	}
 	go statefulset.NewStatefulSetController(
 		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
+		ctx.InformerFactory.Apps().V1beta2().StatefulSets(),
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
+		ctx.InformerFactory.Apps().V1beta2().ControllerRevisions(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
 	).Run(1, ctx.Stop)
 	return true, nil

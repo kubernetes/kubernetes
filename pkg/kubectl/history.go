@@ -23,6 +23,7 @@ import (
 	"text/tabwriter"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	clientappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	clientextv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -241,7 +243,7 @@ type StatefulSetHistoryViewer struct {
 // TODO: this should be a describer
 // TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1beta1(), namespace, name)
+	_, history, err := statefulSetHistory(h.c.AppsV1beta2(), namespace, name)
 	if err != nil {
 		return "", err
 	}
@@ -262,6 +264,25 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 		}
 		return nil
 	})
+}
+
+// controlledHistoryV1beta2 returns all ControllerRevisions in namespace that selected by selector and owned by accessor
+// TODO(dixudx): rename me when all controllers have been bumped to v1beta2
+func controlledHistoryV1beta2(apps clientappsv1beta2.AppsV1beta2Interface, namespace string,
+	selector labels.Selector, accessor metav1.Object) ([]*appsv1beta2.ControllerRevision, error) {
+	var result []*appsv1beta2.ControllerRevision
+	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+	for i := range historyList.Items {
+		history := historyList.Items[i]
+		// Only add history that belongs to the API object
+		if metav1.IsControlledBy(&history, accessor) {
+			result = append(result, &history)
+		}
+	}
+	return result, nil
 }
 
 // controlledHistories returns all ControllerRevisions in namespace that selected by selector and owned by accessor
@@ -310,9 +331,7 @@ func daemonSetHistory(
 }
 
 // statefulSetHistory returns the StatefulSet named name in namespace and all ControllerRevisions in its history.
-func statefulSetHistory(
-	apps clientappsv1beta1.AppsV1beta1Interface,
-	namespace, name string) (*appsv1beta1.StatefulSet, []*appsv1beta1.ControllerRevision, error) {
+func statefulSetHistory(apps clientappsv1beta2.AppsV1beta2Interface, namespace, name string) (*appsv1beta2.StatefulSet, []*appsv1beta2.ControllerRevision, error) {
 	sts, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
@@ -325,7 +344,7 @@ func statefulSetHistory(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %s", name, err.Error())
 	}
-	history, err := controlledHistory(apps, namespace, selector, accessor)
+	history, err := controlledHistoryV1beta2(apps, namespace, selector, accessor)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to find history controlled by StatefulSet %s: %v", name, err)
 	}

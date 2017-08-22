@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1beta2"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -50,13 +50,8 @@ type StatefulPodControlInterface interface {
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 }
 
-func NewRealStatefulPodControl(
-	client clientset.Interface,
-	setLister appslisters.StatefulSetLister,
-	podLister corelisters.PodLister,
-	pvcLister corelisters.PersistentVolumeClaimLister,
-	recorder record.EventRecorder,
-) StatefulPodControlInterface {
+func NewRealStatefulPodControl(client clientset.Interface, setLister appslisters.StatefulSetLister, podLister corelisters.PodLister,
+	pvcLister corelisters.PersistentVolumeClaimLister, recorder record.EventRecorder) StatefulPodControlInterface {
 	return &realStatefulPodControl{client, setLister, podLister, pvcLister, recorder}
 }
 

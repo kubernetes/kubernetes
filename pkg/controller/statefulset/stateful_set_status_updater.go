@@ -19,10 +19,10 @@ package statefulset
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta2"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1beta2"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -36,9 +36,7 @@ type StatefulSetStatusUpdaterInterface interface {
 
 // NewRealStatefulSetStatusUpdater returns a StatefulSetStatusUpdaterInterface that updates the Status of a StatefulSet,
 // using the supplied client and setLister.
-func NewRealStatefulSetStatusUpdater(
-	client clientset.Interface,
-	setLister appslisters.StatefulSetLister) StatefulSetStatusUpdaterInterface {
+func NewRealStatefulSetStatusUpdater(client clientset.Interface, setLister appslisters.StatefulSetLister) StatefulSetStatusUpdaterInterface {
 	return &realStatefulSetStatusUpdater{client, setLister}
 }
 
@@ -47,13 +45,11 @@ type realStatefulSetStatusUpdater struct {
 	setLister appslisters.StatefulSetLister
 }
 
-func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
-	set *apps.StatefulSet,
-	status *apps.StatefulSetStatus) error {
+func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) error {
 	// don't wait due to limited number of clients, but backoff after the default number of steps
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		set.Status = *status
-		_, updateErr := ssu.client.AppsV1beta1().StatefulSets(set.Namespace).UpdateStatus(set)
+		_, updateErr := ssu.client.AppsV1beta2().StatefulSets(set.Namespace).UpdateStatus(set)
 		if updateErr == nil {
 			return nil
 		}
