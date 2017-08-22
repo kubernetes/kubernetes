@@ -51,7 +51,7 @@ type APIGroupInfo struct {
 	GroupMeta apimachinery.GroupMeta
 	// Info about the resources in this group. Its a map from version to resource to the storage.
 	VersionedResourcesStorageMap map[string]map[string]rest.Storage
-	// OptionsExternalVersion controls the APIVersion used for common objects in the
+	// OptionsExternalVersion controlls the APIVersion used for common objects in the
 	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects.
 	// If nil, defaults to groupMeta.GroupVersion.
@@ -66,7 +66,7 @@ type APIGroupInfo struct {
 	// to convert objects from outside of this group that are accepted in this API).
 	// TODO: replace with interfaces
 	Scheme *runtime.Scheme
-	// NegotiatedSerializer controls how this group encodes and decodes data
+	// NegotiatedSerializer controlls how this group encodes and decodes data
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
@@ -108,7 +108,7 @@ type GenericAPIServer struct {
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
 
-	// Serializer controls how common API objects not in a group/version prefix are serialized for this server.
+	// Serializer controlls how common API objects not in a group/version prefix are serialized for this server.
 	// Individual APIGroups may define their own serializers.
 	Serializer runtime.NegotiatedSerializer
 
