@@ -16,7 +16,12 @@ limitations under the License.
 
 package gce
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestEnsureStaticIP(t *testing.T) {
 	fcas := NewFakeCloudAddressService()
@@ -35,5 +40,46 @@ func TestEnsureStaticIP(t *testing.T) {
 	ipPrime, existed, err = ensureStaticIP(fcas, ipName, serviceName, region, ip)
 	if err != nil || !existed || ip != ipPrime {
 		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, fcas, ipName, serviceName, region, ip, ipPrime, existed, err, ip)
+	}
+}
+
+func TestVerifyRequestedIP(t *testing.T) {
+	region := "test-region"
+	lbRef := "test-lb"
+	s := NewFakeCloudAddressService()
+
+	for desc, tc := range map[string]struct {
+		requestedIP     string
+		fwdRuleIP       string
+		ipList          map[string]string
+		expectErr       bool
+		expectUserOwned bool
+	}{
+		"requested IP exists": {
+			requestedIP:     "1.1.1.1",
+			ipList:          map[string]string{"foo": "1.1.1.1"},
+			expectErr:       false,
+			expectUserOwned: true,
+		},
+		"requested IP is not static, but is in use by the fwd rule": {
+			requestedIP: "1.1.1.1",
+			fwdRuleIP:   "1.1.1.1",
+			expectErr:   false,
+		},
+		"requested IP is not static and is not used by the fwd rule": {
+			requestedIP: "1.1.1.1",
+			fwdRuleIP:   "2.2.2.2",
+			expectErr:   true,
+		},
+		"no requested IP": {
+			expectErr: false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			s.SetRegionalAddresses(region, tc.ipList)
+			isUserOwnedIP, err := verifyUserRequestedIP(s, region, tc.requestedIP, tc.fwdRuleIP, lbRef)
+			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
+			assert.Equal(t, tc.expectUserOwned, isUserOwnedIP, desc)
+		})
 	}
 }
