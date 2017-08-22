@@ -63,7 +63,7 @@ func (m *azureDiskMounter) GetPath() string {
 }
 
 func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
-	mounter := m.plugin.host.GetMounter()
+	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
 	volumeSource, err := getVolumeSource(m.spec)
 
 	if err != nil {
@@ -154,7 +154,7 @@ func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	}
 
 	glog.V(4).Infof("azureDisk - TearDownAt: %s", dir)
-	mounter := u.plugin.host.GetMounter()
+	mounter := u.plugin.host.GetMounter(u.plugin.GetPluginName())
 	mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
 		return fmt.Errorf("azureDisk - TearDownAt: %s failed to do IsLikelyNotMountPoint %s", dir, err)

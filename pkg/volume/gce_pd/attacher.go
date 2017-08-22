@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type gcePersistentDiskAttacher struct {
@@ -56,7 +56,7 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 }
 
 func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
@@ -185,7 +185,7 @@ func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 
 func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	// Only mount the PD globally once.
-	mounter := attacher.host.GetMounter()
+	mounter := attacher.host.GetMounter(gcePersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -208,7 +208,7 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 		options = append(options, "ro")
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(gcePersistentDiskPluginName, attacher.host)
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -272,5 +272,5 @@ func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, nodeNa
 }
 
 func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName))
 }

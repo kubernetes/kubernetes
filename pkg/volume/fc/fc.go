@@ -103,10 +103,10 @@ func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 
 func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Mounter, error) {
 	// fc volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// fc volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	fc, readOnly, err := getVolumeSource(spec)
@@ -138,13 +138,13 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 			plugin:  plugin},
 		fsType:   fc.FSType,
 		readOnly: readOnly,
-		mounter:  &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		mounter:  &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 	}, nil
 }
 
 func (plugin *fcPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {

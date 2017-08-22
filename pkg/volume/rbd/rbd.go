@@ -131,7 +131,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.Vol
 	}
 
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
+	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), secret)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*v1.RBDVolumeSource, bool) {
@@ -158,7 +158,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 			Pool:            pool,
 			ReadOnly:        readOnly,
 			manager:         manager,
-			mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+			mounter:         volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
@@ -173,7 +173,7 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 
 func (plugin *rbdPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -183,7 +183,7 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 				podUID:          podUID,
 				volName:         volName,
 				manager:         manager,
-				mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+				mounter:         volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
 				plugin:          plugin,
 				MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 			},

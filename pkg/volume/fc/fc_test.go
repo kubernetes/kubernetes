@@ -141,7 +141,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
-	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	fakeExec := mount.NewFakeExec(nil)
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -210,7 +211,8 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
-	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	fakeExec := mount.NewFakeExec(nil)
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err == nil {
 		t.Errorf("Error failed to make a new Mounter is expected: %v", err)
 	}

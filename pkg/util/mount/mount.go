@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -70,6 +69,16 @@ type Interface interface {
 	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
 }
 
+// Exec executes command where mount utilities are. This can be either the host,
+// container where kubelet runs or even a remote pod with mount utilities.
+// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// not provide stdin/stdout/stderr streams.
+type Exec interface {
+	// Run executes a command and returns its stdout + stderr combined in one
+	// stream.
+	Run(cmd string, args ...string) ([]byte, error)
+}
+
 // Compile-time check to ensure all Mounter implementations satisfy
 // the mount interface
 var _ Interface = &Mounter{}
@@ -89,7 +98,7 @@ type MountPoint struct {
 // mounts it otherwise the device is formatted first then mounted.
 type SafeFormatAndMount struct {
 	Interface
-	Runner exec.Interface
+	Exec
 }
 
 // FormatAndMount formats the given disk, if needed, and mounts it.

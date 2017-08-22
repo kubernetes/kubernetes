@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/utils/exec"
 )
 
@@ -211,7 +212,7 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.plugin.host.GetMounter()
+	mounter := attacher.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
 	if err != nil {
@@ -232,7 +233,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	options := []string{}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -277,7 +278,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter())
+	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
 	if err == nil {
 		glog.V(4).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

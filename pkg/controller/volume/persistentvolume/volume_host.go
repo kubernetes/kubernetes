@@ -61,7 +61,7 @@ func (ctrl *PersistentVolumeController) GetCloudProvider() cloudprovider.Interfa
 	return ctrl.cloud
 }
 
-func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
+func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
 
@@ -91,6 +91,10 @@ func (adc *PersistentVolumeController) GetConfigMapFunc() func(namespace, name s
 	return func(_, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in PersistentVolumeController")
 	}
+}
+
+func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
 }
 
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {

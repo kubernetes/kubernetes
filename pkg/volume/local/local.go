@@ -104,7 +104,7 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 		localVolume: &localVolume{
 			podUID:          pod.UID,
 			volName:         spec.Name(),
-			mounter:         plugin.host.GetMounter(),
+			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin:          plugin,
 			globalPath:      volumeSource.Path,
 			MetricsProvider: volume.NewMetricsStatFS(volumeSource.Path),
@@ -119,7 +119,7 @@ func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) 
 		localVolume: &localVolume{
 			podUID:  podUID,
 			volName: volName,
-			mounter: plugin.host.GetMounter(),
+			mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin:  plugin,
 		},
 	}, nil

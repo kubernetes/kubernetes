@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type vsphereVMDKAttacher struct {
@@ -167,13 +167,13 @@ func (attacher *vsphereVMDKAttacher) GetDeviceMountPath(spec *volume.Spec) (stri
 // GetMountDeviceRefs finds all other references to the device referenced
 // by deviceMountPath; returns a list of paths.
 func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // MountDevice mounts device to global mount point.
 func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.host.GetMounter()
+	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -195,7 +195,7 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 	options := []string{}
 
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
+		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(vsphereVolumePluginName, attacher.host)
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -221,7 +221,7 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	}
 
 	return &vsphereVMDKDetacher{
-		mounter:        plugin.host.GetMounter(),
+		mounter:        plugin.host.GetMounter(plugin.GetPluginName()),
 		vsphereVolumes: vsphereCloud,
 	}, nil
 }
