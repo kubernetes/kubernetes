@@ -16,8 +16,8 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
@@ -43,8 +43,8 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/api/testapi:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )

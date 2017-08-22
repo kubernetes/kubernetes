@@ -45,6 +45,7 @@ go_library(
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/node:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
