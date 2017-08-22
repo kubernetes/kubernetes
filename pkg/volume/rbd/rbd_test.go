@@ -112,7 +112,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	fdm := NewFakeDiskManager()
 	defer fdm.Cleanup()
-	mounter, err := plug.(*rbdPlugin).newMounterInternal(spec, types.UID("poduid"), fdm, &mount.FakeMounter{}, "secrets")
+	exec := mount.NewFakeExec(nil)
+	mounter, err := plug.(*rbdPlugin).newMounterInternal(spec, types.UID("poduid"), fdm, &mount.FakeMounter{}, exec, "secrets")
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -137,7 +138,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fdm, &mount.FakeMounter{})
+	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fdm, &mount.FakeMounter{}, exec)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
