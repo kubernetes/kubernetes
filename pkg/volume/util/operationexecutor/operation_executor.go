@@ -249,7 +249,7 @@ func (volume *VolumeToAttach) GenerateMsgDetailed(prefixMsg, suffixMsg string) (
 
 // GenerateMsg returns simple and detailed msgs for volumes to attach
 func (volume *VolumeToAttach) GenerateMsg(prefixMsg, suffixMsg, contextMsg string) (simpleMsg, detailedMsg string) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q %s", volume.VolumeName, volume.NodeName, contextMsg)
+	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q %v", volume.VolumeName, volume.NodeName, contextMsg)
 	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
 		volumeSpecName = volume.VolumeSpec.Name()
@@ -264,8 +264,7 @@ func (volume *VolumeToAttach) GenerateErrorDetailed(prefixMsg string, err error)
 
 // GenerateError returns simple and detailed errors for volumes to attach
 func (volume *VolumeToAttach) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) from node %q", volume.VolumeName, volume.NodeName)
-	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err), detailedStr)
+	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err), "")
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
 
@@ -320,8 +319,8 @@ func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (d
 }
 
 // GenerateMsg returns simple and detailed msgs for volumes to mount
-func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q)", volume.VolumeName, volume.Pod.Name, volume.Pod.UID)
+func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg, contextMsg string) (simpleMsg, detailedMsg string) {
+	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q) %v", volume.VolumeName, volume.Pod.Name, volume.Pod.UID, contextMsg)
 	volumeSpecName := "nil"
 	if volume.VolumeSpec != nil {
 		volumeSpecName = volume.VolumeSpec.Name()
@@ -336,7 +335,7 @@ func (volume *VolumeToMount) GenerateErrorDetailed(prefixMsg string, err error) 
 
 // GenerateError returns simple and detailed errors for volumes to mount
 func (volume *VolumeToMount) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
-	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
+	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err), "")
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
 
@@ -503,8 +502,8 @@ func (volume *MountedVolume) GenerateMsgDetailed(prefixMsg, suffixMsg string) (d
 }
 
 // GenerateMsg returns simple and detailed msgs for mounted volumes
-func (volume *MountedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, detailedMsg string) {
-	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q) ", volume.VolumeName, volume.PodName, volume.PodUID)
+func (volume *MountedVolume) GenerateMsg(prefixMsg, suffixMsg, contextMsg string) (simpleMsg, detailedMsg string) {
+	detailedStr := fmt.Sprintf("(UniqueName: %q) pod %q (UID: %q) %v", volume.VolumeName, volume.PodName, volume.PodUID, contextMsg)
 	return generateVolumeMsg(prefixMsg, suffixMsg, volume.OuterVolumeSpecName, detailedStr)
 }
 
@@ -515,7 +514,7 @@ func (volume *MountedVolume) GenerateErrorDetailed(prefixMsg string, err error) 
 
 // GenerateError returns simple and detailed errors for mounted volumes
 func (volume *MountedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
-	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
+	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err), "")
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
 }
 
