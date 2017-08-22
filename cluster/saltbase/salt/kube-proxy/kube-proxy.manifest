@@ -1,3 +1,6 @@
+# Please keep kube-proxy configuration in-sync with:
+# cluster/addons/kube-proxy/kube-proxy-ds.yaml
+
 {% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
 {% if grains.api_servers is defined -%}
   {% set api_servers = "--master=https://" + grains.api_servers -%}
