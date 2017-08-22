@@ -31,6 +31,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -87,6 +88,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
 	var usages []string
+	var extraGroups []string
 	var tokenDuration time.Duration
 	var description string
 	createCmd := &cobra.Command{
@@ -114,7 +116,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				fmt.Fprintln(errW, "[kubeadm] WARNING: starting in 1.8, tokens expire after 24 hours by default (if you require a non-expiring token use --ttl 0)")
 			}
 
-			err = RunCreateToken(out, client, token, tokenDuration, usages, description)
+			err = RunCreateToken(out, client, token, tokenDuration, usages, extraGroups, description)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -122,6 +124,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		"ttl", kubeadmconstants.DefaultTokenDuration, "The duration before the token is automatically deleted (e.g. 1s, 2m, 3h). 0 means 'never expires'.")
 	createCmd.Flags().StringSliceVar(&usages,
 		"usages", kubeadmconstants.DefaultTokenUsages, "The ways in which this token can be used. Valid options: [signing,authentication].")
+	createCmd.Flags().StringSliceVar(&extraGroups,
+		"groups", []string{},
+		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q.", bootstrapapi.BootstrapGroupPattern))
 	createCmd.Flags().StringVar(&description,
 		"description", "", "A human friendly description of how this token is used.")
 	tokenCmd.AddCommand(createCmd)
@@ -192,7 +197,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, token string, tokenDuration time.Duration, usages []string, description string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, token string, tokenDuration time.Duration, usages []string, extraGroups []string, description string) error {
 
 	if len(token) == 0 {
 		var err error
@@ -207,8 +212,22 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 		}
 	}
 
+	// adding groups only makes sense for authentication
+	var usagesSet sets.String
+	usagesSet.Insert(usages...)
+	if len(extraGroups) > 0 && !usagesSet.Has("authentication") {
+		return fmt.Errorf("--groups cannot be specified unless --usages includes \"authentication\"")
+	}
+
+	// validate any extra group names
+	for _, group := range extraGroups {
+		if err := bootstrapapi.ValidateBootstrapGroupName(group); err != nil {
+			return err
+		}
+	}
+
 	// TODO: Validate usages here so we don't allow something unsupported
-	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, description)
+	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, extraGroups, description)
 	if err != nil {
 		return err
 	}
