@@ -19,6 +19,7 @@ package azure_dd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,6 +106,16 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 
 func (handler *fakeIOHandler) Readlink(name string) (string, error) {
 	return "/dev/azure/disk/sda", nil
+}
+
+func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
+	if strings.HasSuffix(filename, "vendor") {
+		return []byte("Msft    \n"), nil
+	}
+	if strings.HasSuffix(filename, "model") {
+		return []byte("Virtual Disk \n"), nil
+	}
+	return nil, fmt.Errorf("unknown file")
 }
 
 func TestIoHandler(t *testing.T) {
