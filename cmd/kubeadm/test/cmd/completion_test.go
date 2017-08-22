@@ -40,7 +40,7 @@ func TestCmdCompletion(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 	}

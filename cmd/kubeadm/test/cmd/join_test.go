@@ -40,7 +40,7 @@ func TestCmdJoinConfig(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -69,7 +69,7 @@ func TestCmdJoinDiscoveryFile(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -98,7 +98,7 @@ func TestCmdJoinDiscoveryToken(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -126,7 +126,7 @@ func TestCmdJoinNodeName(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -155,7 +155,7 @@ func TestCmdJoinTLSBootstrapToken(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -184,7 +184,7 @@ func TestCmdJoinToken(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -213,7 +213,7 @@ func TestCmdJoinBadArgs(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
@@ -241,7 +241,7 @@ func TestCmdJoinArgsMixed(t *testing.T) {
 				rt.args,
 				actual,
 				rt.expected,
-				(actual == nil),
+				actual == nil,
 			)
 		}
 		kubeadmReset()
