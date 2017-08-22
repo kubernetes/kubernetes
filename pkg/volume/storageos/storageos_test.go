@@ -184,7 +184,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Couldn't get secret from %v/%v", pod.Namespace, secretName)
 	}
 
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, &mount.FakeMounter{})
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
 	if err != nil {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Unmounter
 	fakeManager = &fakePDManager{}
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, &mount.FakeMounter{})
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	fakeManager := &fakePDManager{}
 	fakeConfig := &fakeConfig{}
 	apiCfg := fakeConfig.GetAPIConfig()
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, &mount.FakeMounter{})
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
