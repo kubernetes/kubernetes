@@ -196,12 +196,9 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if len(authenticators) == 0 {
 		if config.Anonymous {
 			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+		} else {
+			return nil, &securityDefinitions, nil
 		}
-	}
-
-	switch len(authenticators) {
-	case 0:
-		return nil, &securityDefinitions, nil
 	}
 
 	authenticator := union.New(authenticators...)
