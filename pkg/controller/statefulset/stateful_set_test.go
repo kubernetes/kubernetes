@@ -615,6 +615,9 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 	}
 	for set.Status.ReadyReplicas < *set.Spec.Replicas {
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
 		ord := len(pods) - 1
 		pod := getPodAtOrdinal(pods, ord)
 		if pods, err = spc.setPodPending(set, ord); err != nil {
@@ -669,6 +672,9 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
 	pods, err = spc.addTerminatingPod(set, ord)
+	if err != nil {
+		return err
+	}
 	pod = getPodAtOrdinal(pods, ord)
 	ssc.updatePod(&prev, pod)
 	fakeWorker(ssc)
@@ -677,8 +683,15 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	fakeWorker(ssc)
 	for set.Status.Replicas > *set.Spec.Replicas {
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
+
 		ord := len(pods)
 		pods, err = spc.addTerminatingPod(set, ord)
+		if err != nil {
+			return err
+		}
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
