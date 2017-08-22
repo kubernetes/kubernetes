@@ -22,6 +22,7 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
@@ -36,5 +37,19 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
 	).Run(1, ctx.Stop)
+	return true, nil
+}
+
+func startDaemonSetController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "daemonsets"}] {
+		return false, nil
+	}
+	go daemon.NewDaemonSetsController(
+		ctx.InformerFactory.Apps().V1beta2().DaemonSets(),
+		ctx.InformerFactory.Apps().V1beta2().ControllerRevisions(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
+	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }

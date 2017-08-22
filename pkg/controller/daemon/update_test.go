@@ -19,8 +19,8 @@ package daemon
 import (
 	"testing"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -34,9 +34,9 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
@@ -73,9 +73,9 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	markPodsReady(podControl.podStore)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
@@ -99,9 +99,9 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
-	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
 
@@ -124,9 +124,9 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	manager.dsStore.Add(ds)
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
-	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	intStr := intstr.FromInt(maxUnavailable)
-	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	manager.dsStore.Update(ds)
 
 	// template is not changed no pod should be removed
@@ -139,7 +139,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 	cases := []struct {
 		name           string
 		Manager        *daemonSetsController
-		ds             *extensions.DaemonSet
+		ds             *apps.DaemonSet
 		nodeToPods     map[string][]*v1.Pod
 		maxUnavailable int
 		numUnavailable int
@@ -151,10 +151,10 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				manager, _, _ := newTestController()
 				return manager
 			}(),
-			ds: func() *extensions.DaemonSet {
+			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
 				intStr := intstr.FromInt(0)
-				ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+				ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 				return ds
 			}(),
 			nodeToPods:     make(map[string][]*v1.Pod),
@@ -168,10 +168,10 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *extensions.DaemonSet {
+			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
 				intStr := intstr.FromInt(1)
-				ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+				ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {
@@ -194,10 +194,10 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *extensions.DaemonSet {
+			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
 				intStr := intstr.FromInt(0)
-				ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+				ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {
@@ -217,10 +217,10 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
-			ds: func() *extensions.DaemonSet {
+			ds: func() *apps.DaemonSet {
 				ds := newDaemonSet("x")
 				intStr := intstr.FromString("50%")
-				ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+				ds.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 				return ds
 			}(),
 			nodeToPods: func() map[string][]*v1.Pod {
