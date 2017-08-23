@@ -78,20 +78,20 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	It("should have a metadata key of type Reference", func() {
 		Expect(deployment.Fields).To(HaveKey("metadata"))
-		key := deployment.Fields["metadata"].(*openapi.Reference)
+		key := deployment.Fields["metadata"].(openapi.Reference)
 		Expect(key).ToNot(BeNil())
-		Expect(key.Reference).To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"))
-		subSchema := key.GetSubSchema().(*openapi.Kind)
+		Expect(key.Reference()).To(Equal("io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"))
+		subSchema := key.SubSchema().(*openapi.Kind)
 		Expect(subSchema).ToNot(BeNil())
 	})
 
 	var status *openapi.Kind
 	It("should have a status key of type Reference", func() {
 		Expect(deployment.Fields).To(HaveKey("status"))
-		key := deployment.Fields["status"].(*openapi.Reference)
+		key := deployment.Fields["status"].(openapi.Reference)
 		Expect(key).ToNot(BeNil())
-		Expect(key.Reference).To(Equal("io.k8s.api.apps.v1beta1.DeploymentStatus"))
-		status = key.GetSubSchema().(*openapi.Kind)
+		Expect(key.Reference()).To(Equal("io.k8s.api.apps.v1beta1.DeploymentStatus"))
+		status = key.SubSchema().(*openapi.Kind)
 		Expect(status).ToNot(BeNil())
 	})
 
@@ -106,22 +106,22 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 		Expect(status.Fields).To(HaveKey("conditions"))
 		conditions := status.Fields["conditions"].(*openapi.Array)
 		Expect(conditions).ToNot(BeNil())
-		Expect(conditions.GetName()).To(Equal("Array of io.k8s.api.apps.v1beta1.DeploymentCondition"))
+		Expect(conditions.GetName()).To(Equal(`Array of Reference to "io.k8s.api.apps.v1beta1.DeploymentCondition"`))
 		Expect(conditions.GetExtensions()).To(Equal(map[string]interface{}{
 			"x-kubernetes-patch-merge-key": "type",
 			"x-kubernetes-patch-strategy":  "merge",
 		}))
-		condition := conditions.SubType.(*openapi.Reference)
-		Expect(condition.Reference).To(Equal("io.k8s.api.apps.v1beta1.DeploymentCondition"))
+		condition := conditions.SubType.(openapi.Reference)
+		Expect(condition.Reference()).To(Equal("io.k8s.api.apps.v1beta1.DeploymentCondition"))
 	})
 
 	var spec *openapi.Kind
 	It("should have a spec key of type Reference", func() {
 		Expect(deployment.Fields).To(HaveKey("spec"))
-		key := deployment.Fields["spec"].(*openapi.Reference)
+		key := deployment.Fields["spec"].(openapi.Reference)
 		Expect(key).ToNot(BeNil())
-		Expect(key.Reference).To(Equal("io.k8s.api.apps.v1beta1.DeploymentSpec"))
-		spec = key.GetSubSchema().(*openapi.Kind)
+		Expect(key.Reference()).To(Equal("io.k8s.api.apps.v1beta1.DeploymentSpec"))
+		spec = key.SubSchema().(*openapi.Kind)
 		Expect(spec).ToNot(BeNil())
 	})
 
@@ -132,9 +132,9 @@ var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 
 	It("should have a spec with a PodTemplateSpec sub-field", func() {
 		Expect(spec.Fields).To(HaveKey("template"))
-		key := spec.Fields["template"].(*openapi.Reference)
+		key := spec.Fields["template"].(openapi.Reference)
 		Expect(key).ToNot(BeNil())
-		Expect(key.Reference).To(Equal("io.k8s.api.core.v1.PodTemplateSpec"))
+		Expect(key.Reference()).To(Equal("io.k8s.api.core.v1.PodTemplateSpec"))
 	})
 })
 
@@ -164,10 +164,10 @@ var _ = Describe("Reading authorization.k8s.io/v1/SubjectAccessReview from openA
 		sar := schema.(*openapi.Kind)
 		Expect(sar).ToNot(BeNil())
 		Expect(sar.Fields).To(HaveKey("spec"))
-		specRef := sar.Fields["spec"].(*openapi.Reference)
+		specRef := sar.Fields["spec"].(openapi.Reference)
 		Expect(specRef).ToNot(BeNil())
-		Expect(specRef.Reference).To(Equal("io.k8s.api.authorization.v1.SubjectAccessReviewSpec"))
-		sarspec = specRef.GetSubSchema().(*openapi.Kind)
+		Expect(specRef.Reference()).To(Equal("io.k8s.api.authorization.v1.SubjectAccessReviewSpec"))
+		sarspec = specRef.SubSchema().(*openapi.Kind)
 		Expect(sarspec).ToNot(BeNil())
 	})
 
