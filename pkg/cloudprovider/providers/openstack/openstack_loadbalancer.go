@@ -1221,27 +1221,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		if lbSecGroup.Err != nil && !isNotFound(lbSecGroup.Err) {
 			return lbSecGroup.Err
 		}
-
-		// Delete the rules in the Node Security Group
-		opts := rules.ListOpts{
-			SecGroupID:    lbaas.opts.NodeSecurityGroupID,
-			RemoteGroupID: lbSecGroupID,
-		}
-		secGroupRules, err := getSecurityGroupRules(lbaas.network, opts)
-
-		if err != nil && !isNotFound(err) {
-			glog.Errorf("Error finding rules for remote group id %s in security group id %s", lbSecGroupID, lbaas.opts.NodeSecurityGroupID)
-			return err
-		}
-
-		for _, rule := range secGroupRules {
-			res := rules.Delete(lbaas.network, rule.ID)
-			if res.Err != nil && !isNotFound(res.Err) {
-				glog.V(1).Infof("Error occurred deleting security group rule: %s: %v", rule.ID, res.Err)
-			}
-		}
 	}
-
+	
 	return nil
 }
 
