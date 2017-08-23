@@ -10885,9 +10885,7 @@
     "properties": {
      "key": {
       "description": "The label key that the selector applies to.",
-      "type": "string",
-      "x-kubernetes-patch-merge-key": "key",
-      "x-kubernetes-patch-strategy": "merge"
+      "type": "string"
      },
      "operator": {
       "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
@@ -11937,9 +11935,7 @@
      },
      "key": {
       "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
-      "type": "string",
-      "x-kubernetes-patch-merge-key": "key",
-      "x-kubernetes-patch-strategy": "merge"
+      "type": "string"
      },
      "operator": {
       "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",

@@ -1661,8 +1661,6 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // The label key that the selector applies to.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Represents a key's relationship to a set of values.
@@ -3894,8 +3892,6 @@ message TCPSocketAction {
 // any pod that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Required. The taint value corresponding to the taint key.
@@ -3919,8 +3915,6 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
