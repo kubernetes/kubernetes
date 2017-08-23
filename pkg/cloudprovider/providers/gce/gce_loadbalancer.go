@@ -61,7 +61,7 @@ func init() {
 		panic("Incorrect default GCE L7 source ranges")
 	}
 
-	flag.Var(&lbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRS opened in GCE firewall for LB traffic proxy & health checks")
+	flag.Var(&lbSrcRngsFlag, "cloud-provider-gce-lb-src-cidrs", "CIDRs opened in GCE firewall for LB traffic proxy & health checks")
 }
 
 // String is the method to format the flag's value, part of the flag.Value interface.
