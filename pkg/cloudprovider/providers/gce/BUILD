@@ -13,6 +13,7 @@ go_library(
         "gce.go",
         "gce_addresses.go",
         "gce_addresses_fakes.go",
+        "gce_alpha.go",
         "gce_annotations.go",
         "gce_backendservice.go",
         "gce_cert.go",
