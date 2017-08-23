@@ -30,6 +30,7 @@ readonly logexporter_namespace="${3:-logexporter}"
 # check for a function named log_dump_custom_get_instances. If it's
 # defined, we assume the function can me called with one argument, the
 # role, which is either "master" or "node".
+echo "Checking for custom logdump instances, if any"
 if [[ $(type -t log_dump_custom_get_instances) == "function" ]]; then
   readonly use_custom_instance_list=yes
 else
@@ -56,14 +57,17 @@ readonly max_scp_processes=25
 
 # This template spits out the external IPs and images for each node in the cluster in a format like so:
 # 52.32.7.85 gcr.io/google_containers/kube-apiserver:1355c18c32d7bef16125120bce194fad gcr.io/google_containers/kube-controller-manager:46365cdd8d28b8207950c3c21d1f3900 [...]
+echo "Obtaining IPs and images for cluster nodes"
 readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
 
 function setup() {
   if [[ -z "${use_custom_instance_list}" ]]; then
     KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
+    echo "Sourcing kube-util.sh"
     source "${KUBE_ROOT}/cluster/kube-util.sh"
-    detect-project &> /dev/null
+    echo "Detecting project"
+    detect-project 2>&1
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
