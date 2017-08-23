@@ -152,6 +152,34 @@ func Test_AddVolumeNode_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName1, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
+// Test_AddNodeIntoUpdateStatusFor expects the map nodesToUpdateStatusFor
+// adds a new node if the AddNodeFromAttachUpdates is called on a node that
+// does not exist in the actual state of the world.
+func Test_AddNodeIntoUpdateStatusFor(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	nodeName := types.NodeName("new-node")
+
+	// Act
+	asw.AddNodeIntoUpdateStatusFor(nodeName)
+
+	// Assert
+	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
+	if len(nodesToUpdateStatusFor) != 1 {
+		t.Fatalf("the new node should be added into nodesToUpdateStatusFor.")
+	}
+
+	// Act again
+	asw.AddNodeIntoUpdateStatusFor(nodeName)
+
+	// Assert
+	nodesToUpdateStatusFor = asw.GetNodesToUpdateStatusFor()
+	if len(nodesToUpdateStatusFor) != 1 {
+		t.Fatalf("the new node should be added into nodesToUpdateStatusFor.")
+	}
+}
+
 // Populates data struct with one volume/node entry.
 // Calls DeleteVolumeNode() to delete volume/node.
 // Verifies no volume/node entries exists.
