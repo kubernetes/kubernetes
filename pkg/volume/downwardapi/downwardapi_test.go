@@ -241,7 +241,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	volumePath := mounter.GetPath()
@@ -278,7 +278,7 @@ func (test *downwardAPITest) tearDown() {
 		test.t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
 	if unmounter == nil {
-		test.t.Errorf("Got a nil Unmounter")
+		test.t.Fatalf("Got a nil Unmounter")
 	}
 
 	if err := unmounter.TearDown(); err != nil {
