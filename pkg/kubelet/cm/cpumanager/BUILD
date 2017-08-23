@@ -29,13 +29,17 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cpu_assignment_test.go",
         "cpu_manager_test.go",
         "policy_none_test.go",
+        "policy_static_test.go",
+        "policy_test.go",
     ],
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
+        "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
