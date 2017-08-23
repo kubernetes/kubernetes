@@ -57,12 +57,12 @@ func getSignature(t reflect.Type) string {
 		return "n"
 	case reflect.Uint16:
 		return "q"
-	case reflect.Int32:
+	case reflect.Int, reflect.Int32:
 		if t == unixFDType {
 			return "h"
 		}
 		return "i"
-	case reflect.Uint32:
+	case reflect.Uint, reflect.Uint32:
 		if t == unixFDIndexType {
 			return "h"
 		}
@@ -101,6 +101,8 @@ func getSignature(t reflect.Type) string {
 			panic(InvalidTypeError{t})
 		}
 		return "a{" + getSignature(t.Key()) + getSignature(t.Elem()) + "}"
+	case reflect.Interface:
+		return "v"
 	}
 	panic(InvalidTypeError{t})
 }
@@ -162,7 +164,7 @@ func (e SignatureError) Error() string {
 	return fmt.Sprintf("dbus: invalid signature: %q (%s)", e.Sig, e.Reason)
 }
 
-// Try to read a single type from this string. If it was successfull, err is nil
+// Try to read a single type from this string. If it was successful, err is nil
 // and rem is the remaining unparsed part. Otherwise, err is a non-nil
 // SignatureError and rem is "". depth is the current recursion depth which may
 // not be greater than 64 and should be given as 0 on the first call.

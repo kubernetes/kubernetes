@@ -27,6 +27,16 @@ func (o *Object) Call(method string, flags Flags, args ...interface{}) *Call {
 	return <-o.Go(method, flags, make(chan *Call, 1), args...).Done
 }
 
+// AddMatchSignal subscribes BusObject to signals from specified interface and
+// method (member).
+func (o *Object) AddMatchSignal(iface, member string) *Call {
+	return o.Call(
+		"org.freedesktop.DBus.AddMatch",
+		0,
+		"type='signal',interface='"+iface+"',member='"+member+"'",
+	)
+}
+
 // Go calls a method with the given arguments asynchronously. It returns a
 // Call structure representing this method call. The passed channel will
 // return the same value once the call is done. If ch is nil, a new channel
@@ -115,12 +125,12 @@ func (o *Object) GetProperty(p string) (Variant, error) {
 	return result, nil
 }
 
-// Destination returns the destination that calls on o are sent to.
+// Destination returns the destination that calls on (o *Object) are sent to.
 func (o *Object) Destination() string {
 	return o.dest
 }
 
-// Path returns the path that calls on o are sent to.
+// Path returns the path that calls on (o *Object") are sent to.
 func (o *Object) Path() ObjectPath {
 	return o.path
 }
