@@ -65,24 +65,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.name", "metadata.namespace":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
