@@ -2,6 +2,7 @@ approvers:
 - rootfs
 - saad-ali
 - jingxu97
+- humblec
 reviewers:
 - thockin
 - smarterclayton
