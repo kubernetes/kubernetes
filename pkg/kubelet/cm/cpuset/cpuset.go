@@ -140,9 +140,9 @@ func (s CPUSet) Difference(s2 CPUSet) CPUSet {
 	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
-// AsSlice returns a slice of integers that contains all elements from
+// ToSlice returns a slice of integers that contains all elements from
 // this set.
-func (s CPUSet) AsSlice() []int {
+func (s CPUSet) ToSlice() []int {
 	result := []int{}
 	for cpu := range s {
 		result = append(result, cpu)
@@ -160,7 +160,7 @@ func (s CPUSet) String() string {
 		return ""
 	}
 
-	elems := s.AsSlice()
+	elems := s.ToSlice()
 	sort.Ints(elems)
 
 	type rng struct {

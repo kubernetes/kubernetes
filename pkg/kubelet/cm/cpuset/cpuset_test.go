@@ -269,7 +269,7 @@ func TestCPUSetDifference(t *testing.T) {
 	}
 }
 
-func TestCPUSetAsSlice(t *testing.T) {
+func TestCPUSetToSlice(t *testing.T) {
 	testCases := []struct {
 		set      CPUSet
 		expected []int
@@ -280,7 +280,7 @@ func TestCPUSetAsSlice(t *testing.T) {
 	}
 
 	for _, c := range testCases {
-		result := c.set.AsSlice()
+		result := c.set.ToSlice()
 		if !reflect.DeepEqual(result, c.expected) {
 			t.Fatalf("expected set as slice to be [%v] (got [%v]), s: [%v]", c.expected, result, c.set)
 		}
