@@ -265,7 +265,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 	}
 
 	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
-	fmt.Fprintln(w, "TOKEN\tTTL\tEXPIRES\tUSAGES\tDESCRIPTION")
+	fmt.Fprintln(w, "TOKEN\tTTL\tEXPIRES\tUSAGES\tDESCRIPTION\tEXTRA GROUPS")
 	for _, secret := range secrets.Items {
 		tokenId := getSecretString(&secret, bootstrapapi.BootstrapTokenIDKey)
 		if len(tokenId) == 0 {
@@ -323,7 +323,12 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		if len(description) == 0 {
 			description = "<none>"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", tokenutil.BearerToken(td), ttl, expires, usageString, description)
+
+		groups := getSecretString(&secret, bootstrapapi.BootstrapTokenExtraGroupsKey)
+		if len(groups) == 0 {
+			groups = "<none>"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", tokenutil.BearerToken(td), ttl, expires, usageString, description, groups)
 	}
 	w.Flush()
 	return nil
