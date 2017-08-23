@@ -18,10 +18,11 @@ package gce
 
 import (
 	"encoding/json"
-	"golang.org/x/oauth2/google"
 	"reflect"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2/google"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
@@ -268,6 +269,7 @@ type generateConfigParams struct {
 	ProjectID          string
 	NetworkName        string
 	SubnetworkName     string
+	SecondaryRangeName string
 	NodeTags           []string
 	NodeInstancePrefix string
 	Multizone          bool
@@ -283,6 +285,7 @@ func newGenerateConfigDefaults() *generateConfigParams {
 		ProjectID:          "project-id",
 		NetworkName:        "network-name",
 		SubnetworkName:     "",
+		SecondaryRangeName: "",
 		NodeTags:           []string{"node-tag"},
 		NodeInstancePrefix: "node-prefix",
 		Multizone:          false,
@@ -452,6 +455,7 @@ func TestGenerateCloudConfigs(t *testing.T) {
 				ProjectID          string   `gcfg:"project-id"`
 				NetworkName        string   `gcfg:"network-name"`
 				SubnetworkName     string   `gcfg:"subnetwork-name"`
+				SecondaryRangeName string   `gcfg:"secondary-range-name"`
 				NodeTags           []string `gcfg:"node-tags"`
 				NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 				Multizone          bool     `gcfg:"multizone"`
@@ -464,6 +468,7 @@ func TestGenerateCloudConfigs(t *testing.T) {
 				ProjectID:          config.ProjectID,
 				NetworkName:        config.NetworkName,
 				SubnetworkName:     config.SubnetworkName,
+				SecondaryRangeName: config.SecondaryRangeName,
 				NodeTags:           config.NodeTags,
 				NodeInstancePrefix: config.NodeInstancePrefix,
 				Multizone:          config.Multizone,
@@ -477,7 +482,7 @@ func TestGenerateCloudConfigs(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(cloudConfig, tc.cloudConfig) {
-			t.Errorf("Expecting cloud config: %v, but got %v", tc.cloudConfig, cloudConfig)
+			t.Errorf("Got %v, want %v", cloudConfig, tc.cloudConfig)
 		}
 	}
 }
