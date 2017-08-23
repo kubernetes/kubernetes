@@ -1,6 +1,9 @@
 #cloud-config
 
 runcmd:
+  - cp /usr/lib/systemd/system/docker.service /etc/systemd/system/
+  - sed -i -e 's/-s overlay/-s overlay2/g' /etc/systemd/system/docker.service
+  - systemctl daemon-reload
   - echo '{"live-restore":true}' > /etc/docker/daemon.json
   - systemctl restart docker
   - mount /tmp /tmp -o remount,exec,suid
