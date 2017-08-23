@@ -111,8 +111,8 @@ func validateHost(runtime string) error {
 	}
 
 	// Check runtime support. Currently only Docker is supported.
-	if runtime != "docker" {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' runtime. Found: %q.", runtime)
+	if runtime != "docker" && runtime != "remote" {
+		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
 	}
 
 	return nil
