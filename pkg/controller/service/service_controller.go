@@ -263,12 +263,16 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 	if !wantsLoadBalancer(service) {
 		_, exists, err := s.balancer.GetLoadBalancer(s.clusterName, service)
 		if err != nil {
-			return fmt.Errorf("Error getting LB for service %s: %v", key, err), retryable
+			err = fmt.Errorf("Error getting LB for service %s: %v", key, err)
+			s.eventRecorder.Event(service, v1.EventTypeWarning,"GettingLoadBalancerFailed", err.Error())
+			return err, retryable
 		}
 		if exists {
 			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(s.clusterName, service); err != nil {
+				err =  fmt.Errorf("Failed to delete load balancer for service %s: %v", key, err)
+				s.eventRecorder.Event(service, v1.EventTypeWarning,"DeletingLoadBalancerFailed", err.Error())
 				return err, retryable
 			}
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
@@ -284,7 +288,9 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
 		newState, err = s.createLoadBalancer(service)
 		if err != nil {
-			return fmt.Errorf("Failed to create load balancer for service %s: %v", key, err), retryable
+			err =  fmt.Errorf("Failed to create load balancer for service %s: %v", key, err)
+			s.eventRecorder.Event(service, v1.EventTypeWarning,"LoadBalancerCreationFailed", err.Error())
+			return err, retryable
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
 	}
@@ -432,7 +438,7 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 		return true
 	}
 
-	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
+	if !s.portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
 	if !loadBalancerIPsAreEqual(oldService, newService) {
@@ -478,7 +484,7 @@ func (s *ServiceController) loadBalancerName(service *v1.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
 }
 
-func getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
+func (s *ServiceController) getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
 	var protocol v1.Protocol
 
 	ports := []*v1.ServicePort{}
@@ -489,19 +495,21 @@ func getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
 		if protocol == "" {
 			protocol = sp.Protocol
 		} else if protocol != sp.Protocol && wantsLoadBalancer(service) {
-			// TODO:  Convert error messages to use event recorder
-			return nil, fmt.Errorf("mixed protocol external load balancers are not supported.")
+			err := fmt.Errorf("mixed protocol external load balancers are not supported.")
+			s.eventRecorder.Event(service, v1.EventTypeWarning, "mixedProtocolNotSupported", err.Error())
+			return nil, err
+
 		}
 	}
 	return ports, nil
 }
 
-func portsEqualForLB(x, y *v1.Service) bool {
-	xPorts, err := getPortsForLB(x)
+func (s *ServiceController) portsEqualForLB(x, y *v1.Service) bool {
+	xPorts, err := s.getPortsForLB(x)
 	if err != nil {
 		return false
 	}
-	yPorts, err := getPortsForLB(y)
+	yPorts, err := s.getPortsForLB(y)
 	if err != nil {
 		return false
 	}
