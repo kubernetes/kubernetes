@@ -429,6 +429,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			},
 		},
 	}
+
+	obj, err := api.Scheme.DeepCopy(validPodTemplate)
+	if err != nil {
+		t.Errorf("failure during test setup when copying PodTemplate: %v", err)
+	}
+	addContainersValidTemplate, ok := obj.(api.PodTemplate)
+	if !ok {
+		t.Errorf("failure during test setup, copied pod template is not a pod template")
+	}
+	addContainersValidTemplate.Template.Spec.Containers = append(addContainersValidTemplate.Template.Spec.Containers,
+		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent"})
+	if len(addContainersValidTemplate.Template.Spec.Containers) != len(validPodTemplate.Template.Spec.Containers)+1 {
+		t.Errorf("failure during test setup: template %v should have more containers than template %v", addContainersValidTemplate, validPodTemplate)
+	}
+
 	readWriteVolumePodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -474,6 +489,46 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Spec: apps.StatefulSetSpec{
 					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					Replicas:            3,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+		},
+		{
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            addContainersValidTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
 					Template:            validPodTemplate.Template,
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
