@@ -21,6 +21,23 @@ import (
 	"testing"
 )
 
+func TestCPUSetBuilder(t *testing.T) {
+	b := NewBuilder()
+	elems := []int{1, 2, 3, 4, 5}
+	for _, elem := range elems {
+		b.Add(elem)
+	}
+	result := b.Result()
+	for _, elem := range elems {
+		if !result.Contains(elem) {
+			t.Fatalf("expected cpuset to contain element %d: [%v]", elem, result)
+		}
+	}
+	if len(elems) != result.Size() {
+		t.Fatalf("expected cpuset %s to have the same size as %v", result, elems)
+	}
+}
+
 func TestCPUSetSize(t *testing.T) {
 	testCases := []struct {
 		cpuset   CPUSet
@@ -79,29 +96,6 @@ func TestCPUSetContains(t *testing.T) {
 				t.Fatalf("expected cpuset not to contain element %d: [%v]", elem, c.cpuset)
 			}
 		}
-	}
-}
-
-func TestCPUSetAdd(t *testing.T) {
-	result := NewCPUSet()
-	for _, elem := range []int{1, 2, 3, 4, 5} {
-		result.Add(elem)
-		if !result.Contains(elem) {
-			t.Fatalf("expected cpuset to contain element %d: [%v]", elem, result)
-		}
-	}
-}
-
-func TestCPUSetRemove(t *testing.T) {
-	result := NewCPUSet(1, 2, 3, 4, 5)
-	for _, elem := range []int{1, 2, 3, 4, 5} {
-		result.Remove(elem)
-		if result.Contains(elem) {
-			t.Fatalf("expected cpuset to not contain element %d: [%v]", elem, result)
-		}
-	}
-	if !result.IsEmpty() {
-		t.Fatalf("expected cpuset to be empty: [%v]", result)
 	}
 }
 

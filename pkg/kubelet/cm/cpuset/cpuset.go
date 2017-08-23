@@ -26,21 +26,57 @@ import (
 	"strings"
 )
 
-// CPUSet is a set-like data structure for CPU IDs.
-type CPUSet map[int]struct{}
+// Builder is a mutable builder for CPUSet. Functions that mutate instances
+// of this type are not thread-safe.
+type Builder struct {
+	result CPUSet
+	done   bool
+}
 
-// NewCPUSet return CPUSet based on provided cpu id's
-func NewCPUSet(cpus ...int) CPUSet {
-	res := CPUSet{}
-	for _, c := range cpus {
-		res.Add(c)
+// NewBuilder returns a mutable CPUSet builder.
+func NewBuilder() Builder {
+	return Builder{
+		result: CPUSet{
+			elems: map[int]struct{}{},
+		},
 	}
-	return res
+}
+
+// Add adds the supplied elements to the result. Calling Add after calling
+// Result has no effect.
+func (b Builder) Add(elems ...int) {
+	if b.done {
+		return
+	}
+	for _, elem := range elems {
+		b.result.elems[elem] = struct{}{}
+	}
+}
+
+// Result returns the result CPUSet containing all elements that were
+// previously added to this builder. Subsequent calls to Add have no effect.
+func (b Builder) Result() CPUSet {
+	b.done = true
+	return b.result
+}
+
+// CPUSet is a thread-safe, immutable set-like data structure for CPU IDs.
+type CPUSet struct {
+	elems map[int]struct{}
+}
+
+// NewCPUSet returns a new CPUSet containing the supplied elements.
+func NewCPUSet(cpus ...int) CPUSet {
+	b := NewBuilder()
+	for _, c := range cpus {
+		b.Add(c)
+	}
+	return b.Result()
 }
 
 // Size returns the number of elements in this set.
 func (s CPUSet) Size() int {
-	return len(s)
+	return len(s.elems)
 }
 
 // IsEmpty returns true if there are zero elements in this set.
@@ -50,60 +86,45 @@ func (s CPUSet) IsEmpty() bool {
 
 // Contains returns true if the supplied element is present in this set.
 func (s CPUSet) Contains(cpu int) bool {
-	_, found := s[cpu]
+	_, found := s.elems[cpu]
 	return found
-}
-
-// Add mutates this set to contain the supplied elements.
-func (s CPUSet) Add(cpus ...int) {
-	for _, cpu := range cpus {
-		s[cpu] = struct{}{}
-	}
-}
-
-// Remove mutates this set to not contain the supplied elements, if they
-// exists.
-func (s CPUSet) Remove(cpus ...int) {
-	for _, cpu := range cpus {
-		delete(s, cpu)
-	}
 }
 
 // Equals returns true if the supplied set contains exactly the same elements
 // as this set (s IsSubsetOf s2 and s2 IsSubsetOf s).
 func (s CPUSet) Equals(s2 CPUSet) bool {
-	return reflect.DeepEqual(s, s2)
+	return reflect.DeepEqual(s.elems, s2.elems)
 }
 
 // Filter returns a new CPU set that contains all of the elements from this
 // set that match the supplied predicate, without mutating the source set.
 func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
-	result := NewCPUSet()
-	for cpu := range s {
+	b := NewBuilder()
+	for cpu := range s.elems {
 		if predicate(cpu) {
-			result.Add(cpu)
+			b.Add(cpu)
 		}
 	}
-	return result
+	return b.Result()
 }
 
 // FilterNot returns a new CPU set that contains all of the elements from this
 // set that do not match the supplied predicate, without mutating the source
 // set.
 func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
-	result := NewCPUSet()
-	for cpu := range s {
+	b := NewBuilder()
+	for cpu := range s.elems {
 		if !predicate(cpu) {
-			result.Add(cpu)
+			b.Add(cpu)
 		}
 	}
-	return result
+	return b.Result()
 }
 
 // IsSubsetOf returns true if the supplied set contains all the elements
 func (s CPUSet) IsSubsetOf(s2 CPUSet) bool {
 	result := true
-	for cpu := range s {
+	for cpu := range s.elems {
 		if !s2.Contains(cpu) {
 			result = false
 			break
@@ -116,14 +137,14 @@ func (s CPUSet) IsSubsetOf(s2 CPUSet) bool {
 // set and all of the elements from the supplied set, without mutating
 // either source set.
 func (s CPUSet) Union(s2 CPUSet) CPUSet {
-	result := NewCPUSet()
-	for cpu := range s {
-		result.Add(cpu)
+	b := NewBuilder()
+	for cpu := range s.elems {
+		b.Add(cpu)
 	}
-	for cpu := range s2 {
-		result.Add(cpu)
+	for cpu := range s2.elems {
+		b.Add(cpu)
 	}
-	return result
+	return b.Result()
 }
 
 // Intersection returns a new CPU set that contains all of the elements
@@ -144,7 +165,7 @@ func (s CPUSet) Difference(s2 CPUSet) CPUSet {
 // this set.
 func (s CPUSet) ToSlice() []int {
 	result := []int{}
-	for cpu := range s {
+	for cpu := range s.elems {
 		result = append(result, cpu)
 	}
 	sort.Ints(result)
@@ -161,7 +182,6 @@ func (s CPUSet) String() string {
 	}
 
 	elems := s.ToSlice()
-	sort.Ints(elems)
 
 	type rng struct {
 		start int
@@ -210,11 +230,11 @@ func MustParse(s string) CPUSet {
 //
 // See: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
 func Parse(s string) (CPUSet, error) {
-	result := NewCPUSet()
+	b := NewBuilder()
 
 	// Handle empty string.
 	if s == "" {
-		return result, nil
+		return b.Result(), nil
 	}
 
 	// Split CPU list string:
@@ -227,34 +247,34 @@ func Parse(s string) (CPUSet, error) {
 			// Handle ranges that consist of only one element like "34".
 			elem, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return nil, err
+				return NewCPUSet(), err
 			}
-			result.Add(elem)
+			b.Add(elem)
 		} else if len(boundaries) == 2 {
 			// Handle multi-element ranges like "0-5".
 			start, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return nil, err
+				return NewCPUSet(), err
 			}
 			end, err := strconv.Atoi(boundaries[1])
 			if err != nil {
-				return nil, err
+				return NewCPUSet(), err
 			}
 			// Add all elements to the result.
 			// e.g. "0-5", "46-48" => [0, 1, 2, 3, 4, 5, 46, 47, 48].
 			for e := start; e <= end; e++ {
-				result.Add(e)
+				b.Add(e)
 			}
 		}
 	}
-	return result, nil
+	return b.Result(), nil
 }
 
 // Clone returns a copy of this CPU set.
 func (s CPUSet) Clone() CPUSet {
-	res := NewCPUSet()
-	for k, v := range s {
-		res[k] = v
+	b := NewBuilder()
+	for elem := range s.elems {
+		b.Add(elem)
 	}
-	return res
+	return b.Result()
 }
