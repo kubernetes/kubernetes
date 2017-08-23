@@ -333,6 +333,12 @@ func TestServeHTTP(t *testing.T) {
 	}
 }
 
+type RoundTripperFunc func(req *http.Request) (*http.Response, error)
+
+func (fn RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
 func TestProxyUpgrade(t *testing.T) {
 
 	localhostPool := x509.NewCertPool()
@@ -341,8 +347,10 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 
 	testcases := map[string]struct {
-		ServerFunc     func(http.Handler) *httptest.Server
-		ProxyTransport http.RoundTripper
+		ServerFunc       func(http.Handler) *httptest.Server
+		ProxyTransport   http.RoundTripper
+		UpgradeTransport UpgradeRequestRoundTripper
+		ExpectedAuth     string
 	}{
 		"http": {
 			ServerFunc:     httptest.NewServer,
@@ -393,6 +401,30 @@ func TestProxyUpgrade(t *testing.T) {
 			},
 			ProxyTransport: utilnet.SetTransportDefaults(&http.Transport{Dial: net.Dial, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
 		},
+		"https (valid hostname + RootCAs + custom dialer + bearer token)": {
+			ServerFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+				if err != nil {
+					t.Errorf("https (valid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			ProxyTransport: utilnet.SetTransportDefaults(&http.Transport{Dial: net.Dial, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
+			UpgradeTransport: NewUpgradeRequestRoundTripper(
+				utilnet.SetOldTransportDefaults(&http.Transport{Dial: net.Dial, TLSClientConfig: &tls.Config{RootCAs: localhostPool}}),
+				RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					req = utilnet.CloneRequest(req)
+					req.Header.Set("Authorization", "Bearer 1234")
+					return MirrorRequest.RoundTrip(req)
+				}),
+			),
+			ExpectedAuth: "Bearer 1234",
+		},
 	}
 
 	for k, tc := range testcases {
@@ -406,6 +438,12 @@ func TestProxyUpgrade(t *testing.T) {
 			func() { // Cleanup after each test case.
 				backend := http.NewServeMux()
 				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
+					if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
+						t.Errorf("%s: unexpected headers on request: %v", k, ws.Request().Header)
+						defer ws.Close()
+						ws.Write([]byte("you failed"))
+						return
+					}
 					defer ws.Close()
 					body := make([]byte, 5)
 					ws.Read(body)
@@ -422,6 +460,7 @@ func TestProxyUpgrade(t *testing.T) {
 				proxyHandler := &UpgradeAwareHandler{
 					Location:           serverURL,
 					Transport:          tc.ProxyTransport,
+					UpgradeTransport:   tc.UpgradeTransport,
 					InterceptRedirects: redirect,
 					Responder:          &noErrorsAllowed{t: t},
 				}
