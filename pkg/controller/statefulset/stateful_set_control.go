@@ -38,7 +38,7 @@ type StatefulSetControlInterface interface {
 	// Implementors should sink any errors that they do not wish to trigger a retry, and they may feel free to
 	// exit exceptionally at any point provided they wish the update to be re-run at a later point in time.
 	UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error
-	// ListRevisions returns a array of the ControllerRevisions that represent the revisions of set. If the returned
+	// ListRevisions returns an array of the ControllerRevisions that represent the revisions of set. If the returned
 	// error is nil, the returns slice of ControllerRevisions is valid.
 	ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error)
 	// AdoptOrphanRevisions adopts any orphaned ControllerRevisions that match set's Selector. If all adoptions are

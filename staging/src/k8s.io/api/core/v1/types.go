@@ -1540,7 +1540,7 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-	// An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
