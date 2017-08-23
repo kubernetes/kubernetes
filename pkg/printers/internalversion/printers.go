@@ -62,16 +62,12 @@ import (
 const (
 	loadBalancerWidth = 16
 
-	// LabelNodeRoleMaster specifies that a node is a master
+	// labelNodeRolePrefix is a label prefix for node roles
 	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	labelNodeRolePrefix = "node-role.kubernetes.io/"
 
-	// NodeLabelRole specifies the role of a node
-	NodeLabelRole = "kubernetes.io/role"
-
-	// NodeLabelKubeadmAlphaRole is a label that kubeadm applies to a Node as a hint that it has a particular purpose.
-	// Use of NodeLabelRole is preferred.
-	NodeLabelKubeadmAlphaRole = "kubeadm.alpha.kubernetes.io/role"
+	// nodeLabelRole specifies the role of a node
+	nodeLabelRole = "kubernetes.io/role"
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -221,6 +217,7 @@ func AddHandlers(h printers.PrintHandler) {
 	nodeColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "The status of the node"},
+		{Name: "Roles", Type: "string", Description: "The roles of the node"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Version", Type: "string", Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kubeletVersion"]},
 		{Name: "External-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
@@ -1167,12 +1164,13 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1alpha1.Tab
 	if obj.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
-	role := findNodeRole(obj)
-	if role != "" {
-		status = append(status, role)
+
+	roles := strings.Join(findNodeRoles(obj), ",")
+	if len(roles) == 0 {
+		roles = "<none>"
 	}
 
-	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), translateTimestamp(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
+	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), roles, translateTimestamp(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
 	if options.Wide {
 		osImage, kernelVersion, crVersion := obj.Status.NodeInfo.OSImage, obj.Status.NodeInfo.KernelVersion, obj.Status.NodeInfo.ContainerRuntimeVersion
 		if osImage == "" {
@@ -1201,22 +1199,24 @@ func getNodeExternalIP(node *api.Node) string {
 	return "<none>"
 }
 
-// findNodeRole returns the role of a given node, or "" if none found.
-// The role is determined by looking in order for:
-// * a node-role.kubernetes.io/master label
-// * a kubernetes.io/role label
-// * a kubeadm.alpha.kubernetes.io/role label
-func findNodeRole(node *api.Node) string {
-	if _, ok := node.Labels[LabelNodeRoleMaster]; ok {
-		return "Master"
+// findNodeRoles returns the roles of a given node.
+// The roles are determined by looking for:
+// * a node-role.kubernetes.io/<role>="" label
+// * a kubernetes.io/role="<role>" label
+func findNodeRoles(node *api.Node) []string {
+	roles := sets.NewString()
+	for k, v := range node.Labels {
+		switch {
+		case strings.HasPrefix(k, labelNodeRolePrefix):
+			if role := strings.TrimPrefix(k, labelNodeRolePrefix); len(role) > 0 {
+				roles.Insert(role)
+			}
+
+		case k == nodeLabelRole && v != "":
+			roles.Insert(v)
+		}
 	}
-	if role := node.Labels[NodeLabelRole]; role != "" {
-		return strings.Title(role)
-	}
-	if role := node.Labels[NodeLabelKubeadmAlphaRole]; role != "" {
-		return strings.Title(role)
-	}
-	return ""
+	return roles.List()
 }
 
 func printNodeList(list *api.NodeList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {

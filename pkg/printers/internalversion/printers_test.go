@@ -825,34 +825,6 @@ func TestPrintNodeStatus(t *testing.T) {
 			},
 			status: "Unknown,SchedulingDisabled",
 		},
-		{
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo10",
-					Labels: map[string]string{"node-role.kubernetes.io/master": "", "kubernetes.io/role": "node", "kubeadm.alpha.kubernetes.io/role": "node"},
-				},
-			},
-			status: "Unknown,Master",
-		},
-		{
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo11",
-					Labels: map[string]string{"kubernetes.io/role": "node", "kubeadm.alpha.kubernetes.io/role": "node"},
-				},
-			},
-			status: "Unknown,Node",
-		},
-		{
-			node: api.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "foo12",
-					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "node"},
-				},
-				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
-			},
-			status: "Ready,Node",
-		},
 	}
 
 	for _, test := range table {
@@ -863,6 +835,51 @@ func TestPrintNodeStatus(t *testing.T) {
 		}
 		if !contains(strings.Fields(buffer.String()), test.status) {
 			t.Fatalf("Expect printing node %s with status %#v, got: %#v", test.node.Name, test.status, buffer.String())
+		}
+	}
+}
+
+func TestPrintNodeRole(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	AddHandlers(printer)
+	table := []struct {
+		node     api.Node
+		expected string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
+			},
+			expected: "<none>",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo10",
+					Labels: map[string]string{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/proxy": "", "kubernetes.io/role": "node"},
+				},
+			},
+			expected: "master,node,proxy",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo11",
+					Labels: map[string]string{"kubernetes.io/role": "node"},
+				},
+			},
+			expected: "node",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.expected) {
+			t.Fatalf("Expect printing node %s with role %#v, got: %#v", test.node.Name, test.expected, buffer.String())
 		}
 	}
 }
