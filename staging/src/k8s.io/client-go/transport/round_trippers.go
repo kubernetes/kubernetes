@@ -86,12 +86,8 @@ type requestCanceler interface {
 	CancelRequest(*http.Request)
 }
 
-type authProxyRoundTripper struct {
-	username string
-	groups   []string
-	extra    map[string][]string
-
-	rt http.RoundTripper
+type cacheRoundTripper struct {
+	rt *httpcache.Transport
 }
 
 // NewCacheRoundTripper creates a roundtripper that reads the ETag on
@@ -105,7 +101,21 @@ func NewCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
 	t.Transport = rt
 
-	return t
+	return &cacheRoundTripper{rt: t}
+}
+
+func (rt *cacheRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return rt.rt.RoundTrip(req)
+}
+
+func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }
+
+type authProxyRoundTripper struct {
+	username string
+	groups   []string
+	extra    map[string][]string
+
+	rt http.RoundTripper
 }
 
 // NewAuthProxyRoundTripper provides a roundtripper which will add auth proxy fields to requests for
