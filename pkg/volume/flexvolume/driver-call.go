@@ -58,9 +58,6 @@ const (
 	optionKeyPodUID       = "kubernetes.io/pod.uid"
 
 	optionKeyServiceAccountName = "kubernetes.io/serviceAccount.name"
-
-	attachCapability         = "attach"
-	selinuxRelabelCapability = "selinuxRelabel"
 )
 
 const (
@@ -81,11 +78,6 @@ type DriverCall struct {
 	Timeout time.Duration
 	plugin  *flexVolumePlugin
 	args    []string
-}
-
-type driverCapabilities struct {
-	attach         bool
-	selinuxRelabel bool
 }
 
 func (plugin *flexVolumePlugin) NewDriverCall(command string) *DriverCall {
@@ -210,7 +202,19 @@ type DriverStatus struct {
 	// Returns capabilities of the driver.
 	// By default we assume all the capabilities are supported.
 	// If the plugin does not support a capability, it can return false for that capability.
-	Capabilities map[string]bool
+	Capabilities *DriverCapabilities `json:",omitempty"`
+}
+
+type DriverCapabilities struct {
+	Attach         bool `json:"attach"`
+	SELinuxRelabel bool `json:"selinuxRelabel"`
+}
+
+func defaultCapabilities() *DriverCapabilities {
+	return &DriverCapabilities{
+		Attach:         true,
+		SELinuxRelabel: true,
+	}
 }
 
 // isCmdNotSupportedErr checks if the error corresponds to command not supported by
@@ -226,7 +230,9 @@ func isCmdNotSupportedErr(err error) bool {
 // handleCmdResponse processes the command output and returns the appropriate
 // error code or message.
 func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
-	var status DriverStatus
+	status := DriverStatus{
+		Capabilities: defaultCapabilities(),
+	}
 	if err := json.Unmarshal(output, &status); err != nil {
 		glog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
 		return nil, err
@@ -240,24 +246,4 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 	}
 
 	return &status, nil
-}
-
-// getDriverCapabilities returns the reported capabilities as returned by driver's init() function
-func (ds *DriverStatus) getDriverCapabilities() *driverCapabilities {
-	driverCaps := &driverCapabilities{
-		attach:         true,
-		selinuxRelabel: true,
-	}
-
-	// Check if driver supports SELinux Relabeling of mounted volume
-	if dcap, ok := ds.Capabilities[selinuxRelabelCapability]; ok {
-		driverCaps.selinuxRelabel = dcap
-	}
-
-	// Check whether the plugin is attachable.
-	if dcap, ok := ds.Capabilities[attachCapability]; ok {
-		driverCaps.attach = dcap
-	}
-
-	return driverCaps
 }
