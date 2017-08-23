@@ -474,6 +474,9 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			t.Fatal(err)
 		}
 		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		if err != nil {
+			t.Fatalf("error getting statefulset revisions:%v", err)
+		}
 		revisions, err = ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
