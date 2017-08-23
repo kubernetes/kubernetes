@@ -1,7 +1,8 @@
-// +build !go1.6
+// +build go1.8
 
 /*
- * Copyright 2016, Google Inc.
+ *
+ * Copyright 2017, Google Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,20 +33,21 @@
  *
  */
 
-package transport
+package credentials
 
 import (
-	"net"
-	"time"
-
-	"golang.org/x/net/context"
+	"crypto/tls"
 )
 
-// dialContext connects to the address on the named network.
-func dialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	var dialer net.Dialer
-	if deadline, ok := ctx.Deadline(); ok {
-		dialer.Timeout = deadline.Sub(time.Now())
+// cloneTLSConfig returns a shallow clone of the exported
+// fields of cfg, ignoring the unexported sync.Once, which
+// contains a mutex and must not be copied.
+//
+// If cfg is nil, a new zero tls.Config is returned.
+func cloneTLSConfig(cfg *tls.Config) *tls.Config {
+	if cfg == nil {
+		return &tls.Config{}
 	}
-	return dialer.Dial(network, address)
+
+	return cfg.Clone()
 }

@@ -53,6 +53,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // NewServerHandlerTransport returns a ServerTransport handling gRPC
@@ -109,6 +110,10 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request) (ServerTr
 				} else {
 					v = v[:i]
 				}
+			}
+			v, err := decodeMetadataHeader(k, v)
+			if err != nil {
+				return nil, streamErrorf(codes.InvalidArgument, "malformed binary metadata: %v", err)
 			}
 			metakv = append(metakv, k, v)
 		}
@@ -182,7 +187,7 @@ func (ht *serverHandlerTransport) do(fn func()) error {
 	}
 }
 
-func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error {
+func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) error {
 	err := ht.do(func() {
 		ht.writeCommonHeaders(s)
 
@@ -192,10 +197,13 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, 
 		ht.rw.(http.Flusher).Flush()
 
 		h := ht.rw.Header()
-		h.Set("Grpc-Status", fmt.Sprintf("%d", statusCode))
-		if statusDesc != "" {
-			h.Set("Grpc-Message", encodeGrpcMessage(statusDesc))
+		h.Set("Grpc-Status", fmt.Sprintf("%d", st.Code()))
+		if m := st.Message(); m != "" {
+			h.Set("Grpc-Message", encodeGrpcMessage(m))
 		}
+
+		// TODO: Support Grpc-Status-Details-Bin
+
 		if md := s.Trailer(); len(md) > 0 {
 			for k, vv := range md {
 				// Clients don't tolerate reading restricted headers after some non restricted ones were sent.
@@ -203,10 +211,9 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, statusCode codes.Code, 
 					continue
 				}
 				for _, v := range vv {
-					// http2 ResponseWriter mechanism to
-					// send undeclared Trailers after the
-					// headers have possibly been written.
-					h.Add(http2.TrailerPrefix+k, v)
+					// http2 ResponseWriter mechanism to send undeclared Trailers after
+					// the headers have possibly been written.
+					h.Add(http2.TrailerPrefix+k, encodeMetadataHeader(k, v))
 				}
 			}
 		}
@@ -234,6 +241,7 @@ func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
 	// and https://golang.org/pkg/net/http/#example_ResponseWriter_trailers
 	h.Add("Trailer", "Grpc-Status")
 	h.Add("Trailer", "Grpc-Message")
+	// TODO: Support Grpc-Status-Details-Bin
 
 	if s.sendCompress != "" {
 		h.Set("Grpc-Encoding", s.sendCompress)
@@ -260,6 +268,7 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 				continue
 			}
 			for _, v := range vv {
+				v = encodeMetadataHeader(k, v)
 				h.Add(k, v)
 			}
 		}
@@ -268,7 +277,7 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 	})
 }
 
-func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
+func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	// With this transport type there will be exactly 1 stream: this HTTP request.
 
 	var ctx context.Context
@@ -314,7 +323,7 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
 	if req.TLS != nil {
 		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS}
 	}
-	ctx = metadata.NewContext(ctx, ht.headerMD)
+	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	ctx = peer.NewContext(ctx, pr)
 	s.ctx = newContextWithStream(ctx, s)
 	s.dec = &recvBufferReader{ctx: s.ctx, recv: s.buf}
