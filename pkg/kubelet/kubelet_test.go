@@ -563,7 +563,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	spec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"memory": resource.MustParse("90"),
+				v1.ResourceMemory: resource.MustParse("90"),
 			},
 		}}},
 	}

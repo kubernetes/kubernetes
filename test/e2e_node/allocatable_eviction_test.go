@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
 			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
 			kubeReserved.Sub(resource.MustParse("300Mi"))
-			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{"memory": kubeReserved.String()})
+			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.CgroupsPerQOS = true
