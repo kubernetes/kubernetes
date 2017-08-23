@@ -44,6 +44,7 @@ QUICK_PATTERNS+=(
   "verify-staging-imports.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
+  "verify-no-merge-commits.sh"
 )
 
 EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
