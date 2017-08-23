@@ -845,22 +845,24 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-d0000001"] = true
 	routeTables["subnet-d0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
-	result, err = c.findELBSubnets(false)
-	if err != nil {
-		t.Errorf("Error listing subnets: %v", err)
-		return
-	}
-
-	if len(result) != 3 {
-		t.Errorf("Expected 3 subnets but got %d", len(result))
-		return
-	}
-
-	expected = []*string{aws.String("subnet-c0000000"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
-	for _, s := range result {
-		if !contains(expected, s) {
-			t.Errorf("Unexpected subnet '%s' found", s)
+	for _, internalElb := range [2]bool{false, true} {
+		result, err = c.findELBSubnets(internalElb)
+		if err != nil {
+			t.Errorf("Error listing subnets: %v", err)
 			return
+		}
+
+		if len(result) != 3 {
+			t.Errorf("Expected 3 subnets but got %d", len(result))
+			return
+		}
+
+		expected = []*string{aws.String("subnet-c0000000"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
+		for _, s := range result {
+			if !contains(expected, s) {
+				t.Errorf("Unexpected subnet '%s' found", s)
+				return
+			}
 		}
 	}
 }
