@@ -49,7 +49,7 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
-	policy := NewStaticPolicy(topoSingleSocketHT)
+	policy := NewStaticPolicy(topoSingleSocketHT).(*staticPolicy)
 
 	st := &mockState{
 		assignments:   map[string]cpuset.CPUSet{},

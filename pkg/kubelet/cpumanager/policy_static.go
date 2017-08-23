@@ -40,7 +40,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a cupset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
 // the main container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology) *staticPolicy {
+func NewStaticPolicy(topology *topology.CPUTopology) Policy {
 	return &staticPolicy{
 		topology: topology,
 	}

@@ -269,10 +269,10 @@ func TestCPUAccumulatorTake(t *testing.T) {
 			totalTaken += cpus.Size()
 		}
 		if tc.expectSatisfied != acc.isSatisfied() {
-			t.Errorf("[%s] expected acc.isSatisfied() to be %s", tc.description, tc.expectSatisfied)
+			t.Errorf("[%s] expected acc.isSatisfied() to be %t", tc.description, tc.expectSatisfied)
 		}
 		if tc.expectFailed != acc.isFailed() {
-			t.Errorf("[%s] expected acc.isFailed() to be %s", tc.description, tc.expectFailed)
+			t.Errorf("[%s] expected acc.isFailed() to be %t", tc.description, tc.expectFailed)
 		}
 		for _, cpus := range tc.takeCPUs {
 			availableCPUs := acc.details.CPUs()
