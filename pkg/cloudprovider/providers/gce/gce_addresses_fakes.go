@@ -34,10 +34,25 @@ type FakeCloudAddressService struct {
 	addrsByRegionAndName map[string]map[string]*compute.Address
 }
 
+// FakeCloudAddressService Implements CloudAddressService
+var _ CloudAddressService = &FakeCloudAddressService{}
+
 func NewFakeCloudAddressService() *FakeCloudAddressService {
 	return &FakeCloudAddressService{
 		reservedAddrs:        make(map[string]bool),
 		addrsByRegionAndName: make(map[string]map[string]*compute.Address),
+	}
+}
+
+// SetRegionalAddresses populates the addresses of the region with the name to
+// IP map.
+func (cas *FakeCloudAddressService) SetRegionalAddresses(region string, ipList map[string]string) {
+	// Reset addresses in the region.
+	cas.addrsByRegionAndName[region] = make(map[string]*compute.Address)
+
+	for name, ip := range ipList {
+		cas.reservedAddrs[ip] = true
+		cas.addrsByRegionAndName[region][name] = &compute.Address{Name: name, Address: ip}
 	}
 }
 

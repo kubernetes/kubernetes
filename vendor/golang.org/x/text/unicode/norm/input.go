@@ -90,20 +90,16 @@ func (in *input) charinfoNFKC(p int) (uint16, int) {
 }
 
 func (in *input) hangul(p int) (r rune) {
-	var size int
 	if in.bytes == nil {
 		if !isHangulString(in.str[p:]) {
 			return 0
 		}
-		r, size = utf8.DecodeRuneInString(in.str[p:])
+		r, _ = utf8.DecodeRuneInString(in.str[p:])
 	} else {
 		if !isHangul(in.bytes[p:]) {
 			return 0
 		}
-		r, size = utf8.DecodeRune(in.bytes[p:])
-	}
-	if size != hangulUTF8Size {
-		return 0
+		r, _ = utf8.DecodeRune(in.bytes[p:])
 	}
 	return r
 }

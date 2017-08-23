@@ -123,64 +123,34 @@ var transitions = [...][2]ruleTransition{
 // vice versa.
 const exclusiveRTL = uint16(1<<bidi.EN | 1<<bidi.AN)
 
-// From RFC 5893
-// An RTL label is a label that contains at least one character of type
-// R, AL, or AN.
-//
-// An LTR label is any label that is not an RTL label.
-
-// Direction reports the direction of the given label as defined by RFC 5893.
-// The Bidi Rule does not have to be applied to labels of the category
-// LeftToRight.
-func Direction(b []byte) bidi.Direction {
-	for i := 0; i < len(b); {
-		e, sz := bidi.Lookup(b[i:])
-		if sz == 0 {
-			i++
+// Direction reports the direction of the given label as defined by RFC 5893 or
+// an error if b is not a valid label according to the Bidi Rule.
+func Direction(b []byte) (bidi.Direction, error) {
+	t := Transformer{}
+	if n, ok := t.advance(b); ok && n == len(b) {
+		switch t.state {
+		case ruleLTRFinal, ruleInitial:
+			return bidi.LeftToRight, nil
+		case ruleRTLFinal:
+			return bidi.RightToLeft, nil
 		}
-		c := e.Class()
-		if c == bidi.R || c == bidi.AL || c == bidi.AN {
-			return bidi.RightToLeft
-		}
-		i += sz
 	}
-	return bidi.LeftToRight
+	return bidi.Neutral, ErrInvalid
 }
 
 // DirectionString reports the direction of the given label as defined by RFC
-// 5893. The Bidi Rule does not have to be applied to labels of the category
-// LeftToRight.
-func DirectionString(s string) bidi.Direction {
-	for i := 0; i < len(s); {
-		e, sz := bidi.LookupString(s[i:])
-		if sz == 0 {
-			i++
+// 5893 or an error if s is not a valid label according to the Bidi Rule.
+func DirectionString(s string) (bidi.Direction, error) {
+	t := Transformer{}
+	if n, ok := t.advanceString(s); ok && n == len(s) {
+		switch t.state {
+		case ruleLTRFinal, ruleInitial:
+			return bidi.LeftToRight, nil
+		case ruleRTLFinal:
+			return bidi.RightToLeft, nil
 		}
-		c := e.Class()
-		if c == bidi.R || c == bidi.AL || c == bidi.AN {
-			return bidi.RightToLeft
-		}
-		i += sz
 	}
-	return bidi.LeftToRight
-}
-
-// Valid reports whether b conforms to the BiDi rule.
-func Valid(b []byte) bool {
-	var t Transformer
-	if n, ok := t.advance(b); !ok || n < len(b) {
-		return false
-	}
-	return t.isFinal()
-}
-
-// ValidString reports whether s conforms to the BiDi rule.
-func ValidString(s string) bool {
-	var t Transformer
-	if n, ok := t.advanceString(s); !ok || n < len(s) {
-		return false
-	}
-	return t.isFinal()
+	return bidi.Neutral, ErrInvalid
 }
 
 // New returns a Transformer that verifies that input adheres to the Bidi Rule.
@@ -190,23 +160,8 @@ func New() *Transformer {
 
 // Transformer implements transform.Transform.
 type Transformer struct {
-	state  ruleState
-	hasRTL bool
-	seen   uint16
-}
-
-// A rule can only be violated for "Bidi Domain names", meaning if one of the
-// following categories has been observed.
-func (t *Transformer) isRTL() bool {
-	const isRTL = 1<<bidi.R | 1<<bidi.AL | 1<<bidi.AN
-	return t.seen&isRTL != 0
-}
-
-func (t *Transformer) isFinal() bool {
-	if !t.isRTL() {
-		return true
-	}
-	return t.state == ruleLTRFinal || t.state == ruleRTLFinal || t.state == ruleInitial
+	state ruleState
+	seen  uint16
 }
 
 // Reset implements transform.Transformer.
@@ -230,7 +185,7 @@ func (t *Transformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, er
 
 // Span returns the first n bytes of src that conform to the Bidi rule.
 func (t *Transformer) Span(src []byte, atEOF bool) (n int, err error) {
-	if t.state == ruleInvalid && t.isRTL() {
+	if t.state == ruleInvalid {
 		return 0, ErrInvalid
 	}
 	n, ok := t.advance(src)
@@ -243,7 +198,7 @@ func (t *Transformer) Span(src []byte, atEOF bool) (n int, err error) {
 			break
 		}
 		err = ErrInvalid
-	case !t.isFinal():
+	case t.state != ruleLTRFinal && t.state != ruleRTLFinal && t.state != ruleInitial:
 		err = ErrInvalid
 	}
 	return n, err
@@ -270,15 +225,12 @@ func (t *Transformer) advance(s []byte) (n int, ok bool) {
 			e, sz = bidi.Lookup(s[n:])
 			if sz <= 1 {
 				if sz == 1 {
-					// We always consider invalid UTF-8 to be invalid, even if
-					// the string has not yet been determined to be RTL.
-					// TODO: is this correct?
-					return n, false
+					return n, false // invalid UTF-8
 				}
 				return n, true // incomplete UTF-8 encoding
 			}
 		}
-		// TODO: using CompactClass would result in noticeable speedup.
+		// TODO: using CompactClass results in noticeable speedup.
 		// See unicode/bidi/prop.go:Properties.CompactClass.
 		c := uint16(1 << e.Class())
 		t.seen |= c
@@ -293,9 +245,7 @@ func (t *Transformer) advance(s []byte) (n int, ok bool) {
 			t.state = tr[1].next
 		default:
 			t.state = ruleInvalid
-			if t.isRTL() {
-				return n, false
-			}
+			return n, false
 		}
 		n += sz
 	}
@@ -332,9 +282,7 @@ func (t *Transformer) advanceString(s string) (n int, ok bool) {
 			t.state = tr[1].next
 		default:
 			t.state = ruleInvalid
-			if t.isRTL() {
-				return n, false
-			}
+			return n, false
 		}
 		n += sz
 	}

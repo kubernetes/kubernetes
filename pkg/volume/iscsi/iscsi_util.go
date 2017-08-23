@@ -205,6 +205,20 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	iscsiTransport = extractTransportname(string(out))
 
 	bkpPortal := b.Portals
+
+	// create new iface and copy parameters from pre-configured iface to the created iface
+	if b.InitiatorName != "" {
+		// new iface name is <target portal>:<volume name>
+		newIface := bkpPortal[0] + ":" + b.volName
+		err = cloneIface(b, newIface)
+		if err != nil {
+			glog.Errorf("iscsi: failed to clone iface: %s error: %v", b.Iface, err)
+			return err
+		}
+		// update iface name
+		b.Iface = newIface
+	}
+
 	for _, tp := range bkpPortal {
 		// Rescan sessions to discover newly mapped LUNs. Do not specify the interface when rescanning
 		// to avoid establishing additional sessions to the same target.
@@ -268,6 +282,8 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	}
 
 	if len(devicePaths) == 0 {
+		// delete cloned iface
+		b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.Iface, "-o", "delete"})
 		glog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 		return fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 	}
@@ -331,12 +347,13 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 		refCount, err := getDevicePrefixRefCount(c.mounter, prefix)
 		if err == nil && refCount == 0 {
 			var bkpPortal []string
-			var iqn, iface string
+			var iqn, iface, initiatorName string
 			found := true
 
 			// load iscsi disk config from json file
 			if err := util.loadISCSI(c.iscsiDisk, mntPath); err == nil {
 				bkpPortal, iqn, iface = c.iscsiDisk.Portals, c.iscsiDisk.Iqn, c.iscsiDisk.Iface
+				initiatorName = c.iscsiDisk.InitiatorName
 			} else {
 				// If the iscsi disk config is not found, fall back to the original behavior.
 				// This portal/iqn/iface is no longer referenced, log out.
@@ -351,7 +368,12 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 				// Logout may fail as no session may exist for the portal/IQN on the specified interface.
 				iface, found = extractIface(mntPath)
 			}
-			for _, portal := range removeDuplicate(bkpPortal) {
+			portals := removeDuplicate(bkpPortal)
+			if len(portals) == 0 {
+				return fmt.Errorf("iscsi detach disk: failed to detach iscsi disk. Couldn't get connected portals from configurations.")
+			}
+
+			for _, portal := range portals {
 				logout := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
 				delete := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
 				if found {
@@ -370,6 +392,16 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 					glog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
 				}
 			}
+			// Delete the iface after all sessions have logged out
+			// If the iface is not created via iscsi plugin, skip to delete
+			if initiatorName != "" && found && iface == (portals[0]+":"+c.volName) {
+				delete := []string{"-m", "iface", "-I", iface, "-o", "delete"}
+				out, err := c.plugin.execCommand("iscsiadm", delete)
+				if err != nil {
+					glog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
+				}
+			}
+
 		}
 	}
 	return nil
@@ -447,4 +479,58 @@ func removeDuplicate(s []string) []string {
 	}
 	s = s[:len(m)]
 	return s
+}
+
+func parseIscsiadmShow(output string) (map[string]string, error) {
+	params := make(map[string]string)
+	slice := strings.Split(output, "\n")
+	for _, line := range slice {
+		if !strings.HasPrefix(line, "iface.") || strings.Contains(line, "<empty>") {
+			continue
+		}
+		iface := strings.Fields(line)
+		if len(iface) != 3 || iface[1] != "=" {
+			return nil, fmt.Errorf("Error: invalid iface setting: %v", iface)
+		}
+		// iscsi_ifacename is immutable once the iface is created
+		if iface[0] == "iface.iscsi_ifacename" {
+			continue
+		}
+		params[iface[0]] = iface[2]
+	}
+	return params, nil
+}
+
+func cloneIface(b iscsiDiskMounter, newIface string) error {
+	var lastErr error
+	// get pre-configured iface records
+	out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.Iface, "-o", "show"})
+	if err != nil {
+		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", string(out), err)
+		return lastErr
+	}
+	// parse obtained records
+	params, err := parseIscsiadmShow(string(out))
+	if err != nil {
+		lastErr = fmt.Errorf("iscsi: failed to parse iface records: %s (%v)", string(out), err)
+		return lastErr
+	}
+	// update initiatorname
+	params["iface.initiatorname"] = b.InitiatorName
+	// create new iface
+	out, err = b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", newIface, "-o", "new"})
+	if err != nil {
+		lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
+		return lastErr
+	}
+	// update new iface records
+	for key, val := range params {
+		_, err = b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", newIface, "-o", "update", "-n", key, "-v", val})
+		if err != nil {
+			b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", newIface, "-o", "delete"})
+			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.Iface)
+			break
+		}
+	}
+	return lastErr
 }

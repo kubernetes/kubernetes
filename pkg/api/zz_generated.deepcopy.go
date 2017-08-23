@@ -2333,6 +2333,15 @@ func (in *ISCSIVolumeSource) DeepCopyInto(out *ISCSIVolumeSource) {
 			**out = **in
 		}
 	}
+	if in.InitiatorName != nil {
+		in, out := &in.InitiatorName, &out.InitiatorName
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
 	return
 }
 

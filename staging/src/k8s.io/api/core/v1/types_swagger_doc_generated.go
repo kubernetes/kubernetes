@@ -674,6 +674,7 @@ var map_ISCSIVolumeSource = map[string]string{
 	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
 	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
 	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
+	"initiatorName":     "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {

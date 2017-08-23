@@ -80,6 +80,11 @@ const (
 	gceComputeAPIEndpoint = "https://www.googleapis.com/compute/v1/"
 )
 
+// gceObject is an abstraction of all GCE API object in go client
+type gceObject interface {
+	MarshalJSON() ([]byte, error)
+}
+
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	// ClusterID contains functionality for getting (and initializing) the ingress-uid. Call GCECloud.Initialize()
@@ -113,6 +118,11 @@ type GCECloud struct {
 	// lock to prevent shared resources from being prematurely deleted while the operation is
 	// in progress.
 	sharedResourceLock sync.Mutex
+	// AlphaFeatureGate gates gce alpha features in GCECloud instance.
+	// Related wrapper functions that interacts with gce alpha api should examine whether
+	// the corresponding api is enabled.
+	// If not enabled, it should return error.
+	AlphaFeatureGate *AlphaFeatureGate
 }
 
 type ServiceManager interface {
@@ -146,6 +156,9 @@ type ConfigFile struct {
 		// Specifying ApiEndpoint will override the default GCE compute API endpoint.
 		ApiEndpoint string `gcfg:"api-endpoint"`
 		LocalZone   string `gcfg:"local-zone"`
+		// Possible values: List of api names separated by comma. Default to none.
+		// For example: MyFeatureFlag
+		AlphaFeatures []string `gcfg:"alpha-features"`
 	}
 }
 
@@ -162,6 +175,7 @@ type CloudConfig struct {
 	NodeInstancePrefix string
 	TokenSource        oauth2.TokenSource
 	UseMetadataServer  bool
+	AlphaFeatureGate   *AlphaFeatureGate
 }
 
 func init() {
@@ -240,6 +254,12 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
+
+		alphaFeatureGate, err := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
+		if err != nil {
+			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
+		}
+		cloudConfig.AlphaFeatureGate = alphaFeatureGate
 	}
 
 	// retrieve projectID and zone
@@ -393,6 +413,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		nodeInstancePrefix:       config.NodeInstancePrefix,
 		useMetadataServer:        config.UseMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
+		AlphaFeatureGate:         config.AlphaFeatureGate,
 	}
 
 	gce.manager = &GCEServiceManager{gce}

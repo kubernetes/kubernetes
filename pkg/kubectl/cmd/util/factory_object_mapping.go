@@ -28,6 +28,7 @@ import (
 	"time"
 
 	swagger "github.com/emicklei/go-restful-swagger12"
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
@@ -402,8 +404,20 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	return pod, err
 }
 
-func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *ring1Factory) Validator(validate, openapi bool, cacheDir string) (validation.Schema, error) {
 	if validate {
+		if openapi {
+			resources, err := f.OpenAPISchema(cacheDir)
+			if err == nil {
+				return validation.ConjunctiveSchema{
+					openapivalidation.NewSchemaValidation(resources),
+					validation.NoDoubleKeySchema{},
+				}, nil
+			}
+
+			glog.Warningf("Failed to download OpenAPI (%v), falling back to swagger", err)
+		}
+
 		discovery, err := f.clientAccessFactory.DiscoveryClient()
 		if err != nil {
 			return nil, err

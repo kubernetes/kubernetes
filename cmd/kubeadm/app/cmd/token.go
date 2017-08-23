@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -78,13 +77,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return errors.New("missing subcommand; 'token' is not meant to be run on its own")
-			} else {
-				return fmt.Errorf("invalid subcommand: %s", args[0])
-			}
-		},
+		RunE: subCmdRunE("token"),
 	}
 
 	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,

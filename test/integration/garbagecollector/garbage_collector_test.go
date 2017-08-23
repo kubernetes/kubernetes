@@ -418,8 +418,8 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
-	if len(pods.Items) != 1 {
-		t.Fatalf("Expect only 1 pod")
+	if len(pods.Items) > 1 {
+		t.Fatalf("Unexpected pod list: %v", pods.Items)
 	}
 	// wait for the garbage collector to delete the pod
 	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {

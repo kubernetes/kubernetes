@@ -163,7 +163,7 @@ func printUnit(bytes uint64) string {
 	return ByteSize(bytes).Unit()
 }
 
-func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) error {
+func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) {
 	start := time.Now()
 
 	// The container name is the path after the handler
@@ -175,14 +175,16 @@ func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) e
 	}
 	cont, err := m.GetContainerInfo(containerName, &reqParams)
 	if err != nil {
-		return fmt.Errorf("failed to get container %q with error: %v", containerName, err)
+		http.Error(w, fmt.Sprintf("failed to get container %q with error: %v", containerName, err), http.StatusNotFound)
+		return
 	}
 	displayName := getContainerDisplayName(cont.ContainerReference)
 
 	// Get the MachineInfo
 	machineInfo, err := m.GetMachineInfo()
 	if err != nil {
-		return err
+		http.Error(w, fmt.Sprintf("failed to get machine info: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	rootDir := getRootDir(containerName)
@@ -241,7 +243,6 @@ func serveContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) e
 	}
 
 	glog.V(5).Infof("Request took %s", time.Since(start))
-	return nil
 }
 
 // Build a relative path to the root of the container page.

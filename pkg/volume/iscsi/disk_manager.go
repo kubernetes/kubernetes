@@ -35,7 +35,6 @@ type diskManager interface {
 
 // utility to mount a disk based filesystem
 func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
-	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 
@@ -60,6 +59,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	if b.readOnly {
 		options = append(options, "ro")
 	}
+	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {

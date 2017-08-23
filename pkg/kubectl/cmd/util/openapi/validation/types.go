@@ -103,6 +103,9 @@ func (item *mapItem) VisitMap(schema *openapi.Map) {
 func (item *mapItem) VisitKind(schema *openapi.Kind) {
 	// Verify each sub-field.
 	for _, key := range item.sortedKeys() {
+		if item.Map[key] == nil {
+			continue
+		}
 		subItem, err := itemFactory(item.Path().FieldPath(key), item.Map[key])
 		if err != nil {
 			item.AddError(err)
@@ -118,7 +121,7 @@ func (item *mapItem) VisitKind(schema *openapi.Kind) {
 
 	// Verify that all required fields are present.
 	for _, required := range schema.RequiredFields {
-		if _, ok := item.Map[required]; !ok {
+		if v, ok := item.Map[required]; !ok || v == nil {
 			item.AddValidationError(MissingRequiredFieldError{Path: schema.GetPath().String(), Field: required})
 		}
 	}
@@ -139,7 +142,12 @@ func (item *arrayItem) VisitPrimitive(schema *openapi.Primitive) {
 
 func (item *arrayItem) VisitArray(schema *openapi.Array) {
 	for i, v := range item.Array {
-		subItem, err := itemFactory(item.Path().ArrayPath(i), v)
+		path := item.Path().ArrayPath(i)
+		if v == nil {
+			item.AddValidationError(InvalidObjectTypeError{Type: "nil", Path: path.String()})
+			continue
+		}
+		subItem, err := itemFactory(path, v)
 		if err != nil {
 			item.AddError(err)
 			continue

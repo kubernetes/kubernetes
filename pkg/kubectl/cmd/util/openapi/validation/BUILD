@@ -17,6 +17,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/api/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -36,6 +37,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         ":go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

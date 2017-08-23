@@ -11,10 +11,8 @@ go_library(
         "tables.go",
         "trieval.go",
     ],
-    cgo = True,
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/text/internal:go_default_library",
         "//vendor/golang.org/x/text/language:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
         "//vendor/golang.org/x/text/unicode/norm:go_default_library",

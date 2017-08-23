@@ -35,8 +35,8 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 }
 
 // WithDeadline returns a copy of the parent context with the deadline adjusted
-// to be no later than d. If the parent's deadline is already earlier than d,
-// WithDeadline(parent, d) is semantically equivalent to parent. The returned
+// to be no later than d.  If the parent's deadline is already earlier than d,
+// WithDeadline(parent, d) is semantically equivalent to parent.  The returned
 // context's Done channel is closed when the deadline expires, when the returned
 // cancel function is called, or when the parent context's Done channel is
 // closed, whichever happens first.

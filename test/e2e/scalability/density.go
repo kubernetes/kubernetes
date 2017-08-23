@@ -328,7 +328,7 @@ var _ = SIGDescribe("Density", func() {
 
 		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, metrics)

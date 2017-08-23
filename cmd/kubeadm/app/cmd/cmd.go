@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
@@ -68,6 +69,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdCompletion(out, ""))
+	cmds.AddCommand(NewCmdConfig(out))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
@@ -83,4 +85,19 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(experimentalCmd)
 
 	return cmds
+}
+
+// subCmdRunE returns a function that handles a case where a subcommand must be specified
+// Without this callback, if a user runs just the command without a subcommand,
+// or with an invalid subcommand, cobra will print usage information, but still exit cleanly.
+// We want to return an error code in these cases so that the
+// user knows that their command was invalid.
+func subCmdRunE(name string) func(*cobra.Command, []string) error {
+	return func(_ *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return fmt.Errorf("missing subcommand; %q is not meant to be run on its own", name)
+		}
+
+		return fmt.Errorf("invalid subcommand: %q", args[0])
+	}
 }

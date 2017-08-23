@@ -13,6 +13,7 @@ go_library(
         "gce.go",
         "gce_addresses.go",
         "gce_addresses_fakes.go",
+        "gce_alpha.go",
         "gce_annotations.go",
         "gce_backendservice.go",
         "gce_cert.go",
@@ -87,7 +88,10 @@ go_test(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
+        "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

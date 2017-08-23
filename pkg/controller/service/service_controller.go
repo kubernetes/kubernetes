@@ -280,13 +280,12 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
 
-		// The load balancer doesn't exist yet, so create it.
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-		newState, err = s.createLoadBalancer(service)
+		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
+		newState, err = s.ensureLoadBalancer(service)
 		if err != nil {
-			return fmt.Errorf("Failed to create load balancer for service %s: %v", key, err), retryable
+			return fmt.Errorf("Failed to ensure load balancer for service %s: %v", key, err), retryable
 		}
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
 	// Write the state if changed
@@ -340,7 +339,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	return err
 }
 
-func (s *ServiceController) createLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
+func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
 	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
 		return nil, err

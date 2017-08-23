@@ -51,9 +51,10 @@ const (
 	// Increasing threshold to 1s is within our SLO and should solve this problem.
 	apiCallLatencyThreshold time.Duration = 1 * time.Second
 
-	// We set a higher threshold for list apicalls as they can take more time when
-	// the list is really big. For eg. list nodes in a 5000-node cluster.
-	apiListCallLatencyThreshold time.Duration = 2 * time.Second
+	// We use a higher threshold for list apicalls if the cluster is big (i.e having > 500 nodes)
+	// as list response sizes are bigger in general for big clusters.
+	apiListCallLatencyThreshold  time.Duration = 5 * time.Second
+	bigClusterNodeCountThreshold               = 500
 
 	// Cluster Autoscaler metrics names
 	caFunctionMetric      = "cluster_autoscaler_function_duration_seconds_bucket"
@@ -354,8 +355,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 }
 
 // Prints top five summary metrics for request types with latency and returns
-// number of such request types above threshold.
-func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error) {
+// number of such request types above threshold. We use a higher threshold for
+// list calls if nodeCount is above a given threshold (i.e. cluster is big).
+func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIResponsiveness, error) {
+	isBigCluster := (nodeCount > bigClusterNodeCountThreshold)
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, metrics, err
@@ -364,12 +367,14 @@ func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error)
 	badMetrics := 0
 	top := 5
 	for i := range metrics.APICalls {
+		latency := metrics.APICalls[i].Latency.Perc99
+		isListCall := (metrics.APICalls[i].Verb == "LIST")
 		isBad := false
-		verb := metrics.APICalls[i].Verb
-		if verb != "LIST" && metrics.APICalls[i].Latency.Perc99 > apiCallLatencyThreshold ||
-			verb == "LIST" && metrics.APICalls[i].Latency.Perc99 > apiListCallLatencyThreshold {
-			badMetrics++
-			isBad = true
+		if latency > apiCallLatencyThreshold {
+			if !isListCall || !isBigCluster || (latency > apiListCallLatencyThreshold) {
+				isBad = true
+				badMetrics++
+			}
 		}
 		if top > 0 || isBad {
 			top--

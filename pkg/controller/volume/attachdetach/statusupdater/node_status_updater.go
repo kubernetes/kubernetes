@@ -68,13 +68,11 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
-			// Remove the node entry from the collection of attach updates, preventing the
-			// status updater from unnecessarily updating the node.
+			// Do nothing so that there is no retry until node is created.
 			glog.V(2).Infof(
 				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
 				nodeName,
 				err)
-			nsu.actualStateOfWorld.RemoveNodeFromAttachUpdates(nodeName)
 			continue
 		} else if err != nil {
 			// For all other errors, log error and reset flag statusUpdateNeeded

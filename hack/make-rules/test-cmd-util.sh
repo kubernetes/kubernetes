@@ -1234,31 +1234,6 @@ run_kubectl_run_tests() {
   set +o errexit
 }
 
-run_kubectl_using_deprecated_commands_test() {
-  set -o nounset
-  set -o errexit
-
-  create_and_use_new_namespace
-  kube::log::status "Testing kubectl using deprecated commands"
-  ## `kubectl run-container` should function identical to `kubectl run`, but it
-  ## should also print a deprecation warning.
-  # Pre-Condition: no Job exists
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command
-  output_message=$(kubectl 2>&1 run-container pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(15)' "${kube_flags[@]}")
-  # Ensure that the user is warned their command is deprecated.
-  kube::test::if_has_string "${output_message}" 'deprecated'
-  # Post-Condition: Job "pi" is created
-  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
-  # Clean up
-  kubectl delete jobs pi "${kube_flags[@]}"
-  # Post-condition: no pods exist.
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-
-  set +o nounset
-  set +o errexit
-}
-
 run_kubectl_get_tests() {
   set -o nounset
   set -o errexit
@@ -4347,7 +4322,6 @@ runTests() {
     # run for federation apiserver as well.
     record_command run_kubectl_apply_tests
     record_command run_kubectl_run_tests
-    record_command run_kubectl_using_deprecated_commands_test
     record_command run_kubectl_create_filter_tests
   fi
 

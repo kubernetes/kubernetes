@@ -548,7 +548,7 @@ func (s *StatefulSetTester) RestorePodHttpProbe(ss *apps.StatefulSet, pod *v1.Po
 
 var pauseProbe = &v1.Probe{
 	Handler: v1.Handler{
-		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/tmp/statefulset-continue"}},
+		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,
 	SuccessThreshold: 1,
@@ -586,7 +586,7 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 		if resumedPod != "" {
 			Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := RunHostCmd(pod.Namespace, pod.Name, "touch /tmp/statefulset-continue")
+		_, err := RunHostCmd(pod.Namespace, pod.Name, "touch /data/statefulset-continue")
 		ExpectNoError(err)
 		Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name

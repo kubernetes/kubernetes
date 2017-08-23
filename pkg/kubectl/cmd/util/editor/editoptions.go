@@ -229,7 +229,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
+			schema, err := o.f.Validator(o.EnableValidation, o.UseOpenAPI, o.SchemaCacheDir)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}

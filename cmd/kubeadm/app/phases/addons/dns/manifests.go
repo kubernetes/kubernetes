@@ -17,11 +17,8 @@ limitations under the License.
 package dns
 
 const (
-	// KubeDNSVersion is the version of kube-dns to run
-	KubeDNSVersion = "1.14.4"
-
-	// KubeDNSDeployment is the kube-dns Deployemnt manifest
-	KubeDNSDeployment = `
+	// v170AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
+	v170AndAboveKubeDNSDeployment = `
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:

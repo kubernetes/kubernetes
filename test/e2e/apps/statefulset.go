@@ -115,7 +115,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Restarting statefulset " + ss.Name)
 			sst.Restart(ss)
-			sst.Saturate(ss)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("Verifying statefulset mounted data directory is usable")
 			framework.ExpectNoError(sst.CheckMount(ss, "/data"))
@@ -233,13 +233,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.DeleteStatefulPodAtIndex(0, ss)
 
 			By("Confirming stateful pod at index 0 is recreated.")
-			sst.WaitForRunning(2, 0, ss)
+			sst.WaitForRunning(2, 1, ss)
 
-			By("Deleting unhealthy stateful pod at index 1.")
-			sst.DeleteStatefulPodAtIndex(1, ss)
+			By("Resuming stateful pod at index 1.")
+			sst.ResumeNextPod(ss)
 
 			By("Confirming all stateful pods in statefulset are created.")
-			sst.Saturate(ss)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 		})
 
 		It("should perform rolling updates and roll backs of template modifications", func() {

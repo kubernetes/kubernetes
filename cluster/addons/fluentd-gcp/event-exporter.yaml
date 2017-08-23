@@ -51,16 +51,19 @@ spec:
         image: gcr.io/google-containers/event-exporter:v0.1.5
         command:
         - '/event-exporter'
+      # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
         image: gcr.io/google-containers/prometheus-to-sd:v0.2.1
         command:
           - /monitor
           - --component=event_exporter
-          - --stackdriver-prefix=container.googleapis.com/internal/addons
+          - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
+          - --api-override={{ prometheus_to_sd_endpoint }}
           - --whitelisted-metrics=stackdriver_sink_received_entry_count,stackdriver_sink_request_count,stackdriver_sink_successfully_sent_entry_count
         volumeMounts:
         - name: ssl-certs
           mountPath: /etc/ssl/certs
+      # END_PROMETHEUS_TO_SD
       terminationGracePeriodSeconds: 30
       volumes:
       - name: ssl-certs

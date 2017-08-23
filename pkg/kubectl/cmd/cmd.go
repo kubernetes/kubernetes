@@ -285,7 +285,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
-				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
 				set.NewCmdSet(f, out, err),
 			},
 		},
@@ -303,9 +302,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
-				deprecatedAlias("rollingupdate", NewCmdRollingUpdate(f, out)),
 				NewCmdScale(f, out),
-				deprecatedAlias("resize", NewCmdScale(f, out)),
 				NewCmdAutoscale(f, out),
 			},
 		},
@@ -314,7 +311,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
-				deprecatedAlias("clusterinfo", NewCmdClusterInfo(f, out)),
 				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
@@ -341,7 +337,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdApply("kubectl", f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
-				deprecatedAlias("update", NewCmdReplace(f, out)),
 				NewCmdConvert(f, out),
 			},
 		},
@@ -383,7 +378,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(deprecatedAlias("apiversions", NewCmdApiVersions(f, out)))
 	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds

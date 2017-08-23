@@ -6,8 +6,6 @@ go_library(
         "events.go",
         "histogram.go",
         "trace.go",
-        "trace_go16.go",
-        "trace_go17.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
