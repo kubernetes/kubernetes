@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -60,7 +59,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
-const loadBalancerWidth = 16
+const (
+	loadBalancerWidth = 16
+
+	// LabelNodeRoleMaster specifies that a node is a master
+	// It's copied over to here until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
+	// NodeLabelRole specifies the role of a node
+	NodeLabelRole = "kubernetes.io/role"
+
+	// NodeLabelKubeadmAlphaRole is a label that kubeadm applies to a Node as a hint that it has a particular purpose.
+	// Use of NodeLabelRole is preferred.
+	NodeLabelKubeadmAlphaRole = "kubeadm.alpha.kubernetes.io/role"
+)
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
 // TODO: handle errors from Handler
@@ -1191,14 +1203,19 @@ func getNodeExternalIP(node *api.Node) string {
 
 // findNodeRole returns the role of a given node, or "" if none found.
 // The role is determined by looking in order for:
+// * a node-role.kubernetes.io/master label
 // * a kubernetes.io/role label
 // * a kubeadm.alpha.kubernetes.io/role label
-// If no role is found, ("", nil) is returned
 func findNodeRole(node *api.Node) string {
-	if role := node.Labels[kubeadm.NodeLabelKubeadmAlphaRole]; role != "" {
-		return role
+	if _, ok := node.Labels[LabelNodeRoleMaster]; ok {
+		return "Master"
 	}
-	// No role found
+	if role := node.Labels[NodeLabelRole]; role != "" {
+		return strings.Title(role)
+	}
+	if role := node.Labels[NodeLabelKubeadmAlphaRole]; role != "" {
+		return strings.Title(role)
+	}
 	return ""
 }
 
