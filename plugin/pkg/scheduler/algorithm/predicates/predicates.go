@@ -1301,6 +1301,37 @@ func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta interface{}, nodeInfo *sch
 	return true, nil, nil
 }
 
+// CheckNodeConditionPredicate checks if a pod can be scheduled on a node reporting out of disk,
+// network unavailable and not ready condition. Only node conditions are accounted in this predicate.
+func CheckNodeConditionPredicate(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	reasons := []algorithm.PredicateFailureReason{}
+
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
+	}
+
+	node := nodeInfo.Node()
+	for _, cond := range node.Status.Conditions {
+		// We consider the node for scheduling only when its:
+		// - NodeReady condition status is ConditionTrue,
+		// - NodeOutOfDisk condition status is ConditionFalse,
+		// - NodeNetworkUnavailable condition status is ConditionFalse.
+		if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
+			reasons = append(reasons, ErrNodeNotReady)
+		} else if cond.Type == v1.NodeOutOfDisk && cond.Status != v1.ConditionFalse {
+			reasons = append(reasons, ErrNodeOutOfDisk)
+		} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
+			reasons = append(reasons, ErrNodeNetworkUnavailable)
+		}
+	}
+
+	if node.Spec.Unschedulable {
+		reasons = append(reasons, ErrNodeUnschedulable)
+	}
+
+	return len(reasons) == 0, reasons, nil
+}
+
 type VolumeNodeChecker struct {
 	pvInfo  PersistentVolumeInfo
 	pvcInfo PersistentVolumeClaimInfo
