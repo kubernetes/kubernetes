@@ -56,7 +56,7 @@ func TestKubectlValidation(t *testing.T) {
 	}
 	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides, nil)
 	factory := util.NewFactory(cmdConfig)
-	schema, err := factory.Validator(true, "")
+	schema, err := factory.Validator(true, true, "")
 	if err != nil {
 		t.Errorf("failed to get validator: %v", err)
 		return

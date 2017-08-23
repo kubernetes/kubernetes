@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -105,8 +105,8 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -196,9 +196,11 @@ func (o *ImageOptions) Run() error {
 								continue
 							}
 						}
-						spec.Containers[i].Image = resolved
-						// Perform updates
-						transformed = true
+						if spec.Containers[i].Image != resolved {
+							spec.Containers[i].Image = resolved
+							// Perform updates
+							transformed = true
+						}
 					}
 				}
 				// Add a new container if not found

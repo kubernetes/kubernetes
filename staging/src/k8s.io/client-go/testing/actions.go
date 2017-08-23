@@ -319,6 +319,17 @@ type DeleteAction interface {
 	GetName() string
 }
 
+type DeleteCollectionAction interface {
+	Action
+	GetListRestrictions() ListRestrictions
+}
+
+type PatchAction interface {
+	Action
+	GetName() string
+	GetPatch() []byte
+}
+
 type WatchAction interface {
 	Action
 	GetWatchRestrictions() WatchRestrictions

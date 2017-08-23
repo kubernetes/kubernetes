@@ -670,6 +670,10 @@ type LogEntry struct {
 	// log entry payloads.
 	ProtoPayload googleapi.RawMessage `json:"protoPayload,omitempty"`
 
+	// ReceiveTimestamp: Output only. The time the log entry was received by
+	// Stackdriver Logging.
+	ReceiveTimestamp string `json:"receiveTimestamp,omitempty"`
+
 	// Resource: Required. The monitored resource associated with this log
 	// entry. Example: a log entry that reports a database error would be
 	// associated with the monitored resource designating the particular
@@ -973,13 +977,22 @@ type LogSink struct {
 	//
 	Filter string `json:"filter,omitempty"`
 
-	// IncludeChildren: Optional. This field presently applies only to sinks
-	// in organizations and folders. If true, then logs from children of
-	// this entity will also be available to this sink for export. Whether
-	// particular log entries from the children are exported depends on the
-	// sink's filter expression. For example, if this sink is associated
-	// with an organization, then logs from all projects in the organization
-	// as well as from the organization itself will be available for export.
+	// IncludeChildren: Optional. This field applies only to sinks owned by
+	// organizations and folders. If the field is false, the default, only
+	// the logs owned by the sink's parent resource are available for
+	// export. If the field is true, then logs from all the projects,
+	// folders, and billing accounts contained in the sink's parent resource
+	// are also available for export. Whether a particular log entry from
+	// the children is exported depends on the sink's filter expression. For
+	// example, if this field is true, then the filter
+	// resource.type=gce_instance would export all Compute Engine VM
+	// instance log entries from all projects in the sink's parent. To only
+	// export entries from certain child projects, filter on the project
+	// part of the log name:
+	// logName:("projects/test-project1/" OR "projects/test-project2/")
+	// AND
+	// resource.type=gce_instance
+	//
 	IncludeChildren bool `json:"includeChildren,omitempty"`
 
 	// Name: Required. The client-assigned sink identifier, unique within
@@ -989,10 +1002,9 @@ type LogSink struct {
 	// underscores, hyphens, and periods.
 	Name string `json:"name,omitempty"`
 
-	// OutputVersionFormat: Optional. The log entry format to use for this
-	// sink's exported log entries. The v2 format is used by default. The v1
-	// format is deprecated and should be used only as part of a migration
-	// effort to v2. See Migration to the v2 API.
+	// OutputVersionFormat: Deprecated. The log entry format to use for this
+	// sink's exported log entries. The v2 format is used by default and
+	// cannot be changed.
 	//
 	// Possible values:
 	//   "VERSION_FORMAT_UNSPECIFIED" - An unspecified format version that
@@ -1061,13 +1073,13 @@ func (s *LogSink) MarshalJSON() ([]byte, error) {
 //
 type MonitoredResource struct {
 	// Labels: Required. Values for all of the labels listed in the
-	// associated monitored resource descriptor. For example, Cloud SQL
-	// databases use the labels "database_id" and "zone".
+	// associated monitored resource descriptor. For example, Compute Engine
+	// VM instances use the labels "project_id", "instance_id", and "zone".
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Type: Required. The monitored resource type. This field must match
 	// the type field of a MonitoredResourceDescriptor object. For example,
-	// the type of a Cloud SQL database is "cloudsql_database".
+	// the type of a Compute Engine VM instance is gce_instance.
 	Type string `json:"type,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Labels") to
@@ -4285,7 +4297,8 @@ func (r *ProjectsSinksService) Update(sinkNameid string, logsink *LogSink) *Proj
 // then there is no change to the sink's writer_identity.
 // If the old value is false and the new value is true, then
 // writer_identity is changed to a unique service account.
-// It is an error if the old value is true and the new value is false.
+// It is an error if the old value is true and the new value is set to
+// false or defaulted to false.
 func (c *ProjectsSinksUpdateCall) UniqueWriterIdentity(uniqueWriterIdentity bool) *ProjectsSinksUpdateCall {
 	c.urlParams_.Set("uniqueWriterIdentity", fmt.Sprint(uniqueWriterIdentity))
 	return c
@@ -4393,7 +4406,7 @@ func (c *ProjectsSinksUpdateCall) Do(opts ...googleapi.CallOption) (*LogSink, er
 	//       "type": "string"
 	//     },
 	//     "uniqueWriterIdentity": {
-	//       "description": "Optional. See sinks.create for a description of this field. When updating a sink, the effect of this field on the value of writer_identity in the updated sink depends on both the old and new values of this field:\nIf the old and new values of this field are both false or both true, then there is no change to the sink's writer_identity.\nIf the old value is false and the new value is true, then writer_identity is changed to a unique service account.\nIt is an error if the old value is true and the new value is false.",
+	//       "description": "Optional. See sinks.create for a description of this field. When updating a sink, the effect of this field on the value of writer_identity in the updated sink depends on both the old and new values of this field:\nIf the old and new values of this field are both false or both true, then there is no change to the sink's writer_identity.\nIf the old value is false and the new value is true, then writer_identity is changed to a unique service account.\nIt is an error if the old value is true and the new value is set to false or defaulted to false.",
 	//       "location": "query",
 	//       "type": "boolean"
 	//     }

@@ -165,6 +165,16 @@ func (LabelSelectorRequirement) SwaggerDoc() map[string]string {
 	return map_LabelSelectorRequirement
 }
 
+var map_List = map[string]string{
+	"":         "List holds a list of objects, which may not be known by the server.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "List of objects",
+}
+
+func (List) SwaggerDoc() map[string]string {
+	return map_List
+}
+
 var map_ListMeta = map[string]string{
 	"":                "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
 	"selfLink":        "SelfLink is a URL representing this object. Populated by the system. Read-only.",
@@ -295,7 +305,7 @@ var map_StatusDetails = map[string]string{
 	"kind":              "The kind attribute of the resource associated with the status StatusReason. On some operations may differ from the requested resource Kind. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"uid":               "UID of the resource. (when there is a single resource which can be described). More info: http://kubernetes.io/docs/user-guide/identifiers#uids",
 	"causes":            "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
-	"retryAfterSeconds": "If specified, the time in seconds before the operation should be retried.",
+	"retryAfterSeconds": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action.",
 }
 
 func (StatusDetails) SwaggerDoc() map[string]string {

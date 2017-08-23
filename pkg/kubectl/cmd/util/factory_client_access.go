@@ -40,7 +40,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -474,7 +474,6 @@ const (
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
 	JobV1GeneratorName                      = "job/v1"
 	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
-	ScheduledJobV2Alpha1GeneratorName       = "scheduledjob/v2alpha1"
 	NamespaceV1GeneratorName                = "namespace/v1"
 	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
 	SecretV1GeneratorName                   = "secret/v1"
@@ -510,10 +509,12 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
 		}
 	case "deployment":
-		generator = map[string]kubectl.Generator{
-			DeploymentBasicV1Beta1GeneratorName:     kubectl.DeploymentBasicGeneratorV1{},
-			DeploymentBasicAppsV1Beta1GeneratorName: kubectl.DeploymentBasicAppsGeneratorV1{},
-		}
+		// Create Deployment has only StructuredGenerators and no
+		// param-based Generators.
+		// The StructuredGenerators are as follows (as of 2017-07-17):
+		// DeploymentBasicV1Beta1GeneratorName -> kubectl.DeploymentBasicGeneratorV1
+		// DeploymentBasicAppsV1Beta1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1
+		generator = map[string]kubectl.Generator{}
 	case "run":
 		generator = map[string]kubectl.Generator{
 			RunV1GeneratorName:                 kubectl.BasicReplicationController{},
@@ -521,7 +522,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			DeploymentV1Beta1GeneratorName:     kubectl.DeploymentV1Beta1{},
 			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
 			JobV1GeneratorName:                 kubectl.JobV1{},
-			ScheduledJobV2Alpha1GeneratorName:  kubectl.CronJobV2Alpha1{},
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
 		}
 	case "autoscale":

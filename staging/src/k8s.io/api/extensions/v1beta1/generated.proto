@@ -181,7 +181,7 @@ message DaemonSetStatus {
   // uses this field as a collision avoidance mechanism when it needs to
   // create the name for the newest ControllerRevision.
   // +optional
-  optional int64 collisionCount = 9;
+  optional int32 collisionCount = 9;
 }
 
 message DaemonSetUpdateStrategy {
@@ -245,6 +245,7 @@ message DeploymentList {
   repeated Deployment items = 2;
 }
 
+// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 message DeploymentRollback {
   // Required: This must match the Name of a deployment.
@@ -293,6 +294,7 @@ message DeploymentSpec {
   // +optional
   optional bool paused = 7;
 
+  // DEPRECATED.
   // The config this deployment is rolling back to. Will be cleared after rollback is done.
   // +optional
   optional RollbackConfig rollbackTo = 8;
@@ -342,7 +344,7 @@ message DeploymentStatus {
   // field as a collision avoidance mechanism when it needs to create the name for the
   // newest ReplicaSet.
   // +optional
-  optional int64 collisionCount = 8;
+  optional int32 collisionCount = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
@@ -723,6 +725,16 @@ message PodSecurityPolicySpec {
   // will not be forced to.
   // +optional
   optional bool readOnlyRootFilesystem = 14;
+
+  // DefaultAllowPrivilegeEscalation controls the default setting for whether a
+  // process can gain more privileges than it's parent process.
+  // +optional
+  optional bool defaultAllowPrivilegeEscalation = 15;
+
+  // AllowPrivilegeEscalation determines if a pod can request to allow
+  // privilege escalation.
+  // +optional
+  optional bool allowPrivilegeEscalation = 16;
 }
 
 // ReplicaSet represents the configuration of a ReplicaSet.
@@ -842,6 +854,7 @@ message ReplicaSetStatus {
 message ReplicationControllerDummy {
 }
 
+// DEPRECATED.
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.
   // +optional

@@ -205,6 +205,10 @@ func (r *FakeRuntime) ContainerStatus(id string) (*runtimeapi.ContainerStatus, e
 	return &c.Status, nil
 }
 
+func (r *FakeRuntime) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+	return nil
+}
+
 func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
 	c, ok := r.Containers[containerID]
 	if !ok {

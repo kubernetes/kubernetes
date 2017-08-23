@@ -36,8 +36,8 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
@@ -126,7 +126,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
@@ -543,7 +543,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from openapi schema for displaying a resource.")
 	// marking it deprecated so that it is hidden from usage/help text.
-	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "its an experimental feature.")
+	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "It's an experimental feature.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
@@ -566,13 +566,13 @@ func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, 
 		return nil, false
 	}
 	// Found openapi metadata for this resource
-	kind, found := api.LookupResource(mapping.GroupVersionKind)
-	if !found {
-		// Kind not found, return empty columns
+	schema := api.LookupResource(mapping.GroupVersionKind)
+	if schema == nil {
+		// Schema not found, return empty columns
 		return nil, false
 	}
 
-	columns, found := openapi.GetPrintColumns(kind.Extensions)
+	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
 	if !found {
 		// Extension not found, return empty columns
 		return nil, false

@@ -10,7 +10,6 @@ reviewers:
 - liggitt
 - nikhiljindal
 - gmarek
-- kargakis
 - justinsb
 - roberthbailey
 - ncdc
@@ -32,3 +31,4 @@ reviewers:
 - feihujiang
 - sdminonne
 - goltermann
+- enj

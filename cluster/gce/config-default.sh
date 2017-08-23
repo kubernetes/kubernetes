@@ -229,12 +229,12 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # the subnet and is the range used for node instance IPs.
   NODE_IP_RANGE="$(get-node-ip-range)"
   # Add to the provider custom variables.
-  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
@@ -278,3 +278,22 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
+
+if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
+fi
+if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
+fi
+
+# Fluentd requirements
+FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-300Mi}"
+FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-100m}"
+FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-200Mi}"
+# Adding to PROVIDER_VARS, since this is GCP-specific.
+PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST"
+
+# prometheus-to-sd configuration
+PROMETHEUS_TO_SD_ENDPOINT="${PROMETHEUS_TO_SD_ENDPOINT:-https://monitoring.googleapis.com/}"
+PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
+ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"

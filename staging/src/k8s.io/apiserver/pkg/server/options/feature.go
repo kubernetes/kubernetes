@@ -55,3 +55,8 @@ func (o *FeatureOptions) ApplyTo(c *server.Config) error {
 
 	return nil
 }
+
+func (o *FeatureOptions) Validate() []error {
+	errs := []error{}
+	return errs
+}

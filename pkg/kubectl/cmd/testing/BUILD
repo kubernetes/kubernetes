@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,21 +9,20 @@ go_library(
         "fake.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
     ],
     deps = [
-        "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
+        "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/api/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

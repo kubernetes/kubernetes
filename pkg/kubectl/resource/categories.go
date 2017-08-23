@@ -117,6 +117,8 @@ var legacyUserResources = []schema.GroupResource{
 	{Group: "apps", Resource: "statefulsets"},
 	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
 	{Group: "batch", Resource: "jobs"},
+	{Group: "batch", Resource: "cronjobs"},
+	{Group: "extensions", Resource: "daemonsets"},
 	{Group: "extensions", Resource: "deployments"},
 	{Group: "extensions", Resource: "replicasets"},
 }

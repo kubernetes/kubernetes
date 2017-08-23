@@ -38,7 +38,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -53,12 +52,13 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	//aggregatorinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
+	openapi "k8s.io/kube-openapi/pkg/common"
 
+	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/preflight"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -83,6 +83,9 @@ import (
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
+
+	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
+	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
 
 const etcdRetryLimit = 60
@@ -246,9 +249,6 @@ func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Tra
 
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
 func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunneler.Tunneler, proxyTransport http.RoundTripper) (*master.Config, informers.SharedInformerFactory, clientgoinformers.SharedInformerFactory, *kubeserver.InsecureServingInfo, aggregatorapiserver.ServiceResolver, error) {
-	// register all admission plugins
-	RegisterAllAdmissionPlugins(s.Admission.Plugins)
-
 	// set defaults in the options before trying to create the generic config
 	if err := defaultOptions(s); err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -549,14 +549,17 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
+		// TODO we need to update this to batch/v1beta1 when it's enabled by default
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
 
-	// keep Deployments and NetworkPolicies in extensions for backwards compatibility, we'll have to migrate at some point, eventually
+	// keep Deployments, NetworkPolicies, Daemonsets and ReplicaSets in extensions for backwards compatibility, we'll have to migrate at some point, eventually
 	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
+	storageFactory.AddCohabitatingResources(extensions.Resource("daemonsets"), apps.Resource("daemonsets"))
+	storageFactory.AddCohabitatingResources(extensions.Resource("replicasets"), apps.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(extensions.Resource("networkpolicies"), networking.Resource("networkpolicies"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

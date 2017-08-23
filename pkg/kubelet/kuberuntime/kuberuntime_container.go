@@ -426,7 +426,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			// Populate the termination message if needed.
 			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 			labeledInfo := getContainerInfoFromLabels(status.Labels)
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && (cStatus.ExitCode != 0 || cStatus.Reason == "OOMKilled")
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && cStatus.ExitCode != 0
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
 				path := buildFullContainerLogsPath(uid, labeledInfo.ContainerName, annotatedInfo.RestartCount)
@@ -574,8 +574,8 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 
 	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
 
-	// Run the pre-stop lifecycle hooks if applicable.
-	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
+	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
+	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
@@ -631,10 +631,11 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 	return
 }
 
-// pruneInitContainers ensures that before we begin creating init containers, we have reduced the number
-// of outstanding init containers still present. This reduces load on the container garbage collector
-// by only preserving the most recent terminated init container.
-func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.ContainerID]int) {
+// pruneInitContainersBeforeStart ensures that before we begin creating init
+// containers, we have reduced the number of outstanding init containers still
+// present. This reduces load on the container garbage collector by only
+// preserving the most recent terminated init container.
+func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	// only the last execution of each init container should be preserved, and only preserve it if it is in the
 	// list of init containers to keep.
 	initContainerNames := sets.NewString()
@@ -652,19 +653,45 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 			if count == 1 {
 				continue
 			}
-			// if there is a reason to preserve the older container, do so
-			if _, ok := initContainersToKeep[status.ID]; ok {
-				continue
-			}
-
 			// prune all other init containers that match this container name
 			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
+			if err := m.removeContainer(status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
 
 			// remove any references to this container
+			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+				m.containerRefManager.ClearRef(status.ID)
+			} else {
+				glog.Warningf("No ref for container %q", status.ID)
+			}
+		}
+	}
+}
+
+// Remove all init containres. Note that this function does not check the state
+// of the container because it assumes all init containers have been stopped
+// before the call happens.
+func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
+	initContainerNames := sets.NewString()
+	for _, container := range pod.Spec.InitContainers {
+		initContainerNames.Insert(container.Name)
+	}
+	for name := range initContainerNames {
+		count := 0
+		for _, status := range podStatus.ContainerStatuses {
+			if status.Name != name || !initContainerNames.Has(status.Name) {
+				continue
+			}
+			count++
+			// Purge all init containers that match this container name
+			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
+			if err := m.removeContainer(status.ID.ID); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+				continue
+			}
+			// Remove any references to this container
 			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
 				m.containerRefManager.ClearRef(status.ID)
 			} else {
@@ -763,7 +790,7 @@ func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdi
 
 // RunInContainer synchronously executes the command in the container, and returns the output.
 func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
-	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, 0)
+	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, timeout)
 	// NOTE(tallclair): This does not correctly interleave stdout & stderr, but should be sufficient
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.

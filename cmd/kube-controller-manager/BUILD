@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -18,18 +16,17 @@ go_binary(
         "-static",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["controller-manager.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
+        "//pkg/util/reflector/prometheus:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//pkg/version/verflag:go_default_library",

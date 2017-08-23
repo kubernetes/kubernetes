@@ -1130,7 +1130,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 			return
 		}
 		w.Header().Set("Retry-After", "1")
-		http.Error(w, "Too many requests, please try again later.", apierrors.StatusTooManyRequests)
+		http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
 	}))
 	defer testServer.Close()
 
@@ -1204,7 +1204,7 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 			return
 		}
 		w.Header().Set("Retry-After", "0")
-		w.WriteHeader([]int{apierrors.StatusTooManyRequests, 500, 501, 504}[count])
+		w.WriteHeader([]int{http.StatusTooManyRequests, 500, 501, 504}[count])
 		count++
 	}))
 	defer testServer.Close()
@@ -1234,7 +1234,7 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 			return
 		}
 		w.Header().Set("Retry-After", "0")
-		w.WriteHeader(apierrors.StatusTooManyRequests)
+		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer testServer.Close()
 

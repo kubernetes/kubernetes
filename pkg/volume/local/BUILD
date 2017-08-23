@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "doc.go",
         "local.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -32,7 +29,6 @@ go_test(
     name = "go_default_test",
     srcs = ["local_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

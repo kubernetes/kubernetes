@@ -153,6 +153,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*vsphereVolumePlugin).newProvisionerInternal(options, &fakePDManager{})
+	if err != nil {
+		t.Errorf("newProvisionerInternal() failed: %v", err)
+	}
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -177,6 +180,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*vsphereVolumePlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	if err != nil {
+		t.Errorf("newDeleterInternal() failed: %v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

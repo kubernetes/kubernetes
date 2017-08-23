@@ -35,37 +35,7 @@ var priorityclassesResource = schema.GroupVersionResource{Group: "scheduling.k8s
 
 var priorityclassesKind = schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: "", Kind: "PriorityClass"}
 
-func (c *FakePriorityClasses) Create(priorityClass *scheduling.PriorityClass) (result *scheduling.PriorityClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), &scheduling.PriorityClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*scheduling.PriorityClass), err
-}
-
-func (c *FakePriorityClasses) Update(priorityClass *scheduling.PriorityClass) (result *scheduling.PriorityClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), &scheduling.PriorityClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*scheduling.PriorityClass), err
-}
-
-func (c *FakePriorityClasses) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(priorityclassesResource, name), &scheduling.PriorityClass{})
-	return err
-}
-
-func (c *FakePriorityClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(priorityclassesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &scheduling.PriorityClassList{})
-	return err
-}
-
+// Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
 func (c *FakePriorityClasses) Get(name string, options v1.GetOptions) (result *scheduling.PriorityClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(priorityclassesResource, name), &scheduling.PriorityClass{})
@@ -75,6 +45,7 @@ func (c *FakePriorityClasses) Get(name string, options v1.GetOptions) (result *s
 	return obj.(*scheduling.PriorityClass), err
 }
 
+// List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
 func (c *FakePriorityClasses) List(opts v1.ListOptions) (result *scheduling.PriorityClassList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), &scheduling.PriorityClassList{})
@@ -99,6 +70,41 @@ func (c *FakePriorityClasses) List(opts v1.ListOptions) (result *scheduling.Prio
 func (c *FakePriorityClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(priorityclassesResource, opts))
+}
+
+// Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
+func (c *FakePriorityClasses) Create(priorityClass *scheduling.PriorityClass) (result *scheduling.PriorityClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), &scheduling.PriorityClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*scheduling.PriorityClass), err
+}
+
+// Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
+func (c *FakePriorityClasses) Update(priorityClass *scheduling.PriorityClass) (result *scheduling.PriorityClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), &scheduling.PriorityClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*scheduling.PriorityClass), err
+}
+
+// Delete takes name of the priorityClass and deletes it. Returns an error if one occurs.
+func (c *FakePriorityClasses) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(priorityclassesResource, name), &scheduling.PriorityClass{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakePriorityClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(priorityclassesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &scheduling.PriorityClassList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched priorityClass.

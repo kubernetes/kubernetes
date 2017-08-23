@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,19 +10,15 @@ go_test(
     name = "go_default_test",
     srcs = ["clustercontroller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
-        "//federation/pkg/federation-controller/util:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
 )
 
@@ -35,7 +29,6 @@ go_library(
         "clustercontroller.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/cache:go_default_library",
@@ -53,7 +46,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],

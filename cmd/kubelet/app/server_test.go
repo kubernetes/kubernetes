@@ -19,7 +19,7 @@ package app
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -50,8 +50,8 @@ func TestValueOfAllocatableResources(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		kubeReservedCM := make(componentconfig.ConfigurationMap)
-		systemReservedCM := make(componentconfig.ConfigurationMap)
+		kubeReservedCM := make(kubeletconfig.ConfigurationMap)
+		systemReservedCM := make(kubeletconfig.ConfigurationMap)
 
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)

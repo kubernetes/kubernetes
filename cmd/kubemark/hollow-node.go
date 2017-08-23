@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/flag"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -134,7 +134,7 @@ func main() {
 	}
 
 	if config.Morph == "proxy" {
-		eventClient, err := clientgoclientset.NewForConfig(clientConfig)
+		client, err := clientgoclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Fatalf("Failed to create API Server client: %v", err)
 		}
@@ -142,12 +142,12 @@ func main() {
 		sysctl := fakesysctl.NewFake()
 		execer := &fakeexec.FakeExec{}
 		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
 			internalClientset,
-			eventClient,
+			client.CoreV1(),
 			iptInterface,
 			sysctl,
 			execer,

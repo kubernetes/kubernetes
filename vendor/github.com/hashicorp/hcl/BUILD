@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -15,7 +8,7 @@ go_library(
         "lex.go",
         "parse.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",
         "//vendor/github.com/hashicorp/hcl/hcl/parser:go_default_library",
@@ -45,4 +38,5 @@ filegroup(
         "//vendor/github.com/hashicorp/hcl/json/token:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

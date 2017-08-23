@@ -282,8 +282,16 @@ func (c *Client) dial(endpoint string, dopts ...grpc.DialOption) (*grpc.ClientCo
 			tokenMu: &sync.RWMutex{},
 		}
 
-		err := c.getToken(context.TODO())
-		if err != nil {
+		ctx := c.ctx
+		if c.cfg.DialTimeout > 0 {
+			cctx, cancel := context.WithTimeout(ctx, c.cfg.DialTimeout)
+			defer cancel()
+			ctx = cctx
+		}
+		if err := c.getToken(ctx); err != nil {
+			if err == ctx.Err() && ctx.Err() != c.ctx.Err() {
+				err = grpc.ErrClientConnTimeout
+			}
 			return nil, err
 		}
 
@@ -335,6 +343,8 @@ func newClient(cfg *Config) (*Client, error) {
 	client.balancer = newSimpleBalancer(cfg.Endpoints)
 	conn, err := client.dial(cfg.Endpoints[0], grpc.WithBalancer(client.balancer))
 	if err != nil {
+		client.cancel()
+		client.balancer.Close()
 		return nil, err
 	}
 	client.conn = conn
@@ -353,6 +363,7 @@ func newClient(cfg *Config) (*Client, error) {
 		}
 		if !hasConn {
 			client.cancel()
+			client.balancer.Close()
 			conn.Close()
 			return nil, grpc.ErrClientConnTimeout
 		}

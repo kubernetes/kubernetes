@@ -9271,8 +9271,8 @@
      {
       "type": "v1.Binding",
       "method": "POST",
-      "summary": "create binding of a Binding",
-      "nickname": "createNamespacedBindingBinding",
+      "summary": "create binding of a Pod",
+      "nickname": "createNamespacedPodBinding",
       "parameters": [
        {
         "type": "string",
@@ -9332,8 +9332,8 @@
      {
       "type": "v1beta1.Eviction",
       "method": "POST",
-      "summary": "create eviction of an Eviction",
-      "nickname": "createNamespacedEvictionEviction",
+      "summary": "create eviction of a Pod",
+      "nickname": "createNamespacedPodEviction",
       "parameters": [
        {
         "type": "string",
@@ -12234,8 +12234,8 @@
      {
       "type": "v1.Scale",
       "method": "GET",
-      "summary": "read scale of the specified Scale",
-      "nickname": "readNamespacedScaleScale",
+      "summary": "read scale of the specified ReplicationController",
+      "nickname": "readNamespacedReplicationControllerScale",
       "parameters": [
        {
         "type": "string",
@@ -12281,8 +12281,8 @@
      {
       "type": "v1.Scale",
       "method": "PUT",
-      "summary": "replace scale of the specified Scale",
-      "nickname": "replaceNamespacedScaleScale",
+      "summary": "replace scale of the specified ReplicationController",
+      "nickname": "replaceNamespacedReplicationControllerScale",
       "parameters": [
        {
         "type": "string",
@@ -12336,8 +12336,8 @@
      {
       "type": "v1.Scale",
       "method": "PATCH",
-      "summary": "partially update scale of the specified Scale",
-      "nickname": "patchNamespacedScaleScale",
+      "summary": "partially update scale of the specified ReplicationController",
+      "nickname": "patchNamespacedReplicationControllerScale",
       "parameters": [
        {
         "type": "string",
@@ -17580,7 +17580,7 @@
      "retryAfterSeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "If specified, the time in seconds before the operation should be retried."
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action."
      }
     }
    },
@@ -18318,12 +18318,16 @@
        "$ref": "v1.Taint"
       },
       "description": "If specified, the node's taints."
+     },
+     "configSource": {
+      "$ref": "v1.NodeConfigSource",
+      "description": "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field"
      }
     }
    },
    "v1.Taint": {
     "id": "v1.Taint",
-    "description": "The node this Taint is attached to has the effect \"effect\" on any pod that that does not tolerate the Taint.",
+    "description": "The node this Taint is attached to has the \"effect\" on any pod that does not tolerate the Taint.",
     "required": [
      "key",
      "effect"
@@ -18344,6 +18348,23 @@
      "timeAdded": {
       "type": "string",
       "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints."
+     }
+    }
+   },
+   "v1.NodeConfigSource": {
+    "id": "v1.NodeConfigSource",
+    "description": "NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+     },
+     "configMapRef": {
+      "$ref": "v1.ObjectReference"
      }
     }
    },
@@ -19132,6 +19153,10 @@
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
       "description": "CHAP secret for iSCSI target and initiator authentication"
+     },
+     "initiatorName": {
+      "type": "string",
+      "description": "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface \u003ctarget portal\u003e:\u003cvolume name\u003e will be created for the connection."
      }
     }
    },
@@ -19195,22 +19220,18 @@
    "v1.FCVolumeSource": {
     "id": "v1.FCVolumeSource",
     "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-    "required": [
-     "targetWWNs",
-     "lun"
-    ],
     "properties": {
      "targetWWNs": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Required: FC target worldwide names (WWNs)"
+      "description": "Optional: FC target worldwide names (WWNs)"
      },
      "lun": {
       "type": "integer",
       "format": "int32",
-      "description": "Required: FC target lun number"
+      "description": "Optional: FC target lun number"
      },
      "fsType": {
       "type": "string",
@@ -19219,6 +19240,13 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     },
+     "wwids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously."
      }
     }
    },
@@ -20643,6 +20671,10 @@
      "readOnlyRootFilesystem": {
       "type": "boolean",
       "description": "Whether this container has a read-only root filesystem. Default is false."
+     },
+     "allowPrivilegeEscalation": {
+      "type": "boolean",
+      "description": "AllowPrivilegeEscalation controls whether a process can gain more privileges than it's parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN"
      }
     }
    },
@@ -20843,7 +20875,7 @@
       "items": {
        "$ref": "v1.PodAffinityTerm"
       },
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+      "description": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
      },
      "preferredDuringSchedulingIgnoredDuringExecution": {
       "type": "array",
@@ -20903,7 +20935,7 @@
       "items": {
        "$ref": "v1.PodAffinityTerm"
       },
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+      "description": "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
      },
      "preferredDuringSchedulingIgnoredDuringExecution": {
       "type": "array",
@@ -20979,7 +21011,7 @@
      },
      "reason": {
       "type": "string",
-      "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'"
+      "description": "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'"
      },
      "hostIP": {
       "type": "string",
@@ -21786,6 +21818,10 @@
       "type": "integer",
       "format": "int32",
       "description": "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local."
+     },
+     "publishNotReadyAddresses": {
+      "type": "boolean",
+      "description": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field."
      }
     }
    },

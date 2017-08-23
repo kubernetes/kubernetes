@@ -105,78 +105,26 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 		}
 	}()
 
-	if helper.IsServiceIPRequested(service) {
-		// Allocate next available.
-		ip, err := rs.serviceIPs.AllocateNext()
-		if err != nil {
-			// TODO: what error should be returned here?  It's not a
-			// field-level validation failure (the field is valid), and it's
-			// not really an internal error.
-			return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a serviceIP: %v", err))
+	var err error
+	if service.Spec.Type != api.ServiceTypeExternalName {
+		if releaseServiceIP, err = rs.initClusterIP(service); err != nil {
+			return nil, err
 		}
-		service.Spec.ClusterIP = ip.String()
-		releaseServiceIP = true
-	} else if helper.IsServiceIPSet(service) {
-		// Try to respect the requested IP.
-		if err := rs.serviceIPs.Allocate(net.ParseIP(service.Spec.ClusterIP)); err != nil {
-			// TODO: when validation becomes versioned, this gets more complicated.
-			el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIP"), service.Spec.ClusterIP, err.Error())}
-			return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-		}
-		releaseServiceIP = true
 	}
 
 	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
 	defer nodePortOp.Finish()
 
-	assignNodePorts := shouldAssignNodePorts(service)
-	svcPortToNodePort := map[int]int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
-		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
-		if allocatedNodePort == 0 {
-			// This will only scan forward in the service.Spec.Ports list because any matches
-			// before the current port would have been found in svcPortToNodePort. This is really
-			// looking for any user provided values.
-			np := findRequestedNodePort(int(servicePort.Port), service.Spec.Ports)
-			if np != 0 {
-				err := nodePortOp.Allocate(np)
-				if err != nil {
-					// TODO: when validation becomes versioned, this gets more complicated.
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), np, err.Error())}
-					return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-				servicePort.NodePort = int32(np)
-				svcPortToNodePort[int(servicePort.Port)] = np
-			} else if assignNodePorts {
-				nodePort, err := nodePortOp.AllocateNext()
-				if err != nil {
-					// TODO: what error should be returned here?  It's not a
-					// field-level validation failure (the field is valid), and it's
-					// not really an internal error.
-					return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
-				}
-				servicePort.NodePort = int32(nodePort)
-				svcPortToNodePort[int(servicePort.Port)] = nodePort
-			}
-		} else if int(servicePort.NodePort) != allocatedNodePort {
-			if servicePort.NodePort == 0 {
-				servicePort.NodePort = int32(allocatedNodePort)
-			} else {
-				err := nodePortOp.Allocate(int(servicePort.NodePort))
-				if err != nil {
-					// TODO: when validation becomes versioned, this gets more complicated.
-					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
-					return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-				}
-			}
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if err := rs.initNodePorts(service, nodePortOp); err != nil {
+			return nil, err
 		}
 	}
 
 	// Handle ExternalTraiffc related fields during service creation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
 		if apiservice.NeedsHealthCheck(service) {
-			if err := rs.allocateHealthCheckNodePort(service); err != nil {
+			if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 				return nil, errors.NewInternalError(err)
 			}
 		}
@@ -235,7 +183,7 @@ func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) &&
 		apiservice.NeedsHealthCheck(service) {
-		nodePort := apiservice.GetServiceHealthCheckNodePort(service)
+		nodePort := service.Spec.HealthCheckNodePort
 		if nodePort > 0 {
 			err := rs.serviceNodePorts.Release(int(nodePort))
 			if err != nil {
@@ -290,18 +238,18 @@ func externalTrafficPolicyUpdate(oldService, service *api.Service) {
 	}
 	if neededExternalTraffic && !needsExternalTraffic {
 		// Clear ExternalTrafficPolicy to prevent confusion from ineffective field.
-		apiservice.ClearExternalTrafficPolicy(service)
+		service.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
 	}
 }
 
 // healthCheckNodePortUpdate handles HealthCheckNodePort allocation/release
 // and adjusts HealthCheckNodePort during service update if needed.
-func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (bool, error) {
+func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
 	neededHealthCheckNodePort := apiservice.NeedsHealthCheck(oldService)
-	oldHealthCheckNodePort := apiservice.GetServiceHealthCheckNodePort(oldService)
+	oldHealthCheckNodePort := oldService.Spec.HealthCheckNodePort
 
 	needsHealthCheckNodePort := apiservice.NeedsHealthCheck(service)
-	newHealthCheckNodePort := apiservice.GetServiceHealthCheckNodePort(service)
+	newHealthCheckNodePort := service.Spec.HealthCheckNodePort
 
 	switch {
 	// Case 1: Transition from don't need HealthCheckNodePort to needs HealthCheckNodePort.
@@ -309,7 +257,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
 		glog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
-		if err := rs.allocateHealthCheckNodePort(service); err != nil {
+		if err := rs.allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 			return false, errors.NewInternalError(err)
 		}
 
@@ -317,26 +265,17 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 	// Free the existing healthCheckNodePort and clear the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && !needsHealthCheckNodePort:
 		glog.Infof("Transition to non LoadBalancer type service or LoadBalancer type service with ExternalTrafficPolicy=Global")
-		err := rs.serviceNodePorts.Release(int(oldHealthCheckNodePort))
-		if err != nil {
-			glog.Warningf("error releasing service health check %s node port %d: %v", service.Name, oldHealthCheckNodePort, err)
-			return false, errors.NewInternalError(fmt.Errorf("failed to free health check nodePort: %v", err))
-		}
-		glog.Infof("Freed health check nodePort: %d", oldHealthCheckNodePort)
+		glog.V(4).Infof("Releasing healthCheckNodePort: %d", oldHealthCheckNodePort)
+		nodePortOp.ReleaseDeferred(int(oldHealthCheckNodePort))
 		// Clear the HealthCheckNodePort field.
-		apiservice.SetServiceHealthCheckNodePort(service, 0)
+		service.Spec.HealthCheckNodePort = 0
 
 	// Case 3: Remain in needs HealthCheckNodePort.
 	// Reject changing the value of the HealthCheckNodePort field.
 	case neededHealthCheckNodePort && needsHealthCheckNodePort:
 		if oldHealthCheckNodePort != newHealthCheckNodePort {
 			glog.Warningf("Attempt to change value of health check node port DENIED")
-			var fldPath *field.Path
-			if _, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
-				fldPath = field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort)
-			} else {
-				fldPath = field.NewPath("spec", "healthCheckNodePort")
-			}
+			fldPath := field.NewPath("spec", "healthCheckNodePort")
 			el := field.ErrorList{field.Invalid(fldPath, newHealthCheckNodePort,
 				"cannot change healthCheckNodePort on loadBalancer service with externalTraffic=Local during update")}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
@@ -395,11 +334,11 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
 	if (oldService.Spec.Type == api.ServiceTypeNodePort || oldService.Spec.Type == api.ServiceTypeLoadBalancer) &&
 		(service.Spec.Type == api.ServiceTypeExternalName || service.Spec.Type == api.ServiceTypeClusterIP) {
-		rs.releaseNodePort(oldService, nodePortOp)
+		rs.releaseNodePorts(oldService, nodePortOp)
 	}
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := rs.updateNodePort(oldService, service, nodePortOp); err != nil {
+		if err := rs.updateNodePorts(oldService, service, nodePortOp); err != nil {
 			return nil, false, err
 		}
 	}
@@ -411,7 +350,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 
 	// Handle ExternalTraiffc related updates.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalTrafficLocalOnly) {
-		success, err := rs.healthCheckNodePortUpdate(oldService, service)
+		success, err := rs.healthCheckNodePortUpdate(oldService, service, nodePortOp)
 		if !success || err != nil {
 			return nil, false, err
 		}
@@ -518,22 +457,6 @@ func CollectServiceNodePorts(service *api.Service) []int {
 	return servicePorts
 }
 
-func shouldAssignNodePorts(service *api.Service) bool {
-	switch service.Spec.Type {
-	case api.ServiceTypeLoadBalancer:
-		return true
-	case api.ServiceTypeNodePort:
-		return true
-	case api.ServiceTypeClusterIP:
-		return false
-	case api.ServiceTypeExternalName:
-		return false
-	default:
-		glog.Errorf("Unknown service type: %v", service.Spec.Type)
-		return false
-	}
-}
-
 // Loop through the service ports list, find one with the same port number and
 // NodePort specified, return this NodePort otherwise return 0.
 func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
@@ -547,24 +470,24 @@ func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
 }
 
 // allocateHealthCheckNodePort allocates health check node port to service.
-func (rs *REST) allocateHealthCheckNodePort(service *api.Service) error {
-	healthCheckNodePort := apiservice.GetServiceHealthCheckNodePort(service)
+func (rs *REST) allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+	healthCheckNodePort := service.Spec.HealthCheckNodePort
 	if healthCheckNodePort != 0 {
 		// If the request has a health check nodePort in mind, attempt to reserve it.
-		err := rs.serviceNodePorts.Allocate(int(healthCheckNodePort))
+		err := nodePortOp.Allocate(int(healthCheckNodePort))
 		if err != nil {
 			return fmt.Errorf("failed to allocate requested HealthCheck NodePort %v: %v",
 				healthCheckNodePort, err)
 		}
-		glog.Infof("Reserved user requested nodePort: %d", healthCheckNodePort)
+		glog.V(4).Infof("Reserved user requested healthCheckNodePort: %d", healthCheckNodePort)
 	} else {
 		// If the request has no health check nodePort specified, allocate any.
-		healthCheckNodePort, err := rs.serviceNodePorts.AllocateNext()
+		healthCheckNodePort, err := nodePortOp.AllocateNext()
 		if err != nil {
 			return fmt.Errorf("failed to allocate a HealthCheck NodePort %v: %v", healthCheckNodePort, err)
 		}
-		apiservice.SetServiceHealthCheckNodePort(service, int32(healthCheckNodePort))
-		glog.Infof("Reserved allocated nodePort: %d", healthCheckNodePort)
+		service.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
+		glog.V(4).Infof("Reserved allocated healthCheckNodePort: %d", healthCheckNodePort)
 	}
 	return nil
 }
@@ -596,7 +519,56 @@ func (rs *REST) initClusterIP(service *api.Service) (bool, error) {
 	return false, nil
 }
 
-func (rs *REST) updateNodePort(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (rs *REST) initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+	svcPortToNodePort := map[int]int{}
+	for i := range service.Spec.Ports {
+		servicePort := &service.Spec.Ports[i]
+		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
+		if allocatedNodePort == 0 {
+			// This will only scan forward in the service.Spec.Ports list because any matches
+			// before the current port would have been found in svcPortToNodePort. This is really
+			// looking for any user provided values.
+			np := findRequestedNodePort(int(servicePort.Port), service.Spec.Ports)
+			if np != 0 {
+				err := nodePortOp.Allocate(np)
+				if err != nil {
+					// TODO: when validation becomes versioned, this gets more complicated.
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), np, err.Error())}
+					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+				}
+				servicePort.NodePort = int32(np)
+				svcPortToNodePort[int(servicePort.Port)] = np
+			} else {
+				nodePort, err := nodePortOp.AllocateNext()
+				if err != nil {
+					// TODO: what error should be returned here?  It's not a
+					// field-level validation failure (the field is valid), and it's
+					// not really an internal error.
+					return errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+				}
+				servicePort.NodePort = int32(nodePort)
+				svcPortToNodePort[int(servicePort.Port)] = nodePort
+			}
+		} else if int(servicePort.NodePort) != allocatedNodePort {
+			// TODO(xiangpengzhao): do we need to allocate a new NodePort in this case?
+			// Note: the current implementation is better, because it saves a NodePort.
+			if servicePort.NodePort == 0 {
+				servicePort.NodePort = int32(allocatedNodePort)
+			} else {
+				err := nodePortOp.Allocate(int(servicePort.NodePort))
+				if err != nil {
+					// TODO: when validation becomes versioned, this gets more complicated.
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	oldNodePorts := CollectServiceNodePorts(oldService)
 
 	newNodePorts := []int{}
@@ -640,7 +612,7 @@ func (rs *REST) updateNodePort(oldService, newService *api.Service, nodePortOp *
 	return nil
 }
 
-func (rs *REST) releaseNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
+func (rs *REST) releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
 	nodePorts := CollectServiceNodePorts(service)
 
 	for _, nodePort := range nodePorts {

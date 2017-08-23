@@ -19,9 +19,9 @@ limitations under the License.
 package util
 
 import (
-	"syscall"
+	"golang.org/x/sys/unix"
 )
 
 func Umask(mask int) (old int, err error) {
-	return syscall.Umask(mask), nil
+	return unix.Umask(mask), nil
 }

@@ -782,12 +782,12 @@ func TestMakeSignalObservations(t *testing.T) {
 		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
 	}
 	res := quantityMustParse("5Gi")
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *res})
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("5Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("0Gi")})
 	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc, err := makeSignalObservations(provider, nodeProvider, pods, false)
+	actualObservations, statsFunc, err := makeSignalObservations(provider, capacityProvider, pods, false)
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}
@@ -1363,12 +1363,12 @@ func TestHasNodeConditions(t *testing.T) {
 		result bool
 	}{
 		"has-condition": {
-			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeOutOfDisk, v1.NodeMemoryPressure},
+			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeDiskPressure, v1.NodeMemoryPressure},
 			item:   v1.NodeMemoryPressure,
 			result: true,
 		},
 		"does-not-have-condition": {
-			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeOutOfDisk},
+			inputs: []v1.NodeConditionType{v1.NodeReady, v1.NodeDiskPressure},
 			item:   v1.NodeMemoryPressure,
 			result: false,
 		},

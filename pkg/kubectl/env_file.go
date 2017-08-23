@@ -55,7 +55,7 @@ func proccessEnvFileLine(line []byte, filePath string,
 
 	data := strings.SplitN(string(line), "=", 2)
 	key = data[0]
-	if errs := validation.IsCIdentifier(key); len(errs) != 0 {
+	if errs := validation.IsEnvVarName(key); len(errs) != 0 {
 		return ``, ``, fmt.Errorf("%q is not a valid key name: %s", key, strings.Join(errs, ";"))
 	}
 

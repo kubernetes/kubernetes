@@ -23,21 +23,24 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/logs"
+	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	"k8s.io/kubernetes/pkg/version"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
 
 const (
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
-	defaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
+	DefaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
 )
+
+func GetDefaultServerImage() string {
+	return fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+}
 
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	defaultServerImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
-	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, defaultServerImage, defaultEtcdImage)
+	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, GetDefaultServerImage(), DefaultEtcdImage)
 	return cmd.Execute()
 }

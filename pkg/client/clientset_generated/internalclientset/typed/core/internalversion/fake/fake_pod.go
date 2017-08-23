@@ -36,50 +36,7 @@ var podsResource = schema.GroupVersionResource{Group: "", Version: "", Resource:
 
 var podsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "Pod"}
 
-func (c *FakePods) Create(pod *api.Pod) (result *api.Pod, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &api.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Pod), err
-}
-
-func (c *FakePods) Update(pod *api.Pod) (result *api.Pod, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &api.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Pod), err
-}
-
-func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &api.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.Pod), err
-}
-
-func (c *FakePods) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &api.Pod{})
-
-	return err
-}
-
-func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.PodList{})
-	return err
-}
-
+// Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
 func (c *FakePods) Get(name string, options v1.GetOptions) (result *api.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podsResource, c.ns, name), &api.Pod{})
@@ -90,6 +47,7 @@ func (c *FakePods) Get(name string, options v1.GetOptions) (result *api.Pod, err
 	return obj.(*api.Pod), err
 }
 
+// List takes label and field selectors, and returns the list of Pods that match those selectors.
 func (c *FakePods) List(opts v1.ListOptions) (result *api.PodList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), &api.PodList{})
@@ -116,6 +74,56 @@ func (c *FakePods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) Create(pod *api.Pod) (result *api.Pod, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &api.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Pod), err
+}
+
+// Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) Update(pod *api.Pod) (result *api.Pod, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &api.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Pod), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &api.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.Pod), err
+}
+
+// Delete takes name of the pod and deletes it. Returns an error if one occurs.
+func (c *FakePods) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &api.Pod{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.PodList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched pod.

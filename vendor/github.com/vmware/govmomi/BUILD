@@ -1,16 +1,9 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["client.go"],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",
@@ -41,4 +34,5 @@ filegroup(
         "//vendor/github.com/vmware/govmomi/vim25:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

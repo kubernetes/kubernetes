@@ -18,10 +18,10 @@ package api
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -415,8 +415,8 @@ const (
 	AlphaStorageNodeAffinityAnnotation = "volume.alpha.kubernetes.io/node-affinity"
 )
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PersistentVolume struct {
@@ -493,7 +493,7 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -709,15 +709,22 @@ type ISCSIVolumeSource struct {
 	// The secret is used if either DiscoveryCHAPAuth or SessionCHAPAuth is true
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Custom initiator name per volume.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string
 }
 
 // Represents a Fibre Channel volume.
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
-	// Required: FC target worldwide names (WWNs)
+	// Optional: FC target worldwide names (WWNs)
+	// +optional
 	TargetWWNs []string
-	// Required: FC target lun number
+	// Optional: FC target lun number
+	// +optional
 	Lun *int32
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -729,6 +736,10 @@ type FCVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: FC volume World Wide Identifiers (WWIDs)
+	// Either WWIDs or TargetWWNs and Lun must be set, but not both simultaneously.
+	// +optional
+	WWIDs []string
 }
 
 // FlexVolume represents a generic volume resource that is
@@ -1440,7 +1451,7 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// An optional identifier to prepend to each key in the ConfigMap.
 	// +optional
 	Prefix string
 	// The ConfigMap to select from.
@@ -1944,6 +1955,7 @@ type PodAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
@@ -1978,6 +1990,7 @@ type PodAntiAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm
+
 	// If the anti-affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the anti-affinity requirements specified by this field cease to be met
@@ -2026,9 +2039,7 @@ type PodAffinityTerm struct {
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
-	// For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as "all topologies"
-	// ("all topologies" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains);
-	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
+	// Empty topologyKey is not allowed.
 	// +optional
 	TopologyKey string
 }
@@ -2073,8 +2084,8 @@ type PreferredSchedulingTerm struct {
 	Preference NodeSelectorTerm
 }
 
-// The node this Taint is attached to has the effect "effect" on
-// any pod that that does not tolerate the Taint.
+// The node this Taint is attached to has the "effect" on
+// any pod that does not tolerate the Taint.
 type Taint struct {
 	// Required. The taint key to be applied to a node.
 	Key string
@@ -2334,7 +2345,7 @@ type PodStatus struct {
 	// A human readable message indicating details about why the pod is in this state.
 	// +optional
 	Message string
-	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'OutOfDisk'
+	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'
 	// +optional
 	Reason string
 
@@ -2377,7 +2388,7 @@ type PodStatusResult struct {
 	Status PodStatus
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -2407,7 +2418,7 @@ type PodTemplateSpec struct {
 	Spec PodSpec
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -2515,7 +2526,7 @@ type ReplicationControllerCondition struct {
 	Message string
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -2722,6 +2733,18 @@ type ServiceSpec struct {
 	// and ExternalTrafficPolicy is set to Local.
 	// +optional
 	HealthCheckNodePort int32
+
+	// publishNotReadyAddresses, when set to true, indicates that DNS implementations
+	// must publish the notReadyAddresses of subsets for the Endpoints associated with
+	// the Service. The default value is false.
+	// The primary use case for setting this field is to use a StatefulSet's Headless Service
+	// to propagate SRV records for its Pods without respect to their readiness for purpose
+	// of peer discovery.
+	// This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
+	// when that annotation is deprecated and all clients have been converted to use this
+	// field.
+	// +optional
+	PublishNotReadyAddresses bool
 }
 
 type ServicePort struct {
@@ -2750,7 +2773,7 @@ type ServicePort struct {
 	NodePort int32
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -2770,7 +2793,7 @@ type Service struct {
 	Status ServiceStatus
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -2808,7 +2831,7 @@ type ServiceAccountList struct {
 	Items []ServiceAccount
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
@@ -2913,6 +2936,19 @@ type NodeSpec struct {
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint
+
+	// If specified, the source to get node configuration from
+	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +optional
+	ConfigSource *NodeConfigSource
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
+type NodeConfigSource struct {
+	metav1.TypeMeta
+	ConfigMapRef *ObjectReference
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3145,13 +3181,15 @@ const (
 const (
 	// Namespace prefix for opaque counted resources (alpha).
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
+	// Default namespace prefix.
+	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes
@@ -3213,8 +3251,8 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A namespace provides a scope for Names.
@@ -3532,7 +3570,7 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
@@ -3593,13 +3631,7 @@ type EventList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // List holds a list of objects, which may not be known by the server.
-type List struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	Items []runtime.Object
-}
+type List metainternalversion.List
 
 // A type of object that is limited
 type LimitType string
@@ -3641,7 +3673,7 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -3734,7 +3766,7 @@ type ResourceQuotaStatus struct {
 	Used ResourceList
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -3764,7 +3796,7 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -3884,7 +3916,7 @@ type SecretList struct {
 	Items []Secret
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConfigMap holds configuration data for components or applications to consume.
@@ -3969,8 +4001,8 @@ type ComponentCondition struct {
 	Error string
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
@@ -4030,6 +4062,11 @@ type SecurityContext struct {
 	// files to, ensuring the persistent data can only be written to mounts.
 	// +optional
 	ReadOnlyRootFilesystem *bool
+	// AllowPrivilegeEscalation controls whether a process can gain more
+	// privileges than it's parent process. This bool directly controls if
+	// the no_new_privs flag will be set on the container process.
+	// +optional
+	AllowPrivilegeEscalation *bool
 }
 
 // SELinuxOptions are the labels to be applied to the container.

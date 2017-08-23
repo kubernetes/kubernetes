@@ -29,7 +29,7 @@ import (
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -47,7 +47,7 @@ const NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR = "pod-cidr"
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
+	Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -63,16 +63,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID, annotations map[string]string) error
+	SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations map[string]string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	// TODO: rename podInfraContainerID to sandboxID
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error
 
 	// GetPodNetworkStatus is the method called to obtain the ipv4 or ipv6 addresses of the container
-	// TODO: rename podInfraContainerID to sandboxID
-	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podSandboxID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// Status returns error if the network plugin is in error state
 	Status() error
@@ -136,7 +133,7 @@ type Host interface {
 }
 
 // NamespaceGetter is an interface to retrieve namespace information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type NamespaceGetter interface {
 	// GetNetNS returns network namespace information for the given containerID.
@@ -146,7 +143,7 @@ type NamespaceGetter interface {
 }
 
 // PortMappingGetter is an interface to retrieve port mapping information for a given
-// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// podSandboxID. Typically implemented by runtime shims that are closely coupled to
 // CNI plugin wrappers like kubenet.
 type PortMappingGetter interface {
 	// GetPodPortMappings returns sandbox port mappings information.
@@ -154,7 +151,7 @@ type PortMappingGetter interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
@@ -205,7 +202,7 @@ type NoopNetworkPlugin struct {
 
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly

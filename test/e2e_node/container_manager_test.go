@@ -172,8 +172,8 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Limits: v1.ResourceList{
-										"cpu":    resource.MustParse("100m"),
-										"memory": resource.MustParse("50Mi"),
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("50Mi"),
 									},
 								},
 							},
@@ -213,8 +213,8 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										"cpu":    resource.MustParse("100m"),
-										"memory": resource.MustParse("50Mi"),
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("50Mi"),
 									},
 								},
 							},

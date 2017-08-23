@@ -17,15 +17,9 @@ limitations under the License.
 package endpoint
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
@@ -79,28 +73,4 @@ func (endpointsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 
 func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	endpoints, ok := obj.(*api.Endpoints)
-	if !ok {
-		return nil, nil, false, fmt.Errorf("invalid object type %#v", obj)
-	}
-	return endpoints.Labels, EndpointsToSelectableFields(endpoints), endpoints.Initializers != nil, nil
-}
-
-// MatchEndpoints returns a generic matcher for a given label and field selector.
-func MatchEndpoints(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
-	return pkgstorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// EndpointsToSelectableFields returns a field set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func EndpointsToSelectableFields(endpoints *api.Endpoints) fields.Set {
-	return generic.ObjectMetaFieldsSet(&endpoints.ObjectMeta, true)
 }

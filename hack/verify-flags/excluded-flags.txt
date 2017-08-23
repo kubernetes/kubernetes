@@ -15,9 +15,7 @@ new_file_0660
 new_file_0666
 new_file_0777
 pods_per_node
-pods_per_node
 test_args
-up_to
 up_to
 upgrade_args
 valid_flag

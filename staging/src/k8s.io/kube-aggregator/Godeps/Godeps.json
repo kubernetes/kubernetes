@@ -28,47 +28,47 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/fileutil",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Rev": "20490caaf0dcd96bb4a95e40625559def8ef5b04"
+			"Rev": "0520cb9304cb2385f7e72b8bc02d6e4d3257158a"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
@@ -112,7 +112,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "ba18e35c5c1b36ef6334cad706eb681153d2d379"
+			"Rev": "944e07253867aacae43c04b2e6a239005443f33a"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -176,15 +176,15 @@
 		},
 		{
 			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
-			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
 		{
 			"ImportPath": "github.com/googleapis/gnostic/compiler",
-			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
 		{
 			"ImportPath": "github.com/googleapis/gnostic/extensions",
-			"Rev": "68f4ded48ba9414dab2ae69b3f0d69971da73aa5"
+			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
 		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-prometheus",
@@ -340,7 +340,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
+			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",

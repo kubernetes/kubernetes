@@ -45,7 +45,7 @@ func getCgroupPath(cgroupPath string) (string, error) {
 
 	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
 	if filepath.IsAbs(cgroupPath) {
-		// Sometimes subsystems can be mounted togethger as 'cpu,cpuacct'.
+		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
 		return filepath.Join(root, mnt, cgroupPath), nil
 	}
 

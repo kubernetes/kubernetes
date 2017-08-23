@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -131,8 +131,8 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "cloud-controller-manager"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "cloud-controller-manager"})
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
@@ -142,7 +142,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:           kubeClient.Core(),
+				CoreClient:           kubeClient.CoreV1(),
 				AuthenticationClient: kubeClient.Authentication(),
 				Namespace:            "kube-system",
 			}
@@ -172,7 +172,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			Namespace: "kube-system",
 			Name:      "cloud-controller-manager",
 		},
-		Client: leaderElectionClient,
+		Client: leaderElectionClient.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id + "-external-cloud-controller",
 			EventRecorder: recorder,

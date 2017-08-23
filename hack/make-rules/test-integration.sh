@@ -37,6 +37,8 @@ KUBE_TIMEOUT="-timeout 600s"
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
+# Default glog module settings.
+KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
 
 kube::test::find_integration_test_dirs() {
   (
@@ -71,7 +73,7 @@ runTests() {
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
+      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"

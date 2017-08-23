@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const defaultBoilerPlate = `

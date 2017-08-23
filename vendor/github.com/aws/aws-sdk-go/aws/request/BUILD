@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,12 +7,13 @@ go_library(
         "http_request.go",
         "offset_reader.go",
         "request.go",
+        "request_1_7.go",
         "request_1_8.go",
         "request_pagination.go",
         "retryer.go",
         "validation.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
@@ -39,4 +33,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

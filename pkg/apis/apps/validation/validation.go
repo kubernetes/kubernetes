@@ -158,14 +158,42 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
-	containerErrs, _ := apivalidation.ValidateContainerUpdates(statefulSet.Spec.Template.Spec.Containers, oldStatefulSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))
-	allErrs = append(allErrs, containerErrs...)
+	return allErrs
+}
+
+// ValidateStatefulSetStatus validates a StatefulSetStatus.
+func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fieldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
+	if status.ObservedGeneration != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
+	}
+	if status.CollisionCount != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
+	}
+
+	msg := "cannot be greater than status.replicas"
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
+	}
+	if status.CurrentReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("currentReplicas"), status.CurrentReplicas, msg))
+	}
+	if status.UpdatedReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
+	}
+
 	return allErrs
 }
 
 // ValidateStatefulSetStatusUpdate tests if required fields in the StatefulSet are set.
 func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateStatefulSetStatus(&statefulSet.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 	// TODO: Validate status.
 	return allErrs

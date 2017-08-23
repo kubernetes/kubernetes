@@ -338,47 +338,47 @@ func getTestPods() map[string]*v1.Pod {
 	allPods := map[string]*v1.Pod{
 		tinyBurstable: getPodWithResources(tinyBurstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("1m"),
-				"memory": resource.MustParse("1Mi"),
+				v1.ResourceCPU:    resource.MustParse("1m"),
+				v1.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		}),
 		bestEffort: getPodWithResources(bestEffort, v1.ResourceRequirements{}),
 		critical: getPodWithResources(critical, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		burstable: getPodWithResources(burstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		guaranteed: getPodWithResources(guaranteed, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 			Limits: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		highRequestBurstable: getPodWithResources(highRequestBurstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
 		highRequestGuaranteed: getPodWithResources(highRequestGuaranteed, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 			Limits: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
 	}

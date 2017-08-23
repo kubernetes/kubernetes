@@ -163,6 +163,7 @@ define CHECK_TEST_HELP_INFO
 #   WHAT: Directory names to test.  All *_test.go files under these
 #     directories will be run.  If not specified, "everything" will be tested.
 #   TESTS: Same as WHAT.
+#   KUBE_COVER: Whether to run tests with code coverage. Set to 'y' to enable coverage collection.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags to pass to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
@@ -425,7 +426,7 @@ define CMD_HELP_INFO
 #   make kubectl kube-proxy
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
-EXCLUDE_TARGET=OWNERS
+EXCLUDE_TARGET=BUILD OWNERS
 .PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
 ifeq ($(PRINT_HELP),y)
 $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
@@ -524,7 +525,7 @@ bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
 bazel-build:
-	bazel build //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/... //vendor/k8s.io/...
+	bazel build //cmd/... //hack/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/... //vendor/k8s.io/...
 endif
 
 
@@ -557,14 +558,14 @@ bazel-test-integration:
 endif
 
 ifeq ($(PRINT_HELP),y)
-define BAZEL_BUILD_HELP_INFO
+define BAZEL_RELEASE_HELP_INFO
 # Build release tars with bazel
 #
 # Example:
 # make bazel-release
 endef
 bazel-release:
-	@echo "$$BAZEL_BUILD_HELP_INFO"
+	@echo "$$BAZEL_RELEASE_HELP_INFO"
 else
 bazel-release:
 	bazel build //build/release-tars

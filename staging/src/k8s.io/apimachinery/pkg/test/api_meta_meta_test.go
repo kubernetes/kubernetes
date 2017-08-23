@@ -215,7 +215,7 @@ type MyAPIObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`
 }
 
-func (obj *MyAPIObject) GetListMeta() metav1.List { return &obj.TypeMeta }
+func (obj *MyAPIObject) GetListMeta() metav1.ListInterface { return &obj.TypeMeta }
 
 func (obj *MyAPIObject) GetObjectKind() schema.ObjectKind { return obj }
 func (obj *MyAPIObject) SetGroupVersionKind(gvk schema.GroupVersionKind) {

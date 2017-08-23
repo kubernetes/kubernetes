@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -19,13 +17,12 @@ go_library(
         "selector.go",
         "visitor.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
     ],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/kubectl/validation:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
@@ -59,9 +56,6 @@ go_test(
         "//test/fixtures",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

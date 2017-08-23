@@ -2,8 +2,6 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -17,6 +15,10 @@ filegroup(
         ":package-srcs",
         "//cluster/addons:all-srcs",
         "//cluster/gce:all-srcs",
+        "//cluster/images/etcd-version-monitor:all-srcs",
+        "//cluster/images/etcd/attachlease:all-srcs",
+        "//cluster/images/etcd/rollback:all-srcs",
+        "//cluster/lib:all-srcs",
         "//cluster/saltbase:all-srcs",
     ],
     tags = ["automanaged"],

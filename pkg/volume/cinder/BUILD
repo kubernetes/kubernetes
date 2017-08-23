@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "cinder_util.go",
         "doc.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
@@ -47,7 +44,6 @@ go_test(
         "cinder_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/util/mount:go_default_library",

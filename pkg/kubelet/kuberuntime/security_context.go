@@ -33,6 +33,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 		synthesized = &runtimeapi.LinuxContainerSecurityContext{}
 	}
 
+	// set SeccompProfilePath.
+	synthesized.SeccompProfilePath = m.getSeccompProfileFromAnnotations(pod.Annotations, container.Name)
+
 	// set ApparmorProfile.
 	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
 
@@ -65,6 +68,8 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, groups...)
 	}
+
+	synthesized.NoNewPrivs = securitycontext.AddNoNewPrivileges(effectiveSc)
 
 	return synthesized
 }

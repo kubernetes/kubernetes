@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -32,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/federation/apis/federation"
-	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/fake"
+	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -171,15 +172,46 @@ func TestDescribeService(t *testing.T) {
 			Name:      "bar",
 			Namespace: "foo",
 		},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeLoadBalancer,
+			Ports: []api.ServicePort{{
+				Name:       "port-tcp",
+				Port:       8080,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(9527),
+				NodePort:   31111,
+			}},
+			Selector:              map[string]string{"blah": "heh"},
+			ClusterIP:             "1.2.3.4",
+			LoadBalancerIP:        "5.6.7.8",
+			SessionAffinity:       "None",
+			ExternalTrafficPolicy: "Local",
+			HealthCheckNodePort:   32222,
+		},
 	})
+	expectedElements := []string{
+		"Name", "bar",
+		"Namespace", "foo",
+		"Selector", "blah=heh",
+		"Type", "LoadBalancer",
+		"IP", "1.2.3.4",
+		"Port", "port-tcp", "8080/TCP",
+		"TargetPort", "9527/TCP",
+		"NodePort", "port-tcp", "31111/TCP",
+		"Session Affinity", "None",
+		"External Traffic Policy", "Local",
+		"HealthCheck NodePort", "32222",
+	}
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
 	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Labels:") || !strings.Contains(out, "bar") {
-		t.Errorf("unexpected out: %s", out)
+	for _, expected := range expectedElements {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
 	}
 }
 
@@ -742,7 +774,7 @@ func TestDescribeDeployment(t *testing.T) {
 			},
 		},
 	})
-	d := DeploymentDescriber{fake, versionedFake}
+	d := DeploymentDescriber{fake, versionedFake.ExtensionsV1beta1()}
 	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -771,7 +803,7 @@ func TestDescribeCluster(t *testing.T) {
 		},
 		Status: federation.ClusterStatus{
 			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: api.ConditionTrue},
+				{Type: federation.ClusterReady, Status: v1.ConditionTrue},
 			},
 		},
 	}
@@ -831,7 +863,10 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "pdb1") {
+	if !strings.Contains(out, "pdb1") ||
+		!strings.Contains(out, "ns1") ||
+		!strings.Contains(out, "22") ||
+		!strings.Contains(out, "5") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -1232,7 +1267,7 @@ func TestDescribeEvents(t *testing.T) {
 					Replicas: utilpointer.Int32Ptr(1),
 					Selector: &metav1.LabelSelector{},
 				},
-			}),
+			}).ExtensionsV1beta1(),
 		},
 		"EndpointsDescriber": &EndpointsDescriber{
 			fake.NewSimpleClientset(&api.Endpoints{
@@ -1458,6 +1493,63 @@ URL:	http://localhost
 			if strings.Contains(output, test.unexpected) {
 				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
 			}
+		}
+	}
+}
+
+func TestDescribePodSecurityPolicy(t *testing.T) {
+	expected := []string{
+		"Name:\t*mypsp",
+		"Allow Privileged:\t*false",
+		"Default Add Capabilities:\t*<none>",
+		"Required Drop Capabilities:\t*<none>",
+		"Allowed Capabilities:\t*<none>",
+		"Allowed Volume Types:\t*<none>",
+		"Allow Host Network:\t*false",
+		"Allow Host Ports:\t*<none>",
+		"Allow Host PID:\t*false",
+		"Allow Host IPC:\t*false",
+		"Read Only Root Filesystem:\t*false",
+		"SELinux Context Strategy: RunAsAny",
+		"User:\t*<none>",
+		"Role:\t*<none>",
+		"Type:\t*<none>",
+		"Level:\t*<none>",
+		"Run As User Strategy: RunAsAny",
+		"FSGroup Strategy: RunAsAny",
+		"Supplemental Groups Strategy: RunAsAny",
+	}
+
+	fake := fake.NewSimpleClientset(&extensions.PodSecurityPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mypsp",
+		},
+		Spec: extensions.PodSecurityPolicySpec{
+			SELinux: extensions.SELinuxStrategyOptions{
+				Rule: extensions.SELinuxStrategyRunAsAny,
+			},
+			RunAsUser: extensions.RunAsUserStrategyOptions{
+				Rule: extensions.RunAsUserStrategyRunAsAny,
+			},
+			FSGroup: extensions.FSGroupStrategyOptions{
+				Rule: extensions.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := PodSecurityPolicyDescriber{c}
+	out, err := d.Describe("", "mypsp", printers.DescriberSettings{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, item := range expected {
+		if matched, _ := regexp.MatchString(item, out); !matched {
+			t.Errorf("Expected to find %q in: %q", item, out)
 		}
 	}
 }

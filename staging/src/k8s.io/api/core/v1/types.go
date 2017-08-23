@@ -19,7 +19,6 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -464,8 +463,8 @@ const (
 	AlphaStorageNodeAffinityAnnotation = "volume.alpha.kubernetes.io/node-affinity"
 )
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -566,7 +565,7 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -1096,16 +1095,23 @@ type ISCSIVolumeSource struct {
 	// CHAP secret for iSCSI target and initiator authentication
 	// +optional
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
+	// Custom iSCSI initiator name.
+	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+	// <target portal>:<volume name> will be created for the connection.
+	// +optional
+	InitiatorName *string `json:"initiatorName,omitempty" protobuf:"bytes,12,opt,name=initiatorName"`
 }
 
 // Represents a Fibre Channel volume.
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
-	// Required: FC target worldwide names (WWNs)
-	TargetWWNs []string `json:"targetWWNs" protobuf:"bytes,1,rep,name=targetWWNs"`
-	// Required: FC target lun number
-	Lun *int32 `json:"lun" protobuf:"varint,2,opt,name=lun"`
+	// Optional: FC target worldwide names (WWNs)
+	// +optional
+	TargetWWNs []string `json:"targetWWNs,omitempty" protobuf:"bytes,1,rep,name=targetWWNs"`
+	// Optional: FC target lun number
+	// +optional
+	Lun *int32 `json:"lun,omitempty" protobuf:"varint,2,opt,name=lun"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
@@ -1116,6 +1122,10 @@ type FCVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	// Optional: FC volume world wide identifiers (wwids)
+	// Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
+	// +optional
+	WWIDs []string `json:"wwids,omitempty" protobuf:"bytes,5,rep,name=wwids"`
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
@@ -2109,9 +2119,7 @@ type NodeSelectorTerm struct {
 // that relates the key and values.
 type NodeSelectorRequirement struct {
 	// The label key that the selector applies to.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
 	Operator NodeSelectorOperator `json:"operator" protobuf:"bytes,2,opt,name=operator,casttype=NodeSelectorOperator"`
@@ -2162,6 +2170,7 @@ type PodAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+
 	// If the affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the affinity requirements specified by this field cease to be met
@@ -2196,6 +2205,7 @@ type PodAntiAffinity struct {
 	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
 	// +optional
 	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+
 	// If the anti-affinity requirements specified by this field are not met at
 	// scheduling time, the pod will not be scheduled onto the node.
 	// If the anti-affinity requirements specified by this field cease to be met
@@ -2291,13 +2301,11 @@ type PreferredSchedulingTerm struct {
 	Preference NodeSelectorTerm `json:"preference" protobuf:"bytes,2,opt,name=preference"`
 }
 
-// The node this Taint is attached to has the effect "effect" on
-// any pod that that does not tolerate the Taint.
+// The node this Taint is attached to has the "effect" on
+// any pod that does not tolerate the Taint.
 type Taint struct {
 	// Required. The taint key to be applied to a node.
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// Required. The taint value corresponding to the taint key.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
@@ -2339,9 +2347,7 @@ type Toleration struct {
 	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
-	// +patchMergeKey=key
-	// +patchStrategy=merge
-	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
@@ -2624,7 +2630,7 @@ type PodStatus struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// A brief CamelCase message indicating details about why the pod is in this state.
-	// e.g. 'OutOfDisk'
+	// e.g. 'Evicted'
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
 
@@ -2677,7 +2683,7 @@ type PodStatusResult struct {
 	Status PodStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod is a collection of containers that can run on a host. This resource is created
@@ -2731,7 +2737,7 @@ type PodTemplateSpec struct {
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -2855,7 +2861,7 @@ type ReplicationControllerCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3070,6 +3076,18 @@ type ServiceSpec struct {
 	// and ExternalTrafficPolicy is set to Local.
 	// +optional
 	HealthCheckNodePort int32 `json:"healthCheckNodePort,omitempty" protobuf:"bytes,12,opt,name=healthCheckNodePort"`
+
+	// publishNotReadyAddresses, when set to true, indicates that DNS implementations
+	// must publish the notReadyAddresses of subsets for the Endpoints associated with
+	// the Service. The default value is false.
+	// The primary use case for setting this field is to use a StatefulSet's Headless Service
+	// to propagate SRV records for its Pods without respect to their readiness for purpose
+	// of peer discovery.
+	// This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints
+	// when that annotation is deprecated and all clients have been converted to use this
+	// field.
+	// +optional
+	PublishNotReadyAddresses bool `json:"publishNotReadyAddresses,omitempty" protobuf:"varint,13,opt,name=publishNotReadyAddresses"`
 }
 
 // ServicePort contains information on service's port.
@@ -3109,7 +3127,7 @@ type ServicePort struct {
 	NodePort int32 `json:"nodePort,omitempty" protobuf:"varint,5,opt,name=nodePort"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -3155,7 +3173,7 @@ type ServiceList struct {
 	Items []Service `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -3204,7 +3222,7 @@ type ServiceAccountList struct {
 	Items []ServiceAccount `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service. Example:
@@ -3332,6 +3350,18 @@ type NodeSpec struct {
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
+	// If specified, the source to get node configuration from
+	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+	// +optional
+	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+type NodeConfigSource struct {
+	metav1.TypeMeta `json:",inline"`
+	ConfigMapRef    *ObjectReference `json:"configMapRef,omitempty" protobuf:"bytes,1,opt,name=configMapRef"`
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -3510,8 +3540,6 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeInodePressure means the kubelet is under pressure due to insufficient available inodes.
-	NodeInodePressure NodeConditionType = "InodePressure"
 )
 
 // NodeCondition contains condition information for a node.
@@ -3582,13 +3610,15 @@ const (
 const (
 	// Namespace prefix for opaque counted resources (alpha).
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
+	// Default namespace prefix.
+	ResourceDefaultNamespacePrefix = "kubernetes.io/"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes.
@@ -3662,8 +3692,8 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Namespace provides a scope for Names.
@@ -4057,7 +4087,7 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
@@ -4120,16 +4150,7 @@ type EventList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // List holds a list of objects, which may not be known by the server.
-type List struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// List of objects
-	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
+type List metav1.List
 
 // LimitType is a type of object that is limited
 type LimitType string
@@ -4171,7 +4192,7 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem `json:"limits" protobuf:"bytes,1,rep,name=limits"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -4272,7 +4293,7 @@ type ResourceQuotaStatus struct {
 	Used ResourceList `json:"used,omitempty" protobuf:"bytes,2,rep,name=used,casttype=ResourceList,castkey=ResourceName"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -4309,7 +4330,7 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Secret holds secret data of a certain type. The total bytes of the values in
@@ -4439,7 +4460,7 @@ type SecretList struct {
 	Items []Secret `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConfigMap holds configuration data for pods to consume.
@@ -4496,8 +4517,8 @@ type ComponentCondition struct {
 	Error string `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
@@ -4613,6 +4634,14 @@ type SecurityContext struct {
 	// Default is false.
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
+	// AllowPrivilegeEscalation controls whether a process can gain more
+	// privileges than it's parent process. This bool directly controls if
+	// the no_new_privs flag will be set on the container process.
+	// AllowPrivilegeEscalation is true always when the container is:
+	// 1) run as Privileged
+	// 2) has CAP_SYS_ADMIN
+	// +optional
+	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,7,opt,name=allowPrivilegeEscalation"`
 }
 
 // SELinuxOptions are the labels to be applied to the container

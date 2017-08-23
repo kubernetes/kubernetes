@@ -21,8 +21,6 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -43,6 +41,9 @@ func TestCompactRules(t *testing.T) {
 
 				{Verbs: []string{"create"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}},
 				{Verbs: []string{"delete"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}},
+				{Verbs: []string{"patch"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}, ResourceNames: []string{""}},
+				{Verbs: []string{"get"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}, ResourceNames: []string{"foo"}},
+				{Verbs: []string{"list"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}, ResourceNames: []string{"foo"}},
 
 				{Verbs: []string{"educate"}, APIGroups: []string{""}, Resources: []string{"dolphins"}},
 
@@ -56,6 +57,8 @@ func TestCompactRules(t *testing.T) {
 			},
 			Expected: []rbac.PolicyRule{
 				{Verbs: []string{"create", "delete"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}},
+				{Verbs: []string{"patch"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}, ResourceNames: []string{""}},
+				{Verbs: []string{"get", "list"}, APIGroups: []string{"extensions"}, Resources: []string{"daemonsets"}, ResourceNames: []string{"foo"}},
 				{Verbs: []string{"get", "list", "update", "patch"}, APIGroups: []string{""}, Resources: []string{"builds"}},
 				{Verbs: []string{"educate"}, APIGroups: []string{""}, Resources: []string{"dolphins"}},
 				{Verbs: nil, APIGroups: []string{""}, Resources: []string{"pirates"}},
@@ -109,10 +112,9 @@ func TestCompactRules(t *testing.T) {
 
 	for k, tc := range testcases {
 		rules := tc.Rules
-		originalRules, err := api.Scheme.DeepCopy(tc.Rules)
-		if err != nil {
-			t.Errorf("%s: couldn't copy rules: %v", k, err)
-			continue
+		originalRules := make([]rbac.PolicyRule, len(tc.Rules))
+		for i := range tc.Rules {
+			originalRules[i] = *tc.Rules[i].DeepCopy()
 		}
 		compacted, err := CompactRules(tc.Rules)
 		if err != nil {
@@ -145,58 +147,68 @@ func TestIsSimpleResourceRule(t *testing.T) {
 	testcases := map[string]struct {
 		Rule     rbac.PolicyRule
 		Simple   bool
-		Resource schema.GroupResource
+		Resource simpleResource
 	}{
 		"simple, no verbs": {
 			Rule:     rbac.PolicyRule{Verbs: []string{}, APIGroups: []string{""}, Resources: []string{"builds"}},
 			Simple:   true,
-			Resource: schema.GroupResource{Group: "", Resource: "builds"},
+			Resource: simpleResource{Group: "", Resource: "builds"},
 		},
 		"simple, one verb": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}},
 			Simple:   true,
-			Resource: schema.GroupResource{Group: "", Resource: "builds"},
+			Resource: simpleResource{Group: "", Resource: "builds"},
+		},
+		"simple, one empty resource name": {
+			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}, ResourceNames: []string{""}},
+			Simple:   true,
+			Resource: simpleResource{Group: "", Resource: "builds", ResourceNameExist: true, ResourceName: ""},
+		},
+		"simple, one resource name": {
+			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}, ResourceNames: []string{"foo"}},
+			Simple:   true,
+			Resource: simpleResource{Group: "", Resource: "builds", ResourceNameExist: true, ResourceName: "foo"},
 		},
 		"simple, multi verb": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get", "list"}, APIGroups: []string{""}, Resources: []string{"builds"}},
 			Simple:   true,
-			Resource: schema.GroupResource{Group: "", Resource: "builds"},
+			Resource: simpleResource{Group: "", Resource: "builds"},
 		},
 
 		"complex, empty": {
 			Rule:     rbac.PolicyRule{},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, no group": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{}, Resources: []string{"builds"}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, multi group": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{"a", "b"}, Resources: []string{"builds"}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, no resource": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, multi resource": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds", "images"}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, resource names": {
-			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}, ResourceNames: []string{"foo"}},
+			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}, ResourceNames: []string{"foo", "bar"}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 		"complex, non-resource urls": {
 			Rule:     rbac.PolicyRule{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"builds"}, NonResourceURLs: []string{"/"}},
 			Simple:   false,
-			Resource: schema.GroupResource{},
+			Resource: simpleResource{},
 		},
 	}
 

@@ -20,7 +20,7 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
 SCRIPT_BASE=${SCRIPT_ROOT}/../..
-KUBEGEN_PKG=${KUBEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/kube-gen 2>/dev/null || echo k8s.io/kube-gen)}
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo k8s.io/code-generator)}
 
 # Register function to be called on EXIT to remove generated binary.
 function cleanup {
@@ -30,7 +30,7 @@ trap cleanup EXIT
 
 echo "Building client-gen"
 CLIENTGEN="${PWD}/client-gen-binary"
-go build -o "${CLIENTGEN}" ${KUBEGEN_PKG}/cmd/client-gen
+go build -o "${CLIENTGEN}" ${CODEGEN_PKG}/cmd/client-gen
 
 PREFIX=k8s.io/metrics/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"

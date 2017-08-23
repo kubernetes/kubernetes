@@ -1253,9 +1253,14 @@ func (s *EtcdServer) apply(es []raftpb.Entry, confState *raftpb.ConfState) (appl
 		case raftpb.EntryNormal:
 			s.applyEntryNormal(&e)
 		case raftpb.EntryConfChange:
+			// set the consistent index of current executing entry
+			if e.Index > s.consistIndex.ConsistentIndex() {
+				s.consistIndex.setConsistentIndex(e.Index)
+			}
 			var cc raftpb.ConfChange
 			pbutil.MustUnmarshal(&cc, e.Data)
 			removedSelf, err := s.applyConfChange(cc, confState)
+			s.setAppliedIndex(e.Index)
 			shouldStop = shouldStop || removedSelf
 			s.w.Trigger(cc.ID, err)
 		default:

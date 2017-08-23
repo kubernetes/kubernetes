@@ -196,6 +196,7 @@ type Cacher struct {
 func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
@@ -212,7 +213,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		copier:      config.Copier,
 		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
-		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,
@@ -368,6 +369,12 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		return err
 	}
 
+	if getRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
+	}
+
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
 	c.ready.wait()
@@ -411,6 +418,12 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	listRV, err := ParseListResourceVersion(resourceVersion)
 	if err != nil {
 		return err
+	}
+
+	if listRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
@@ -469,6 +482,12 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 
+	if listRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
+	}
+
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -524,11 +543,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		glog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
-		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
-		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
-		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
@@ -858,26 +874,11 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Added, Object: object}
+		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
 	case curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Modified, Object: object}
+		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
 	case !curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.PrevObject)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: event.PrevObject.DeepCopyObject()}
 	}
 
 	// We need to ensure that if we put event X to the c.result, all
@@ -963,6 +964,14 @@ func (r *ready) wait() {
 		r.c.Wait()
 	}
 	r.c.L.Unlock()
+}
+
+// TODO: Make check() function more sophisticated, in particular
+// allow it to behave as "waitWithTimeout".
+func (r *ready) check() bool {
+	r.c.L.Lock()
+	defer r.c.L.Unlock()
+	return r.ok
 }
 
 func (r *ready) set(ok bool) {

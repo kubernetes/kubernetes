@@ -34,18 +34,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.ConfigMap{} },
-		NewListFunc:       func() runtime.Object { return &api.ConfigMapList{} },
-		PredicateFunc:     configmap.MatchConfigMap,
-		QualifiedResource: api.Resource("configmaps"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("configmaps"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.ConfigMap{} },
+		NewListFunc:              func() runtime.Object { return &api.ConfigMapList{} },
+		DefaultQualifiedResource: api.Resource("configmaps"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("configmaps"),
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
 		DeleteStrategy: configmap.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: configmap.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

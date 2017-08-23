@@ -26,7 +26,9 @@ import (
 // GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
 
 	pods, err := kl.runtimeCache.GetPods()
 	if err != nil {

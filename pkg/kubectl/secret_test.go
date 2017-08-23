@@ -157,7 +157,7 @@ func TestSecretGenerate(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			setup: setupEnvFile("key.1=value1"),
+			setup: setupEnvFile("key#1=value1"),
 			params: map[string]interface{}{
 				"name":          "invalid_key",
 				"from-env-file": "file.env",

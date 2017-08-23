@@ -37,18 +37,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.Ingress{} },
-		NewListFunc:       func() runtime.Object { return &extensions.IngressList{} },
-		PredicateFunc:     ingress.MatchIngress,
-		QualifiedResource: extensions.Resource("ingresses"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("ingresses"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &extensions.Ingress{} },
+		NewListFunc:              func() runtime.Object { return &extensions.IngressList{} },
+		DefaultQualifiedResource: extensions.Resource("ingresses"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("ingresses"),
 
 		CreateStrategy: ingress.Strategy,
 		UpdateStrategy: ingress.Strategy,
 		DeleteStrategy: ingress.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: ingress.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

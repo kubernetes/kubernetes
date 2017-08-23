@@ -26,20 +26,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcertificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *componentconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string) (Manager, error) {
+func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, ips []net.IP, hostnames []string, certDirectory string) (Manager, error) {
 	var certSigningRequestClient clientcertificates.CertificateSigningRequestInterface
 	if kubeClient != nil && kubeClient.Certificates() != nil {
 		certSigningRequestClient = kubeClient.Certificates().CertificateSigningRequests()
 	}
 	certificateStore, err := NewFileStore(
 		"kubelet-server",
-		kubeCfg.CertDirectory,
-		kubeCfg.CertDirectory,
+		certDirectory,
+		certDirectory,
 		kubeCfg.TLSCertFile,
 		kubeCfg.TLSPrivateKeyFile)
 	if err != nil {
@@ -62,7 +62,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			// digital signatures used during TLS negotiation.
 			certificates.UsageDigitalSignature,
 			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
+			// keys, including the symmetric keys negotiated during TLS setup
 			// and used for data transfer.
 			certificates.UsageKeyEncipherment,
 			// ServerAuth allows the cert to be used by a TLS server to
@@ -106,7 +106,7 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 			// negotiation.
 			certificates.UsageDigitalSignature,
 			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symetric keys negotiated during TLS setup
+			// keys, including the symmetric keys negotiated during TLS setup
 			// and used for data transfer..
 			certificates.UsageKeyEncipherment,
 			// ClientAuth allows the cert to be used by a TLS client to

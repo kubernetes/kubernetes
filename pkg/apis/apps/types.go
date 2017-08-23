@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -187,6 +187,12 @@ type StatefulSetStatus struct {
 	// updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string
+
+	// collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller
+	// uses this field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ControllerRevision.
+	// +optional
+	CollisionCount *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -199,7 +205,7 @@ type StatefulSetList struct {
 	Items []StatefulSet
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients

@@ -31,7 +31,6 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -78,16 +77,6 @@ func TestIdentityMatches(t *testing.T) {
 	pod.Namespace = ""
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with the wrong namespace")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Hostname = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no hostname")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Subdomain = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no subdomain")
 	}
 }
 
@@ -137,24 +126,6 @@ func TestUpdateIdentity(t *testing.T) {
 	updateIdentity(set, pod)
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to update the Pods namespace")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Hostname = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no hostname")
-	}
-	updateIdentity(set, pod)
-	if !identityMatches(set, pod) {
-		t.Error("updateIdentity failed to update the Pod's hostname")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Subdomain = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no subdomain")
-	}
-	updateIdentity(set, pod)
-	if !identityMatches(set, pod) {
-		t.Error("updateIdentity failed to update the Pod's subdomain")
 	}
 }
 
@@ -213,18 +184,6 @@ func TestIsRunningAndReady(t *testing.T) {
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
 	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to true")
-	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
-	if isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not respected init annotation set to false")
-	}
-	pod.Annotations[apps.StatefulSetInitAnnotation] = "blah"
-	if !isRunningAndReady(pod) {
-		t.Error("isRunningAndReady does not erroneous init annotation")
-	}
 }
 
 func TestAscendingOrdinal(t *testing.T) {
@@ -264,7 +223,7 @@ func TestOverlappingStatefulSets(t *testing.T) {
 func TestNewPodControllerRef(t *testing.T) {
 	set := newStatefulSet(1)
 	pod := newStatefulSetPod(set, 0)
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		t.Fatalf("No ControllerRef found on new pod")
 	}
@@ -287,21 +246,35 @@ func TestNewPodControllerRef(t *testing.T) {
 
 func TestCreateApplyRevision(t *testing.T) {
 	set := newStatefulSet(1)
-	revision, err := newRevision(set, 1)
+	set.Status.CollisionCount = new(int32)
+	revision, err := newRevision(set, 1, set.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	set.Spec.Template.Spec.Containers[0].Name = "foo"
+	if set.Annotations == nil {
+		set.Annotations = make(map[string]string)
+	}
+	key := "foo"
+	expectedValue := "bar"
+	set.Annotations[key] = expectedValue
 	restoredSet, err := applyRevision(set, revision)
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoredRevision, err := newRevision(restoredSet, 2)
+	restoredRevision, err := newRevision(restoredSet, 2, restoredSet.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !history.EqualRevision(revision, restoredRevision) {
 		t.Errorf("wanted %v got %v", string(revision.Data.Raw), string(restoredRevision.Data.Raw))
+	}
+	value, ok := restoredRevision.Annotations[key]
+	if !ok {
+		t.Errorf("missing annotation %s", key)
+	}
+	if value != expectedValue {
+		t.Errorf("for annotation %s wanted %s got %s", key, expectedValue, value)
 	}
 }
 

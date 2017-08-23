@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage_extensions.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -18,9 +15,9 @@ go_library(
         "//pkg/registry/extensions/daemonset/storage:go_default_library",
         "//pkg/registry/extensions/deployment/storage:go_default_library",
         "//pkg/registry/extensions/ingress/storage:go_default_library",
-        "//pkg/registry/extensions/networkpolicy/storage:go_default_library",
         "//pkg/registry/extensions/podsecuritypolicy/storage:go_default_library",
         "//pkg/registry/extensions/replicaset/storage:go_default_library",
+        "//pkg/registry/networking/networkpolicy/storage:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",

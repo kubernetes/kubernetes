@@ -77,7 +77,7 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
@@ -104,8 +104,8 @@ type PodDisruptionBudgetList struct {
 	Items []PodDisruptionBudget
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.

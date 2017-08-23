@@ -171,6 +171,16 @@ func (d *kubeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return err
 }
 
+func (d *kubeDockerClient) UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error {
+	ctx, cancel := d.getTimeoutContext()
+	defer cancel()
+	_, err := d.client.ContainerUpdate(ctx, id, updateConfig)
+	if ctxErr := contextError(ctx); ctxErr != nil {
+		return ctxErr
+	}
+	return err
+}
+
 func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspect, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
@@ -454,6 +464,15 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 		return err
 	}
 	defer resp.Close()
+
+	if sopts.ExecStarted != nil {
+		// Send a message to the channel indicating that the exec has started. This is needed so
+		// interactive execs can handle resizing correctly - the request to resize the TTY has to happen
+		// after the call to d.client.ContainerExecAttach, and because d.holdHijackedConnection below
+		// blocks, we use sopts.ExecStarted to signal the caller that it's ok to resize.
+		sopts.ExecStarted <- struct{}{}
+	}
+
 	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
@@ -584,6 +603,7 @@ type StreamOptions struct {
 	InputStream  io.Reader
 	OutputStream io.Writer
 	ErrorStream  io.Writer
+	ExecStarted  chan struct{}
 }
 
 // operationTimeout is the error returned when the docker operations are timeout.

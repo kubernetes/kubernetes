@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -122,7 +122,7 @@ type Options struct {
 func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.ConfigFile, "config", options.ConfigFile, "The path to the configuration file.")
 	fs.StringVar(&options.WriteConfigTo, "write-config-to", options.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
-	fs.BoolVar(&options.CleanupAndExit, "cleanup-iptables", options.CleanupAndExit, "If true cleanup iptables rules and exit.")
+	fs.BoolVar(&options.CleanupAndExit, "cleanup-iptables", options.CleanupAndExit, "If true, cleanup iptables rules and exit.")
 
 	// All flags below here are deprecated and will eventually be removed.
 
@@ -369,7 +369,7 @@ type ProxyServer struct {
 	ConntrackConfiguration componentconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
-	NodeRef                *clientv1.ObjectReference
+	NodeRef                *v1.ObjectReference
 	CleanupAndExit         bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
@@ -413,7 +413,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		return nil, nil, err
 	}
 
-	return client, eventClient.Core(), nil
+	return client, eventClient.CoreV1(), nil
 }
 
 // NewProxyServer returns a new ProxyServer.
@@ -460,12 +460,19 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Create event recorder
 	hostname := utilnode.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
 
 	var healthzServer *healthcheck.HealthzServer
 	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 		healthzUpdater = healthzServer
 	}
 
@@ -570,13 +577,6 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	// Add iptables reload function, if not on Windows.
 	if goruntime.GOOS != "windows" {
 		iptInterface.AddReloadFunc(proxier.Sync)
-	}
-
-	nodeRef := &clientv1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
 	}
 
 	return &ProxyServer{

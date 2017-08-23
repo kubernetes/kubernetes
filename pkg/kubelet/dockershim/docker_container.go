@@ -131,6 +131,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 			OpenStdin: config.Stdin,
 			StdinOnce: config.StdinOnce,
 			Tty:       config.Tty,
+			// Disable Docker's health check until we officially support it
+			// (https://github.com/kubernetes/kubernetes/issues/25829).
+			Healthcheck: &dockercontainer.HealthConfig{
+				Test: []string{"NONE"},
+			},
 		},
 		HostConfig: &dockercontainer.HostConfig{
 			Binds: generateMountBindings(config.GetMounts()),
@@ -150,7 +155,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 	hc.Resources.Devices = devices
 
-	securityOpts, err := ds.getSecurityOpts(config.Metadata.Name, sandboxConfig, securityOptSep)
+	securityOpts, err := ds.getSecurityOpts(config.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSep)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate security options for container %q: %v", config.Metadata.Name, err)
 	}
@@ -401,4 +406,23 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Annotations: annotations,
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
+}
+
+func (ds *dockerService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	updateConfig := dockercontainer.UpdateConfig{
+		Resources: dockercontainer.Resources{
+			CPUPeriod:  resources.CpuPeriod,
+			CPUQuota:   resources.CpuQuota,
+			CPUShares:  resources.CpuShares,
+			Memory:     resources.MemoryLimitInBytes,
+			CpusetCpus: resources.CpusetCpus,
+			CpusetMems: resources.CpusetMems,
+		},
+	}
+
+	err := ds.client.UpdateContainerResources(containerID, updateConfig)
+	if err != nil {
+		return fmt.Errorf("failed to update container %q: %v", containerID, err)
+	}
+	return nil
 }

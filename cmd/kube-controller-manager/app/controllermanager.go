@@ -33,12 +33,13 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/apiserver/pkg/server/healthz"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -154,18 +155,23 @@ func Run(s *options.CMServer) error {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "controller-manager"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
 			ClientConfig: kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
+		if s.UseServiceAccountCredentials {
+			if len(s.ServiceAccountKeyFile) > 0 {
+				// It's possible another controller process is creating the tokens for us.
+				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
+				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
+			}
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:           kubeClient.Core(),
+				CoreClient:           kubeClient.CoreV1(),
 				AuthenticationClient: kubeClient.Authentication(),
 				Namespace:            "kube-system",
 			}
@@ -200,7 +206,7 @@ func Run(s *options.CMServer) error {
 	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
-		leaderElectionClient,
+		leaderElectionClient.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
@@ -341,6 +347,7 @@ func NewControllerInitializers() map[string]InitFunc {
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	var discoveryClient discovery.DiscoveryInterface
 
+	var healthzContent string
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
 	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
@@ -351,22 +358,27 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 		}
 
 		healthStatus := 0
-		client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		resp := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
 			glog.Errorf("Server isn't healthy yet.  Waiting a little while.")
 			return false, nil
 		}
+		content, _ := resp.Raw()
+		healthzContent = string(content)
 
 		discoveryClient = client.Discovery()
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get api versions from server: %v", err)
+		return nil, fmt.Errorf("failed to get api versions from server: %v: %v", healthzContent, err)
 	}
 
 	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get supported resources from server: %v", err)
+		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+	}
+	if len(resourceMap) == 0 {
+		return nil, fmt.Errorf("unable to get any supported resources from server")
 	}
 
 	allResources := map[schema.GroupVersionResource]bool{}
@@ -399,6 +411,14 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
 		cloud.Initialize(rootClientBuilder)
+
+		if cloud.HasClusterID() == false {
+			if s.AllowUntaggedCloud == true {
+				glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+			} else {
+				return ControllerContext{}, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
+			}
+		}
 	}
 
 	ctx := ControllerContext{
@@ -460,7 +480,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return false, nil
 	}
-	privateKey, err := serviceaccount.ReadPrivateKey(ctx.Options.ServiceAccountKeyFile)
+	privateKey, err := certutil.PrivateKeyFromFile(ctx.Options.ServiceAccountKeyFile)
 	if err != nil {
 		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}

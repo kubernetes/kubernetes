@@ -53,7 +53,6 @@ const (
 	NodeSelectorMismatching              = "NodeSelectorMismatching"
 	InsufficientFreeCPU                  = "InsufficientFreeCPU"
 	InsufficientFreeMemory               = "InsufficientFreeMemory"
-	OutOfDisk                            = "OutOfDisk"
 	HostNetworkNotSupported              = "HostNetworkNotSupported"
 	UndefinedShaper                      = "NilShaper"
 	NodeRebooted                         = "Rebooted"
@@ -62,6 +61,7 @@ const (
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
 	UnsupportedMountOption               = "UnsupportedMountOption"
+	SandboxChanged                       = "SandboxChanged"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"

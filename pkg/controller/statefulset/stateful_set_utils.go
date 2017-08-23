@@ -31,8 +31,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-
-	"github.com/golang/glog"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -52,10 +50,10 @@ func (o overlappingStatefulSets) Len() int { return len(o) }
 func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o overlappingStatefulSets) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -113,9 +111,7 @@ func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return ordinal >= 0 &&
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
-		pod.Namespace == set.Namespace &&
-		pod.Spec.Hostname == pod.Name &&
-		pod.Spec.Subdomain == set.Spec.ServiceName
+		pod.Namespace == set.Namespace
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
@@ -183,34 +179,23 @@ func updateStorage(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Spec.Volumes = newVolumes
 }
 
-// updateIdentity updates pod's name, hostname, and subdomain to conform to set's name and headless service.
-func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
-	pod.Name = getPodName(set, getOrdinal(pod))
-	pod.Namespace = set.Namespace
+func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
+	updateIdentity(set, pod)
+	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
 	pod.Spec.Subdomain = set.Spec.ServiceName
 }
 
-// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady, and if the init
-// annotation has not explicitly disabled the Pod from being ready.
+// updateIdentity updates pod's name, hostname, and subdomain to conform to set's name and headless service.
+func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
+	pod.Name = getPodName(set, getOrdinal(pod))
+	pod.Namespace = set.Namespace
+
+}
+
+// isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
 func isRunningAndReady(pod *v1.Pod) bool {
-	if pod.Status.Phase != v1.PodRunning {
-		return false
-	}
-	podReady := podutil.IsPodReady(pod)
-	// User may have specified a pod readiness override through a debug annotation.
-	initialized, ok := pod.Annotations[apps.StatefulSetInitAnnotation]
-	if ok {
-		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
-			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v",
-				apps.StatefulSetInitAnnotation, pod.Name, err)
-		} else if !initAnnotation {
-			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name,
-				apps.StatefulSetInitAnnotation)
-			podReady = initAnnotation
-		}
-	}
-	return podReady
+	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -238,20 +223,6 @@ func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
 }
 
-// newControllerRef returns an ControllerRef pointing to a given StatefulSet.
-func newControllerRef(set *apps.StatefulSet) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               set.Name,
-		UID:                set.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
-}
-
 // setPodRevision sets the revision of Pod to revision by adding the StatefulSetRevisionLabel
 func setPodRevision(pod *v1.Pod, revision string) {
 	if pod.Labels == nil {
@@ -271,9 +242,9 @@ func getPodRevision(pod *v1.Pod) string {
 
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, newControllerRef(set))
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerRef(set, controllerKind))
 	pod.Name = getPodName(set, ordinal)
-	updateIdentity(set, pod)
+	initIdentity(set, pod)
 	updateStorage(set, pod)
 	return pod
 }
@@ -321,7 +292,7 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 // The Revision of the returned ControllerRevision is set to revision. If the returned error is nil, the returned
 // ControllerRevision is valid. StatefulSet revisions are stored as patches that re-apply the current state of set
 // to a new StatefulSet using a strategic merge patch to replace the saved state of the new StatefulSet.
-func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevision, error) {
+func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(set)
 	if err != nil {
 		return nil, err
@@ -330,11 +301,22 @@ func newRevision(set *apps.StatefulSet, revision int64) (*apps.ControllerRevisio
 	if err != nil {
 		return nil, err
 	}
-	return history.NewControllerRevision(set,
+	cr, err := history.NewControllerRevision(set,
 		controllerKind,
 		selector,
 		runtime.RawExtension{Raw: patch},
-		revision)
+		revision,
+		collisionCount)
+	if err != nil {
+		return nil, err
+	}
+	if cr.ObjectMeta.Annotations == nil {
+		cr.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for key, value := range set.Annotations {
+		cr.ObjectMeta.Annotations[key] = value
+	}
+	return cr, nil
 }
 
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error

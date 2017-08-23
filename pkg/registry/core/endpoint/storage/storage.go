@@ -33,18 +33,17 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against endpoints.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.Endpoints{} },
-		NewListFunc:       func() runtime.Object { return &api.EndpointsList{} },
-		PredicateFunc:     endpoint.MatchEndpoints,
-		QualifiedResource: api.Resource("endpoints"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("endpoints"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.Endpoints{} },
+		NewListFunc:              func() runtime.Object { return &api.EndpointsList{} },
+		DefaultQualifiedResource: api.Resource("endpoints"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("endpoints"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
 		DeleteStrategy: endpoint.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: endpoint.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

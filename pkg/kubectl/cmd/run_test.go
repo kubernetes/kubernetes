@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 func TestGetRestartPolicy(t *testing.T) {
@@ -361,6 +361,13 @@ func TestRunValidations(t *testing.T) {
 		},
 		{
 			args:        []string{"test"},
+			expectedErr: "--image is required",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image": "#",
+			},
 			expectedErr: "Invalid image name",
 		},
 		{

@@ -19,6 +19,7 @@ package scheme
 import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -26,12 +27,14 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -70,6 +73,7 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	admissionregistrationv1alpha1.AddToScheme(scheme)
 	appsv1beta1.AddToScheme(scheme)
+	appsv1beta2.AddToScheme(scheme)
 	authenticationv1.AddToScheme(scheme)
 	authenticationv1beta1.AddToScheme(scheme)
 	authorizationv1.AddToScheme(scheme)
@@ -77,12 +81,14 @@ func AddToScheme(scheme *runtime.Scheme) {
 	autoscalingv1.AddToScheme(scheme)
 	autoscalingv2alpha1.AddToScheme(scheme)
 	batchv1.AddToScheme(scheme)
+	batchv1beta1.AddToScheme(scheme)
 	batchv2alpha1.AddToScheme(scheme)
 	certificatesv1beta1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
 	extensionsv1beta1.AddToScheme(scheme)
 	networkingv1.AddToScheme(scheme)
 	policyv1beta1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
 	rbacv1beta1.AddToScheme(scheme)
 	rbacv1alpha1.AddToScheme(scheme)
 	schedulingv1alpha1.AddToScheme(scheme)

@@ -1,16 +1,9 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["secretbox.go"],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/crypto/poly1305:go_default_library",
         "//vendor/golang.org/x/crypto/salsa20/salsa:go_default_library",
@@ -28,4 +21,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
 	"github.com/spf13/cobra"
 )
@@ -35,7 +36,7 @@ func AddPrinterFlags(cmd *cobra.Command) {
 	AddNonDeprecatedPrinterFlags(cmd)
 
 	cmd.Flags().String("output-version", "", "DEPRECATED: To use a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
-	cmd.Flags().MarkDeprecated("output-version", "the resource is used exactly as fetched from the API. To get a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
+	cmd.Flags().MarkDeprecated("output-version", "The resource is used exactly as fetched from the API. To get a specific API version, fully-qualify the resource, version, and group (for example: 'jobs.v1.batch/myjob').")
 	cmd.Flags().MarkHidden("output-version")
 }
 
@@ -124,6 +125,13 @@ func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, m
 	printer, err := printers.GetStandardPrinter(outputOpts, noHeaders, mapper, typer, encoder, decoders, options)
 	if err != nil {
 		return nil, err
+	}
+
+	// we try to convert to HumanReadablePrinter, if return ok, it must be no generic
+	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
+	// need to convert to delegatePrinter again then invoke AddHandlers()
+	if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
+		printersinternal.AddHandlers(humanReadablePrinter)
 	}
 
 	return maybeWrapSortingPrinter(cmd, printer), nil

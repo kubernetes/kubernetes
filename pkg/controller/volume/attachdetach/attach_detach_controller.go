@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -135,7 +134,7 @@ func NewAttachDetachController(
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "attachdetach"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach"})
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
@@ -540,7 +539,7 @@ func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
 	return adc.cloud
 }
 
-func (adc *attachDetachController) GetMounter() mount.Interface {
+func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
 
@@ -570,6 +569,10 @@ func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name strin
 	return func(_, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
 	}
+}
+
+func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {

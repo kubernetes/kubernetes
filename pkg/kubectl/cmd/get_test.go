@@ -26,8 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,7 +140,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
 	actual := tf.Printer.(*testPrinter).Objects
 	if len(actual) != len(expected) {
-		t.Fatal(actual)
+		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
 	for i, obj := range actual {
 		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
@@ -158,7 +156,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(expectedMap, actualMap) {
-			t.Errorf("unexpected object: \n%#v\n%#v", expectedMap, actualMap)
+			t.Errorf("expectedMap: %#v, but actualMap: %#v", expectedMap, actualMap)
 		}
 	}
 }
@@ -214,24 +212,31 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
-func testOpenAPISchemaData() (*openapi.Resources, error) {
-	return &openapi.Resources{
-		GroupVersionKindToName: map[schema.GroupVersionKind]string{
+type FakeResources struct {
+	resources map[schema.GroupVersionKind]openapi.Schema
+}
+
+func (f FakeResources) LookupResource(s schema.GroupVersionKind) openapi.Schema {
+	return f.resources[s]
+}
+
+var _ openapi.Resources = &FakeResources{}
+
+func testOpenAPISchemaData() (openapi.Resources, error) {
+	return &FakeResources{
+		resources: map[schema.GroupVersionKind]openapi.Schema{
 			{
 				Version: "v1",
 				Kind:    "Pod",
-			}: "io.k8s.kubernetes.pkg.api.v1.Pod",
-		},
-		NameToDefinition: map[string]openapi.Kind{
-			"io.k8s.kubernetes.pkg.api.v1.Pod": {
-				Name:       "io.k8s.kubernetes.pkg.api.v1.Pod",
-				IsResource: false,
-				Extensions: spec.Extensions{
-					"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
+			}: &openapi.Primitive{
+				BaseSchema: openapi.BaseSchema{
+					Extensions: map[string]interface{}{
+						"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
+					},
 				},
 			},
 		},
@@ -260,7 +265,7 @@ func TestGetObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -346,7 +351,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 			case p == "/api/v1/namespaces/test" && m == "GET":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ns.Items[0])}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -412,7 +417,7 @@ func TestGetSortedObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -421,7 +426,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 	var err error
 
 	if len(actual) != len(expected) {
-		t.Fatalf("expected %d, got %d", len(expected), len(actual))
+		t.Fatalf("expected %d, but actual %d", len(expected), len(actual))
 	}
 	for i, obj := range actual {
 		switch obj.(type) {
@@ -438,7 +443,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 			t.Fatal(err)
 		}
 		if !apiequality.Semantic.DeepEqual(expected[i], actualObj) {
-			t.Errorf("unexpected object: %d \n%#v\n%#v", i, expected[i], actualObj)
+			t.Errorf("expected object: %#v, but actualObj:%#v\n", expected[i], actualObj)
 		}
 	}
 }
@@ -466,7 +471,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -495,7 +500,7 @@ func TestGetListObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -537,7 +542,7 @@ func TestGetAllListObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -566,7 +571,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -585,7 +590,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -605,7 +610,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -624,7 +629,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -670,7 +675,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(actualBytes) != string(expectedBytes) {
-		t.Errorf("unexpected object:\n%s\n%s", expectedBytes, actualBytes)
+		t.Errorf("expectedBytes: %s,but actualBytes: %s", expectedBytes, actualBytes)
 	}
 }
 
@@ -684,7 +689,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -692,7 +697,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 			case "/namespaces/test/services":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -714,7 +719,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -741,7 +746,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 			case "/namespaces/test/services/bar":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -759,7 +764,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -784,7 +789,7 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 
 	showAllFlag, _ := cmd.Flags().GetBool("show-all")
 	if showAllFlag {
-		t.Errorf("expected showAll to not be true when getting resource")
+		t.Error("expected showAll to not be true when getting resource")
 	}
 }
 
@@ -874,7 +879,7 @@ func TestWatchSelector(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
@@ -884,7 +889,7 @@ func TestWatchSelector(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -904,7 +909,7 @@ func TestWatchSelector(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -924,10 +929,10 @@ func TestWatchResource(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -946,7 +951,7 @@ func TestWatchResource(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -966,10 +971,10 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -989,7 +994,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -1009,10 +1014,10 @@ func TestWatchOnlyResource(t *testing.T) {
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -1031,7 +1036,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 
@@ -1058,7 +1063,7 @@ func TestWatchOnlyList(t *testing.T) {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
 			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
@@ -1077,7 +1082,7 @@ func TestWatchOnlyList(t *testing.T) {
 	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
 
 	if len(buf.String()) == 0 {
-		t.Errorf("unexpected empty output")
+		t.Error("unexpected empty output")
 	}
 }
 

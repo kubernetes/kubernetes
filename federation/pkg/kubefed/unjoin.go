@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -40,12 +40,12 @@ import (
 
 var (
 	unjoin_long = templates.LongDesc(`
-		Unjoin removes a cluster from a federation.
+		Unjoin a cluster from a federation.
 
         Current context is assumed to be a federation endpoint.
         Please use the --context flag otherwise.`)
 	unjoin_example = templates.Examples(`
-		# Unjoin removes the specified cluster from a federation.
+		# Unjoin the specified cluster from a federation.
 		# Federation control plane's host cluster context name
 		# must be specified via the --host-cluster-context flag
 		# to properly cleanup the credentials.
@@ -72,7 +72,7 @@ func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.Admin
 
 	cmd := &cobra.Command{
 		Use:     "unjoin CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
-		Short:   "Unjoins a cluster from a federation",
+		Short:   "Unjoin a cluster from a federation",
 		Long:    unjoin_long,
 		Example: unjoin_example,
 		Run: func(cmd *cobra.Command, args []string) {

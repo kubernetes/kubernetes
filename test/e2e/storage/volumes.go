@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -132,14 +133,15 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
-			framework.SkipUnlessNodeOSDistroIs("gci")
+			framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+
 			// create gluster server and endpoints
 			config, _, _ := framework.NewGlusterfsServer(cs, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
-					err := cs.Core().Endpoints(namespace.Name).Delete(name, nil)
+					err := cs.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
 					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()
@@ -231,7 +233,7 @@ var _ = SIGDescribe("Volumes", func() {
 				Type: "kubernetes.io/rbd",
 			}
 
-			secClient := cs.Core().Secrets(config.Namespace)
+			secClient := cs.CoreV1().Secrets(config.Namespace)
 
 			defer func() {
 				if clean {
@@ -307,14 +309,14 @@ var _ = SIGDescribe("Volumes", func() {
 
 			defer func() {
 				if clean {
-					if err := cs.Core().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
+					if err := cs.CoreV1().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
 						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 					}
 				}
 			}()
 
 			var err error
-			if secret, err = cs.Core().Secrets(namespace.Name).Create(secret); err != nil {
+			if secret, err = cs.CoreV1().Secrets(namespace.Name).Create(secret); err != nil {
 				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 			}
 
@@ -421,52 +423,32 @@ var _ = SIGDescribe("Volumes", func() {
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
 	Describe("PD", func() {
-		// Flaky issue: #43977
-		It("should be mountable [Flaky]", func() {
+		var config framework.VolumeTestConfig
+
+		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
-			config := framework.VolumeTestConfig{
+			config = framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "pd",
-			}
-
-			By("creating a test gce pd volume")
-			volumeName, err := framework.CreatePDWithRetry()
-			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				// - Get NodeName from the pod spec to which the volume is mounted.
-				// - Force detach and delete.
-				pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
-				detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
-			}()
-
-			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
-
-			tests := []framework.VolumeTest{
-				{
-					Volume: v1.VolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName:   volumeName,
-							FSType:   "ext3",
-							ReadOnly: false,
-						},
-					},
-					File: "index.html",
-					// Randomize index.html to make sure we don't see the
-					// content from previous test runs.
-					ExpectedContent: "Hello from GCE from namespace " + volumeName,
+				// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+				// so pods should be also scheduled there.
+				NodeSelector: map[string]string{
+					kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 				},
 			}
+		})
 
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
-
-			fsGroup := int64(1234)
-			framework.TestVolumeClient(cs, config, &fsGroup, tests)
+		It("should be mountable with ext3", func() {
+			testGCEPD(f, config, cs, clean, "ext3")
+		})
+		It("should be mountable with ext4", func() {
+			testGCEPD(f, config, cs, clean, "ext4")
+		})
+		It("should be mountable with xfs", func() {
+			// xfs is not supported on gci
+			// and not installed by default on debian
+			framework.SkipUnlessNodeOSDistroIs("ubuntu")
+			testGCEPD(f, config, cs, clean, "xfs")
 		})
 	})
 
@@ -499,11 +481,11 @@ var _ = SIGDescribe("Volumes", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.Core().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.Core().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502
@@ -651,3 +633,44 @@ var _ = SIGDescribe("Volumes", func() {
 		})
 	})
 })
+
+func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs clientset.Interface, clean bool, fs string) {
+	By("creating a test gce pd volume")
+	volumeName, err := framework.CreatePDWithRetry()
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		// - Get NodeName from the pod spec to which the volume is mounted.
+		// - Force detach and delete.
+		pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
+		detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
+	}()
+
+	defer func() {
+		if clean {
+			framework.Logf("Running volumeTestCleanup")
+			framework.VolumeTestCleanup(f, config)
+		}
+	}()
+
+	tests := []framework.VolumeTest{
+		{
+			Volume: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   volumeName,
+					FSType:   fs,
+					ReadOnly: false,
+				},
+			},
+			File: "index.html",
+			// Randomize index.html to make sure we don't see the
+			// content from previous test runs.
+			ExpectedContent: "Hello from GCE from namespace " + volumeName,
+		},
+	}
+
+	framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+
+	fsGroup := int64(1234)
+	framework.TestVolumeClient(cs, config, &fsGroup, tests)
+}

@@ -35,8 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // AnnotateOptions have the data required to perform the annotate operation
@@ -130,8 +130,8 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().Bool("local", false, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)

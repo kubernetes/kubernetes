@@ -204,18 +204,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 
-	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
-	//     Running with swap enabled should be considered an error, but in order to maintain legacy
-	//     behavior we have to require an opt-in to this error for a period of time.
-
-	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should error out.
+	// Running with swap enabled should be considered an error, but in order to maintain legacy
+	// behavior we have to require an opt-in to this error for a period of time.
+	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+	// error out unless --fail-swap-on is set to false.
 	if len(buf) > 1 {
 		if failSwapOn {
-			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! /proc/swaps contained: %v", buf)
+			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", buf)
 		}
-		glog.Warningf("Running with swap on is not supported, please disable swap! " +
-			"This will be a fatal error by default starting in K8s v1.6! " +
-			"In the meantime, you can opt-in to making this a fatal error by enabling --experimental-fail-swap-on.")
 	}
 	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
@@ -494,14 +490,17 @@ func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) 
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
-	// Setup the node
-	if err := cm.setupNode(activePods); err != nil {
-		return err
-	}
+
 	// Ensure that node allocatable configuration is valid.
 	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
 	}
+
+	// Setup the node
+	if err := cm.setupNode(activePods); err != nil {
+		return err
+	}
+
 	// Don't run a background thread if there are no ensureStateFuncs.
 	hasEnsureStateFuncs := false
 	for _, cont := range cm.systemContainers {

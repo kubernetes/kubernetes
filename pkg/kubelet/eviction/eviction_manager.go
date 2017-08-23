@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -68,7 +67,7 @@ type managerImpl struct {
 	// captures when a node condition was last observed based on a threshold being met
 	nodeConditionsLastObservedAt nodeConditionsObservedAt
 	// nodeRef is a reference to the node
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 	// used to record events about the node
 	recorder record.EventRecorder
 	// used to measure usage stats on system
@@ -100,7 +99,7 @@ func NewManager(
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
-	nodeRef *clientv1.ObjectReference,
+	nodeRef *v1.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,
@@ -148,11 +147,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 }
 
 // Start starts the control loop to observe and response to low compute resources.
-func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider, monitoringInterval time.Duration) {
+func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, capacityProvider CapacityProvider, monitoringInterval time.Duration) {
 	// start the eviction manager monitoring
 	go func() {
 		for {
-			if evictedPods := m.synchronize(diskInfoProvider, podFunc, nodeProvider); evictedPods != nil {
+			if evictedPods := m.synchronize(diskInfoProvider, podFunc, capacityProvider); evictedPods != nil {
 				glog.Infof("eviction manager: pods %s evicted, waiting for pod to be cleaned up", format.Pods(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
@@ -211,7 +210,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, nodeProvider NodeProvider) []*v1.Pod {
+func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, capacityProvider CapacityProvider) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
@@ -233,7 +232,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	activePods := podFunc()
 	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, nodeProvider, activePods, *m.dedicatedImageFs)
+	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods, *m.dedicatedImageFs)
 	if err != nil {
 		glog.Errorf("eviction manager: unexpected err: %v", err)
 		return nil
@@ -248,7 +247,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
-			m.synchronize(diskInfoProvider, podFunc, nodeProvider)
+			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
@@ -256,7 +255,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		// start hard memory notification
 		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
-			m.synchronize(diskInfoProvider, podFunc, nodeProvider)
+			m.synchronize(diskInfoProvider, podFunc, capacityProvider)
 		})
 		if err != nil {
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
@@ -310,8 +309,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.lastObservations = observations
 	m.Unlock()
 
-	// evict pods if there is a resource uage violation from local volume temporary storage
-	// If eviction happenes in localVolumeEviction function, skip the rest of eviction action
+	// evict pods if there is a resource usage violation from local volume temporary storage
+	// If eviction happens in localVolumeEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		if evictedPods := m.localStorageEviction(activePods); len(evictedPods) > 0 {
 			return evictedPods

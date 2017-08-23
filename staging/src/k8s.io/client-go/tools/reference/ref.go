@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -61,10 +62,10 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReferen
 	}
 
 	// An object that implements only List has enough metadata to build a reference
-	var listMeta meta.List
+	var listMeta metav1.Common
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
-		listMeta, err = meta.ListAccessor(obj)
+		listMeta, err = meta.CommonAccessor(obj)
 		if err != nil {
 			return nil, err
 		}

@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -66,7 +65,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
-		rc, err := cs.Core().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
+		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
 			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, RCName)
@@ -157,7 +156,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
-			allocatable, found := node.Status.Allocatable["cpu"]
+			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 			Expect(found).To(Equal(true))
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
@@ -166,7 +165,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		framework.WaitForStableCluster(cs, masterNodes)
 
-		pods, err := cs.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
@@ -201,10 +200,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					Labels: map[string]string{"name": ""},
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 						Requests: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 						},
 					},
 				}), true, framework.Logf))
@@ -215,7 +214,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+					v1.ResourceCPU: *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
 				},
 			},
 		}
@@ -281,7 +280,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		createPausePod(f, pausePodConfig{
 			Name: labelPodName,
 			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": nodeName,
 				k: v,
 			},
 		})
@@ -292,7 +290,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.Core().Pods(ns).Get(labelPodName, metav1.GetOptions{})
+		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -361,10 +359,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      "kubernetes.io/hostname",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{nodeName},
-									}, {
 										Key:      k,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{v},
@@ -384,259 +378,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-	})
-
-	// labelSelector Operator is DoesNotExist but values are there in requiredDuringSchedulingIgnoredDuringExecution
-	// part of podAffinity, so validation fails.
-	It("validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid", func() {
-		By("Trying to launch a pod with an invalid pod Affinity data.")
-		podName := "without-label-" + string(uuid.NewUUID())
-		_, err := cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
-			Name:   podName,
-			Labels: map[string]string{"name": "without-label"},
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "security",
-										Operator: metav1.LabelSelectorOpDoesNotExist,
-										Values:   []string{"securityscan"},
-									},
-								},
-							},
-							TopologyKey: "kubernetes.io/hostname",
-						},
-					},
-				},
-			},
-		}))
-
-		if err == nil || !errors.IsInvalid(err) {
-			framework.Failf("Expect error of invalid, got : %v", err)
-		}
-	})
-
-	// Test Nodes does not have any pod, hence it should be impossible to schedule a Pod with pod affinity.
-	It("validates that Inter-pod-Affinity is respected if not matching", func() {
-		By("Trying to schedule Pod with nonempty Pod Affinity.")
-		framework.WaitForStableCluster(cs, masterNodes)
-		podName := "without-label-" + string(uuid.NewUUID())
-		conf := pausePodConfig{
-			Name: podName,
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"securityscan", "value2"},
-									},
-								},
-							},
-							TopologyKey: "kubernetes.io/hostname",
-						},
-					},
-				},
-			},
-		}
-
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
-		verifyResult(cs, 0, 1, ns)
-	})
-
-	// test the pod affinity successful matching scenario.
-	It("validates that InterPodAffinity is respected if matching", func() {
-		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
-
-		By("Trying to apply a random label on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "china-e2etest"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
-
-		By("Trying to launch the pod, now with podAffinity.")
-		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
-		createPausePod(f, pausePodConfig{
-			Name: labelPodName,
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"S1", "value2"},
-									},
-								},
-							},
-							TopologyKey: k,
-							Namespaces:  []string{ns},
-						},
-					},
-				},
-			},
-		})
-
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new label yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-	})
-
-	// test when the pod anti affinity rule is not satisfied, the pod would stay pending.
-	It("validates that InterPodAntiAffinity is respected if matching 2", func() {
-		// launch pods to find nodes which can launch a pod. We intentionally do
-		// not just take the node list and choose the first and the second of them.
-		// Depending on the cluster and the scheduler it might be that a "normal" pod
-		// cannot be scheduled onto it.
-		By("Launching two pods on two distinct nodes to get two node names")
-		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "host-port")
-		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		Expect(len(podList.Items)).To(Equal(2))
-		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
-		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
-
-		By("Applying a random label to both nodes.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "china-e2etest"
-		for _, nodeName := range nodeNames {
-			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-			defer framework.RemoveLabelOffNode(cs, nodeName, k)
-		}
-
-		By("Trying to launch another pod on the first node with the service label.")
-		podName := "with-label-" + string(uuid.NewUUID())
-
-		runPausePod(f, pausePodConfig{
-			Name:         podName,
-			Labels:       map[string]string{"service": "S1"},
-			NodeSelector: map[string]string{k: v}, // only launch on our two nodes
-		})
-
-		By("Trying to launch another pod, now with podAntiAffinity with same Labels.")
-		labelPodName := "with-podantiaffinity-" + string(uuid.NewUUID())
-		conf := pausePodConfig{
-			Name:         labelPodName,
-			Labels:       map[string]string{"service": "Diff"},
-			NodeSelector: map[string]string{k: v}, // only launch on our two nodes, contradicting the podAntiAffinity
-			Affinity: &v1.Affinity{
-				PodAntiAffinity: &v1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "service",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"S1", "value2"},
-									},
-								},
-							},
-							TopologyKey: k,
-							Namespaces:  []string{ns},
-						},
-					},
-				},
-			},
-		}
-
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), labelPodName, false)
-		verifyResult(cs, 3, 1, ns)
-	})
-
-	// test the pod affinity successful matching scenario with multiple Label Operators.
-	It("validates that InterPodAffinity is respected if matching with multiple Affinities", func() {
-		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
-
-		By("Trying to apply a random label on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "kubernetes-e2e"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
-
-		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
-		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
-		createPausePod(f, pausePodConfig{
-			Name: labelPodName,
-			Affinity: &v1.Affinity{
-				PodAffinity: &v1.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "security",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"S1", "value2"},
-									}, {
-										Key:      "security",
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"S2"},
-									}, {
-										Key:      "security",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-							TopologyKey: k,
-						},
-					},
-				},
-			},
-		})
-
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new label yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
-		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-	})
-
-	// test the pod affinity and anti affinity successful matching scenario.
-	It("validates that InterPod Affinity and AntiAffinity is respected if matching", func() {
-		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
-
-		By("Trying to apply a random label on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "e2e-testing"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
-
-		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
-		pod := createPodWithPodAffinity(f, k)
-
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new label yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, pod.Name))
-		labelPod, err := cs.Core().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -679,7 +420,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
 		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, tolerationPodName))
-		deployedPod, err := cs.Core().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
+		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
 	})
@@ -753,7 +494,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 }
 
 func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(initPausePod(f, conf))
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -761,7 +502,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
-	pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
 }
@@ -774,7 +515,7 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	pod := runPausePod(f, conf)
 
 	By("Explicitly delete pod here to free the resource it takes.")
-	err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err)
 
 	return pod.Spec.NodeName
@@ -841,34 +582,6 @@ func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Po
 			},
 		},
 	})
-}
-
-// Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
-	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
-				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
-				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
-				// that it would always be not nil, this would cause a rare race condition.
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
-				}
-				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
-				}
-				if scheduledCondition.Reason == "Unschedulable" {
-					notScheduledPods = append(notScheduledPods, pod)
-				}
-			}
-		}
-	}
-	return
 }
 
 func getRequestedCPU(pod v1.Pod) int64 {
@@ -949,7 +662,7 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 
 func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {
 	selector := labels.SelectorFromSet(labels.Set(labelsMap))
-	allPods, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+	allPods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
 	return allPods
 }

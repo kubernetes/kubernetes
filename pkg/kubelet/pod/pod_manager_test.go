@@ -97,8 +97,8 @@ func TestGetSetPods(t *testing.T) {
 			t.Errorf("pod %q was not found in %#v", expected.UID, actualPods)
 		}
 	}
-	// Tests UID translation works as expected.
-	if uid := podManager.TranslatePodUID(mirrorPod.UID); uid != staticPod.UID {
+	// Tests UID translation works as expected. Convert static pod UID for comparison only.
+	if uid := podManager.TranslatePodUID(mirrorPod.UID); uid != kubetypes.ResolvedPodUID(staticPod.UID) {
 		t.Errorf("unable to translate UID %q to the static POD's UID %q; %#v",
 			mirrorPod.UID, staticPod.UID, podManager.mirrorPodByUID)
 	}

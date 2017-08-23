@@ -395,16 +395,19 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().String("schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+	cmd.Flags().Bool("openapi-validation", false, "If true, use openapi rather than swagger for validation.")
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
 func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 	cmd.Flags().BoolVar(&options.EnableValidation, "validate", true, "If true, use a schema to validate the input before sending it")
 	cmd.Flags().StringVar(&options.SchemaCacheDir, "schema-cache-dir", fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName), fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName))
+	cmd.Flags().BoolVar(&options.UseOpenAPI, "openapi-validation", false, "If true, use openapi rather than swagger for validation")
 	cmd.MarkFlagFilename("schema-cache-dir")
 }
 
 func AddOpenAPIFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("openapi-validation", false, "If true, use openapi rather than swagger for validation")
 	cmd.Flags().String("schema-cache-dir",
 		fmt.Sprintf("~/%s/%s", clientcmd.RecommendedHomeDir, clientcmd.RecommendedSchemaName),
 		fmt.Sprintf("If non-empty, load/store cached API schemas in this directory, default is '$HOME/%s/%s'",
@@ -448,6 +451,7 @@ func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 
 type ValidateOptions struct {
 	EnableValidation bool
+	UseOpenAPI       bool
 	SchemaCacheDir   string
 }
 
@@ -619,7 +623,7 @@ func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
 func GetResourcesAndPairs(args []string, pairType string) (resources []string, pairArgs []string, err error) {
 	foundPair := false
 	for _, s := range args {
-		nonResource := strings.Contains(s, "=") || strings.HasSuffix(s, "-")
+		nonResource := (strings.Contains(s, "=") && s[0] != '=') || (strings.HasSuffix(s, "-") && s != "-")
 		switch {
 		case !foundPair && nonResource:
 			foundPair = true
@@ -645,7 +649,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	var invalidBuf bytes.Buffer
 	var invalidBufNonEmpty bool
 	for _, pairArg := range pairArgs {
-		if strings.Contains(pairArg, "=") {
+		if strings.Contains(pairArg, "=") && pairArg[0] != '=' {
 			parts := strings.SplitN(pairArg, "=", 2)
 			if len(parts) != 2 {
 				if invalidBufNonEmpty {
@@ -656,7 +660,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 			} else {
 				newPairs[parts[0]] = parts[1]
 			}
-		} else if supportRemove && strings.HasSuffix(pairArg, "-") {
+		} else if supportRemove && strings.HasSuffix(pairArg, "-") && pairArg != "-" {
 			removePairs = append(removePairs, pairArg[:len(pairArg)-1])
 		} else {
 			if invalidBufNonEmpty {

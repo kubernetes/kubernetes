@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,7 +123,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: UserAgentName})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,

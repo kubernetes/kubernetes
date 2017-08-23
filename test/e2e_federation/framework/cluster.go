@@ -120,7 +120,7 @@ func waitForNamespaceInFederatedClusters(clusters ClusterSlice, nsName string) {
 		name := c.Name
 		By(fmt.Sprintf("Waiting for namespace %q to be created in cluster %q", nsName, name))
 		err := wait.PollImmediate(framework.Poll, FederatedDefaultTestTimeout, func() (bool, error) {
-			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+			_, err := c.Clientset.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return false, nil
 			} else if err != nil {

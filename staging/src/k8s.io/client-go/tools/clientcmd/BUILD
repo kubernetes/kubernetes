@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -17,7 +15,6 @@ go_test(
         "validation_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/imdario/mergo:go_default_library",
@@ -42,7 +39,6 @@ go_library(
         "overrides.go",
         "validation.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/howeyc/gopass:go_default_library",
@@ -59,4 +55,20 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api/latest:go_default_library",
         "//vendor/k8s.io/client-go/util/homedir:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:all-srcs",
+    ],
+    tags = ["automanaged"],
 )

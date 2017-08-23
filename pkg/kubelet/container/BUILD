@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,15 +14,19 @@ go_library(
         "container_reference_manager.go",
         "helpers.go",
         "os.go",
-        "pty_linux.go",
+        "pty_unsupported.go",
         "ref.go",
         "resize.go",
         "runtime.go",
         "runtime_cache.go",
         "runtime_cache_fake.go",
         "sync_result.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "pty_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
@@ -34,7 +36,6 @@ go_library(
         "//pkg/volume:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/kr/pty:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -45,7 +46,12 @@ go_library(
         "//vendor/k8s.io/client-go/tools/reference:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/kr/pty:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -57,7 +63,6 @@ go_test(
         "sync_result_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
@@ -71,9 +76,8 @@ go_test(
 go_test(
     name = "go_default_xtest",
     srcs = ["runtime_cache_test.go"],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/container:go_default_library",
+        ":go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
     ],
 )

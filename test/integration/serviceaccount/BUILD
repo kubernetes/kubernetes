@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_test",
@@ -14,10 +12,7 @@ go_test(
         "main_test.go",
         "service_account_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

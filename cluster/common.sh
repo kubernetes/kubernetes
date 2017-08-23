@@ -668,6 +668,9 @@ ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-f
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
 ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
+PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
+PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
+ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -759,7 +762,9 @@ EOF
 
     for var_name in ${PROVIDER_VARS}; do
       eval "local var_value=\$(yaml-quote \${${var_name}})"
-      echo "${var_name}: ${var_value}" >>$file
+      cat >>$file <<EOF
+${var_name}: ${var_value}
+EOF
     done
   fi
 

@@ -42,12 +42,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type DrainOptions struct {
@@ -286,7 +285,7 @@ func (o *DrainOptions) getController(namespace string, controllerRef *metav1.Own
 }
 
 func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, error) {
-	controllerRef := controller.GetControllerOf(&pod)
+	controllerRef := metav1.GetControllerOf(&pod)
 	if controllerRef == nil {
 		return nil, nil
 	}
@@ -495,9 +494,12 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 				err = o.evictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
+				} else if apierrors.IsNotFound(err) {
+					doneCh <- true
+					return
 				} else if apierrors.IsTooManyRequests(err) {
 					time.Sleep(5 * time.Second)
-				} else if !apierrors.IsNotFound(err) {
+				} else {
 					errCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
 				}
@@ -628,6 +630,9 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			return err
 		}
 		oldData, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
 		node, ok := obj.(*corev1.Node)
 		if !ok {
 			return fmt.Errorf("unexpected Type%T, expected Node", obj)
@@ -638,8 +643,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			node.Spec.Unschedulable = desired
-			var err error
 			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 			if err != nil {
 				return err

@@ -160,7 +160,7 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deploym
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
 // 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
-func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet, podList *v1.PodList, collisionCount *int64) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet, podList *v1.PodList, collisionCount *int32) (*extensions.ReplicaSet, error) {
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return rs, nil
@@ -306,7 +306,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 			// Make the name deterministic, to ensure idempotence
 			Name:            d.Name + "-" + podTemplateSpecHash,
 			Namespace:       d.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(d)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas:        new(int32),
@@ -349,7 +349,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		// and requeue the Deployment.
 		if !isEqual {
 			if d.Status.CollisionCount == nil {
-				d.Status.CollisionCount = new(int64)
+				d.Status.CollisionCount = new(int32)
 			}
 			preCollisionCount := *d.Status.CollisionCount
 			*d.Status.CollisionCount++
@@ -650,18 +650,4 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment, rsList 
 		}
 	}
 	return false, nil
-}
-
-// newControllerRef returns a ControllerRef pointing to the deployment.
-func newControllerRef(d *extensions.Deployment) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               d.Name,
-		UID:                d.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
 }

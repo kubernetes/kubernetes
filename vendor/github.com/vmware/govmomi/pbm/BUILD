@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,7 +6,7 @@ go_library(
         "client.go",
         "pbm_util.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/pbm/methods:go_default_library",
         "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",
@@ -38,4 +31,5 @@ filegroup(
         "//vendor/github.com/vmware/govmomi/pbm/types:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

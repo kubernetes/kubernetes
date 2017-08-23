@@ -144,6 +144,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
 			User:   user.GetName(),
+			UID:    user.GetUID(),
 			Groups: user.GetGroups(),
 			Extra:  convertToSARExtra(user.GetExtra()),
 		}

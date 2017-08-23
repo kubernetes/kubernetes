@@ -1,16 +1,40 @@
+# External Repository Staging Area
+
 This directory is the staging area for packages that have been split to their
 own repository. The content here will be periodically published to respective
 top-level k8s.io repositories.
 
-Most code in the `staging/` directory is authoritative, i.e. the only copy of
-the code. You can directly modify such code. However the packages in
-`staging/src/k8s.io/client-go/pkg` are copied from `pkg/`. If you modify the
-original code in `pkg/`, you need to run `hack/godep-restore.sh` from the k8s
-root directory, followed by `hack/update-staging-client-go.sh`. We are working
-towards making all code in `staging/` authoritative.
+Repositories currently staged here:
 
-The `vendor/k8s.io` directory contains symlinks pointing to this staging area,
-so to use a package in the staging area, you can import it as
-`k8s.io/<package-name>`, as if the package were vendored. Packages will be
-vendored from `k8s.io/<package-name>` for real after the test matrix is
-converted to vendor k8s components.
+- [`k8s.io/apiextensions-apiserver`](https://github.com/kubernetes/apiextensions-apiserver)
+- [`k8s.io/api`](https://github.com/kubernetes/api)
+- [`k8s.io/apimachinery`](https://github.com/kubernetes/apimachinery)
+- [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)
+- [`k8s.io/client-go`](https://github.com/kubernetes/client-go)
+- [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
+- [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator) (about to be published)
+- [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
+- [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
+
+The code in the staging/ directory is authoritative, i.e. the only copy of the
+code. You can directly modify such code.
+
+## Using staged repositories from Kubernetes code
+
+Kubernetes code uses the repositories in this directory via symlinks in the
+`vendor/k8s.io` directory into this staging area.  For example, when
+Kubernetes code imports a package from the `k8s.io/client-go` repository, that
+import is resolved to `staging/src/k8s.io/client-go` relative to the project
+root:
+
+```go
+// pkg/example/some_code.go
+package example
+
+import (
+  "k8s.io/client-go/dynamic" // resolves to staging/src/k8s.io/client-go/dynamic
+)
+```
+
+Once the change-over to external repositories is complete, these repositories
+will actually be vendored from `k8s.io/<package-name>`.

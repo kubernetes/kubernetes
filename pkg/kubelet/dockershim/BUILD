@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -24,17 +22,24 @@ go_library(
         "docker_streaming.go",
         "exec.go",
         "helpers.go",
-        "helpers_linux.go",
+        "helpers_unsupported.go",
         "naming.go",
         "security_context.go",
         "selinux_util.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "helpers_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "helpers_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/cm:go_default_library",
@@ -82,18 +87,21 @@ go_test(
         "docker_legacy_test.go",
         "docker_sandbox_test.go",
         "docker_service_test.go",
-        "helpers_linux_test.go",
         "helpers_test.go",
         "naming_test.go",
         "security_context_test.go",
         "selinux_util_test.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "helpers_linux_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     data = [
         "fixtures/seccomp/sub/subtest",
         "fixtures/seccomp/test",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -114,7 +122,6 @@ go_test(
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )

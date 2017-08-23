@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,11 +12,11 @@ go_library(
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+        "util.go",
     ],
     data = [
         "@com_coreos_etcd//:etcd",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

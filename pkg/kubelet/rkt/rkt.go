@@ -439,6 +439,14 @@ func setIsolators(app *appctypes.App, c *v1.Container, ctx *v1.SecurityContext) 
 		}
 	}
 
+	if ok := securitycontext.AddNoNewPrivileges(ctx); ok {
+		isolator, err := newNoNewPrivilegesIsolator(true)
+		if err != nil {
+			return err
+		}
+		isolators = append(isolators, *isolator)
+	}
+
 	mergeIsolators(app, isolators)
 	return nil
 }
@@ -839,7 +847,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 		return err
 	}
 
-	// Create additional mount for termintation message path.
+	// Create additional mount for termination message path.
 	mount, err := r.makeContainerLogMount(opts, &c)
 	if err != nil {
 		return err
@@ -2620,4 +2628,17 @@ func convertKubePortMappings(portMappings []kubecontainer.PortMapping) ([]appcty
 	}
 
 	return containerPorts, hostPorts
+}
+
+func newNoNewPrivilegesIsolator(v bool) (*appctypes.Isolator, error) {
+	b := fmt.Sprintf(`{"name": "%s", "value": %t}`, appctypes.LinuxNoNewPrivilegesName, v)
+
+	i := &appctypes.Isolator{
+		Name: appctypes.LinuxNoNewPrivilegesName,
+	}
+	if err := i.UnmarshalJSON([]byte(b)); err != nil {
+		return nil, err
+	}
+
+	return i, nil
 }

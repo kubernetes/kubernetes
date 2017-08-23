@@ -24,8 +24,6 @@ import (
 )
 
 const (
-	// StatefulSetInitAnnotation if present, and set to false, indicates that a Pod's readiness should be ignored.
-	StatefulSetInitAnnotation      = "pod.alpha.kubernetes.io/initialized"
 	ControllerRevisionHashLabelKey = "controller-revision-hash"
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
 )
@@ -56,8 +54,8 @@ type ScaleStatus struct {
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Scale represents a scaling request for a resource.
@@ -76,7 +74,7 @@ type Scale struct {
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -241,6 +239,12 @@ type StatefulSetStatus struct {
 	// updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
 	// [replicas-updatedReplicas,replicas)
 	UpdateRevision string `json:"updateRevision,omitempty" protobuf:"bytes,7,opt,name=updateRevision"`
+
+	// collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller
+	// uses this field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ControllerRevision.
+	// +optional
+	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -253,7 +257,7 @@ type StatefulSetList struct {
 	Items           []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -307,6 +311,7 @@ type DeploymentSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 
+	// DEPRECATED.
 	// The config this deployment is rolling back to. Will be cleared after rollback is done.
 	// +optional
 	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,8,opt,name=rollbackTo"`
@@ -323,6 +328,7 @@ type DeploymentSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:",inline"`
@@ -335,6 +341,7 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
+// DEPRECATED.
 type RollbackConfig struct {
 	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
@@ -438,7 +445,7 @@ type DeploymentStatus struct {
 	// field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ReplicaSet.
 	// +optional
-	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
+	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
 }
 
 type DeploymentConditionType string
@@ -487,7 +494,7 @@ type DeploymentList struct {
 	Items []Deployment `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients

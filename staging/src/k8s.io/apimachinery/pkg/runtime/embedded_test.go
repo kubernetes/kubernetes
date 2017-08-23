@@ -197,8 +197,8 @@ func TestNestedObject(t *testing.T) {
 	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
-	if !reflect.DeepEqual(externalViaJSON.EmptyObject.Raw, []byte("null")) || len(externalViaJSON.Object.Raw) == 0 {
-		t.Errorf("Expected deserialization of nested objects into bytes, got %#v", externalViaJSON)
+	if len(externalViaJSON.EmptyObject.Raw) > 0 {
+		t.Errorf("Expected deserialization of empty nested objects into empty bytes, got %#v", externalViaJSON)
 	}
 
 	// test JSON decoding, too, since Decode uses yaml unmarshalling.
@@ -243,12 +243,8 @@ func TestDeepCopyOfRuntimeObject(t *testing.T) {
 	}
 	t.Logf("originalRole = %v\n", string(originalData))
 
-	copyOfOriginal, err := s.DeepCopy(original)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	copiedData, err := runtime.Encode(codec, copyOfOriginal.(runtime.Object))
+	copyOfOriginal := original.DeepCopy()
+	copiedData, err := runtime.Encode(codec, copyOfOriginal)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

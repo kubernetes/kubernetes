@@ -22,15 +22,18 @@ import (
 	"fmt"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1beta1 "k8s.io/api/apps/v1beta1"
+	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/autoscaling/v1"
 	v2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batch_v1 "k8s.io/api/batch/v1"
+	batch_v1beta1 "k8s.io/api/batch/v1beta1"
 	batch_v2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/api/certificates/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
 	networking_v1 "k8s.io/api/networking/v1"
 	policy_v1beta1 "k8s.io/api/policy/v1beta1"
+	rbac_v1 "k8s.io/api/rbac/v1"
 	rbac_v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
 	scheduling_v1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -81,6 +84,18 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 
+		// Group=Apps, Version=V1beta2
+	case v1beta2.SchemeGroupVersion.WithResource("controllerrevisions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().ControllerRevisions().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("daemonsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().DaemonSets().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("deployments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().Deployments().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("replicasets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().ReplicaSets().Informer()}, nil
+	case v1beta2.SchemeGroupVersion.WithResource("statefulsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().StatefulSets().Informer()}, nil
+
 		// Group=Autoscaling, Version=V1
 	case v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
@@ -92,6 +107,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=Batch, Version=V1
 	case batch_v1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
+
+		// Group=Batch, Version=V1beta1
+	case batch_v1beta1.SchemeGroupVersion.WithResource("cronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1beta1().CronJobs().Informer()}, nil
 
 		// Group=Batch, Version=V2alpha1
 	case batch_v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
@@ -156,6 +175,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=Policy, Version=V1beta1
 	case policy_v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1beta1().PodDisruptionBudgets().Informer()}, nil
+
+		// Group=Rbac, Version=V1
+	case rbac_v1.SchemeGroupVersion.WithResource("clusterroles"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1().ClusterRoles().Informer()}, nil
+	case rbac_v1.SchemeGroupVersion.WithResource("clusterrolebindings"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1().ClusterRoleBindings().Informer()}, nil
+	case rbac_v1.SchemeGroupVersion.WithResource("roles"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1().Roles().Informer()}, nil
+	case rbac_v1.SchemeGroupVersion.WithResource("rolebindings"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1().RoleBindings().Informer()}, nil
 
 		// Group=Rbac, Version=V1alpha1
 	case rbac_v1alpha1.SchemeGroupVersion.WithResource("clusterroles"):

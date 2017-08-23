@@ -17,11 +17,10 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -30,23 +29,16 @@ func NewCmdMarkMaster() *cobra.Command {
 	var kubeConfigFile string
 	cmd := &cobra.Command{
 		Use:     "mark-master <node-name>",
-		Short:   "Create KubeConfig files from given credentials.",
+		Short:   "Mark a node as master.",
 		Aliases: []string{"markmaster"},
 		RunE: func(_ *cobra.Command, args []string) error {
-			if len(args) < 1 || len(args[0]) == 0 {
-				return fmt.Errorf("missing required argument node-name")
-			}
-			if len(args) > 1 {
-				return fmt.Errorf("too many arguments, only one argument supported: node-name")
-			}
+			err := validateExactArgNumber(args, []string{"node-name"})
+			kubeadmutil.CheckErr(err)
+
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			if err != nil {
-				return err
-			}
+			kubeadmutil.CheckErr(err)
 
 			nodeName := args[0]
-			fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", nodeName)
-
 			return markmasterphase.MarkMaster(client, nodeName)
 		},
 	}

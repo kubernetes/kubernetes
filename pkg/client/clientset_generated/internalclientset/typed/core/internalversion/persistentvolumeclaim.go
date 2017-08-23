@@ -59,6 +59,41 @@ func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolum
 	}
 }
 
+// Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
+func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
+	result = &api.PersistentVolumeClaim{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("persistentvolumeclaims").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
+func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
+	result = &api.PersistentVolumeClaimList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("persistentvolumeclaims").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
+func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("persistentvolumeclaims").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
 func (c *persistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
@@ -85,7 +120,7 @@ func (c *persistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVol
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *persistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
 	result = &api.PersistentVolumeClaim{}
@@ -120,41 +155,6 @@ func (c *persistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, lis
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
-func (c *persistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
-	result = &api.PersistentVolumeClaim{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("persistentvolumeclaims").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
-func (c *persistentVolumeClaims) List(opts v1.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
-	result = &api.PersistentVolumeClaimList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("persistentvolumeclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
-func (c *persistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("persistentvolumeclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.

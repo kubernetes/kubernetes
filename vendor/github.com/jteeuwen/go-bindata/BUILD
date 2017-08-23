@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -21,7 +14,7 @@ go_library(
         "stringwriter.go",
         "toc.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -38,4 +31,5 @@ filegroup(
         "//vendor/github.com/jteeuwen/go-bindata/go-bindata:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

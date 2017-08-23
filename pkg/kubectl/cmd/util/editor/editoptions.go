@@ -229,7 +229,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
+			schema, err := o.f.Validator(o.EnableValidation, o.UseOpenAPI, o.SchemaCacheDir)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
@@ -335,6 +335,9 @@ func (o *EditOptions) Run() error {
 		infos, err := o.OriginalResult.Infos()
 		if err != nil {
 			return err
+		}
+		if len(infos) == 0 {
+			return errors.New("edit cancelled, no objects found.")
 		}
 		return editFn(infos)
 	case ApplyEditMode:
@@ -442,10 +445,7 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
-	objCopy, err := api.Scheme.Copy(obj)
-	if err != nil {
-		return nil, beforeJSON, types.MergePatchType, err
-	}
+	objCopy := obj.DeepCopyObject()
 	accessor := meta.NewAccessor()
 	annotations, err := accessor.Annotations(objCopy)
 	if err != nil {
@@ -500,11 +500,7 @@ func getPrinter(format string) *editPrinterOptions {
 	}
 }
 
-func (o *EditOptions) visitToPatch(
-	originalInfos []*resource.Info,
-	patchVisitor resource.Visitor,
-	results *editResults,
-) error {
+func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor, results *editResults) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		editObjUID, err := meta.NewAccessor().UID(info.Object)
 		if err != nil {

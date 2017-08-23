@@ -26,7 +26,7 @@ import (
 type synchronizedOpenAPIGetter struct {
 	// Cached results
 	sync.Once
-	openAPISchema *Resources
+	openAPISchema Resources
 	err           error
 
 	serverVersion string
@@ -39,7 +39,7 @@ var _ Getter = &synchronizedOpenAPIGetter{}
 // Getter is an interface for fetching openapi specs and parsing them into an Resources struct
 type Getter interface {
 	// OpenAPIData returns the parsed OpenAPIData
-	Get() (*Resources, error)
+	Get() (Resources, error)
 }
 
 // NewOpenAPIGetter returns an object to return OpenAPIDatas which either read from a
@@ -53,7 +53,7 @@ func NewOpenAPIGetter(cacheDir, serverVersion string, openAPIClient discovery.Op
 }
 
 // Resources implements Getter
-func (g *synchronizedOpenAPIGetter) Get() (*Resources, error) {
+func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
 	g.Do(func() {
 		client := NewCachingOpenAPIClient(g.openAPIClient, g.serverVersion, g.cacheDir)
 		result, err := client.OpenAPIData()

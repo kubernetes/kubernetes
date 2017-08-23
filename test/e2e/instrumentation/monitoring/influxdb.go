@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/instrumentation"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -142,7 +142,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		if err != nil {
 			return nil, err
 		}
-		psList, err := c.Apps().StatefulSets(metav1.NamespaceSystem).List(options)
+		psList, err := c.AppsV1beta1().StatefulSets(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}

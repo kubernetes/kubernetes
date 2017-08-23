@@ -75,7 +75,7 @@ func (t *awsTagging) init(legacyClusterID string, clusterID string) error {
 	if clusterID != "" {
 		glog.Infof("AWS cloud filtering on ClusterID: %v", clusterID)
 	} else {
-		glog.Infof("AWS cloud - no clusterID filtering")
+		glog.Warning("AWS cloud - no clusterID filtering applied for shared resources; do not run multiple clusters in this AZ.")
 	}
 
 	return nil
@@ -275,4 +275,8 @@ func (t *awsTagging) buildTags(lifecycle ResourceLifecycle, additionalTags map[s
 	tags[t.clusterTagKey()] = string(lifecycle)
 
 	return tags
+}
+
+func (t *awsTagging) clusterID() string {
+	return t.ClusterID
 }

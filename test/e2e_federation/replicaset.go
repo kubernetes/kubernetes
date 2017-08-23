@@ -311,13 +311,14 @@ func waitForReplicaSetOrFail(c *fedclientset.Clientset, namespace string, replic
 func waitForReplicaSet(c *fedclientset.Clientset, namespace string, replicaSetName string, clusters fedframework.ClusterSlice, expect map[string]int32) error {
 	framework.Logf("waitForReplicaSet: %s/%s; clusters: %v; expect: %v", namespace, replicaSetName, clusters, expect)
 	err := wait.Poll(10*time.Second, fedframework.FederatedDefaultTestTimeout, func() (bool, error) {
-		frs, err := c.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
+		frs, err := c.ExtensionsV1beta1().ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		specReplicas, statusReplicas := int32(0), int32(0)
 		for _, cluster := range clusters {
-			rs, err := cluster.ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
+			// TODO: switch to use AppsV1beta2 ReplicaSet when apps/v1beta2 is enabled by default
+			rs, err := cluster.ExtensionsV1beta1().ReplicaSets(namespace).Get(replicaSetName, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				framework.Logf("Failed getting replicaset: \"%s/%s/%s\", err: %v", cluster.Name, namespace, replicaSetName, err)
 				return false, err
@@ -391,7 +392,7 @@ func updateReplicaSetOrFail(clientset *fedclientset.Clientset, replicaset *v1bet
 	}
 	By(fmt.Sprintf("Updating federation replicaset %q in namespace %q", replicaset.Name, namespace))
 
-	newRS, err := clientset.ReplicaSets(namespace).Update(replicaset)
+	newRS, err := clientset.ExtensionsV1beta1().ReplicaSets(namespace).Update(replicaset)
 	framework.ExpectNoError(err, "Updating replicaset %q in namespace %q", replicaset.Name, namespace)
 	By(fmt.Sprintf("Successfully updated federation replicaset %q in namespace %q", replicaset.Name, namespace))
 

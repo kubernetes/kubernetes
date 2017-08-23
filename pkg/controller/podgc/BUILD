@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "doc.go",
         "gc_controller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -36,10 +33,9 @@ go_test(
     name = "go_default_test",
     srcs = ["gc_controller_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller:go_default_library",
-        "//pkg/controller/node/testutil:go_default_library",
+        "//pkg/controller/testutil:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

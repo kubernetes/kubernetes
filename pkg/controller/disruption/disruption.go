@@ -23,7 +23,6 @@ import (
 
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -125,7 +124,7 @@ func NewDisruptionController(
 		recheckQueue: workqueue.NewNamedDelayingQueue("disruption-recheck"),
 		broadcaster:  record.NewBroadcaster(),
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "controllermanager"})
+	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -185,7 +184,7 @@ var (
 // getPodReplicaSets finds replicasets which have no matching deployments.
 func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndScale, error) {
 	var casSlice []controllerAndScale
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		return nil, nil
 	}
@@ -200,7 +199,7 @@ func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndS
 	if rs.UID != controllerRef.UID {
 		return nil, nil
 	}
-	controllerRef = controller.GetControllerOf(rs)
+	controllerRef = metav1.GetControllerOf(rs)
 	if controllerRef != nil && controllerRef.Kind == controllerKindDep.Kind {
 		// Skip RS if it's controlled by a Deployment.
 		return nil, nil
@@ -212,7 +211,7 @@ func (dc *DisruptionController) getPodReplicaSets(pod *v1.Pod) ([]controllerAndS
 // getPodStatefulSet returns the statefulset managing the given pod.
 func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAndScale, error) {
 	var casSlice []controllerAndScale
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		return nil, nil
 	}
@@ -235,7 +234,7 @@ func (dc *DisruptionController) getPodStatefulSets(pod *v1.Pod) ([]controllerAnd
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndScale, error) {
 	var casSlice []controllerAndScale
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		return nil, nil
 	}
@@ -250,7 +249,7 @@ func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndS
 	if rs.UID != controllerRef.UID {
 		return nil, nil
 	}
-	controllerRef = controller.GetControllerOf(rs)
+	controllerRef = metav1.GetControllerOf(rs)
 	if controllerRef == nil {
 		return nil, nil
 	}
@@ -271,7 +270,7 @@ func (dc *DisruptionController) getPodDeployments(pod *v1.Pod) ([]controllerAndS
 
 func (dc *DisruptionController) getPodReplicationControllers(pod *v1.Pod) ([]controllerAndScale, error) {
 	var casSlice []controllerAndScale
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		return nil, nil
 	}

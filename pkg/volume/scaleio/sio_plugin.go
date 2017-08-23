@@ -53,7 +53,7 @@ var _ volume.VolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-	p.mounter = host.GetMounter()
+	p.mounter = host.GetMounter(p.GetPluginName())
 	p.volumeMtx = keymutex.NewKeyMutex()
 	return nil
 }
@@ -149,6 +149,7 @@ var _ volume.PersistentVolumePlugin = &sioPlugin{}
 func (p *sioPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
+		api.ReadOnlyMany,
 	}
 }
 

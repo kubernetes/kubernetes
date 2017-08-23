@@ -473,7 +473,12 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
-	diskId, err := os.AttachDisk(os.localInstanceID, vol)
+	id, err := os.InstanceID()
+	if err != nil {
+		t.Fatalf("Cannot find instance id: %v", err)
+	}
+
+	diskId, err := os.AttachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 	}
@@ -487,7 +492,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
 
-	err = os.DetachDisk(os.localInstanceID, vol)
+	err = os.DetachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
 	}

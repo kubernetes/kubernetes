@@ -18,6 +18,7 @@ package rest
 
 import (
 	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
+	appsapiv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -26,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	controllerrevisionsstore "k8s.io/kubernetes/pkg/registry/apps/controllerrevision/storage"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
 	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -39,6 +42,10 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta1.SchemeGroupVersion
+	}
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapiv1beta2.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta2.SchemeGroupVersion.Version] = p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.GroupMeta.GroupVersion = appsapiv1beta2.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
@@ -56,9 +63,44 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
-		statefulsetStorage, statefulsetStatusStorage := statefulsetstore.NewREST(restOptionsGetter)
-		storage["statefulsets"] = statefulsetStorage
-		storage["statefulsets/status"] = statefulsetStatusStorage
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+		storage["statefulsets/scale"] = statefulSetStorage.Scale
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
+		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
+		storage["controllerrevisions"] = historyStorage
+	}
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	version := appsapiv1beta2.SchemeGroupVersion
+
+	storage := map[string]rest.Storage{}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
+		storage["deployments"] = deploymentStorage.Deployment
+		storage["deployments/status"] = deploymentStorage.Status
+		storage["deployments/scale"] = deploymentStorage.Scale
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+		storage["statefulsets/scale"] = statefulSetStorage.Scale
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
+		daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
+		storage["daemonsets"] = daemonSetStorage
+		storage["daemonsets/status"] = daemonSetStatusStorage
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
+		storage["replicasets"] = replicaSetStorage.ReplicaSet
+		storage["replicasets/status"] = replicaSetStorage.Status
+		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
 		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)

@@ -57,6 +57,38 @@ func newCustomResourceDefinitions(c *ApiextensionsV1beta1Client) *customResource
 	}
 }
 
+// Get takes name of the customResourceDefinition, and returns the corresponding customResourceDefinition object, and an error if there is any.
+func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
+	result = &v1beta1.CustomResourceDefinition{}
+	err = c.client.Get().
+		Resource("customresourcedefinitions").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
+func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *v1beta1.CustomResourceDefinitionList, err error) {
+	result = &v1beta1.CustomResourceDefinitionList{}
+	err = c.client.Get().
+		Resource("customresourcedefinitions").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested customResourceDefinitions.
+func (c *customResourceDefinitions) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("customresourcedefinitions").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
 func (c *customResourceDefinitions) Create(customResourceDefinition *v1beta1.CustomResourceDefinition) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
@@ -81,7 +113,7 @@ func (c *customResourceDefinitions) Update(customResourceDefinition *v1beta1.Cus
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *customResourceDefinitions) UpdateStatus(customResourceDefinition *v1beta1.CustomResourceDefinition) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
@@ -113,38 +145,6 @@ func (c *customResourceDefinitions) DeleteCollection(options *v1.DeleteOptions, 
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the customResourceDefinition, and returns the corresponding customResourceDefinition object, and an error if there is any.
-func (c *customResourceDefinitions) Get(name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
-	result = &v1beta1.CustomResourceDefinition{}
-	err = c.client.Get().
-		Resource("customresourcedefinitions").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
-func (c *customResourceDefinitions) List(opts v1.ListOptions) (result *v1beta1.CustomResourceDefinitionList, err error) {
-	result = &v1beta1.CustomResourceDefinitionList{}
-	err = c.client.Get().
-		Resource("customresourcedefinitions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested customResourceDefinitions.
-func (c *customResourceDefinitions) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("customresourcedefinitions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched customResourceDefinition.

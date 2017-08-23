@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/instrumentation"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gcm "google.golang.org/api/monitoring/v3"
 )
@@ -60,7 +60,7 @@ var (
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gke")
+		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")

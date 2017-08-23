@@ -41,26 +41,31 @@ type flunderInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newFlunderInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewFlunderInformer constructs a new informer for Flunder type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFlunderInformer(client clientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.WardleV1alpha1().Flunders(v1.NamespaceAll).List(options)
+				return client.WardleV1alpha1().Flunders(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.WardleV1alpha1().Flunders(v1.NamespaceAll).Watch(options)
+				return client.WardleV1alpha1().Flunders(namespace).Watch(options)
 			},
 		},
 		&wardle_v1alpha1.Flunder{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultFlunderInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFlunderInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&wardle_v1alpha1.Flunder{}, newFlunderInformer)
+	return f.factory.InformerFor(&wardle_v1alpha1.Flunder{}, defaultFlunderInformer)
 }
 
 func (f *flunderInformer) Lister() v1alpha1.FlunderLister {

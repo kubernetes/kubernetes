@@ -164,6 +164,7 @@ type PersistentVolumeController struct {
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
 	clusterName               string
+	resyncPeriod              time.Duration
 
 	// Cache of the last known version of volumes and claims. This cache is
 	// thread safe as long as the volumes/claims there are not modified, they
@@ -1308,7 +1309,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
-		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,

@@ -62,16 +62,16 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 	t.set = framework.NewStatefulSet(ssName, ns, headlessSvcName, 2, statefulPodMounts, podMounts, labels)
 	t.service = framework.CreateStatefulSetService(ssName, labels)
 	*(t.set.Spec.Replicas) = 3
-	framework.SetStatefulSetInitializedAnnotation(t.set, "false")
+	t.tester = framework.NewStatefulSetTester(f.ClientSet)
+	t.tester.PauseNewPods(t.set)
 
 	By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.Core().Services(ns).Create(t.service)
 	Expect(err).NotTo(HaveOccurred())
-	t.tester = framework.NewStatefulSetTester(f.ClientSet)
 
 	By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
-	_, err = f.ClientSet.Apps().StatefulSets(ns).Create(t.set)
+	_, err = f.ClientSet.AppsV1beta1().StatefulSets(ns).Create(t.set)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Saturating stateful set " + t.set.Name)
@@ -110,5 +110,5 @@ func (t *StatefulSetUpgradeTest) verify() {
 func (t *StatefulSetUpgradeTest) restart() {
 	By("Restarting statefulset " + t.set.Name)
 	t.tester.Restart(t.set)
-	t.tester.Saturate(t.set)
+	t.tester.WaitForRunningAndReady(*t.set.Spec.Replicas, t.set)
 }

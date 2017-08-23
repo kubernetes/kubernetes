@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"io"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -102,6 +104,8 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 			return c.admitPod(nodeName, a)
 		case "status":
 			return c.admitPodStatus(nodeName, a)
+		case "eviction":
+			return c.admitPodEviction(nodeName, a)
 		default:
 			return admission.NewForbidden(a, fmt.Errorf("unexpected pod subresource %q", a.GetSubresource()))
 		}
@@ -161,6 +165,9 @@ func (c *nodePlugin) admitPod(nodeName string, a admission.Attributes) error {
 		if errors.IsNotFound(err) {
 			// wasn't found in the server cache, do a live lookup before forbidding
 			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(a.GetName(), v1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return err
+			}
 		}
 		if err != nil {
 			return admission.NewForbidden(a, err)
@@ -195,20 +202,85 @@ func (c *nodePlugin) admitPodStatus(nodeName string, a admission.Attributes) err
 	}
 }
 
+func (c *nodePlugin) admitPodEviction(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Create:
+		// require eviction to an existing pod object
+		eviction, ok := a.GetObject().(*policy.Eviction)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		// use pod name from the admission attributes, if set, rather than from the submitted Eviction object
+		podName := a.GetName()
+		if len(podName) == 0 {
+			if len(eviction.Name) == 0 {
+				return admission.NewForbidden(a, fmt.Errorf("could not determine pod from request data"))
+			}
+			podName = eviction.Name
+		}
+		// get the existing pod from the server cache
+		existingPod, err := c.podsGetter.Pods(a.GetNamespace()).Get(podName, v1.GetOptions{ResourceVersion: "0"})
+		if errors.IsNotFound(err) {
+			// wasn't found in the server cache, do a live lookup before forbidding
+			existingPod, err = c.podsGetter.Pods(a.GetNamespace()).Get(podName, v1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return err
+			}
+		}
+		if err != nil {
+			return admission.NewForbidden(a, err)
+		}
+		// only allow a node to evict a pod bound to itself
+		if existingPod.Spec.NodeName != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("node %s can only evict pods with spec.nodeName set to itself", nodeName))
+		}
+		return nil
+
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %s", a.GetOperation()))
+	}
+}
+
 func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 	requestedName := a.GetName()
-
-	// On create, get name from new object if unset in admission
-	if len(requestedName) == 0 && a.GetOperation() == admission.Create {
+	if a.GetOperation() == admission.Create {
 		node, ok := a.GetObject().(*api.Node)
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
-		requestedName = node.Name
-	}
 
+		// Don't allow a node to create its Node API object with the config source set.
+		// We scope node access to things listed in the Node.Spec, so allowing this would allow a view escalation.
+		if node.Spec.ConfigSource != nil {
+			return admission.NewForbidden(a, fmt.Errorf("cannot create with non-nil configSource"))
+		}
+
+		// On create, get name from new object if unset in admission
+		if len(requestedName) == 0 {
+			requestedName = node.Name
+		}
+	}
 	if requestedName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node %q cannot modify node %q", nodeName, requestedName))
 	}
+
+	if a.GetOperation() == admission.Update {
+		node, ok := a.GetObject().(*api.Node)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		oldNode, ok := a.GetOldObject().(*api.Node)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+
+		// Don't allow a node to update the config source on its Node API object.
+		// We scope node access to things listed in the Node.Spec, so allowing this would allow a view escalation.
+		// We only do the check if the new node's configSource is non-nil; old kubelets might drop the field during a status update.
+		if node.Spec.ConfigSource != nil && !apiequality.Semantic.DeepEqual(node.Spec.ConfigSource, oldNode.Spec.ConfigSource) {
+			return admission.NewForbidden(a, fmt.Errorf("cannot update configSource to a new non-nil configSource"))
+		}
+	}
+
 	return nil
 }

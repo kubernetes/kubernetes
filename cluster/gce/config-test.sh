@@ -152,6 +152,16 @@ CONTROLLER_MANAGER_TEST_LOG_LEVEL="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-$TEST_CL
 SCHEDULER_TEST_LOG_LEVEL="${SCHEDULER_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_LOG_LEVEL="${KUBEPROXY_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 
+# TODO: change this and flex e2e test when default flex volume install path is changed for GCI
+# Set flex dir to one that's readable from controller-manager container and writable by the flex e2e test.
+if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
+    CONTROLLER_MANAGER_TEST_VOLUME_PLUGIN_DIR="--flex-volume-plugin-dir=/etc/srv/kubernetes/kubelet-plugins/volume/exec"
+fi
+# Set flex dir to one that's readable from kubelet and writable by the flex e2e test.
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || ([[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] && [[ "${REGISTER_MASTER_KUBELET}" == "false" ]]); then
+    KUBELET_TEST_VOLUME_PLUGIN_DIR="--volume-plugin-dir=/etc/srv/kubernetes/kubelet-plugins/volume/exec"
+fi
+
 TEST_CLUSTER_DELETE_COLLECTION_WORKERS="${TEST_CLUSTER_DELETE_COLLECTION_WORKERS:---delete-collection-workers=1}"
 TEST_CLUSTER_MAX_REQUESTS_INFLIGHT="${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT:-}"
 TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}"
@@ -159,7 +169,7 @@ TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m
 # ContentType used by all components to communicate with apiserver.
 TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
-KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --max-pods=110 --serialize-image-pulls=false --outofdisk-transition-frequency=0 ${TEST_CLUSTER_API_CONTENT_TYPE}"
+KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --max-pods=110 --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE} ${KUBELET_TEST_VOLUME_PLUGIN_DIR:-}"
 if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   NODE_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
 fi
@@ -167,7 +177,7 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || [[ "${MASTER_OS_DISTRIBUTION}" 
   MASTER_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
 fi
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
-CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
+CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE} ${CONTROLLER_MANAGER_TEST_VOLUME_PLUGIN_DIR:-}"
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 
@@ -263,11 +273,11 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # the subnet and is the range used for node instance IPs.
   NODE_IP_RANGE="${NODE_IP_RANGE:-10.40.0.0/22}"
   # Add to the provider custom variables.
-  PROVIDER_VARS="${PROVIDER_VARS} ENABLE_IP_ALIASES"
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
 fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota}"
+ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota}"
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
@@ -327,3 +337,22 @@ if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT}" == "true" ]]; then
 fi
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
+
+if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
+fi
+if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
+fi
+
+# Fluentd requirements
+FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-300Mi}"
+FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-100m}"
+FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-200Mi}"
+# Adding to PROVIDER_VARS, since this is GCP-specific.
+PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST"
+
+# prometheus-to-sd configuration
+PROMETHEUS_TO_SD_ENDPOINT="${PROMETHEUS_TO_SD_ENDPOINT:-https://monitoring.googleapis.com/}"
+PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
+ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"

@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -93,7 +93,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	}
 	usage := "containing the resource to describe"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)

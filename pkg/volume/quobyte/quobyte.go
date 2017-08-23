@@ -92,7 +92,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	// If Quobyte is already mounted we don't need to check if the binary is installed
-	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter()); err == nil {
+	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter(plugin.GetPluginName())); err == nil {
 		qm, _ := mounter.(*quobyteMounter)
 		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
@@ -155,7 +155,7 @@ func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (
 }
 
 func (plugin *quobytePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
@@ -181,7 +181,7 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, 
 }
 
 func (plugin *quobytePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *quobytePlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -395,7 +395,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quoybte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
@@ -465,7 +465,7 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 	}
 
 	if len(apiServer) == 0 {
-		return nil, fmt.Errorf("Quoybte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("Quobyte API server missing or malformed: must be a http(s)://host:port pair or multiple pairs separated by commas")
 	}
 
 	secretMap, err := util.GetSecretForPV(secretNamespace, secretName, quobytePluginName, plugin.host.GetKubeClient())

@@ -233,6 +233,7 @@ func autoConvert_v1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReview
 	out.User = in.User
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	out.Extra = *(*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.UID = in.UID
 	return nil
 }
 
@@ -247,6 +248,7 @@ func autoConvert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReview
 	out.User = in.User
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
 	out.Extra = *(*map[string]v1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.UID = in.UID
 	return nil
 }
 

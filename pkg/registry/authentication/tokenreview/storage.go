@@ -49,6 +49,10 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, include
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("namespace is not allowed on this type: %v", namespace))
 	}
 
+	if len(tokenReview.Spec.Token) == 0 {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("token is required for TokenReview in authentication"))
+	}
+
 	if r.tokenAuthenticator == nil {
 		return tokenReview, nil
 	}

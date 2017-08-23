@@ -322,11 +322,14 @@ func (r *Request) setParam(paramName, value string) *Request {
 	return r
 }
 
-func (r *Request) SetHeader(key, value string) *Request {
+func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
-	r.headers.Set(key, value)
+	r.headers.Del(key)
+	for _, value := range values {
+		r.headers.Add(key, value)
+	}
 	return r
 }
 
@@ -429,7 +432,7 @@ func (r *Request) URL() *url.URL {
 // finalURLTemplate is similar to URL(), but will make all specific parameter values equal
 // - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
 // parameters will be reset. This creates a copy of the request so as not to change the
-// underyling object.  This means some useful request info (like the types of field
+// underlying object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
 func (r Request) finalURLTemplate() url.URL {
@@ -889,7 +892,7 @@ func isTextResponse(resp *http.Response) bool {
 func checkWait(resp *http.Response) (int, bool) {
 	switch r := resp.StatusCode; {
 	// any 500 error code and 429 can trigger a wait
-	case r == errors.StatusTooManyRequests, r >= 500:
+	case r == http.StatusTooManyRequests, r >= 500:
 	default:
 		return 0, false
 	}

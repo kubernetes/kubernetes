@@ -19,8 +19,7 @@ package eventsink
 import (
 	"testing"
 
-	clientv1 "k8s.io/api/core/v1"
-	kubev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
@@ -47,7 +46,7 @@ func TestEventSink(t *testing.T) {
 		return true, obj, nil
 	})
 
-	event := clientv1.Event{
+	event := v1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bzium",
 			Namespace: "ns",
@@ -56,7 +55,7 @@ func TestEventSink(t *testing.T) {
 	sink := NewFederatedEventSink(fakeFederationClient)
 	eventUpdated, err := sink.Create(&event)
 	assert.NoError(t, err)
-	eventV1 := GetObjectFromChan(createdChan).(*kubev1.Event)
+	eventV1 := GetObjectFromChan(createdChan).(*v1.Event)
 	assert.NotNil(t, eventV1)
 	// Just some simple sanity checks.
 	assert.Equal(t, event.Name, eventV1.Name)
@@ -64,7 +63,7 @@ func TestEventSink(t *testing.T) {
 
 	eventUpdated, err = sink.Update(&event)
 	assert.NoError(t, err)
-	eventV1 = GetObjectFromChan(updateChan).(*kubev1.Event)
+	eventV1 = GetObjectFromChan(updateChan).(*v1.Event)
 	assert.NotNil(t, eventV1)
 	// Just some simple sanity checks.
 	assert.Equal(t, event.Name, eventV1.Name)

@@ -27,10 +27,13 @@ func getClaimRefNamespace(pv *api.PersistentVolume) string {
 	return ""
 }
 
+// Visitor is called with each object's namespace and name, and returns true if visiting should continue
+type Visitor func(namespace, name string) (shouldContinue bool)
+
 // VisitPVSecretNames invokes the visitor function with the name of every secret
 // referenced by the PV spec. If visitor returns false, visiting is short-circuited.
 // Returns true if visiting completed, false if visiting was short-circuited.
-func VisitPVSecretNames(pv *api.PersistentVolume, visitor func(string, string) bool) bool {
+func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 	source := &pv.Spec.PersistentVolumeSource
 	switch {
 	case source.AzureFile != nil:

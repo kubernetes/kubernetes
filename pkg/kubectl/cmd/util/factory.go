@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful-swagger12"
+	swagger "github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -45,16 +45,16 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -220,11 +220,11 @@ type ObjectMappingFactory interface {
 	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
 	// Returns a schema that can validate objects stored on disk.
-	Validator(validate bool, cacheDir string) (validation.Schema, error)
+	Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// OpenAPISchema returns the schema openapi schema definiton
-	OpenAPISchema(cacheDir string) (*openapi.Resources, error)
+	OpenAPISchema(cacheDir string) (openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
@@ -296,13 +296,13 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
-		k8s_api_v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		apiv1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
 		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		internalPod := &api.Pod{}
-		k8s_api_v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		apiv1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
 

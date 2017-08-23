@@ -36,16 +36,16 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -240,10 +240,11 @@ type TestFactory struct {
 	Err                error
 	Command            string
 	TmpDir             string
+	CategoryExpander   resource.CategoryExpander
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	OpenAPISchemaFunc                func() (*openapi.Resources, error)
+	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
 type FakeFactory struct {
@@ -410,7 +411,7 @@ func (f *FakeFactory) ResolveImage(name string) (string, error) {
 	return name, nil
 }
 
-func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *FakeFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
@@ -418,8 +419,8 @@ func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclar
 	return nil, nil
 }
 
-func (f *FakeFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
-	return &openapi.Resources{}, nil
+func (f *FakeFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+	return nil, nil
 }
 
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
@@ -587,17 +588,17 @@ func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
 	// version.
 	fakeClient := f.tf.Client.(*fake.RESTClient)
 	clientset := internalclientset.NewForConfigOrDie(f.tf.ClientConfig)
-	clientset.CoreClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthenticationClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AuthorizationClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AutoscalingClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.BatchClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.CertificatesClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.ExtensionsClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.RbacClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.StorageClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.AppsClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.PolicyClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Autoscaling().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Batch().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Certificates().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Extensions().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Rbac().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Storage().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	return clientset, f.tf.Err
 }
@@ -620,6 +621,13 @@ func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, 
 
 	cacheDir := filepath.Join(f.tf.TmpDir, ".kube", "cache", "discovery")
 	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *fakeAPIFactory) CategoryExpander() resource.CategoryExpander {
+	if f.tf.CategoryExpander != nil {
+		return f.tf.CategoryExpander
+	}
+	return f.Factory.CategoryExpander()
 }
 
 func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
@@ -691,7 +699,7 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 	}
 }
 
-func (f *fakeAPIFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *fakeAPIFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
@@ -756,11 +764,11 @@ func (f *fakeAPIFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDec
 	return nil, nil
 }
 
-func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
 	if f.tf.OpenAPISchemaFunc != nil {
 		return f.tf.OpenAPISchemaFunc()
 	}
-	return &openapi.Resources{}, nil
+	return nil, nil
 }
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {

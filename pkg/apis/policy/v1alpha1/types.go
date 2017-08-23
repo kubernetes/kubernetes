@@ -52,7 +52,7 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,4,opt,name=expectedPods"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods

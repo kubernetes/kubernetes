@@ -112,7 +112,7 @@ elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
 fi
 
 if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
-ginkgo_args+=("--untilItFails=true")
+  ginkgo_args+=("--untilItFails=true")
 fi
 
 FLAKE_ATTEMPTS=1
@@ -136,6 +136,7 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
   --gce-zone="${ZONE:-}" \
+  --gce-region="${REGION:-}" \
   --gce-multizone="${MULTIZONE:-false}" \
   --gke-cluster="${CLUSTER_NAME:-}" \
   --kube-master="${KUBE_MASTER:-}" \

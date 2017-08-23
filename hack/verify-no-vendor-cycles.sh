@@ -31,7 +31,7 @@ for i in $(find vendor/ -type d); do
     echo "Package ${i} has a cyclic dependency on the main repository."
     failed=true
   fi
-  deps_on_staging=$(echo "${deps}" | grep "k8s.io/kubernetes/vendor/k8s.io" | grep -E ${staging_repos_pattern} || echo "")
+  deps_on_staging=$(echo "${deps}" | grep "k8s.io/kubernetes/vendor/k8s.io" | grep -E "k8s.io\/${staging_repos_pattern}\>" || echo "")
   if [ -n "${deps_on_staging}" ]; then
     echo "Package ${i} has a cyclic dependency on staging repository packages: ${deps_on_staging}"
     failed=true

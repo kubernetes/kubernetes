@@ -22,98 +22,109 @@ import (
 
 	"github.com/spf13/cobra"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api"
 )
 
+// NewCmdKubeConfig return main command for kubeconfig phase
 func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kubeconfig",
-		Short: "Create KubeConfig files from given credentials.",
+		Short: "Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.",
 		RunE:  subCmdRunE("kubeconfig"),
 	}
 
-	cmd.AddCommand(NewCmdToken(out))
-	cmd.AddCommand(NewCmdClientCerts(out))
+	cmd.AddCommand(getKubeConfigSubCommands(out, kubeadmconstants.KubernetesDir)...)
 	return cmd
 }
 
-func NewCmdToken(out io.Writer) *cobra.Command {
-	config := &kubeconfigphase.BuildConfigProperties{
-		MakeClientCerts: false,
-	}
-	cmd := &cobra.Command{
-		Use:   "token",
-		Short: "Output a valid KubeConfig file to STDOUT with a token as the authentication method.",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCreateWithToken(out, config)
-			kubeadmutil.CheckErr(err)
+// getKubeConfigSubCommands returns sub commands for kubeconfig phase
+func getKubeConfigSubCommands(out io.Writer, outDir string) []*cobra.Command {
+
+	cfg := &kubeadmapiext.MasterConfiguration{}
+	// Default values for the cobra help text
+	api.Scheme.Default(cfg)
+
+	var cfgPath, token, clientName string
+	var subCmds []*cobra.Command
+
+	subCmdProperties := []struct {
+		use     string
+		short   string
+		cmdFunc func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+	}{
+		{
+			use:     "all",
+			short:   "Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.",
+			cmdFunc: kubeconfigphase.CreateInitKubeConfigFiles,
+		},
+		{
+			use:     "admin",
+			short:   "Generate a kubeconfig file for the admin to use and for kubeadm itself.",
+			cmdFunc: kubeconfigphase.CreateAdminKubeConfigFile,
+		},
+		{
+			use:     "kubelet",
+			short:   "Generate a kubeconfig file for the Kubelet to use. Please note that this should *only* be used for bootstrapping purposes. After your control plane is up, you should request all kubelet credentials from the CSR API.",
+			cmdFunc: kubeconfigphase.CreateKubeletKubeConfigFile,
+		},
+		{
+			use:     "controller-manager",
+			short:   "Generate a kubeconfig file for the Controller Manager to use.",
+			cmdFunc: kubeconfigphase.CreateControllerManagerKubeConfigFile,
+		},
+		{
+			use:     "scheduler",
+			short:   "Generate a kubeconfig file for the Scheduler to use.",
+			cmdFunc: kubeconfigphase.CreateSchedulerKubeConfigFile,
+		},
+		{
+			use:   "user",
+			short: "Outputs a kubeconfig file for an additional user.",
+			cmdFunc: func(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+				if clientName == "" {
+					return fmt.Errorf("missing required argument client-name")
+				}
+
+				// if the kubeconfig file for an additional user has to use a token, use it
+				if token != "" {
+					return kubeconfigphase.WriteKubeConfigWithToken(out, cfg, clientName, token)
+				}
+
+				// Otherwise, write a kubeconfig file with a generate client cert
+				return kubeconfigphase.WriteKubeConfigWithClientCert(out, cfg, clientName)
+			},
 		},
 	}
-	addCommonFlags(cmd, config)
-	cmd.Flags().StringVar(&config.Token, "token", "", "The path to the directory where the certificates are.")
-	return cmd
-}
 
-func NewCmdClientCerts(out io.Writer) *cobra.Command {
-	config := &kubeconfigphase.BuildConfigProperties{
-		MakeClientCerts: true,
-	}
-	cmd := &cobra.Command{
-		Use:   "client-certs",
-		Short: "Output a valid KubeConfig file to STDOUT with a client certificates as the authentication method.",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCreateWithClientCerts(out, config)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-	addCommonFlags(cmd, config)
-	cmd.Flags().StringSliceVar(&config.Organization, "organization", []string{}, "The organization (group) the certificate should be in.")
-	return cmd
-}
+	for _, properties := range subCmdProperties {
+		// Creates the UX Command
+		cmd := &cobra.Command{
+			Use:   properties.use,
+			Short: properties.short,
+			Run:   runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg),
+		}
 
-func addCommonFlags(cmd *cobra.Command, config *kubeconfigphase.BuildConfigProperties) {
-	cmd.Flags().StringVar(&config.CertDir, "cert-dir", kubeadmapiext.DefaultCertificatesDir, "The path to the directory where the certificates are.")
-	cmd.Flags().StringVar(&config.ClientName, "client-name", "", "The name of the client for which the KubeConfig file will be generated.")
-	cmd.Flags().StringVar(&config.APIServer, "server", "", "The location of the api server.")
-}
+		// Add flags to the command
+		if properties.use != "user" {
+			cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		}
+		cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored.")
+		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address or DNS name the API Server is accessible on.")
+		cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API Server is accessible on.")
+		if properties.use == "all" || properties.use == "kubelet" {
+			cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name that the kubelet client cert should use.`)
+		}
+		if properties.use == "user" {
+			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig.")
+			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of the KubeConfig user that will be created. Will also be used as the CN if client certs are created.")
+		}
 
-func validateCommonFlags(config *kubeconfigphase.BuildConfigProperties) error {
-	if len(config.ClientName) == 0 {
-		return fmt.Errorf("The --client-name flag is required")
+		subCmds = append(subCmds, cmd)
 	}
-	if len(config.APIServer) == 0 {
-		return fmt.Errorf("The --server flag is required")
-	}
-	return nil
-}
 
-// RunCreateWithToken generates a kubeconfig file from with a token as the authentication mechanism
-func RunCreateWithToken(out io.Writer, config *kubeconfigphase.BuildConfigProperties) error {
-	if len(config.Token) == 0 {
-		return fmt.Errorf("The --token flag is required")
-	}
-	if err := validateCommonFlags(config); err != nil {
-		return err
-	}
-	kubeConfigBytes, err := kubeconfigphase.GetKubeConfigBytesFromSpec(*config)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(out, string(kubeConfigBytes))
-	return nil
-}
-
-// RunCreateWithClientCerts generates a kubeconfig file from with client certs as the authentication mechanism
-func RunCreateWithClientCerts(out io.Writer, config *kubeconfigphase.BuildConfigProperties) error {
-	if err := validateCommonFlags(config); err != nil {
-		return err
-	}
-	kubeConfigBytes, err := kubeconfigphase.GetKubeConfigBytesFromSpec(*config)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(out, string(kubeConfigBytes))
-	return nil
+	return subCmds
 }

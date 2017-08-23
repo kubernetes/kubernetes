@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,34 +8,27 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "bootstrap_test.go",
-        "server_test.go",
-    ],
+    srcs = ["server_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/componentconfig:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-    ],
+    deps = ["//pkg/kubelet/apis/kubeletconfig:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
         "auth.go",
-        "bootstrap.go",
         "plugins.go",
         "server.go",
-        "server_linux.go",
-    ],
-    tags = ["automanaged"],
+        "server_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "server_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/client/chaosclient:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -49,8 +40,12 @@ go_library(
         "//pkg/credentialprovider/rancher:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/certificate:go_default_library",
+        "//pkg/kubelet/certificate/bootstrap:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -59,13 +54,13 @@ go_library(
         "//pkg/kubelet/dockershim/remote:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
+        "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/network/cni:go_default_library",
         "//pkg/kubelet/network/kubenet:go_default_library",
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/kubelet/util/csr:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flock:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -105,13 +100,9 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/golang.org/x/exp/inotify:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -124,15 +115,17 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/auth:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/exp/inotify:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

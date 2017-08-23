@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +108,7 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	}
 	dc := &DeploymentController{
 		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
@@ -206,7 +205,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(rs); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(rs); controllerRef != nil {
 		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
 		if d == nil {
 			return
@@ -261,8 +260,8 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := controller.GetControllerOf(curRS)
-	oldControllerRef := controller.GetControllerOf(oldRS)
+	curControllerRef := metav1.GetControllerOf(curRS)
+	oldControllerRef := metav1.GetControllerOf(oldRS)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -320,7 +319,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(rs)
+	controllerRef := metav1.GetControllerOf(rs)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -356,7 +355,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
-		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client))
+		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.ExtensionsV1beta1()))
 		if err != nil {
 			return
 		}
@@ -410,7 +409,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	// Find the owning replica set
 	var rs *extensions.ReplicaSet
 	var err error
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller owns this Pod.
 		return nil
@@ -426,7 +425,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	}
 
 	// Now find the Deployment that owns that ReplicaSet.
-	controllerRef = controller.GetControllerOf(rs)
+	controllerRef = metav1.GetControllerOf(rs)
 	if controllerRef == nil {
 		return nil
 	}
@@ -435,7 +434,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
-// of the corrrect Kind.
+// of the correct Kind.
 func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.Deployment {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -543,7 +542,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *extensions.Deployment,
 	for _, pod := range pods {
 		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
 		// Pods from older versions are running before spinning up new Pods.
-		controllerRef := controller.GetControllerOf(pod)
+		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
 			continue
 		}

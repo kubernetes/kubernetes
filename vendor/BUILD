@@ -1,7 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -370,6 +366,7 @@ filegroup(
         "//vendor/gopkg.in/gcfg.v1:all-srcs",
         "//vendor/gopkg.in/inf.v0:all-srcs",
         "//vendor/gopkg.in/natefinch/lumberjack.v2:all-srcs",
+        "//vendor/gopkg.in/warnings.v0:all-srcs",
         "//vendor/gopkg.in/yaml.v2:all-srcs",
         "//vendor/k8s.io/gengo/args:all-srcs",
         "//vendor/k8s.io/gengo/examples/deepcopy-gen/generators:all-srcs",
@@ -382,8 +379,15 @@ filegroup(
         "//vendor/k8s.io/gengo/parser:all-srcs",
         "//vendor/k8s.io/gengo/types:all-srcs",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/aggregator:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/builder:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/common:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/generators:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/handler:all-srcs",
+        "//vendor/k8s.io/kube-openapi/pkg/util:all-srcs",
         "//vendor/k8s.io/utils/exec:all-srcs",
         "//vendor/vbom.ml/util/sortorder:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

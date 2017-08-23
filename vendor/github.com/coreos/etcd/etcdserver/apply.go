@@ -520,15 +520,14 @@ func (a *applierV3backend) LeaseGrant(lc *pb.LeaseGrantRequest) (*pb.LeaseGrantR
 	if err == nil {
 		resp.ID = int64(l.ID)
 		resp.TTL = l.TTL()
-		resp.Header = &pb.ResponseHeader{Revision: a.s.KV().Rev()}
+		resp.Header = newHeader(a.s)
 	}
-
 	return resp, err
 }
 
 func (a *applierV3backend) LeaseRevoke(lc *pb.LeaseRevokeRequest) (*pb.LeaseRevokeResponse, error) {
 	err := a.s.lessor.Revoke(lease.LeaseID(lc.ID))
-	return &pb.LeaseRevokeResponse{Header: &pb.ResponseHeader{Revision: a.s.KV().Rev()}}, err
+	return &pb.LeaseRevokeResponse{Header: newHeader(a.s)}, err
 }
 
 func (a *applierV3backend) Alarm(ar *pb.AlarmRequest) (*pb.AlarmResponse, error) {
@@ -609,69 +608,125 @@ func (a *applierV3backend) AuthEnable() (*pb.AuthEnableResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pb.AuthEnableResponse{}, nil
+	return &pb.AuthEnableResponse{Header: newHeader(a.s)}, nil
 }
 
 func (a *applierV3backend) AuthDisable() (*pb.AuthDisableResponse, error) {
 	a.s.AuthStore().AuthDisable()
-	return &pb.AuthDisableResponse{}, nil
+	return &pb.AuthDisableResponse{Header: newHeader(a.s)}, nil
 }
 
 func (a *applierV3backend) Authenticate(r *pb.InternalAuthenticateRequest) (*pb.AuthenticateResponse, error) {
-	ctx := context.WithValue(context.WithValue(context.TODO(), "index", a.s.consistIndex.ConsistentIndex()), "simpleToken", r.SimpleToken)
-	return a.s.AuthStore().Authenticate(ctx, r.Name, r.Password)
+	ctx := context.WithValue(context.WithValue(context.Background(), "index", a.s.consistIndex.ConsistentIndex()), "simpleToken", r.SimpleToken)
+	resp, err := a.s.AuthStore().Authenticate(ctx, r.Name, r.Password)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserAdd(r *pb.AuthUserAddRequest) (*pb.AuthUserAddResponse, error) {
-	return a.s.AuthStore().UserAdd(r)
+	resp, err := a.s.AuthStore().UserAdd(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserDelete(r *pb.AuthUserDeleteRequest) (*pb.AuthUserDeleteResponse, error) {
-	return a.s.AuthStore().UserDelete(r)
+	resp, err := a.s.AuthStore().UserDelete(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserChangePassword(r *pb.AuthUserChangePasswordRequest) (*pb.AuthUserChangePasswordResponse, error) {
-	return a.s.AuthStore().UserChangePassword(r)
+	resp, err := a.s.AuthStore().UserChangePassword(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserGrantRole(r *pb.AuthUserGrantRoleRequest) (*pb.AuthUserGrantRoleResponse, error) {
-	return a.s.AuthStore().UserGrantRole(r)
+	resp, err := a.s.AuthStore().UserGrantRole(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserGet(r *pb.AuthUserGetRequest) (*pb.AuthUserGetResponse, error) {
-	return a.s.AuthStore().UserGet(r)
+	resp, err := a.s.AuthStore().UserGet(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserRevokeRole(r *pb.AuthUserRevokeRoleRequest) (*pb.AuthUserRevokeRoleResponse, error) {
-	return a.s.AuthStore().UserRevokeRole(r)
+	resp, err := a.s.AuthStore().UserRevokeRole(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleAdd(r *pb.AuthRoleAddRequest) (*pb.AuthRoleAddResponse, error) {
-	return a.s.AuthStore().RoleAdd(r)
+	resp, err := a.s.AuthStore().RoleAdd(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleGrantPermission(r *pb.AuthRoleGrantPermissionRequest) (*pb.AuthRoleGrantPermissionResponse, error) {
-	return a.s.AuthStore().RoleGrantPermission(r)
+	resp, err := a.s.AuthStore().RoleGrantPermission(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleGet(r *pb.AuthRoleGetRequest) (*pb.AuthRoleGetResponse, error) {
-	return a.s.AuthStore().RoleGet(r)
+	resp, err := a.s.AuthStore().RoleGet(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleRevokePermission(r *pb.AuthRoleRevokePermissionRequest) (*pb.AuthRoleRevokePermissionResponse, error) {
-	return a.s.AuthStore().RoleRevokePermission(r)
+	resp, err := a.s.AuthStore().RoleRevokePermission(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleDelete(r *pb.AuthRoleDeleteRequest) (*pb.AuthRoleDeleteResponse, error) {
-	return a.s.AuthStore().RoleDelete(r)
+	resp, err := a.s.AuthStore().RoleDelete(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) UserList(r *pb.AuthUserListRequest) (*pb.AuthUserListResponse, error) {
-	return a.s.AuthStore().UserList(r)
+	resp, err := a.s.AuthStore().UserList(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 func (a *applierV3backend) RoleList(r *pb.AuthRoleListRequest) (*pb.AuthRoleListResponse, error) {
-	return a.s.AuthStore().RoleList(r)
+	resp, err := a.s.AuthStore().RoleList(r)
+	if resp != nil {
+		resp.Header = newHeader(a.s)
+	}
+	return resp, err
 }
 
 type quotaApplierV3 struct {
@@ -835,4 +890,13 @@ func pruneKVs(rr *mvcc.RangeResult, isPrunable func(*mvccpb.KeyValue) bool) {
 		}
 	}
 	rr.KVs = rr.KVs[:j]
+}
+
+func newHeader(s *EtcdServer) *pb.ResponseHeader {
+	return &pb.ResponseHeader{
+		ClusterId: uint64(s.Cluster().ID()),
+		MemberId:  uint64(s.ID()),
+		Revision:  s.KV().Rev(),
+		RaftTerm:  s.Term(),
+	}
 }

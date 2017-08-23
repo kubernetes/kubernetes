@@ -1,16 +1,13 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["tlsconfig_clone.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "tlsconfig_clone.go",
+        "tlsconfig_clone_go16.go",
+        "tlsconfig_clone_go17.go",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -24,4 +21,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -36,9 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/retry"
+	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -307,6 +309,10 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
 	ips := CollectAddresses(nodes, v1.NodeExternalIP)
+	if len(ips) == 0 {
+		// If ExternalIP isn't set, assume the test programs can reach the InternalIP
+		ips = CollectAddresses(nodes, v1.NodeInternalIP)
+	}
 	return ips, nil
 }
 
@@ -1388,4 +1394,30 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 		headlessService.Spec.ClusterIP = "None"
 	}
 	return headlessService
+}
+
+// EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
+// setting for the supported cloud providers: GCE/GKE and Azure
+func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
+	enable = func(svc *v1.Service) {}
+	disable = func(svc *v1.Service) {}
+
+	switch TestContext.Provider {
+	case "gce", "gke":
+		enable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{gcecloud.ServiceAnnotationLoadBalancerType: string(gcecloud.LBTypeInternal)}
+		}
+		disable = func(svc *v1.Service) {
+			delete(svc.ObjectMeta.Annotations, gcecloud.ServiceAnnotationLoadBalancerType)
+		}
+	case "azure":
+		enable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "true"}
+		}
+		disable = func(svc *v1.Service) {
+			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "false"}
+		}
+	}
+
+	return
 }

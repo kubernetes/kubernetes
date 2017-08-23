@@ -79,6 +79,7 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 	s.Etcd.StorageConfig = *storageConfig
 	s.Etcd.DefaultStorageMediaType = "application/json"
 	s.Admission.PluginNames = strings.Split("Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota,DefaultTolerationSeconds", ",")
+	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	t.Logf("Starting kube-apiserver...")
 	runErrCh := make(chan error, 1)
@@ -105,7 +106,7 @@ func StartTestServer(t *testing.T) (result *restclient.Config, tearDownForCaller
 		default:
 		}
 
-		result := client.CoreV1Client.RESTClient().Get().AbsPath("/healthz").Do()
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {
@@ -127,8 +128,14 @@ func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
 	// retry test because the bind might fail due to a race with another process
 	// binding to the port. We cannot listen to :0 (then the kernel would give us
 	// a port which is free for sure), so we need this workaround.
+
+	var err error
+
 	for retry := 0; retry < 5 && !t.Failed(); retry++ {
-		config, td, err := StartTestServer(t)
+		var config *restclient.Config
+		var td TearDownFunc
+
+		config, td, err = StartTestServer(t)
 		if err == nil {
 			return config, td
 		}
@@ -138,7 +145,7 @@ func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
 		t.Logf("Bind error, retrying...")
 	}
 
-	t.Fatalf("Failed to launch server")
+	t.Fatalf("Failed to launch server: %v", err)
 	return nil, nil
 }
 

@@ -80,13 +80,13 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	history.SortControllerRevisions(revisions)
 
 	// get the current, and update revisions
-	currentRevision, updateRevision, err := ssc.getStatefulSetRevisions(set, revisions)
+	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
 	if err != nil {
 		return err
 	}
 
 	// perform the main update function and get the status
-	status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, pods)
+	status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods)
 	if err != nil {
 		return err
 	}
@@ -174,21 +174,31 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	return nil
 }
 
-// getStatefulSetRevisions returns the current and update ControllerRevisions for set. This method may create a new revision,
-// or modify the Revision of an existing revision if an update to set is detected. This method expects that revisions
-// is sorted when supplied.
+// getStatefulSetRevisions returns the current and update ControllerRevisions for set. It also
+// returns a collision count that records the number of name collisions set saw when creating
+// new ControllerRevisions. This count is incremented on every name collision and is used in
+// building the ControllerRevision names for name collision avoidance. This method may create
+// a new revision, or modify the Revision of an existing revision if an update to set is detected.
+// This method expects that revisions is sorted when supplied.
 func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 	set *apps.StatefulSet,
-	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, error) {
+	revisions []*apps.ControllerRevision) (*apps.ControllerRevision, *apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 
 	revisionCount := len(revisions)
 	history.SortControllerRevisions(revisions)
 
+	// Use a local copy of set.Status.CollisionCount to avoid modifying set.Status directly.
+	// This copy is returned so the value gets carried over to set.Status in updateStatefulSet.
+	var collisionCount int32
+	if set.Status.CollisionCount != nil {
+		collisionCount = *set.Status.CollisionCount
+	}
+
 	// create a new revision from the current set
-	updateRevision, err := newRevision(set, nextRevision(revisions))
+	updateRevision, err := newRevision(set, nextRevision(revisions), &collisionCount)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, collisionCount, err
 	}
 
 	// find any equivalent revisions
@@ -205,13 +215,13 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 			equalRevisions[equalCount-1],
 			updateRevision.Revision)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, collisionCount, err
 		}
 	} else {
 		//if there is no equivalent revision we create a new one
-		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision)
+		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision, &collisionCount)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, collisionCount, err
 		}
 	}
 
@@ -227,7 +237,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 		currentRevision = updateRevision
 	}
 
-	return currentRevision, updateRevision, nil
+	return currentRevision, updateRevision, collisionCount, nil
 }
 
 // updateStatefulSet performs the update function for a StatefulSet. This method creates, updates, and deletes Pods in
@@ -243,6 +253,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	set *apps.StatefulSet,
 	currentRevision *apps.ControllerRevision,
 	updateRevision *apps.ControllerRevision,
+	collisionCount int32,
 	pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
 	// get the current and update revisions of the set.
 	currentSet, err := applyRevision(set, currentRevision)
@@ -260,6 +271,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	*status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
+	status.CollisionCount = new(int32)
+	*status.CollisionCount = collisionCount
 
 	replicaCount := int(*set.Spec.Replicas)
 	// slice that will contain all Pods such that 0 <= getOrdinal(pod) < set.Spec.Replicas

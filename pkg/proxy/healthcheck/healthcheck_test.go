@@ -368,7 +368,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := clock.NewFakeClock(time.Now())
 
-	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	// Should return 200 "OK" by default.

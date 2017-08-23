@@ -783,7 +783,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	role := rbacv1beta1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Role",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -805,7 +805,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	rolebinding := rbacv1beta1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RoleBinding",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",

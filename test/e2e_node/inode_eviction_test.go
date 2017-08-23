@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 	testCondition := "Disk Pressure due to Inodes"
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.EvictionHard = "nodefs.inodesFree<70%"
 		})
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.

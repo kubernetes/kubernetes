@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(
@@ -67,7 +64,6 @@ filegroup(
         "//pkg/registry/extensions/daemonset:all-srcs",
         "//pkg/registry/extensions/deployment:all-srcs",
         "//pkg/registry/extensions/ingress:all-srcs",
-        "//pkg/registry/extensions/networkpolicy:all-srcs",
         "//pkg/registry/extensions/podsecuritypolicy:all-srcs",
         "//pkg/registry/extensions/replicaset:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",

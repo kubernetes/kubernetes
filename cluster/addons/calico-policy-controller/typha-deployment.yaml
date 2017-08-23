@@ -22,7 +22,7 @@ spec:
         operator: Exists
       hostNetwork: true
       containers:
-      - image: calico/typha:v0.2.2
+      - image: calico/typha:v0.2.3
         name: calico-typha
         ports:
         - containerPort: 5473

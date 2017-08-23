@@ -1737,8 +1737,8 @@
      {
       "type": "v1beta1.DeploymentRollback",
       "method": "POST",
-      "summary": "create rollback of a DeploymentRollback",
-      "nickname": "createNamespacedDeploymentRollbackRollback",
+      "summary": "create rollback of a Deployment",
+      "nickname": "createNamespacedDeploymentRollback",
       "parameters": [
        {
         "type": "string",
@@ -1798,8 +1798,8 @@
      {
       "type": "v1beta1.Scale",
       "method": "GET",
-      "summary": "read scale of the specified Scale",
-      "nickname": "readNamespacedScaleScale",
+      "summary": "read scale of the specified Deployment",
+      "nickname": "readNamespacedDeploymentScale",
       "parameters": [
        {
         "type": "string",
@@ -1845,8 +1845,8 @@
      {
       "type": "v1beta1.Scale",
       "method": "PUT",
-      "summary": "replace scale of the specified Scale",
-      "nickname": "replaceNamespacedScaleScale",
+      "summary": "replace scale of the specified Deployment",
+      "nickname": "replaceNamespacedDeploymentScale",
       "parameters": [
        {
         "type": "string",
@@ -1900,8 +1900,8 @@
      {
       "type": "v1beta1.Scale",
       "method": "PATCH",
-      "summary": "partially update scale of the specified Scale",
-      "nickname": "patchNamespacedScaleScale",
+      "summary": "partially update scale of the specified Deployment",
+      "nickname": "patchNamespacedDeploymentScale",
       "parameters": [
        {
         "type": "string",
@@ -2983,6 +2983,171 @@
     ]
    },
    {
+    "path": "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/scale",
+    "description": "API at /apis/apps/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Scale",
+      "method": "GET",
+      "summary": "read scale of the specified StatefulSet",
+      "nickname": "readNamespacedStatefulSetScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.Scale",
+      "method": "PUT",
+      "summary": "replace scale of the specified StatefulSet",
+      "nickname": "replaceNamespacedStatefulSetScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Scale",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.Scale",
+      "method": "PATCH",
+      "summary": "partially update scale of the specified StatefulSet",
+      "nickname": "patchNamespacedStatefulSetScale",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Scale",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Scale"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/status",
     "description": "API at /apis/apps/v1beta1",
     "operations": [
@@ -3460,7 +3625,7 @@
      "retryAfterSeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "If specified, the time in seconds before the operation should be retried."
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action."
      }
     }
    },
@@ -3645,7 +3810,7 @@
      },
      "rollbackTo": {
       "$ref": "v1beta1.RollbackConfig",
-      "description": "The config this deployment is rolling back to. Will be cleared after rollback is done."
+      "description": "DEPRECATED. The config this deployment is rolling back to. Will be cleared after rollback is done."
      },
      "progressDeadlineSeconds": {
       "type": "integer",
@@ -4184,6 +4349,10 @@
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
       "description": "CHAP secret for iSCSI target and initiator authentication"
+     },
+     "initiatorName": {
+      "type": "string",
+      "description": "Custom iSCSI initiator name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface \u003ctarget portal\u003e:\u003cvolume name\u003e will be created for the connection."
      }
     }
    },
@@ -4466,22 +4635,18 @@
    "v1.FCVolumeSource": {
     "id": "v1.FCVolumeSource",
     "description": "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-    "required": [
-     "targetWWNs",
-     "lun"
-    ],
     "properties": {
      "targetWWNs": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Required: FC target worldwide names (WWNs)"
+      "description": "Optional: FC target worldwide names (WWNs)"
      },
      "lun": {
       "type": "integer",
       "format": "int32",
-      "description": "Required: FC target lun number"
+      "description": "Optional: FC target lun number"
      },
      "fsType": {
       "type": "string",
@@ -4490,6 +4655,13 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     },
+     "wwids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously."
      }
     }
    },
@@ -5340,6 +5512,10 @@
      "readOnlyRootFilesystem": {
       "type": "boolean",
       "description": "Whether this container has a read-only root filesystem. Default is false."
+     },
+     "allowPrivilegeEscalation": {
+      "type": "boolean",
+      "description": "AllowPrivilegeEscalation controls whether a process can gain more privileges than it's parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN"
      }
     }
    },
@@ -5540,7 +5716,7 @@
       "items": {
        "$ref": "v1.PodAffinityTerm"
       },
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+      "description": "If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
      },
      "preferredDuringSchedulingIgnoredDuringExecution": {
       "type": "array",
@@ -5600,7 +5776,7 @@
       "items": {
        "$ref": "v1.PodAffinityTerm"
       },
-      "description": "NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented. If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system will try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:\"requiredDuringSchedulingRequiredDuringExecution,omitempty\"` If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
+      "description": "If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied."
      },
      "preferredDuringSchedulingIgnoredDuringExecution": {
       "type": "array",
@@ -5685,6 +5861,7 @@
    },
    "v1beta1.RollbackConfig": {
     "id": "v1beta1.RollbackConfig",
+    "description": "DEPRECATED.",
     "properties": {
      "revision": {
       "type": "integer",
@@ -5736,7 +5913,7 @@
      },
      "collisionCount": {
       "type": "integer",
-      "format": "int64",
+      "format": "int32",
       "description": "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet."
      }
     }
@@ -5777,7 +5954,7 @@
    },
    "v1beta1.DeploymentRollback": {
     "id": "v1beta1.DeploymentRollback",
-    "description": "DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -6106,6 +6283,11 @@
      "updateRevision": {
       "type": "string",
       "description": "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)"
+     },
+     "collisionCount": {
+      "type": "integer",
+      "format": "int32",
+      "description": "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision."
      }
     }
    },

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,13 +10,12 @@ go_library(
     srcs = [
         "addon_update.go",
         "cluster_upgrade.go",
+        "framework.go",
         "ha_master.go",
         "reboot.go",
         "resize_nodes.go",
         "restart.go",
-        "sig.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
@@ -29,6 +26,7 @@ go_library(
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/upgrades:go_default_library",
         "//test/e2e/upgrades/apps:go_default_library",
+        "//test/e2e/upgrades/storage:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/junit:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

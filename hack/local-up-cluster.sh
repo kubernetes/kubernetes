@@ -76,8 +76,7 @@ ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
-ENABLE_RBAC=${ENABLE_RBAC:-true}
-AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-""}
+AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
@@ -92,6 +91,7 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
+ADMISSION_CONTROL=${ADMISSION_CONTROL:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
@@ -199,7 +199,9 @@ API_SECURE_PORT=${API_SECURE_PORT:-6443}
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
 API_HOST=${API_HOST:-localhost}
 API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
+ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
 API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
+EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
@@ -405,8 +407,7 @@ function start_apiserver {
     fi
 
     # Admission Controllers to invoke prior to persisting objects in cluster
-    ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},ResourceQuota,DefaultStorageClass,DefaultTolerationSeconds
-
+    ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
 
@@ -434,19 +435,21 @@ function start_apiserver {
     fi
 
     authorizer_arg=""
-    if [[ "${ENABLE_RBAC}" = true ]]; then
-      authorizer_arg="--authorization-mode=RBAC "
-    fi
     if [[ -n "${AUTHORIZATION_MODE}" ]]; then
-      if [[ "${ENABLE_RBAC}" = true ]]; then
-        warning "AUTHORIZATION_MODE=$AUTHORIZATION_MODE overrode ENABLE_RBAC=true"
-      fi
       authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
     fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
+
+    if [[ ${ADMISSION_CONTROL} == *"Initializers"* ]]; then
+        if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+        fi
+        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
+    fi
+
     runtime_config=""
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
@@ -457,6 +460,9 @@ function start_apiserver {
     advertise_address=""
     if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
         advertise_address="--advertise_address=${API_HOST_IP}"
+    fi
+    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+        advertise_address="--advertise_address=${ADVERTISE_ADDRESS}"
     fi
 
     # Create CA signers
@@ -513,6 +519,7 @@ function start_apiserver {
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
+      --external-hostname="${EXTERNAL_HOSTNAME}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
       --requestheader-username-headers=X-Remote-User \
@@ -581,14 +588,14 @@ function start_controller_manager {
 
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
-    mkdir -p ${POD_MANIFEST_PATH} || true
+    mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
     fi
 
-    mkdir -p /var/lib/kubelet
+    mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
@@ -647,7 +654,6 @@ function start_kubelet {
         --cloud-provider="${CLOUD_PROVIDER}" \
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
-        --require-kubeconfig \
         --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
@@ -710,7 +716,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -902,7 +908,7 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ -n "${PSP_ADMISSION}" && ("${ENABLE_RBAC}" = true || "${AUTHORIZATION_MODE}" = *RBAC* ) ]]; then
+if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 

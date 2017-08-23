@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type ApplyOptions struct {
@@ -124,8 +124,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().BoolVar(&options.Force, "force", false, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
@@ -187,7 +187,7 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 }
 
 func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ aliases:
     - wojtek-t
     - k82cn
     - jayunit100
+    - resouer
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -32,13 +33,21 @@ aliases:
     - ghodss
     - mengqiy
     - rootfs
+    - shiywang
     - smarterclayton
     - soltysh
     - sttts
-  test-infra-maintainers:
+  sig-testing-reviewers:
     - fejta
     - ixdy
     - rmmh
+    - spiffxp
+    - spxtr
+  sig-testing-approvers:
+    - fejta
+    - ixdy
+    - rmmh
+    - spiffxp
     - spxtr
   sig-node-reviewers:
     - Random-Liu
@@ -46,7 +55,6 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
-    - euank
     - feiskyer
     - mtaufen
     - ncdc
@@ -58,14 +66,26 @@ aliases:
     - vishh
     - yifan-gu
     - yujuhong
-  sig-network-reviewers:
-    - thockin
-    - freehan
+  sig-network-approvers:
     - bowei
-    - mrhohn
-    - dcbw
-    - danwinship
     - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
+  sig-network-reviewers:
+    - bowei
+    - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
   sig-apps-reviewers:
     - enisoc
     - erictune

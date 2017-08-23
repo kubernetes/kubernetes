@@ -28,13 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	qoshelper "k8s.io/kubernetes/pkg/api/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 // Register registers a plugin
@@ -110,7 +113,11 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 
 	var finalTolerations []api.Toleration
-	if a.GetOperation() == admission.Create {
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if a.GetOperation() == admission.Create || updateUninitialized {
 		ts, err := p.getNamespaceDefaultTolerations(namespace)
 		if err != nil {
 			return err
@@ -160,6 +167,16 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its namespace whitelist")
 			}
 		}
+	}
+
+	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
+		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
+			{
+				Key:      algorithm.TaintNodeMemoryPressure,
+				Operator: api.TolerationOpExists,
+				Effect:   api.TaintEffectNoSchedule,
+			},
+		})
 	}
 
 	pod.Spec.Tolerations = finalTolerations

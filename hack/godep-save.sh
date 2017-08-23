@@ -24,6 +24,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::util::ensure_single_dir_gopath
 kube::util::ensure_godep_version v79
+kube::util::ensure_no_staging_repos_in_gopath
 
 if [ -e "${KUBE_ROOT}/vendor" -o -e "${KUBE_ROOT}/Godeps" ]; then
   echo "The directory vendor/ or Godeps/ exists. Remove them before running godep-save.sh" 1>&2
@@ -40,18 +41,6 @@ REQUIRED_BINS=(
 )
 
 pushd "${KUBE_ROOT}" > /dev/null
-  # sanity check that staging directories do not exist in GOPATH
-  error=0
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
-    if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
-      echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
-      error=1
-    fi
-  done
-  if [ "${error}" = "1" ]; then
-    exit 1
-  fi
-
   echo "Running godep save. This will take around 15 minutes."
   GOPATH=${GOPATH}:${KUBE_ROOT}/staging godep save "${REQUIRED_BINS[@]}"
 

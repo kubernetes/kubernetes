@@ -31,7 +31,7 @@ import (
 	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -134,9 +134,9 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "verb that applies to the resources contained in the rule")
-	cmd.Flags().StringSlice("resource", []string{}, "resource that the rule applies to")
-	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "Verb that applies to the resources contained in the rule")
+	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
+	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }

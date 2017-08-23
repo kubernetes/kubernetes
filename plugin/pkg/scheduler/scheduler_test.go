@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -116,6 +115,7 @@ func TestScheduler(t *testing.T) {
 		sendPod          *v1.Pod
 		algo             algorithm.ScheduleAlgorithm
 		expectErrorPod   *v1.Pod
+		expectForgetPod  *v1.Pod
 		expectAssumedPod *v1.Pod
 		expectError      error
 		expectBind       *v1.Binding
@@ -140,7 +140,8 @@ func TestScheduler(t *testing.T) {
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
 			expectError:      errB,
-			expectErrorPod:   podWithID("foo", ""),
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
 		}, {
 			sendPod:     deletingPod("foo"),
@@ -152,11 +153,15 @@ func TestScheduler(t *testing.T) {
 	for i, item := range table {
 		var gotError error
 		var gotPod *v1.Pod
+		var gotForgetPod *v1.Pod
 		var gotAssumedPod *v1.Pod
 		var gotBinding *v1.Binding
 		configurator := &FakeConfigurator{
 			Config: &Config{
 				SchedulerCache: &schedulertesting.FakeCache{
+					ForgetFunc: func(pod *v1.Pod) {
+						gotForgetPod = pod
+					},
 					AssumeFunc: func(pod *v1.Pod) {
 						gotAssumedPod = pod
 					},
@@ -177,13 +182,13 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Recorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "scheduler"}),
+				Recorder: eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "scheduler"}),
 			},
 		}
 
 		s, _ := NewFromConfigurator(configurator, nil...)
 		called := make(chan struct{})
-		events := eventBroadcaster.StartEventWatcher(func(e *clientv1.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}
@@ -196,6 +201,9 @@ func TestScheduler(t *testing.T) {
 		}
 		if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error pod: wanted %v, got %v", i, e, a)
+		}
+		if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: forget pod: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)

@@ -320,7 +320,7 @@ current-context: kubemark-context")
   if [ "${NUM_NODES:-10}" -gt 1000 ]; then
     proxy_cpu=50
   fi
-  proxy_mem_per_node=100
+  proxy_mem_per_node=50
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"

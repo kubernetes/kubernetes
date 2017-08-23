@@ -112,7 +112,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - create
     - delete
@@ -294,7 +293,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - create
     - delete
@@ -360,6 +358,38 @@ items:
     - authorization.k8s.io
     resources:
     - selfsubjectaccessreviews
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:certificates.k8s.io:certificatesigningrequests:nodeclient
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests/nodeclient
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:certificates.k8s.io:certificatesigningrequests:selfnodeclient
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - certificatesigningrequests/selfnodeclient
     verbs:
     - create
 - apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -689,6 +719,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/eviction
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - configmaps
     - secrets
     verbs:
@@ -919,7 +955,6 @@ items:
     resources:
     - cronjobs
     - jobs
-    - scheduledjobs
     verbs:
     - get
     - list

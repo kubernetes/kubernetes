@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -52,8 +52,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 			diskReserve = uint64(0.8 * diskAvail / 1000000) // Reserve 0.8 * disk Capacity for kube-reserved scratch storage
 			maxDisk := 10000000                             // Set dd command to read and write up to 10MB at a time
 			count := uint64(0.8 * diskAvail / float64(maxDisk))
-			command := fmt.Sprintf("dd if=/dev/urandom of=dummy bs=%d count=%d; sleep 0.5; while true; do sleep 5; done", maxDisk, count)
-
+			command := fmt.Sprintf("dd if=/dev/urandom of=dummy bs=%d count=%d; while true; do sleep 5; done", maxDisk, count)
 			podTestSpecs = []podTestSpec{
 				{
 					evictionPriority: 1, // This pod should be evicted before the innocent pod
@@ -93,9 +92,9 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 		})
 
 		// Set up --kube-reserved for scratch storage
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			framework.Logf("Set up --kube-reserved for local storage reserved %dMi", diskReserve)
-			initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"storage": fmt.Sprintf("%dMi", diskReserve)})
+			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{"storage": fmt.Sprintf("%dMi", diskReserve)})
 
 		})
 

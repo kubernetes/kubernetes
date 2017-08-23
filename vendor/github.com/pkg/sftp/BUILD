@@ -1,28 +1,36 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "attrs.go",
-        "attrs_unix.go",
         "client.go",
         "conn.go",
         "packet.go",
         "release.go",
         "server.go",
-        "server_statvfs_impl.go",
-        "server_statvfs_linux.go",
-        "server_unix.go",
+        "server_statvfs_stubs.go",
         "sftp.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "attrs_unix.go",
+            "server_statvfs_darwin.go",
+            "server_statvfs_impl.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "attrs_unix.go",
+            "server_statvfs_impl.go",
+            "server_statvfs_linux.go",
+            "server_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "attrs_stubs.go",
+            "server_stubs.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/kr/fs:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
@@ -41,4 +49,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

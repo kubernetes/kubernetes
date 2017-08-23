@@ -102,11 +102,12 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 
 	return &localVolumeMounter{
 		localVolume: &localVolume{
-			podUID:     pod.UID,
-			volName:    spec.Name(),
-			mounter:    plugin.host.GetMounter(),
-			plugin:     plugin,
-			globalPath: volumeSource.Path,
+			podUID:          pod.UID,
+			volName:         spec.Name(),
+			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
+			plugin:          plugin,
+			globalPath:      volumeSource.Path,
+			MetricsProvider: volume.NewMetricsStatFS(volumeSource.Path),
 		},
 		readOnly: readOnly,
 	}, nil
@@ -118,7 +119,7 @@ func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) 
 		localVolume: &localVolume{
 			podUID:  podUID,
 			volName: volName,
-			mounter: plugin.host.GetMounter(),
+			mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin:  plugin,
 		},
 	}, nil
@@ -151,8 +152,7 @@ type localVolume struct {
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
 	plugin  *localVolumePlugin
-	// TODO: add metrics
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (l *localVolume) GetPath() string {

@@ -73,12 +73,12 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.Node{} },
-		NewListFunc:       func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:     node.MatchNode,
-		QualifiedResource: api.Resource("nodes"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("nodes"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.Node{} },
+		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:            node.MatchNode,
+		DefaultQualifiedResource: api.Resource("nodes"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("nodes"),
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,

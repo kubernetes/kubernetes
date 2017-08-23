@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "templater.go",
         "templates.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
     ],

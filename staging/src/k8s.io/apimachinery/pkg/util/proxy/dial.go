@@ -32,7 +32,10 @@ import (
 func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
-	dialer, _ := utilnet.DialerFor(transport)
+	dialer, err := utilnet.DialerFor(transport)
+	if err != nil {
+		glog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
+	}
 
 	switch url.Scheme {
 	case "http":
@@ -45,7 +48,10 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 		var tlsConfig *tls.Config
 		var tlsConn *tls.Conn
 		var err error
-		tlsConfig, _ = utilnet.TLSClientConfig(transport)
+		tlsConfig, err = utilnet.TLSClientConfig(transport)
+		if err != nil {
+			glog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
+		}
 
 		if dialer != nil {
 			// We have a dialer; use it to open the connection, then
@@ -94,6 +100,9 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 
 		// Verify
 		host, _, _ := net.SplitHostPort(dialAddr)
+		if tlsConfig != nil && len(tlsConfig.ServerName) > 0 {
+			host = tlsConfig.ServerName
+		}
 		if err := tlsConn.VerifyHostname(host); err != nil {
 			tlsConn.Close()
 			return nil, err

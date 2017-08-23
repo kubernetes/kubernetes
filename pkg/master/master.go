@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
@@ -36,6 +37,7 @@ import (
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
@@ -385,11 +387,16 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
+		// TODO: enable batch/v1beta1 by default before 1.8 release, after issues
+		// with CronJobs existing in multiple versions at once is solved
+		// batchapiv1beta1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsv1beta1.SchemeGroupVersion,
+		appsv1beta2.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
+		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
 		// by default only because they were enabled in previous releases.

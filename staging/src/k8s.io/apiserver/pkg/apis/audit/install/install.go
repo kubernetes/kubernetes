@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/v1alpha1"
+	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
 )
 
 // Install registers the API group and adds types to a scheme
@@ -32,13 +33,13 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:              audit.GroupName,
-			VersionPreferenceOrder: []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:           "k8s.io/apiserver/pkg/apis/audit",
+			VersionPreferenceOrder: []string{v1beta1.SchemeGroupVersion.Version, v1alpha1.SchemeGroupVersion.Version},
 			// Any Kind that is not namespaced must be cluster scoped.
 			RootScopedKinds:            sets.NewString("Event", "Policy"),
 			AddInternalObjectsToScheme: audit.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
+			v1beta1.SchemeGroupVersion.Version:  v1beta1.AddToScheme,
 			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {

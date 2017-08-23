@@ -434,7 +434,7 @@
      "retryAfterSeconds": {
       "type": "integer",
       "format": "int32",
-      "description": "If specified, the time in seconds before the operation should be retried."
+      "description": "If specified, the time in seconds before the operation should be retried. Some errors may indicate the client must take an alternate action - for those errors this field may indicate how long to wait before taking the alternate action."
      }
     }
    },
@@ -482,6 +482,10 @@
      "extra": {
       "type": "object",
       "description": "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here."
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID information about the requesting user."
      }
     }
    },

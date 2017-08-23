@@ -111,6 +111,11 @@ func (f *FakeCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []s
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (f *FakeCloud) HasClusterID() bool {
+	return true
+}
+
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
 func (f *FakeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

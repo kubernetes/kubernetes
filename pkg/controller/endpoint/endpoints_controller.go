@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,6 +64,8 @@ const (
 	// receiving traffic for the Service from the moment the kubelet starts all
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
+	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
+	// subsequent releases.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
@@ -199,6 +202,56 @@ func (e *EndpointController) addPod(obj interface{}) {
 	}
 }
 
+func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
+	return &v1.EndpointAddress{
+		IP:       pod.Status.PodIP,
+		NodeName: &pod.Spec.NodeName,
+		TargetRef: &v1.ObjectReference{
+			Kind:            "Pod",
+			Namespace:       pod.ObjectMeta.Namespace,
+			Name:            pod.ObjectMeta.Name,
+			UID:             pod.ObjectMeta.UID,
+			ResourceVersion: pod.ObjectMeta.ResourceVersion,
+		}}
+}
+
+func podChanged(oldPod, newPod *v1.Pod) bool {
+	// If the pod's readiness has changed, the associated endpoint address
+	// will move from the unready endpoints set to the ready endpoints.
+	// So for the purposes of an endpoint, a readiness change on a pod
+	// means we have a changed pod.
+	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(newPod) {
+		return true
+	}
+	// Convert the pod to an EndpointAddress, clear inert fields,
+	// and see if they are the same.
+	newEndpointAddress := podToEndpointAddress(newPod)
+	oldEndpointAddress := podToEndpointAddress(oldPod)
+	// Ignore the ResourceVersion because it changes
+	// with every pod update. This allows the comparison to
+	// show equality if all other relevant fields match.
+	newEndpointAddress.TargetRef.ResourceVersion = ""
+	oldEndpointAddress.TargetRef.ResourceVersion = ""
+	if reflect.DeepEqual(newEndpointAddress, oldEndpointAddress) {
+		// The pod has not changed in any way that impacts the endpoints
+		return false
+	}
+	return true
+}
+
+func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
+	if podChanged {
+		// if the labels and pod changed, all services need to be updated
+		services = services.Union(oldServices)
+	} else {
+		// if only the labels changed, services not common to
+		// both the new and old service set (i.e the disjunctive union)
+		// need to be updated
+		services = services.Difference(oldServices).Union(oldServices.Difference(services))
+	}
+	return services
+}
+
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
@@ -210,22 +263,37 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
+
+	podChangedFlag := podChanged(oldPod, newPod)
+
+	// Check if the pod labels have changed, indicating a possibe
+	// change in the service membership
+	labelsChanged := false
+	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
+		!hostNameAndDomainAreEqual(newPod, oldPod) {
+		labelsChanged = true
+	}
+
+	// If both the pod and labels are unchanged, no update is needed
+	if !podChangedFlag && !labelsChanged {
+		return
+	}
+
 	services, err := e.getPodServiceMemberships(newPod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		return
 	}
 
-	// Only need to get the old services if the labels changed.
-	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
-		!hostNameAndDomainAreEqual(newPod, oldPod) {
+	if labelsChanged {
 		oldServices, err := e.getPodServiceMemberships(oldPod)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Unable to get pod %v/%v's service memberships: %v", oldPod.Namespace, oldPod.Name, err))
 			return
 		}
-		services = services.Union(oldServices)
+		services = determineNeededServiceUpdates(oldServices, services, podChangedFlag)
 	}
+
 	for key := range services {
 		e.queue.Add(key)
 	}
@@ -328,12 +396,6 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Need to delete endpoint with key %q, but couldn't understand the key: %v", key, err))
-			// Don't retry, as the key isn't going to magically become understandable.
-			return nil
-		}
 		err = e.client.Core().Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
@@ -379,16 +441,7 @@ func (e *EndpointController) syncService(key string) error {
 			continue
 		}
 
-		epa := v1.EndpointAddress{
-			IP:       pod.Status.PodIP,
-			NodeName: &pod.Spec.NodeName,
-			TargetRef: &v1.ObjectReference{
-				Kind:            "Pod",
-				Namespace:       pod.ObjectMeta.Namespace,
-				Name:            pod.ObjectMeta.Name,
-				UID:             pod.ObjectMeta.UID,
-				ResourceVersion: pod.ObjectMeta.ResourceVersion,
-			}}
+		epa := *podToEndpointAddress(pod)
 
 		hostname := pod.Spec.Hostname
 		if len(hostname) > 0 && pod.Spec.Subdomain == service.Name && service.Namespace == pod.Namespace {
@@ -438,8 +491,11 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
-	if reflect.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
+	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+
+	if !createEndpoints &&
+		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
+		apiequality.Semantic.DeepEqual(currentEndpoints.Labels, service.Labels) {
 		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
@@ -455,7 +511,6 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
-	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
 	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.Core().Endpoints(service.Namespace).Create(newEndpoints)

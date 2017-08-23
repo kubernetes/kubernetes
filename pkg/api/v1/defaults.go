@@ -115,10 +115,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
 	// to Global for consistency.
-	if _, ok := obj.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
-		// Don't default this field if beta annotation exists.
-		return
-	} else if (obj.Spec.Type == v1.ServiceTypeNodePort ||
+	if (obj.Spec.Type == v1.ServiceTypeNodePort ||
 		obj.Spec.Type == v1.ServiceTypeLoadBalancer) &&
 		obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster

@@ -35,7 +35,8 @@ import (
 
 //NewRandomNameCustomResourceDefinition generates a CRD with random name to avoid name conflict in e2e tests
 func NewRandomNameCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
-	gName := names.SimpleNameGenerator.GenerateName("foo")
+	// ensure the singular doesn't end in an s for now
+	gName := names.SimpleNameGenerator.GenerateName("foo") + "a"
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: gName + "s.mygroup.example.com"},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
@@ -141,7 +142,7 @@ func NewCurletInstance(namespace, name string) *unstructured.Unstructured {
 	}
 }
 
-func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (*dynamic.Client, error) {
+func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, clientPool dynamic.ClientPool) (dynamic.Interface, error) {
 	_, err := apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Create(crd)
 	if err != nil {
 		return nil, err
@@ -194,7 +195,7 @@ func CreateNewCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceD
 	return dynamicClient, nil
 }
 
-func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient *dynamic.Client) error {
+func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition, dynamicClient dynamic.Interface) error {
 	ns := ""
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		ns = "aval"

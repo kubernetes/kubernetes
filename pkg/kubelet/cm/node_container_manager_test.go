@@ -221,7 +221,7 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 func TestNodeAllocatableInputValidation(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
 	highMemoryEvictionThreshold := resource.MustParse("2Gi")
-	testCases := []struct {
+	cpuMemTestCases := []struct {
 		kubeReserved         v1.ResourceList
 		systemReserved       v1.ResourceList
 		capacity             v1.ResourceList
@@ -279,7 +279,7 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 			invalidConfiguration: true,
 		},
 	}
-	for _, tc := range testCases {
+	for _, tc := range cpuMemTestCases {
 		nc := NodeConfig{
 			NodeAllocatableConfig: NodeAllocatableConfig{
 				KubeReserved:   tc.kubeReserved,
@@ -297,9 +297,74 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		if err := cm.validateNodeAllocatable(); err != nil && !tc.invalidConfiguration {
+		err := cm.validateNodeAllocatable()
+		if err == nil && tc.invalidConfiguration {
+			t.Logf("Expected invalid node allocatable configuration")
+			t.FailNow()
+		} else if err != nil && !tc.invalidConfiguration {
 			t.Logf("Expected valid node allocatable configuration: %v", err)
 			t.FailNow()
 		}
 	}
+
+	storageEvictionThreshold := resource.MustParse("100Mi")
+	storageTestCases := []struct {
+		kubeReserved         v1.ResourceList
+		systemReserved       v1.ResourceList
+		capacity             v1.ResourceList
+		hardThreshold        evictionapi.ThresholdValue
+		invalidConfiguration bool
+	}{
+		{
+			kubeReserved:   getScratchResourceList("100Mi"),
+			systemReserved: getScratchResourceList("50Mi"),
+			capacity:       getScratchResourceList("500Mi"),
+		},
+		{
+			kubeReserved:   getScratchResourceList("10Gi"),
+			systemReserved: getScratchResourceList("10Gi"),
+			hardThreshold: evictionapi.ThresholdValue{
+				Quantity: &storageEvictionThreshold,
+			},
+			capacity:             getScratchResourceList("20Gi"),
+			invalidConfiguration: true,
+		},
+	}
+	for _, tc := range storageTestCases {
+		nc := NodeConfig{
+			NodeAllocatableConfig: NodeAllocatableConfig{
+				KubeReserved:   tc.kubeReserved,
+				SystemReserved: tc.systemReserved,
+				HardEvictionThresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalNodeFsAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value:    tc.hardThreshold,
+					},
+				},
+			},
+		}
+		cm := &containerManagerImpl{
+			NodeConfig: nc,
+			capacity:   tc.capacity,
+		}
+		err := cm.validateNodeAllocatable()
+		if err == nil && tc.invalidConfiguration {
+			t.Logf("Expected invalid node allocatable configuration")
+			t.FailNow()
+		} else if err != nil && !tc.invalidConfiguration {
+			t.Logf("Expected valid node allocatable configuration: %v", err)
+			t.FailNow()
+		}
+	}
+}
+
+// getScratchResourceList returns a ResourceList with the
+// specified scratch storage resource values
+func getScratchResourceList(storage string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if storage != "" {
+		res[v1.ResourceStorageScratch] = resource.MustParse(storage)
+	}
+	return res
 }

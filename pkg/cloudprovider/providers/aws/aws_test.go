@@ -792,12 +792,18 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		}
 	}
 
-	// test with 4 subnets from 3 different AZs
-	// add duplicate az subnet
+	// Test with 5 subnets from 3 different AZs.
+	// Add 2 duplicate AZ subnets lexicographically chosen one is the middle element in array to
+	// check that we both choose the correct entry when it comes after and before another element
+	// in the same AZ.
 	subnets[3] = make(map[string]string)
-	subnets[3]["id"] = "subnet-c0000002"
+	subnets[3]["id"] = "subnet-c0000000"
 	subnets[3]["az"] = "af-south-1c"
+	subnets[4] = make(map[string]string)
+	subnets[4]["id"] = "subnet-c0000002"
+	subnets[4]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
+	routeTables["subnet-c0000000"] = true
 	routeTables["subnet-c0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
@@ -811,6 +817,16 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		t.Errorf("Expected 3 subnets but got %d", len(result))
 		return
 	}
+
+	expected := []*string{aws.String("subnet-a0000001"), aws.String("subnet-b0000001"), aws.String("subnet-c0000000")}
+	for _, s := range result {
+		if !contains(expected, s) {
+			t.Errorf("Unexpected subnet '%s' found", s)
+			return
+		}
+	}
+
+	delete(routeTables, "subnet-c0000002")
 
 	// test with 6 subnets from 3 different AZs
 	// with 3 private subnets
@@ -825,7 +841,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-a0000001"] = false
 	routeTables["subnet-b0000001"] = false
 	routeTables["subnet-c0000001"] = false
-	routeTables["subnet-c0000002"] = true
+	routeTables["subnet-c0000000"] = true
 	routeTables["subnet-d0000001"] = true
 	routeTables["subnet-d0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
@@ -840,7 +856,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
-	expected := []*string{aws.String("subnet-c0000002"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
+	expected = []*string{aws.String("subnet-c0000000"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
 	for _, s := range result {
 		if !contains(expected, s) {
 			t.Errorf("Unexpected subnet '%s' found", s)

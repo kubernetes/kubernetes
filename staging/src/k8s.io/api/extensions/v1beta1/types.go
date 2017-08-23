@@ -50,8 +50,8 @@ type ScaleStatus struct {
 	TargetSelector string `json:"targetSelector,omitempty" protobuf:"bytes,3,opt,name=targetSelector"`
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
@@ -100,8 +100,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus `json:"items" protobuf:"bytes,1,rep,name=items"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
@@ -157,7 +157,7 @@ type ThirdPartyResourceData struct {
 	Data []byte `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -211,6 +211,7 @@ type DeploymentSpec struct {
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 
+	// DEPRECATED.
 	// The config this deployment is rolling back to. Will be cleared after rollback is done.
 	// +optional
 	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,8,opt,name=rollbackTo"`
@@ -227,6 +228,7 @@ type DeploymentSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:",inline"`
@@ -239,6 +241,7 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
+// DEPRECATED.
 type RollbackConfig struct {
 	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
@@ -342,7 +345,7 @@ type DeploymentStatus struct {
 	// field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ReplicaSet.
 	// +optional
-	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
+	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
 }
 
 type DeploymentConditionType string
@@ -521,10 +524,10 @@ type DaemonSetStatus struct {
 	// uses this field as a collision avoidance mechanism when it needs to
 	// create the name for the newest ControllerRevision.
 	// +optional
-	CollisionCount *int64 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
+	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,9,opt,name=collisionCount"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
@@ -590,7 +593,7 @@ type ThirdPartyResourceDataList struct {
 	Items []ThirdPartyResourceData `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the
@@ -759,7 +762,7 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString `json:"servicePort" protobuf:"bytes,2,opt,name=servicePort"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a ReplicaSet.
@@ -886,8 +889,8 @@ type ReplicaSetCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod Security Policy governs the ability to make requests that affect the Security Context
@@ -954,6 +957,14 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
+	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
+	// process can gain more privileges than it's parent process.
+	// +optional
+	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"varint,15,opt,name=defaultAllowPrivilegeEscalation"`
+	// AllowPrivilegeEscalation determines if a pod can request to allow
+	// privilege escalation.
+	// +optional
+	AllowPrivilegeEscalation bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,16,opt,name=allowPrivilegeEscalation"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.

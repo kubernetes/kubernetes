@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -8,11 +6,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "types.generated.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_testing_CONSUMERS",
     ],

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -377,8 +376,8 @@ func TestSchedulerExtender(t *testing.T) {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: v1.DefaultSchedulerName})
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.Core().RESTClient()).Events("")})
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 	scheduler, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
 	informerFactory.Start(schedulerConfig.StopEverything)
 	scheduler.Run()
@@ -391,7 +390,7 @@ func TestSchedulerExtender(t *testing.T) {
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.Core().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	defer cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -411,7 +410,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := 0; ii < 5; ii++ {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := cs.Core().Nodes().Create(node); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
@@ -423,7 +422,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	myPod, err := cs.Core().Pods(ns.Name).Create(pod)
+	myPod, err := cs.CoreV1().Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -433,17 +432,17 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	myPod, err = cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	myPod, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	var gracePeriod int64
-	if err := cs.Core().Pods(ns.Name).Delete(myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+	if err := cs.CoreV1().Pods(ns.Name).Delete(myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	_, err = cs.Core().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	_, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}

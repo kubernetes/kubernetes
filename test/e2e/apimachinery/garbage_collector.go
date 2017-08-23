@@ -20,16 +20,24 @@ import (
 	"fmt"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -37,6 +45,11 @@ import (
 
 func getForegroundOptions() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
+	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+}
+
+func getBackgroundOptions() *metav1.DeleteOptions {
+	policy := metav1.DeletePropagationBackground
 	return &metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
@@ -50,24 +63,30 @@ func getNonOrphanOptions() *metav1.DeleteOptions {
 	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
-var zero = int64(0)
-var deploymentLabels = map[string]string{"app": "gc-test"}
-var podTemplateSpec = v1.PodTemplateSpec{
-	ObjectMeta: metav1.ObjectMeta{
-		Labels: deploymentLabels,
-	},
-	Spec: v1.PodSpec{
-		TerminationGracePeriodSeconds: &zero,
-		Containers: []v1.Container{
-			{
-				Name:  "nginx",
-				Image: "gcr.io/google_containers/nginx-slim:0.7",
+var (
+	zero = int64(0)
+
+	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+)
+
+func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
+	return v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &zero,
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "gcr.io/google_containers/nginx-slim:0.7",
+				},
 			},
 		},
-	},
+	}
 }
 
-func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.Deployment {
+func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *v1beta1.Deployment {
 	replicas := int32(2)
 	return &v1beta1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -75,11 +94,11 @@ func newOwnerDeployment(f *framework.Framework, deploymentName string) *v1beta1.
 		},
 		Spec: v1beta1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: deploymentLabels},
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Strategy: v1beta1.DeploymentStrategy{
 				Type: v1beta1.RollingUpdateDeploymentStrategyType,
 			},
-			Template: podTemplateSpec,
+			Template: getPodTemplateSpec(labels),
 		},
 	}
 }
@@ -88,7 +107,8 @@ func getSelector() map[string]string {
 	return map[string]string{"app": "gc-test"}
 }
 
-func newOwnerRC(f *framework.Framework, name string, replicas int32) *v1.ReplicationController {
+func newOwnerRC(f *framework.Framework, name string, replicas int32, labels map[string]string) *v1.ReplicationController {
+	template := getPodTemplateSpec(labels)
 	return &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
@@ -100,8 +120,8 @@ func newOwnerRC(f *framework.Framework, name string, replicas int32) *v1.Replica
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: &replicas,
-			Selector: map[string]string{"app": "gc-test"},
-			Template: &podTemplateSpec,
+			Selector: labels,
+			Template: &template,
 		},
 	}
 }
@@ -166,10 +186,10 @@ func newGCPod(name string) *v1.Pod {
 	}
 }
 
-// verifyRemainingObjects verifies if the number of the remaining replication
+// verifyRemainingReplicationControllersPods verifies if the number of the remaining replication
 // controllers and pods are rcNum and podNum. It returns error if the
 // communication with the API server fails.
-func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
+func verifyRemainingReplicationControllersPods(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
@@ -191,10 +211,46 @@ func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interfac
 	return ret, nil
 }
 
+// verifyRemainingCronJobsJobsPods verifies if the number of remaining cronjobs,
+// jobs and pods. It returns error if the communication with the API server fails.
+func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset.Interface,
+	cjNum, jobNum, podNum int) (bool, error) {
+	var ret = true
+
+	cronJobs, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list cronjobs: %v", err)
+	}
+	if len(cronJobs.Items) != cjNum {
+		ret = false
+		By(fmt.Sprintf("expected %d cronjobs, got %d cronjobs", cjNum, len(cronJobs.Items)))
+	}
+
+	jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list jobs: %v", err)
+	}
+	if len(jobs.Items) != jobNum {
+		ret = false
+		By(fmt.Sprintf("expected %d jobs, got %d jobs", jobNum, len(jobs.Items)))
+	}
+
+	pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("Failed to list pods: %v", err)
+	}
+	if len(pods.Items) != podNum {
+		ret = false
+		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
+	}
+
+	return ret, nil
+}
+
 func gatherMetrics(f *framework.Framework) {
 	By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, false, false, true, false)
+	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
@@ -208,6 +264,41 @@ func gatherMetrics(f *framework.Framework) {
 	}
 }
 
+func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
+	parallelism := int32(1)
+	completions := int32(1)
+	return &batchv2alpha1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "CronJob",
+		},
+		Spec: batchv2alpha1.CronJobSpec{
+			Schedule: schedule,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Parallelism: &parallelism,
+					Completions: &completions,
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							RestartPolicy:                 v1.RestartPolicyOnFailure,
+							TerminationGracePeriodSeconds: &zero,
+							Containers: []v1.Container{
+								{
+									Name:    "c",
+									Image:   "gcr.io/google_containers/busybox:1.24",
+									Command: []string{"sleep", "300"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("should delete pods created by rc when not orphaning", func() {
@@ -215,7 +306,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_pods"}
+		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -248,7 +341,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		By("wait for all pods to be garbage collected")
 		// wait for the RCs and Pods to reach the expected numbers.
 		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-			return verifyRemainingObjects(f, clientSet, 0, 0)
+			return verifyRemainingReplicationControllersPods(f, clientSet, 0, 0)
 		}); err != nil {
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 			remainingPods, err := podClient.List(metav1.ListOptions{})
@@ -266,7 +359,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 100)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_pods"}
+		rc := newOwnerRC(f, rcName, 100, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -297,9 +392,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// a client is 5. If the qps is saturated, it will take 20s to orphan
 		// the pods. However, apiserver takes hundreds of ms to finish one
 		// PATCH, and the gc sends the patching in a single thread, so the
-		// actual qps is less than 5. According to the test logs, 60s is enough
-		// time.
-		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		// actual qps is less than 5. Also, the e2e tests are running in
+		// parallel, the GC controller might get distracted by other tests.
+		// According to the test logs, 120s is enough time.
+		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
 			rcs, err := rcClient.List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list rcs: %v", err)
@@ -332,7 +428,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 2)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_pods_nil_option"}
+		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -379,7 +477,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
 		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		deployment := newOwnerDeployment(f, deploymentName)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_rs"}
+		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
 		if err != nil {
@@ -395,8 +495,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(rsList.Items) > 0, nil
 
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		if err != nil {
+			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		By("delete the deployment")
@@ -428,7 +528,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.Extensions().Deployments(f.Namespace.Name)
 		rsClient := clientSet.Extensions().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		deployment := newOwnerDeployment(f, deploymentName)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "orphan_rs"}
+		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
 		if err != nil {
@@ -444,8 +546,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			return len(rsList.Items) > 0, nil
 
 		})
-		if err == wait.ErrWaitTimeout {
-			err = fmt.Errorf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
+		if err != nil {
+			framework.Failf("Failed to wait for the Deployment to create some ReplicaSet: %v", err)
 		}
 
 		By("delete the deployment")
@@ -478,7 +580,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
 		for _, replicaSet := range rs.Items {
-			if controller.GetControllerOf(&replicaSet.ObjectMeta) != nil {
+			if metav1.GetControllerOf(&replicaSet.ObjectMeta) != nil {
 				framework.Failf("Found ReplicaSet with non nil ownerRef %v", replicaSet)
 			}
 		}
@@ -491,7 +593,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		rc := newOwnerRC(f, rcName, 100)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
+		rc := newOwnerRC(f, rcName, 100, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -519,7 +623,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By("wait for the rc to be deleted")
 		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
-		if err := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: 30s is enough assuming immediate processing of dependents following
+		// owner deletion, but in practice there can be a long delay between owner
+		// deletion and dependent deletion processing. For now, increase the timeout
+		// and investigate the processing delay.
+		if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
@@ -571,16 +679,18 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(100)
 		halfReplicas := int(replicas / 2)
-		rc1 := newOwnerRC(f, rc1Name, replicas)
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels := map[string]string{"gctest": "valid_and_pending_owners"}
+		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabels)
 		By("create the rc1")
 		rc1, err := rcClient.Create(rc1)
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		rc2Name := "simpletest-rc-to-stay"
-		rc2 := newOwnerRC(f, rc2Name, 0)
-		rc2.Spec.Selector = nil
-		rc2.Spec.Template.ObjectMeta.Labels = map[string]string{"another.key": "another.value"}
+		// TODO: find better way to keep this label unique in the test
+		uniqLabels = map[string]string{"another.key": "another.value"}
+		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabels)
 		By("create the rc2")
 		rc2, err = rcClient.Create(rc2)
 		if err != nil {
@@ -617,8 +727,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for the rc to be deleted")
-		// default client QPS is 20, deleting each pod requires 2 requests, so 30s should be enough
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
+		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
+		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			_, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
@@ -704,7 +815,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Expect(err).NotTo(HaveOccurred())
 		var pods *v1.PodList
 		var err2 error
-		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
+		// Tracked at https://github.com/kubernetes/kubernetes/issues/50046.
+		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			pods, err2 = podClient.List(metav1.ListOptions{})
 			if err2 != nil {
 				return false, fmt.Errorf("Failed to list pods: %v", err)
@@ -718,5 +831,142 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Logf("pods are %#v", pods.Items)
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 		}
+	})
+
+	It("should support cascading deletion of custom resources", func() {
+		config, err := framework.LoadConfig()
+		if err != nil {
+			framework.Failf("failed to load config: %v", err)
+		}
+
+		apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
+		if err != nil {
+			framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		}
+
+		// Create a random custom resource definition and ensure it's available for
+		// use.
+		definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+		defer func() {
+			err = apiextensionstestserver.DeleteCustomResourceDefinition(definition, apiExtensionClient)
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
+			}
+		}()
+		client, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, f.ClientPool)
+		if err != nil {
+			framework.Failf("failed to create CustomResourceDefinition: %v", err)
+		}
+
+		// Get a client for the custom resource.
+		resourceClient := client.Resource(&metav1.APIResource{
+			Name:       definition.Spec.Names.Plural,
+			Namespaced: false,
+		}, api.NamespaceNone)
+		apiVersion := definition.Spec.Group + "/" + definition.Spec.Version
+
+		// Create a custom owner resource.
+		ownerName := names.SimpleNameGenerator.GenerateName("owner")
+		owner := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": ownerName,
+				},
+			},
+		}
+		persistedOwner, err := resourceClient.Create(owner)
+		if err != nil {
+			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
+		}
+		framework.Logf("created owner resource %q", ownerName)
+
+		// Create a custom dependent resource.
+		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
+		dependent := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": apiVersion,
+				"kind":       definition.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": dependentName,
+					"ownerReferences": []map[string]string{
+						{
+							"uid":        string(persistedOwner.GetUID()),
+							"apiVersion": apiVersion,
+							"kind":       definition.Spec.Names.Kind,
+							"name":       ownerName,
+						},
+					},
+				},
+			},
+		}
+		persistedDependent, err := resourceClient.Create(dependent)
+		if err != nil {
+			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
+		}
+		framework.Logf("created dependent resource %q", dependentName)
+
+		// Delete the owner.
+		background := metav1.DeletePropagationBackground
+		err = resourceClient.Delete(ownerName, &metav1.DeleteOptions{PropagationPolicy: &background})
+		if err != nil {
+			framework.Failf("failed to delete owner resource %q: %v", ownerName, err)
+		}
+
+		// Ensure the dependent is deleted.
+		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
+			return errors.IsNotFound(err), nil
+		}); err != nil {
+			framework.Logf("owner: %#v", persistedOwner)
+			framework.Logf("dependent: %#v", persistedDependent)
+			framework.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
+		}
+
+		// Ensure the owner is deleted.
+		_, err = resourceClient.Get(ownerName, metav1.GetOptions{})
+		if err == nil {
+			framework.Failf("expected owner resource %q to be deleted", ownerName)
+		} else {
+			if !errors.IsNotFound(err) {
+				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
+			}
+		}
+	})
+
+	It("should delete jobs and pods created by cronjob", func() {
+		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+
+		By("Create the cronjob")
+		cronJob := newCronJob("simple", "*/1 * * * ?")
+		cronJob, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Create(cronJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Wait for the CronJob to create new Job")
+		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
+			jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list jobs: %v", err)
+			}
+			return len(jobs.Items) > 0, nil
+		})
+		if err != nil {
+			framework.Failf("Failed to wait for the CronJob to create some Jobs: %v", err)
+		}
+
+		By("Delete the cronjob")
+		if err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Delete(cronJob.Name, getBackgroundOptions()); err != nil {
+			framework.Failf("Failed to delete the CronJob: %v", err)
+		}
+		By("Verify if cronjob does not leave jobs nor pods behind")
+		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
+			return verifyRemainingCronJobsJobsPods(f, f.ClientSet, 0, 0, 0)
+		})
+		if err != nil {
+			framework.Failf("Failed to wait for all jobs and pods to be deleted: %v", err)
+		}
+
+		gatherMetrics(f)
 	})
 })

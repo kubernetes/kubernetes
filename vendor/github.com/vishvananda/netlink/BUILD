@@ -1,37 +1,35 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "addr.go",
-        "addr_linux.go",
         "filter.go",
-        "filter_linux.go",
         "link.go",
-        "link_linux.go",
         "neigh.go",
-        "neigh_linux.go",
         "netlink.go",
+        "netlink_unspecified.go",
         "protinfo.go",
-        "protinfo_linux.go",
         "qdisc.go",
-        "qdisc_linux.go",
         "route.go",
-        "route_linux.go",
         "xfrm.go",
         "xfrm_policy.go",
-        "xfrm_policy_linux.go",
         "xfrm_state.go",
-        "xfrm_state_linux.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "addr_linux.go",
+            "filter_linux.go",
+            "link_linux.go",
+            "neigh_linux.go",
+            "protinfo_linux.go",
+            "qdisc_linux.go",
+            "route_linux.go",
+            "xfrm_policy_linux.go",
+            "xfrm_state_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/vishvananda/netlink/nl:go_default_library"],
 )
 
@@ -49,4 +47,5 @@ filegroup(
         "//vendor/github.com/vishvananda/netlink/nl:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

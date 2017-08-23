@@ -291,6 +291,15 @@ func (s *AuditLogConfig) MarshalJSON() ([]byte, error) {
 
 // Binding: Associates `members` with a `role`.
 type Binding struct {
+	// Condition: The condition that is associated with this binding.
+	// NOTE: an unsatisfied condition will not allow user access via
+	// current
+	// binding. Different bindings, including their conditions, are
+	// examined
+	// independently.
+	// This field is GOOGLE_INTERNAL.
+	Condition *Expr `json:"condition,omitempty"`
+
 	// Members: Specifies the identities requesting access for a Cloud
 	// Platform resource.
 	// `members` can have the following values:
@@ -317,6 +326,7 @@ type Binding struct {
 	// group.
 	//    For example, `admins@example.com`.
 	//
+	//
 	// * `domain:{domain}`: A Google Apps domain name that represents all
 	// the
 	//    users of that domain. For example, `google.com` or
@@ -331,7 +341,7 @@ type Binding struct {
 	// Required
 	Role string `json:"role,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Members") to
+	// ForceSendFields is a list of field names (e.g. "Condition") to
 	// unconditionally include in API requests. By default, fields with
 	// empty values are omitted from API requests. However, any non-pointer,
 	// non-interface field appearing in ForceSendFields will be sent to the
@@ -339,7 +349,7 @@ type Binding struct {
 	// used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Members") to include in
+	// NullFields is a list of field names (e.g. "Condition") to include in
 	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
@@ -356,6 +366,37 @@ func (s *Binding) MarshalJSON() ([]byte, error) {
 
 // CloudAuditOptions: Write a Cloud Audit log
 type CloudAuditOptions struct {
+	// LogName: The log_name to populate in the Cloud Audit Record.
+	//
+	// Possible values:
+	//   "UNSPECIFIED_LOG_NAME" - Default. Should not be used.
+	//   "ADMIN_ACTIVITY" - Corresponds to
+	// "cloudaudit.googleapis.com/activity"
+	//   "DATA_ACCESS" - Corresponds to
+	// "cloudaudit.googleapis.com/data_access"
+	LogName string `json:"logName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "LogName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "LogName") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CloudAuditOptions) MarshalJSON() ([]byte, error) {
+	type noMethod CloudAuditOptions
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
 // Condition: A condition to be met.
@@ -379,7 +420,6 @@ type Condition struct {
 	// additional
 	// access, and are thus only used in a strictly positive context
 	// (e.g. ALLOW/IN or DENY/NOT_IN).
-	// See: go/rpc-security-policy-dynamicauth.
 	//   "JUSTIFICATION_TYPE" - What types of justifications have been
 	// supplied with this request.
 	// String values should match enum names from
@@ -801,6 +841,60 @@ func (s *EncryptResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Expr: Represents an expression text. Example:
+//
+//     title: "User account presence"
+//     description: "Determines whether the request has a user account"
+//     expression: "size(request.user) > 0"
+type Expr struct {
+	// Description: An optional description of the expression. This is a
+	// longer text which
+	// describes the expression, e.g. when hovered over it in a UI.
+	Description string `json:"description,omitempty"`
+
+	// Expression: Textual representation of an expression in
+	// Common Expression Language syntax.
+	//
+	// The application context of the containing message determines
+	// which
+	// well-known feature set of CEL is supported.
+	Expression string `json:"expression,omitempty"`
+
+	// Location: An optional string indicating the location of the
+	// expression for error
+	// reporting, e.g. a file name and a position in the file.
+	Location string `json:"location,omitempty"`
+
+	// Title: An optional title for the expression, i.e. a short string
+	// describing
+	// its purpose. This can be used e.g. in UIs which allow to enter
+	// the
+	// expression.
+	Title string `json:"title,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Description") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Description") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Expr) MarshalJSON() ([]byte, error) {
+	type noMethod Expr
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // KeyRing: A KeyRing is a toplevel logical grouping of CryptoKeys.
 type KeyRing struct {
 	// CreateTime: Output only. The time at which this KeyRing was created.
@@ -1053,6 +1147,35 @@ func (s *Location) MarshalJSON() ([]byte, error) {
 }
 
 // LogConfig: Specifies what kind of log the caller must write
+// Increment a streamz counter with the specified metric and field
+// names.
+//
+// Metric names should start with a '/', generally be
+// lowercase-only,
+// and end in "_count". Field names should not contain an initial
+// slash.
+// The actual exported metric names will have "/iam/policy"
+// prepended.
+//
+// Field names correspond to IAM request parameters and field values
+// are
+// their respective values.
+//
+// At present the only supported field names are
+//    - "iam_principal", corresponding to IAMContext.principal;
+//    - "" (empty string), resulting in one aggretated counter with no
+// field.
+//
+// Examples:
+//   counter { metric: "/debug_access_count"  field: "iam_principal" }
+//   ==> increment counter /iam/policy/backend_debug_access_count
+//                         {iam_principal=[value of
+// IAMContext.principal]}
+//
+// At this time we do not support:
+// * multiple field names (though this may be supported in the future)
+// * decrementing the counter
+// * incrementing it by anything other than 1
 type LogConfig struct {
 	// CloudAudit: Cloud audit options.
 	CloudAudit *CloudAuditOptions `json:"cloudAudit,omitempty"`
@@ -1128,8 +1251,6 @@ type Policy struct {
 	AuditConfigs []*AuditConfig `json:"auditConfigs,omitempty"`
 
 	// Bindings: Associates a list of `members` to a `role`.
-	// Multiple `bindings` must not be specified for the same
-	// `role`.
 	// `bindings` with no members will result in an error.
 	Bindings []*Binding `json:"bindings,omitempty"`
 
@@ -2819,7 +2940,7 @@ type ProjectsLocationsKeyRingsCryptoKeysDecryptCall struct {
 	header_        http.Header
 }
 
-// Decrypt: Decrypt data that was protected by Encrypt.
+// Decrypt: Decrypts data that was protected by Encrypt.
 func (r *ProjectsLocationsKeyRingsCryptoKeysService) Decrypt(name string, decryptrequest *DecryptRequest) *ProjectsLocationsKeyRingsCryptoKeysDecryptCall {
 	c := &ProjectsLocationsKeyRingsCryptoKeysDecryptCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.name = name
@@ -2913,7 +3034,7 @@ func (c *ProjectsLocationsKeyRingsCryptoKeysDecryptCall) Do(opts ...googleapi.Ca
 	}
 	return ret, nil
 	// {
-	//   "description": "Decrypt data that was protected by Encrypt.",
+	//   "description": "Decrypts data that was protected by Encrypt.",
 	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/keyRings/{keyRingsId}/cryptoKeys/{cryptoKeysId}:decrypt",
 	//   "httpMethod": "POST",
 	//   "id": "cloudkms.projects.locations.keyRings.cryptoKeys.decrypt",
@@ -2954,7 +3075,7 @@ type ProjectsLocationsKeyRingsCryptoKeysEncryptCall struct {
 	header_        http.Header
 }
 
-// Encrypt: Encrypt data, so that it can only be recovered by a call to
+// Encrypt: Encrypts data, so that it can only be recovered by a call to
 // Decrypt.
 func (r *ProjectsLocationsKeyRingsCryptoKeysService) Encrypt(name string, encryptrequest *EncryptRequest) *ProjectsLocationsKeyRingsCryptoKeysEncryptCall {
 	c := &ProjectsLocationsKeyRingsCryptoKeysEncryptCall{s: r.s, urlParams_: make(gensupport.URLParams)}
@@ -3049,7 +3170,7 @@ func (c *ProjectsLocationsKeyRingsCryptoKeysEncryptCall) Do(opts ...googleapi.Ca
 	}
 	return ret, nil
 	// {
-	//   "description": "Encrypt data, so that it can only be recovered by a call to Decrypt.",
+	//   "description": "Encrypts data, so that it can only be recovered by a call to Decrypt.",
 	//   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/keyRings/{keyRingsId}/cryptoKeys/{cryptoKeysId}:encrypt",
 	//   "httpMethod": "POST",
 	//   "id": "cloudkms.projects.locations.keyRings.cryptoKeys.encrypt",

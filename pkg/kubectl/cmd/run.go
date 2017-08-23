@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	uexec "k8s.io/utils/exec"
 )
@@ -60,6 +60,9 @@ var (
 
 		# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
 		kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
+
+		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
+		kubectl run hazelcast --image=nginx --labels="app=hazelcast,env=prod"
 
 		# Start a replicated instance of nginx.
 		kubectl run nginx --image=nginx --replicas=5
@@ -127,7 +130,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec")
 	cmd.Flags().String("port", "", i18n.T("The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
+	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
@@ -156,6 +159,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	// validate image name
 	imageName := cmdutil.GetFlagString(cmd, "image")
+	if imageName == "" {
+		return fmt.Errorf("--image is required")
+	}
 	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
 	if !validImageRef {
 		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
@@ -169,6 +175,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	replicas := cmdutil.GetFlagInt(cmd, "replicas")
 	if interactive && replicas != 1 {
 		return cmdutil.UsageErrorf(cmd, "-i/--stdin requires that replicas is 1, found %d", replicas)
+	}
+	if cmdutil.GetFlagBool(cmd, "expose") && len(cmdutil.GetFlagString(cmd, "port")) == 0 {
+		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -449,42 +458,44 @@ func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, nam
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
-	ctrName, err := opts.GetContainerName(pod)
-	if err != nil {
-		return err
-	}
+
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
-		return err
+		return logOpts(f, pod, opts)
 	}
 
 	opts.PodClient = podClient
-
 	opts.PodName = name
 	opts.Namespace = ns
+
 	// TODO: opts.Run sets opts.Err to nil, we need to find a better way
 	stderr := opts.Err
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(stderr, "Error attaching, falling back to logs: %v\n", err)
-		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
-		if err != nil {
-			return err
-		}
-		readCloser, err := req.Stream()
-		if err != nil {
-			return err
-		}
-		defer readCloser.Close()
-		_, err = io.Copy(opts.Out, readCloser)
+		return logOpts(f, pod, opts)
+	}
+	return nil
+}
+
+// logOpts logs output from opts to the pods log.
+func logOpts(f cmdutil.Factory, pod *api.Pod, opts *AttachOptions) error {
+	ctrName, err := opts.GetContainerName(pod)
+	if err != nil {
+		return err
+	}
+
+	req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName}, opts.GetPodTimeout)
+	if err != nil {
+		return err
+	}
+
+	readCloser, err := req.Stream()
+	if err != nil {
+		return err
+	}
+	defer readCloser.Close()
+
+	_, err = io.Copy(opts.Out, readCloser)
+	if err != nil {
 		return err
 	}
 	return nil
@@ -528,11 +539,6 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
 	}
 	names := generator.ParamNames()
-
-	port := cmdutil.GetFlagString(cmd, "port")
-	if len(port) == 0 {
-		return nil, fmt.Errorf("--port must be set when exposing a service")
-	}
 
 	params := map[string]interface{}{}
 	for key, value := range paramsIn {

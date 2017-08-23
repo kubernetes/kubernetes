@@ -22,9 +22,12 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
@@ -54,6 +57,30 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
+
+	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
+	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
+	// OutOfDisk taint.
+	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      algorithm.TaintNodeDiskPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+		Key:      algorithm.TaintNodeMemoryPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubelettypes.IsCritical(newTemplate.Namespace, newTemplate.Annotations) {
+		v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
+			Key:      algorithm.TaintNodeOutOfDisk,
+			Operator: v1.TolerationOpExists,
+			Effect:   v1.TaintEffectNoExecute,
+		})
+	}
 
 	templateGenerationStr := fmt.Sprint(generation)
 	newTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(

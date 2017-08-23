@@ -159,6 +159,12 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 		if len(portProtocol) != 2 {
 			return nil, fmt.Errorf("unexpected port protocol mapping: %s", protocolsSlice[ix])
 		}
+		if len(portProtocol[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty port")
+		}
+		if len(portProtocol[1]) == 0 {
+			return nil, fmt.Errorf("unexpected empty protocol")
+		}
 		portProtocolMap[portProtocol[0]] = portProtocol[1]
 	}
 	return portProtocolMap, nil
@@ -187,6 +193,9 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 		labelSpec := strings.Split(labelSpecs[ix], "=")
 		if len(labelSpec) != 2 {
 			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
+		}
+		if len(labelSpec[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty label key")
 		}
 		labels[labelSpec[0]] = labelSpec[1]
 	}

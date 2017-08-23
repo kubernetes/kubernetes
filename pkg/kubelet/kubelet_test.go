@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
-	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,8 +40,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -160,7 +159,7 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "", 1440)
+	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), kubeletconfig.HairpinNone, "", 1440)
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
@@ -213,11 +212,6 @@ func newTestKubeletWithImageList(
 	kubelet.configMapManager = configMapManager
 	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager)
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, DiskSpacePolicy{})
-	if err != nil {
-		t.Fatalf("can't initialize disk space manager: %v", err)
-	}
-	kubelet.diskSpaceManager = diskSpaceManager
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -233,7 +227,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
-	fakeNodeRef := &clientv1.ObjectReference{
+	fakeNodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      testKubeletHostname,
 		UID:       types.UID(testKubeletHostname),
@@ -263,7 +257,7 @@ func newTestKubeletWithImageList(
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = stats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.containerRuntime)
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kubelet.nodeName),
 		UID:       types.UID(kubelet.nodeName),
@@ -569,7 +563,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	spec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"memory": resource.MustParse("90"),
+				v1.ResourceMemory: resource.MustParse("90"),
 			},
 		}}},
 	}
@@ -735,25 +729,6 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
 		assert.Error(t, err, fmt.Sprintf("[case %d] invalid container name should cause an error", i))
 	}
-}
-
-// updateDiskSpacePolicy creates a new DiskSpaceManager with a new policy. This new manager along
-// with the mock FsInfo values added to Cadvisor should make the kubelet report that it has
-// sufficient disk space or it is out of disk, depending on the capacity, availability and
-// threshold values.
-func updateDiskSpacePolicy(kubelet *Kubelet, mockCadvisor *cadvisortest.Mock, rootCap, dockerCap, rootAvail, dockerAvail uint64, rootThreshold, dockerThreshold int) error {
-	dockerimagesFsInfo := cadvisorapiv2.FsInfo{Capacity: rootCap * mb, Available: rootAvail * mb}
-	rootFsInfo := cadvisorapiv2.FsInfo{Capacity: dockerCap * mb, Available: dockerAvail * mb}
-	mockCadvisor.On("ImagesFsInfo").Return(dockerimagesFsInfo, nil)
-	mockCadvisor.On("RootFsInfo").Return(rootFsInfo, nil)
-
-	dsp := DiskSpacePolicy{DockerFreeDiskMB: rootThreshold, RootFreeDiskMB: dockerThreshold}
-	diskSpaceManager, err := newDiskSpaceManager(mockCadvisor, dsp)
-	if err != nil {
-		return err
-	}
-	kubelet.diskSpaceManager = diskSpaceManager
-	return nil
 }
 
 func TestCreateMirrorPod(t *testing.T) {

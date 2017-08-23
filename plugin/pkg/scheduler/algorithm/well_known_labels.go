@@ -28,6 +28,26 @@ const (
 	// and removed when node becomes reachable (NodeReady status ConditionTrue).
 	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 
+	// When feature-gate for TaintBasedEvictions=true flag is enabled,
+	// TaintNodeOutOfDisk would be automatically added by node controller
+	// when node becomes out of disk, and removed when node has enough disk.
+	TaintNodeOutOfDisk = "node.kubernetes.io/outOfDisk"
+
+	// When feature-gate for TaintBasedEvictions=true flag is enabled,
+	// TaintNodeMemoryPressure would be automatically added by node controller
+	// when node has memory pressure, and removed when node has enough memory.
+	TaintNodeMemoryPressure = "node.kubernetes.io/memoryPressure"
+
+	// When feature-gate for TaintBasedEvictions=true flag is enabled,
+	// TaintNodeDiskPressure would be automatically added by node controller
+	// when node has disk pressure, and removed when node has enough disk.
+	TaintNodeDiskPressure = "node.kubernetes.io/diskPressure"
+
+	// When feature-gate for TaintBasedEvictions=true flag is enabled,
+	// TaintNodeNetworkUnavailable would be automatically added by node controller
+	// when node's network is unavailable, and removed when network becomes ready.
+	TaintNodeNetworkUnavailable = "node.kubernetes.io/networkUnavailable"
+
 	// When kubelet is started with the "external" cloud provider, then
 	// it sets this taint on a node to mark it as unusable, until a controller
 	// from the cloud-controller-manager intitializes this node, and then removes

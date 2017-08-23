@@ -19,7 +19,7 @@ function enable-accounting() {
   cat <<EOF >/etc/systemd/system.conf.d/kubernetes-accounting.conf
 [Manager]
 DefaultCPUAccounting=yes
-DefaultMemoryAccounting=yes  
+DefaultMemoryAccounting=yes
 EOF
   systemctl daemon-reload
 }
@@ -95,6 +95,7 @@ grains:
   network_mode: openvswitch
   networkInterfaceName: '$(echo "$NETWORK_IF_NAME" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  kubelet_kubeconfig: /srv/salt-overlay/salt/kubelet/kubeconfig
   cloud: vagrant
   roles:
     - $role
@@ -178,6 +179,7 @@ apiVersion: v1
 kind: Config
 clusters:
 - cluster:
+    server: "https://${MASTER_IP}"
     insecure-skip-tls-verify: true
   name: local
 contexts:

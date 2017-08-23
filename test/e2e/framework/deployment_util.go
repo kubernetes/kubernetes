@@ -72,7 +72,7 @@ func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 		}
 		d = deployment
 
-		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c)
+		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
 		if err != nil {
 			return false, err
 		}
@@ -108,7 +108,7 @@ func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, r
 	})
 	if pollErr == wait.ErrWaitTimeout {
 		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deployment.Name, deployment.Status.Conditions)
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c)
+		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 		if err == nil {
 			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
 			logPodsOfDeployment(c, deployment, append(allOldRSs, newRS))
@@ -176,7 +176,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 		if err != nil {
 			return false, err
 		}
-		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c)
+		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 		if err != nil {
 			return false, err
 		}
@@ -276,8 +276,8 @@ func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) er
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
-			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c)
-			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c)
+			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.ExtensionsV1beta1())
+			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.ExtensionsV1beta1())
 			if err == nil && nerr == nil {
 				Logf("%+v", d)
 				logReplicaSetsOfDeployment(d, allOldRSs, newRS)

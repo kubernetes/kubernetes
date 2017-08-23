@@ -12,7 +12,7 @@ images:
   containervm:
     image: e2e-node-containervm-v20161208-image # docker 1.11.2
     project: kubernetes-node-e2e-images
-  gci:
+  cos-stable:
     image_regex: cos-stable-59-9460-64-0 # docker 1.11.2
     project: cos-cloud
     metadata: "user-data<test/e2e_node/jenkins/gci-init-gpu.yaml,gci-update-strategy=update_disabled"
@@ -20,3 +20,7 @@ images:
       accelerators:
         - type: nvidia-tesla-k80
           count: 2
+  cos-beta:
+    image_regex: cos-beta-60-9592-70-0 # docker 1.13.1
+    project: cos-cloud
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"

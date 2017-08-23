@@ -66,6 +66,8 @@ const (
 
 	activeStatus = "ACTIVE"
 	errorStatus  = "ERROR"
+
+	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
 )
 
 // LoadBalancer implementation for LBaaS v1
@@ -96,34 +98,6 @@ func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, erro
 	})
 
 	return seen, err
-}
-
-func getPortByIP(client *gophercloud.ServiceClient, ipAddress string) (neutronports.Port, error) {
-	var targetPort neutronports.Port
-	var portFound = false
-
-	err := neutronports.List(client, neutronports.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		portList, err := neutronports.ExtractPorts(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, port := range portList {
-			for _, ip := range port.FixedIPs {
-				if ip.IPAddress == ipAddress {
-					targetPort = port
-					portFound = true
-					return false, nil
-				}
-			}
-		}
-
-		return true, nil
-	})
-	if err == nil && !portFound {
-		err = ErrNotFound
-	}
-	return targetPort, err
 }
 
 func getFloatingIPByPortID(client *gophercloud.ServiceClient, portID string) (*floatingips.FloatingIP, error) {
@@ -581,6 +555,49 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 	return addrs[0].Address, nil
 }
 
+//getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
+func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting string) string {
+	glog.V(4).Infof("getStringFromServiceAnnotation(%v, %v, %v)", service, annotationKey, defaultSetting)
+	if annotationValue, ok := service.Annotations[annotationKey]; ok {
+		//if there is an annotation for this setting, set the "setting" var to it
+		// annotationValue can be empty, it is working as designed
+		// it makes possible for instance provisioning loadbalancer without floatingip
+		glog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
+		return annotationValue
+	}
+	//if there is no annotation, set "settings" var to the value from cloud config
+	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
+	return defaultSetting
+}
+
+// getSubnetIDForLB returns subnet-id for a specific node
+func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string, error) {
+	ipAddress, err := nodeAddressForLB(&node)
+	if err != nil {
+		return "", err
+	}
+
+	instanceID := node.Spec.ProviderID
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
+	}
+
+	interfaces, err := getAttachedInterfacesByID(compute, instanceID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, intf := range interfaces {
+		for _, fixedIP := range intf.FixedIPs {
+			if fixedIP.IPAddress == ipAddress {
+				return intf.NetID, nil
+			}
+		}
+	}
+
+	return "", ErrNotFound
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in
@@ -590,13 +607,24 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	if len(lbaas.opts.SubnetId) == 0 {
-		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			return nil, fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
 	}
 
 	ports := apiService.Spec.Ports
 	if len(ports) == 0 {
 		return nil, fmt.Errorf("no ports provided to openstack load balancer")
 	}
+
+	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
+	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
 
 	// Check for TCP protocol on each port
 	// TODO: Convert all error messages to use an event recorder
@@ -827,10 +855,10 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	if err != nil && err != ErrNotFound {
 		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
-	if floatIP == nil && lbaas.opts.FloatingNetworkId != "" {
+	if floatIP == nil && floatingPool != "" {
 		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lbaas.opts.FloatingNetworkId,
+			FloatingNetworkID: floatingPool,
 			PortID:            portID,
 		}
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
@@ -955,7 +983,15 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
 	if len(lbaas.opts.SubnetId) == 0 {
-		return fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", service.Namespace, service.Name, err)
+			return fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", service.Namespace, service.Name, err)
+		}
+		lbaas.opts.SubnetId = subnetID
 	}
 
 	ports := service.Spec.Ports
@@ -1080,7 +1116,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		return nil
 	}
 
-	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
+	if loadbalancer != nil && loadbalancer.VipPortID != "" {
 		portID := loadbalancer.VipPortID
 		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
@@ -1234,7 +1270,15 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
 	if len(lb.opts.SubnetId) == 0 {
-		return nil, fmt.Errorf("subnet-id not set in cloud provider config")
+		// Get SubnetId automatically.
+		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
+		subnetID, err := getSubnetIDForLB(lb.compute, *nodes[0])
+		if err != nil {
+			glog.Warningf("Failed to find subnet-id for loadbalancer service %s/%s: %v", apiService.Namespace, apiService.Name, err)
+			return nil, fmt.Errorf("No subnet-id for service %s/%s : subnet-id not set in cloud provider config, "+
+				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
+		}
+		lb.opts.SubnetId = subnetID
 	}
 
 	ports := apiService.Spec.Ports

@@ -85,7 +85,6 @@ func TestStatefulSetControl(t *testing.T) {
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
 		{RecreatesFailedPod, simpleSetFn},
-		{SetsInitAnnotation, simpleSetFn},
 		{CreatePodFailure, simpleSetFn},
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
@@ -279,59 +278,6 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 	}
 }
 
-func SetsInitAnnotation(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
-	client := fake.NewSimpleClientset(set)
-	spc, _, ssc, stop := setupController(client)
-	defer close(stop)
-
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		t.Error(err)
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
-	}
-	if err = ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err = invariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodRunning(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodReady(set, 0); err != nil {
-		t.Error(err)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, false); err != nil {
-		t.Error(err)
-	}
-	replicas := int(set.Status.Replicas)
-	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
-		t.Errorf("Error updating StatefulSet %s", err)
-	}
-	if err := invariants(set, spc); err != nil {
-		t.Error(err)
-	}
-	if replicas != int(set.Status.Replicas) {
-		t.Errorf("StatefulSetControl does not block on %s=false", apps.StatefulSetInitAnnotation)
-	}
-	if pods, err = spc.setPodInitStatus(set, 0, true); err != nil {
-		t.Error(err)
-	}
-	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
-		t.Errorf("Failed to turn up StatefulSet : %s", err)
-	}
-	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
-	if err != nil {
-		t.Fatalf("Error getting updated StatefulSet: %v", err)
-	}
-	if int(set.Status.Replicas) != 3 {
-		t.Errorf("StatefulSetControl does not unblock on %s=true", apps.StatefulSetInitAnnotation)
-	}
-}
-
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	spc, _, ssc, stop := setupController(client)
@@ -519,14 +465,18 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1beta1().ControllerRevisions().Informer().HasSynced,
 		)
+		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
-			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i])
+			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
 		}
 		revisions, err := ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		if err != nil {
+			t.Fatalf("error getting statefulset revisions:%v", err)
+		}
 		revisions, err = ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
@@ -534,20 +484,20 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if len(revisions) != test.expectedCount {
 			t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
 		}
-		if test.err && err != nil {
+		if test.err && err == nil {
 			t.Errorf("%s: expected error", test.name)
 		}
 		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
 			t.Errorf("%s: for current want %v got %v", test.name, test.expectedCurrent, current)
 		}
 		if !test.err && !history.EqualRevision(update, test.expectedUpdate) {
-			t.Errorf("%s: for current want %v got %v", test.name, test.expectedUpdate, update)
+			t.Errorf("%s: for update want %v got %v", test.name, test.expectedUpdate, update)
 		}
 		if !test.err && test.expectedCurrent != nil && current != nil && test.expectedCurrent.Revision != current.Revision {
 			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedCurrent.Revision, current.Revision)
 		}
 		if !test.err && test.expectedUpdate != nil && update != nil && test.expectedUpdate.Revision != update.Revision {
-			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
+			t.Errorf("%s: for update revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
 		}
 	}
 
@@ -562,14 +512,17 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 	}
 
 	set := newStatefulSet(3)
+	set.Status.CollisionCount = new(int32)
 	rev0 := newRevisionOrDie(set, 1)
 	set1 := copySet(set)
 	set1.Spec.Template.Spec.Containers[0].Image = "foo"
 	set1.Status.CurrentRevision = rev0.Name
+	set1.Status.CollisionCount = new(int32)
 	rev1 := newRevisionOrDie(set1, 2)
 	set2 := copySet(set1)
 	set2.Spec.Template.Labels["new"] = "label"
 	set2.Status.CurrentRevision = rev0.Name
+	set2.Status.CollisionCount = new(int32)
 	rev2 := newRevisionOrDie(set2, 3)
 	tests := []testcase{
 		{
@@ -1673,30 +1626,6 @@ func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal in
 	return spc.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (spc *fakeStatefulPodControl) setPodInitStatus(set *apps.StatefulSet, ordinal int, init bool) ([]*v1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		return nil, err
-	}
-	if 0 > ordinal || ordinal >= len(pods) {
-		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
-	}
-	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
-	if init {
-		pod.Annotations[apps.StatefulSetInitAnnotation] = "true"
-	} else {
-		pod.Annotations[apps.StatefulSetInitAnnotation] = "false"
-	}
-	fakeResourceVersion(pod)
-	spc.podsIndexer.Update(pod)
-	return spc.podsLister.Pods(set.Namespace).List(selector)
-}
-
 func (spc *fakeStatefulPodControl) addTerminatingPod(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	pod := newStatefulSetPod(set, ordinal)
 	pod.Status.Phase = v1.PodRunning
@@ -2175,7 +2104,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 }
 
 func newRevisionOrDie(set *apps.StatefulSet, revision int64) *apps.ControllerRevision {
-	rev, err := newRevision(set, revision)
+	rev, err := newRevision(set, revision, set.Status.CollisionCount)
 	if err != nil {
 		panic(err)
 	}

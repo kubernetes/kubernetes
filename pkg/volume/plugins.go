@@ -34,6 +34,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
+const (
+	// Common parameter which can be specified in StorageClass to specify the desired FSType
+	// Provisioners SHOULD implement support for this if they are block device based
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Default value depends on the provisioner
+	VolumeParameterFSType = "fstype"
+)
+
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -216,7 +224,7 @@ type VolumeHost interface {
 	GetCloudProvider() cloudprovider.Interface
 
 	// Get mounter interface.
-	GetMounter() mount.Interface
+	GetMounter(pluginName string) mount.Interface
 
 	// Get writer interface for writing data to disk.
 	GetWriter() io.Writer
@@ -235,6 +243,9 @@ type VolumeHost interface {
 
 	// Returns a function that returns a configmap.
 	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+
+	// Returns an interface that should be used to execute any utilities in volume plugins
+	GetExec(pluginName string) mount.Exec
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
@@ -378,6 +389,10 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
+
+	if spec == nil {
+		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
+	}
 
 	matches := []string{}
 	for k, v := range pm.plugins {

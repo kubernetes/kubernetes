@@ -296,7 +296,7 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 // IMPORTANT: This test is designed to work on large (>= 100 Nodes) clusters. For smaller ones
 // results will not be representative for control-plane performance as we'll start hitting
 // limits on Docker's concurrent container startup.
-var _ = framework.KubeDescribe("Density", func() {
+var _ = SIGDescribe("Density", func() {
 	var c clientset.Interface
 	var nodeCount int
 	var additionalPodsPrefix string
@@ -328,7 +328,7 @@ var _ = framework.KubeDescribe("Density", func() {
 
 		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, metrics)
@@ -582,7 +582,7 @@ var _ = framework.KubeDescribe("Density", func() {
 							var startTime metav1.Time
 							for _, cs := range p.Status.ContainerStatuses {
 								if cs.State.Running != nil {
-									if startTime.Before(cs.State.Running.StartedAt) {
+									if startTime.Before(&cs.State.Running.StartedAt) {
 										startTime = cs.State.Running.StartedAt
 									}
 								}

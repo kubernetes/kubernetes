@@ -76,9 +76,37 @@ CNI_CONF_DIR=${CNI_CONF_DIR:-""}
 # CNI_BIN_DIR is the path to network plugin config files.
 CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 
+# KUBELET_KUBECONFIG_DIR is the path to a dir for the kubelet's kubeconfig file
+KUBELET_KUBECONFIG=${KUBELET_KUBECONFIG:-"/var/lib/kubelet/kubeconfig"}
+
+# Creates a kubeconfig file for the kubelet.
+# Args: address (e.g. "http://localhost:8080"), destination file path
+function create-kubelet-kubeconfig() {
+  local api_addr="${1}"
+  local dest="${2}"
+  local dest_dir="$(dirname "${dest}")"
+  mkdir -p "${dest_dir}" &>/dev/null || sudo mkdir -p "${dest_dir}"
+  sudo=$(test -w "${dest_dir}" || echo "sudo -E")
+  cat <<EOF | ${sudo} tee "${dest}" > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      server: ${api_addr}
+    name: local
+contexts:
+  - context:
+      cluster: local
+    name: local
+current-context: local
+EOF
+}
+
 # start_kubelet starts kubelet and redirect kubelet log to $LOG_DIR/kubelet.log.
 kubelet_log=kubelet.log
 start_kubelet() {
+  echo "Creating kubelet.kubeconfig"
+  create-kubelet-kubeconfig "http://localhost:8080" $KUBELET_KUBECONFIG
   echo "Starting kubelet..."
   sudo -b $KUBELET $@ &>$LOG_DIR/$kubelet_log
   if [ $? -ne 0 ]; then
@@ -147,7 +175,6 @@ if [ ! -z $pid ]; then
   exit 1
 fi
 
-apiserver=http://localhost:8080
 volume_stats_agg_period=10s
 allow_privileged=true
 serialize_image_pulls=false
@@ -155,7 +182,7 @@ config_dir=`mktemp -d`
 file_check_frequency=10s
 pod_cidr=10.100.0.0/24
 log_level=4
-start_kubelet --api-servers $apiserver \
+start_kubelet --kubeconfig "${KUBELET_KUBECONFIG_DIR}/kubelet.kubeconfig" \
   --volume-stats-agg-period $volume_stats_agg_period \
   --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \

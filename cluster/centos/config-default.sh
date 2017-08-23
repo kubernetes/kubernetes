@@ -120,7 +120,7 @@ export FLANNEL_NET=${FLANNEL_NET:-"172.16.0.0/16"}
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,ResourceQuota"}
+export ADMISSION_CONTROL=${ADMISSION_CONTROL:-"Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultTolerationSeconds,Priority,ResourceQuota"}
 
 # Extra options to set on the Docker command line.
 # This is useful for setting --insecure-registry for local registries.

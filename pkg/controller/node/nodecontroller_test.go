@@ -36,13 +36,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/node/testutil"
+	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	"k8s.io/kubernetes/pkg/controller/node/scheduler"
+	"k8s.io/kubernetes/pkg/controller/node/util"
+	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 const (
@@ -103,7 +106,7 @@ func NewNodeControllerFromClient(
 		serviceCIDR,
 		nodeCIDRMaskSize,
 		allocateNodeCIDRs,
-		RangeAllocatorType,
+		ipam.RangeAllocatorType,
 		useTaints,
 		useTaints,
 	)
@@ -637,9 +640,9 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
-				nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUid, _ := value.UID.(string)
-					deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
+					util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -782,9 +785,9 @@ func TestPodStatusChange(t *testing.T) {
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUid, _ := value.UID.(string)
-				deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+				util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -1326,7 +1329,6 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				break
 			}
 		}
-
 		if item.expectedEvictPods != podEvicted {
 			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
@@ -1338,9 +1340,9 @@ func (nc *nodeController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) 
 	var podEvicted bool
 	zones := testutil.GetZones(fakeNodeHandler)
 	for _, zone := range zones {
-		nc.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
-			deletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			util.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
 			return true, 0
 		})
 	}
@@ -2006,7 +2008,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doTaintingPass()
+	nodeController.doNoExecuteTaintingPass()
 
 	node0, err := fakeNodeHandler.Get("node0", metav1.GetOptions{})
 	if err != nil {
@@ -2019,7 +2021,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 
-	if originalTaint != nil && !v1helper.TaintExists(node0.Spec.Taints, originalTaint) {
+	if originalTaint != nil && !taintutils.TaintExists(node0.Spec.Taints, originalTaint) {
 		t.Errorf("Can't find taint %v in %v", originalTaint, node0.Spec.Taints)
 	}
 
@@ -2044,7 +2046,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.monitorNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	nodeController.doTaintingPass()
+	nodeController.doNoExecuteTaintingPass()
 
 	node0, err = fakeNodeHandler.Get("node0", metav1.GetOptions{})
 	if err != nil {
@@ -2052,7 +2054,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		return
 	}
 	if updatedTaint != nil {
-		if !v1helper.TaintExists(node0.Spec.Taints, updatedTaint) {
+		if !taintutils.TaintExists(node0.Spec.Taints, updatedTaint) {
 			t.Errorf("Can't find taint %v in %v", updatedTaint, node0.Spec.Taints)
 		}
 	}
@@ -2311,7 +2313,7 @@ func TestCheckNodeKubeletVersionParsing(t *testing.T) {
 				},
 			},
 		}
-		isOutdated := nodeRunningOutdatedKubelet(n)
+		isOutdated := util.NodeRunningOutdatedKubelet(n)
 		if ov.outdated != isOutdated {
 			t.Errorf("Version %v doesn't match test expectation. Expected outdated %v got %v", n.Status.NodeInfo.KubeletVersion, ov.outdated, isOutdated)
 		} else {

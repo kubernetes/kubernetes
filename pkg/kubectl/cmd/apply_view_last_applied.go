@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type ViewLastAppliedOptions struct {
@@ -73,8 +73,8 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 	}
 
 	cmd.Flags().StringP("output", "o", "", "Output format. Must be one of yaml|json")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	usage := "that contains the last-applied-configuration annotations"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 

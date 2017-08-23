@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -15,14 +8,28 @@ go_library(
         "sockets.go",
         "sockets_unix.go",
         "tcp_socket.go",
-        "unix_socket.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "unix_socket.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "sockets_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/Sirupsen/logrus:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         "//vendor/golang.org/x/net/proxy:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/Sirupsen/logrus:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/Microsoft/go-winio:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -36,4 +43,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

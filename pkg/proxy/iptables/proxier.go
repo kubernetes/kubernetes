@@ -35,7 +35,7 @@ import (
 
 	"github.com/golang/glog"
 
-	clientv1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -211,7 +211,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 	copy(info.externalIPs, service.Spec.ExternalIPs)
 
 	if apiservice.NeedsHealthCheck(service) {
-		p := apiservice.GetServiceHealthCheckNodePort(service)
+		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
 			glog.Errorf("Service %q has no healthcheck nodeport", svcPortName.NamespacedName.String())
 		} else {
@@ -687,20 +687,6 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.syncProxyRules()
 }
 
-func shouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
-	// if ClusterIP is "None" or empty, skip proxying
-	if !helper.IsServiceIPSet(service) {
-		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
-		return true
-	}
-	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
-	if service.Spec.Type == api.ServiceTypeExternalName {
-		glog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
-		return true
-	}
-	return false
-}
-
 // <serviceMap> is updated by this function (based on the given changes).
 // <changes> map is cleared after applying them.
 func updateServiceMap(
@@ -894,7 +880,7 @@ func serviceToServiceMap(service *api.Service) proxyServiceMap {
 		return nil
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if shouldSkipService(svcName, service) {
+	if utilproxy.ShouldSkipService(svcName, service) {
 		return nil
 	}
 
@@ -959,8 +945,6 @@ func (esp *endpointServicePair) IPPart() string {
 	return esp.endpoint
 }
 
-const noConnectionToDelete = "0 flow entries have been deleted"
-
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
 // risk sending more traffic to it, all of which will be lost (because UDP).
 // This assumes the proxier mutex is held
@@ -968,13 +952,9 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
 			endpointIP := epSvcPair.endpoint[0:strings.Index(epSvcPair.endpoint, ":")]
-			glog.V(2).Infof("Deleting connection tracking state for service IP %s, endpoint IP %s", svcInfo.clusterIP.String(), endpointIP)
-			err := utilproxy.ExecConntrackTool(proxier.exec, "-D", "--orig-dst", svcInfo.clusterIP.String(), "--dst-nat", endpointIP, "-p", "udp")
-			if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
-				// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
-				// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
-				// is expensive to baby sit all udp connections to kubernetes services.
-				glog.Errorf("conntrack return with error: %v", err)
+			err := utilproxy.ClearUDPConntrackForPeers(proxier.exec, svcInfo.clusterIP.String(), endpointIP)
+			if err != nil {
+				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.servicePortName.String(), err)
 			}
 		}
 	}
@@ -1217,7 +1197,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the "external" IP happens to be an IP that is local to this
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			if local, err := isLocalIP(externalIP); err != nil {
+			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
 			} else if local {
 				lp := localPort{
@@ -1235,7 +1215,7 @@ func (proxier *Proxier) syncProxyRules() {
 						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lp.String(), err)
 
 						proxier.recorder.Eventf(
-							&clientv1.ObjectReference{
+							&v1.ObjectReference{
 								Kind:      "Node",
 								Name:      proxier.hostname,
 								UID:       types.UID(proxier.hostname),
@@ -1373,7 +1353,14 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if lp.protocol == "udp" {
-					proxier.clearUDPConntrackForPort(lp.port)
+					// TODO: We might have multiple services using the same port, and this will clear conntrack for all of them.
+					// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
+					// This only affects UDP connections, which are not common.
+					// See issue: https://github.com/kubernetes/kubernetes/issues/49881
+					err := utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.port)
+					if err != nil {
+						glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.port, err)
+					}
 				}
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
@@ -1599,7 +1586,20 @@ func (proxier *Proxier) syncProxyRules() {
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		glog.Errorf("Failed to execute iptables-restore: %v", err)
-		glog.V(2).Infof("Rules:\n%s", proxier.iptablesData.Bytes())
+		// ~rough approximation, assume ~100 chars per line
+		// we log first 1000 bytes, but full list at higher levels
+		rules := proxier.iptablesData.Bytes()
+		if len(rules) > 1000 {
+			abridgedRules := rules[:1000]
+			if glog.V(4) {
+				glog.V(4).Infof("Rules:\n%s", rules)
+			} else {
+				glog.V(2).Infof("Rules (abridged):\n%s", abridgedRules)
+			}
+		} else {
+			glog.V(2).Infof("Rules:\n%s", rules)
+		}
+
 		// Revert new local ports.
 		revertPorts(replacementPortsMap, proxier.portsMap)
 		return
@@ -1629,26 +1629,13 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 
 	// Finish housekeeping.
-	// TODO: these and clearUDPConntrackForPort() could be made more consistent.
-	utilproxy.DeleteServiceConnections(proxier.exec, staleServices.List())
-	proxier.deleteEndpointConnections(endpointUpdateResult.staleEndpoints)
-}
-
-// Clear UDP conntrack for port or all conntrack entries when port equal zero.
-// When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
-// The solution is clearing the conntrack. Known issus:
-// https://github.com/docker/docker/issues/8795
-// https://github.com/kubernetes/kubernetes/issues/31983
-func (proxier *Proxier) clearUDPConntrackForPort(port int) {
-	glog.V(2).Infof("Deleting conntrack entries for udp connections")
-	if port > 0 {
-		err := utilproxy.ExecConntrackTool(proxier.exec, "-D", "-p", "udp", "--dport", strconv.Itoa(port))
-		if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
-			glog.Errorf("conntrack return with error: %v", err)
+	// TODO: these could be made more consistent.
+	for _, svcIP := range staleServices.List() {
+		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
+			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
-	} else {
-		glog.Errorf("Wrong port number. The port number must be greater than zero")
 	}
+	proxier.deleteEndpointConnections(endpointUpdateResult.staleEndpoints)
 }
 
 // Join all words with spaces, terminate with newline and write to buf.
@@ -1662,23 +1649,6 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 			buf.WriteByte('\n')
 		}
 	}
-}
-
-func isLocalIP(ip string) (bool, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false, err
-	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false, err
-		}
-		if net.ParseIP(ip).Equal(intf) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func openLocalPort(lp *localPort) (closeable, error) {

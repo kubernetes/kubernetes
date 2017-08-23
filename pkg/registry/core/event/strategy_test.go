@@ -25,6 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func testEvent(name string) *api.Event {

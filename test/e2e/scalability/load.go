@@ -78,7 +78,7 @@ var knownKinds = []schema.GroupKind{
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
-var _ = framework.KubeDescribe("Load capacity", func() {
+var _ = SIGDescribe("Load capacity", func() {
 	var clientset clientset.Interface
 	var nodeCount int
 	var ns string
@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries := make([]framework.TestDataSummary, 0, 1)
@@ -518,7 +518,9 @@ func generateServicesForConfigs(configs []testutils.RunObjectConfig) []*v1.Servi
 }
 
 func sleepUpTo(d time.Duration) {
-	time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
+	if d.Nanoseconds() > 0 {
+		time.Sleep(time.Duration(rand.Int63n(d.Nanoseconds())))
+	}
 }
 
 func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration) {

@@ -825,6 +825,34 @@ func TestPrintNodeStatus(t *testing.T) {
 			},
 			status: "Unknown,SchedulingDisabled",
 		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo10",
+					Labels: map[string]string{"node-role.kubernetes.io/master": "", "kubernetes.io/role": "node", "kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+			},
+			status: "Unknown,Master",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo11",
+					Labels: map[string]string{"kubernetes.io/role": "node", "kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+			},
+			status: "Unknown,Node",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo12",
+					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,Node",
+		},
 	}
 
 	for _, test := range table {
@@ -1094,10 +1122,14 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 			},
 		},
 	}
-	buff := bytes.Buffer{}
-	printIngress(&ingress, &buff, printers.PrintOptions{
-		ColumnLabels: []string{"app_name"},
-	})
+	buff := bytes.NewBuffer([]byte{})
+	table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+		t.Fatal(err)
+	}
 	output := string(buff.Bytes())
 	appName := ingress.ObjectMeta.Labels["app_name"]
 	if !strings.Contains(output, appName) {
@@ -1219,8 +1251,14 @@ func TestPrintHumanReadableService(t *testing.T) {
 
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
-			buff := bytes.Buffer{}
-			printService(&svc, &buff, printers.PrintOptions{Wide: wide})
+			buff := bytes.NewBuffer([]byte{})
+			table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&svc, printers.PrintOptions{Wide: wide})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+				t.Fatal(err)
+			}
 			output := string(buff.Bytes())
 			ip := svc.Spec.ClusterIP
 			if !strings.Contains(output, ip) {
@@ -1588,7 +1626,7 @@ func TestPrintPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
 				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
 				Status: api.PodStatus{
-					Reason: "OutOfDisk",
+					Reason: "podReason",
 					Phase:  "podPhase",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
@@ -1596,7 +1634,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "OutOfDisk", 6, "<unknown>"}}},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
 		},
 	}
 
@@ -1892,13 +1930,22 @@ func TestPrintDeployment(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printDeployment(&test.deployment, buf, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
 		// print deployment with '-o wide' option
-		printDeployment(&test.deployment, buf, printers.PrintOptions{Wide: true})
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if buf.String() != test.wideExpect {
 			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
 		}
@@ -2366,13 +2413,13 @@ func TestPrintHPA(t *testing.T) {
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		err := printHorizontalPodAutoscaler(&test.hpa, buff, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.hpa, printers.PrintOptions{})
 		if err != nil {
-			t.Errorf("expected %q, got error: %v", test.expected, err)
-			buff.Reset()
-			continue
+			t.Fatal(err)
 		}
-
+		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if buff.String() != test.expected {
 			t.Errorf("expected %q, got %q", test.expected, buff.String())
 		}
@@ -2594,7 +2641,13 @@ func TestPrintService(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printService(&test.service, buf, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.service, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		// We ignore time
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
@@ -2605,6 +2658,7 @@ func TestPrintService(t *testing.T) {
 
 func TestPrintPodDisruptionBudget(t *testing.T) {
 	minAvailable := intstr.FromInt(22)
+	maxUnavailable := intstr.FromInt(11)
 	tests := []struct {
 		pdb    policy.PodDisruptionBudget
 		expect string
@@ -2624,6 +2678,22 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 				},
 			},
 			"pdb1\t22\tN/A\t5\t0s\n",
+		},
+		{
+			policy.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "ns2",
+					Name:              "pdb2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MaxUnavailable: &maxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 5,
+				},
+			},
+			"pdb2\tN/A\t11\t5\t0s\n",
 		}}
 
 	buf := bytes.NewBuffer([]byte{})
@@ -2745,7 +2815,13 @@ func TestPrintControllerRevision(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		printControllerRevision(&test.history, buf, printers.PrintOptions{})
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.history, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
 		}

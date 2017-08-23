@@ -275,7 +275,7 @@ type ResourceMetricStatus struct {
 	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,3,name=currentAverageValue"`
 }
 
-// +genclient=true
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod

@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -481,7 +482,9 @@ type StatusDetails struct {
 	// failure. Not all StatusReasons may provide detailed causes.
 	// +optional
 	Causes []StatusCause `json:"causes,omitempty" protobuf:"bytes,4,rep,name=causes"`
-	// If specified, the time in seconds before the operation should be retried.
+	// If specified, the time in seconds before the operation should be retried. Some errors may indicate
+	// the client must take an alternate action - for those errors this field may indicate how long to wait
+	// before taking the alternate action.
 	// +optional
 	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty" protobuf:"varint,5,opt,name=retryAfterSeconds"`
 }
@@ -586,6 +589,15 @@ const (
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 
+	// StatusReasonTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again. A client may
+	// always retry the request that led to this error, although the client should wait at least
+	// the number of seconds specified by the retryAfterSeconds field.
+	// Details (optional):
+	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
+	// Status code 429
+	StatusReasonTooManyRequests StatusReason = "TooManyRequests"
+
 	// StatusReasonBadRequest means that the request itself was invalid, because the request
 	// doesn't make any sense, for example deleting a read-only object.  This is different than
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
@@ -667,6 +679,20 @@ const (
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// List holds a list of objects, which may not be known by the server.
+type List struct {
+	TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// List of objects
+	Items []runtime.RawExtension `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
 
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.

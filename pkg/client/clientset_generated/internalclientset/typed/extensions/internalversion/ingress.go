@@ -59,6 +59,41 @@ func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 	}
 }
 
+// Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
+func (c *ingresses) Get(name string, options v1.GetOptions) (result *extensions.Ingress, err error) {
+	result = &extensions.Ingress{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
+func (c *ingresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
+	result = &extensions.IngressList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested ingresses.
+func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Create(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
@@ -85,7 +120,7 @@ func (c *ingresses) Update(ingress *extensions.Ingress) (result *extensions.Ingr
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *ingresses) UpdateStatus(ingress *extensions.Ingress) (result *extensions.Ingress, err error) {
 	result = &extensions.Ingress{}
@@ -120,41 +155,6 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(name string, options v1.GetOptions) (result *extensions.Ingress, err error) {
-	result = &extensions.Ingress{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(opts v1.ListOptions) (result *extensions.IngressList, err error) {
-	result = &extensions.IngressList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched ingress.

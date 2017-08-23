@@ -32,11 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -116,7 +115,7 @@ func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -139,11 +138,11 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}}, nil
+		blockDeviceMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &CinderDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -216,7 +215,7 @@ func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
 }
 
 func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 	if err != nil {
@@ -241,7 +240,7 @@ type cdManager interface {
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(unmounter *cinderVolumeUnmounter) error
 	// Creates a volume
-	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
+	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *cinderVolumeDeleter) error
 }
@@ -380,7 +379,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 
 func (cd *cinderVolume) GetPath() string {
 	name := cinderVolumePluginName
-	return cd.plugin.host.GetPodVolumeDir(cd.podUID, strings.EscapeQualifiedNameForDisk(name), cd.volName)
+	return cd.plugin.host.GetPodVolumeDir(cd.podUID, kstrings.EscapeQualifiedNameForDisk(name), cd.volName)
 }
 
 type cinderVolumeUnmounter struct {
@@ -467,7 +466,7 @@ var _ volume.Deleter = &cinderVolumeDeleter{}
 
 func (r *cinderVolumeDeleter) GetPath() string {
 	name := cinderVolumePluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
+	return r.plugin.host.GetPodVolumeDir(r.podUID, kstrings.EscapeQualifiedNameForDisk(name), r.volName)
 }
 
 func (r *cinderVolumeDeleter) Delete() error {
@@ -486,7 +485,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
-	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +507,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Cinder: &v1.CinderVolumeSource{
 					VolumeID: volumeID,
-					FSType:   "ext4",
+					FSType:   fstype,
 					ReadOnly: false,
 				},
 			},

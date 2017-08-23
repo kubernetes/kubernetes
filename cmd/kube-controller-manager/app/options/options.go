@@ -69,9 +69,6 @@ func NewCMServer() *CMServer {
 			ConcurrentDeploymentSyncs:                       5,
 			ConcurrentNamespaceSyncs:                        10,
 			ConcurrentSATokenSyncs:                          5,
-			LookupCacheSizeForRC:                            4096,
-			LookupCacheSizeForRS:                            4096,
-			LookupCacheSizeForDaemonSet:                     1024,
 			ServiceSyncPeriod:                               metav1.Duration{Duration: 5 * time.Minute},
 			RouteReconciliationPeriod:                       metav1.Duration{Duration: 10 * time.Second},
 			ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
@@ -134,6 +131,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.BoolVar(&s.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances.  This is a legacy mode of operation and a cluster-id will be required in the future.")
+	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release.  A cluster-id will be required on cloud instances")
 	fs.Int32Var(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load")
@@ -142,15 +141,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.Int32Var(&s.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", s.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more responsive deployments, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentNamespaceSyncs, "concurrent-namespace-syncs", s.ConcurrentNamespaceSyncs, "The number of namespace objects that are allowed to sync concurrently. Larger number = more responsive namespace termination, but more CPU (and network) load")
 	fs.Int32Var(&s.ConcurrentSATokenSyncs, "concurrent-serviceaccount-token-syncs", s.ConcurrentSATokenSyncs, "The number of service account token objects that are allowed to sync concurrently. Larger number = more responsive token generation, but more CPU (and network) load")
-	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
-	fs.Int32Var(&s.LookupCacheSizeForRC, "replication-controller-lookup-cache-size", s.LookupCacheSizeForRC, "This flag is deprecated and will be removed in future releases. ReplicationController no longer requires a lookup cache.")
-	fs.MarkDeprecated("replication-controller-lookup-cache-size", "This flag is deprecated and will be removed in future releases. ReplicationController no longer requires a lookup cache.")
-	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
-	fs.Int32Var(&s.LookupCacheSizeForRS, "replicaset-lookup-cache-size", s.LookupCacheSizeForRS, "This flag is deprecated and will be removed in future releases. ReplicaSet no longer requires a lookup cache.")
-	fs.MarkDeprecated("replicaset-lookup-cache-size", "This flag is deprecated and will be removed in future releases. ReplicaSet no longer requires a lookup cache.")
-	// TODO(#43388): Remove the following flag 6 months after v1.6.0 is released.
-	fs.Int32Var(&s.LookupCacheSizeForDaemonSet, "daemonset-lookup-cache-size", s.LookupCacheSizeForDaemonSet, "This flag is deprecated and will be removed in future releases. DaemonSet no longer requires a lookup cache.")
-	fs.MarkDeprecated("daemonset-lookup-cache-size", "This flag is deprecated and will be removed in future releases. DaemonSet no longer requires a lookup cache.")
 	fs.DurationVar(&s.ServiceSyncPeriod.Duration, "service-sync-period", s.ServiceSyncPeriod.Duration, "The period for syncing services with their external load balancers")
 	fs.DurationVar(&s.NodeSyncPeriod.Duration, "node-sync-period", 0, ""+
 		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+

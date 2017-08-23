@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -51,13 +51,13 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 	testCondition := "Memory Pressure"
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
 			kubeReserved := getNodeCPUAndMemoryCapacity(f)[v1.ResourceMemory]
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
 			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
 			kubeReserved.Sub(resource.MustParse("300Mi"))
-			initialConfig.KubeReserved = componentconfig.ConfigurationMap(map[string]string{"memory": kubeReserved.String()})
+			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.CgroupsPerQOS = true

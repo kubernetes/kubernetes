@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_test",
@@ -18,16 +16,14 @@ go_test(
         "node_test.go",
         "rbac_test.go",
     ],
-    tags = [
-        "automanaged",
-        "integration",
-    ],
+    tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
@@ -48,7 +44,6 @@ go_test(
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/auth/authenticator/token/bootstrap:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
-        "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//test/e2e/lifecycle/bootstrap:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",

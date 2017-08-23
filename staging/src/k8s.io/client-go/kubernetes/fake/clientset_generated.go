@@ -21,11 +21,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
-	kubernetes "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	fakeadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1/fake"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	fakeappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1/fake"
+	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
+	fakeappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2/fake"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	fakeauthenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1/fake"
 	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
@@ -40,6 +42,8 @@ import (
 	fakeautoscalingv2alpha1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2alpha1/fake"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	fakebatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1/fake"
+	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	fakebatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1/fake"
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	fakebatchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1/fake"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -52,6 +56,8 @@ import (
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	fakerbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1/fake"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
@@ -87,7 +93,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	return &Clientset{fakePtr}
 }
 
-// Clientset implements kubernetes.Interface. Meant to be embedded into a
+// Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
@@ -98,7 +104,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
 }
 
-var _ kubernetes.Interface = &Clientset{}
+var _ clientset.Interface = &Clientset{}
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
 func (c *Clientset) AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface {
@@ -115,9 +121,14 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
-// Apps retrieves the AppsV1beta1Client
-func (c *Clientset) Apps() appsv1beta1.AppsV1beta1Interface {
-	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
+// AppsV1beta2 retrieves the AppsV1beta2Client
+func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
+	return &fakeappsv1beta2.FakeAppsV1beta2{Fake: &c.Fake}
+}
+
+// Apps retrieves the AppsV1beta2Client
+func (c *Clientset) Apps() appsv1beta2.AppsV1beta2Interface {
+	return &fakeappsv1beta2.FakeAppsV1beta2{Fake: &c.Fake}
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
@@ -175,6 +186,11 @@ func (c *Clientset) Batch() batchv1.BatchV1Interface {
 	return &fakebatchv1.FakeBatchV1{Fake: &c.Fake}
 }
 
+// BatchV1beta1 retrieves the BatchV1beta1Client
+func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
+	return &fakebatchv1beta1.FakeBatchV1beta1{Fake: &c.Fake}
+}
+
 // BatchV2alpha1 retrieves the BatchV2alpha1Client
 func (c *Clientset) BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface {
 	return &fakebatchv2alpha1.FakeBatchV2alpha1{Fake: &c.Fake}
@@ -230,13 +246,18 @@ func (c *Clientset) Policy() policyv1beta1.PolicyV1beta1Interface {
 	return &fakepolicyv1beta1.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
-// RbacV1beta1 retrieves the RbacV1beta1Client
-func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	return &fakerbacv1beta1.FakeRbacV1beta1{Fake: &c.Fake}
+// RbacV1 retrieves the RbacV1Client
+func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
+	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
 }
 
-// Rbac retrieves the RbacV1beta1Client
-func (c *Clientset) Rbac() rbacv1beta1.RbacV1beta1Interface {
+// Rbac retrieves the RbacV1Client
+func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
+	return &fakerbacv1.FakeRbacV1{Fake: &c.Fake}
+}
+
+// RbacV1beta1 retrieves the RbacV1beta1Client
+func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
 	return &fakerbacv1beta1.FakeRbacV1beta1{Fake: &c.Fake}
 }
 

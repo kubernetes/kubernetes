@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -24,7 +22,6 @@ filegroup(
         "//pkg/util/flock:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
-        "//pkg/util/i18n:all-srcs",
         "//pkg/util/initsystem:all-srcs",
         "//pkg/util/interrupt:all-srcs",
         "//pkg/util/io:all-srcs",
@@ -33,7 +30,6 @@ filegroup(
         "//pkg/util/keymutex:all-srcs",
         "//pkg/util/labels:all-srcs",
         "//pkg/util/limitwriter:all-srcs",
-        "//pkg/util/logs:all-srcs",
         "//pkg/util/maps:all-srcs",
         "//pkg/util/metrics:all-srcs",
         "//pkg/util/mount:all-srcs",
@@ -44,6 +40,7 @@ filegroup(
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pointer:all-srcs",
         "//pkg/util/procfs:all-srcs",
+        "//pkg/util/reflector/prometheus:all-srcs",
         "//pkg/util/removeall:all-srcs",
         "//pkg/util/resourcecontainer:all-srcs",
         "//pkg/util/rlimit:all-srcs",
@@ -62,4 +59,11 @@ filegroup(
         "//pkg/util/workqueue/prometheus:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+sh_test(
+    name = "verify-util-pkg",
+    size = "small",
+    srcs = ["verify-util-pkg.sh"],
+    data = glob(["*.go"]),
 )

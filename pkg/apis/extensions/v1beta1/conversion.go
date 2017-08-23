@@ -59,6 +59,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort,
 		Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec,
 		Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec,
+		Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
 	)
 	if err != nil {
 		return err
@@ -428,4 +429,8 @@ func Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *netwo
 		}
 	}
 	return nil
+}
+
+func Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *extensionsv1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
+	return autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in, out, s)
 }

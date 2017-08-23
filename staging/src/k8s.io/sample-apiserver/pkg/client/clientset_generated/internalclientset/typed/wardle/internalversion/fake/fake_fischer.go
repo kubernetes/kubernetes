@@ -35,37 +35,7 @@ var fischersResource = schema.GroupVersionResource{Group: "wardle.k8s.io", Versi
 
 var fischersKind = schema.GroupVersionKind{Group: "wardle.k8s.io", Version: "", Kind: "Fischer"}
 
-func (c *FakeFischers) Create(fischer *wardle.Fischer) (result *wardle.Fischer, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(fischersResource, fischer), &wardle.Fischer{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*wardle.Fischer), err
-}
-
-func (c *FakeFischers) Update(fischer *wardle.Fischer) (result *wardle.Fischer, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), &wardle.Fischer{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*wardle.Fischer), err
-}
-
-func (c *FakeFischers) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(fischersResource, name), &wardle.Fischer{})
-	return err
-}
-
-func (c *FakeFischers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(fischersResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &wardle.FischerList{})
-	return err
-}
-
+// Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
 func (c *FakeFischers) Get(name string, options v1.GetOptions) (result *wardle.Fischer, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(fischersResource, name), &wardle.Fischer{})
@@ -75,6 +45,7 @@ func (c *FakeFischers) Get(name string, options v1.GetOptions) (result *wardle.F
 	return obj.(*wardle.Fischer), err
 }
 
+// List takes label and field selectors, and returns the list of Fischers that match those selectors.
 func (c *FakeFischers) List(opts v1.ListOptions) (result *wardle.FischerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(fischersResource, fischersKind, opts), &wardle.FischerList{})
@@ -99,6 +70,41 @@ func (c *FakeFischers) List(opts v1.ListOptions) (result *wardle.FischerList, er
 func (c *FakeFischers) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(fischersResource, opts))
+}
+
+// Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
+func (c *FakeFischers) Create(fischer *wardle.Fischer) (result *wardle.Fischer, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(fischersResource, fischer), &wardle.Fischer{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*wardle.Fischer), err
+}
+
+// Update takes the representation of a fischer and updates it. Returns the server's representation of the fischer, and an error, if there is any.
+func (c *FakeFischers) Update(fischer *wardle.Fischer) (result *wardle.Fischer, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), &wardle.Fischer{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*wardle.Fischer), err
+}
+
+// Delete takes name of the fischer and deletes it. Returns an error if one occurs.
+func (c *FakeFischers) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(fischersResource, name), &wardle.Fischer{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeFischers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(fischersResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &wardle.FischerList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched fischer.

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,13 +13,13 @@ go_library(
         "crud.go",
         "event.go",
         "ingress.go",
+        "job.go",
         "namespace.go",
         "replicaset.go",
         "service.go",
         "upgrade.go",
         "util.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -29,6 +27,7 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
+        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//test/e2e_federation/upgrades:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

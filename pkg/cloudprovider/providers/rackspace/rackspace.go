@@ -529,6 +529,11 @@ func (os *Rackspace) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (os *Rackspace) HasClusterID() bool {
+	return true
+}
+
 func (os *Rackspace) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }

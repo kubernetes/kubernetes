@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,12 +11,11 @@ go_test(
     srcs = [
         "cluster_test.go",
         "configmap_test.go",
-        "deployment_test.go",
+        "delete_test.go",
         "env_file_test.go",
         "generate_test.go",
         "kubectl_test.go",
         "namespace_test.go",
-        "proxy_server_test.go",
         "quota_test.go",
         "resource_filter_test.go",
         "rolebinding_test.go",
@@ -33,10 +30,8 @@ go_test(
         "service_test.go",
         "serviceaccount_test.go",
         "sorting_printer_test.go",
-        "stop_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
@@ -86,6 +81,7 @@ go_library(
         "cluster.go",
         "clusterrolebinding.go",
         "configmap.go",
+        "delete.go",
         "deployment.go",
         "doc.go",
         "env_file.go",
@@ -96,7 +92,6 @@ go_library(
         "kubectl.go",
         "namespace.go",
         "pdb.go",
-        "proxy_server.go",
         "quota.go",
         "resource_filter.go",
         "rolebinding.go",
@@ -112,10 +107,8 @@ go_library(
         "service_basic.go",
         "serviceaccount.go",
         "sorting_printer.go",
-        "stop.go",
         "versioned_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
@@ -133,9 +126,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
-        "//pkg/client/retry:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/credentialprovider:go_default_library",
@@ -172,13 +163,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/apps/v1beta1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/integer:go_default_library",
         "//vendor/k8s.io/client-go/util/jsonpath:go_default_library",
+        "//vendor/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/vbom.ml/util/sortorder:go_default_library",
     ],
 )
@@ -197,9 +187,11 @@ filegroup(
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
         "//pkg/kubectl/plugins:all-srcs",
+        "//pkg/kubectl/proxy:all-srcs",
         "//pkg/kubectl/resource:all-srcs",
         "//pkg/kubectl/testing:all-srcs",
         "//pkg/kubectl/util:all-srcs",
+        "//pkg/kubectl/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

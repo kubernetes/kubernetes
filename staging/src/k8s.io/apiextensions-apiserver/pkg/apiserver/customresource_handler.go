@@ -52,7 +52,7 @@ import (
 )
 
 // crdHandler serves the `/apis` endpoint.
-// This is registered as a filter so that it never collides with any explictly registered endpoints
+// This is registered as a filter so that it never collides with any explicitly registered endpoints
 type crdHandler struct {
 	versionDiscoveryHandler *versionDiscoveryHandler
 	groupDiscoveryHandler   *groupDiscoveryHandler
@@ -343,8 +343,17 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		storage:      storage,
 		requestScope: requestScope,
 	}
-	storageMap[crd.UID] = ret
-	r.customStorage.Store(storageMap)
+
+	storageMap2 := make(crdStorageMap, len(storageMap))
+
+	// Copy because we cannot write to storageMap without a race
+	// as it is used without locking elsewhere
+	for k, v := range storageMap {
+		storageMap2[k] = v
+	}
+
+	storageMap2[crd.UID] = ret
+	r.customStorage.Store(storageMap2)
 	return ret
 }
 

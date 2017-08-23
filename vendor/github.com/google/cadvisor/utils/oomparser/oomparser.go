@@ -32,7 +32,7 @@ import (
 
 var (
 	containerRegexp = regexp.MustCompile(`Task in (.*) killed as a result of limit of (.*)`)
-	lastLineRegexp  = regexp.MustCompile(`(^[A-Z][a-z]{2} .*[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}) .* Killed process ([0-9]+) \(([\w]+)\)`)
+	lastLineRegexp  = regexp.MustCompile(`(^[A-Z][a-z]{2} .*[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}) .* Killed process ([0-9]+) \((.+)\)`)
 	firstLineRegexp = regexp.MustCompile(`invoked oom-killer:`)
 )
 
