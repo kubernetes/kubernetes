@@ -71,10 +71,12 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		return "", 0, nil, "", err
 	}
 
-	tags := aws.GetAdditionalTagsFromAnnotation(c.options.PVC.Annotations, aws.VolumeClaimAnnotationBlockStorageAdditionalTags)
-
-	for k, v := range *c.options.CloudTags {
-		tags[k] = v
+	// AWS volumes don't have Name field, store the name in Name tag		 +	tags := aws.GetAdditionalTagsFromAnnotation(c.options.PVC.Annotations, aws.VolumeClaimAnnotationBlockStorageAdditionalTags)
+	var tags map[string]string
+	if c.options.CloudTags == nil {
+	    tags = make(map[string]string)
+	} else {
+		tags = *c.options.CloudTags
 	}
 
 	// AWS volumes don't have Name field, store the name in Name tag

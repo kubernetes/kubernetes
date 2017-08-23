@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	addtionaltags "k8s.io/kubernetes/pkg/util/tags"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -145,6 +146,12 @@ const createProvisionedPVRetryCount = 5
 
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
+
+// VolumeClaimAnnotationAdditionalTags is the annotation used on the volume
+// claim to specify a comma-separated list of key-value pairs which will be recorded as
+// additional tags in the volume which is created.
+// For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
+const VolumeClaimAnnotationAdditionalTags = "volume.beta.kubernetes.io/additional-tags"
 
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
@@ -1303,7 +1310,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	}
 
 	// Gather provisioning options
-	tags := make(map[string]string)
+	tags := addtionaltags.GetAdditionalTagsFromAnnotation(claim.Annotations, VolumeClaimAnnotationAdditionalTags)
 	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
 	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
 	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
