@@ -61,14 +61,11 @@ type ActualStateOfWorld interface {
 	// SetVolumeMountedByNode sets the MountedByNode value for the given volume
 	// and node. When set to true the mounted parameter indicates the volume
 	// is mounted by the given node, indicating it may not be safe to detach.
-	// If the forceUnmount is set to true the MountedByNode value would be reset
-	// to false even it was not set yet (this is required during a controller
-	// crash recovery).
 	// If no volume with the name volumeName exists in the store, an error is
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error
+	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error
 
 	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
 	// node to true indicating the AttachedVolume field in the Node's Status
@@ -203,12 +200,6 @@ type nodeAttachedTo struct {
 	// node and is unsafe to detach
 	mountedByNode bool
 
-	// number of times SetVolumeMountedByNode has been called to set the value
-	// of mountedByNode to true. This is used to prevent mountedByNode from
-	// being reset during the period between attach and mount when volumesInUse
-	// status for the node may not be set.
-	mountedByNodeSetCount uint
-
 	// detachRequestedTime used to capture the desire to detach this volume
 	detachRequestedTime time.Time
 }
@@ -315,10 +306,9 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 	if !nodeExists {
 		// Create object if it doesn't exist.
 		volumeObj.nodesAttachedTo[nodeName] = nodeAttachedTo{
-			nodeName:              nodeName,
-			mountedByNode:         true, // Assume mounted, until proven otherwise
-			mountedByNodeSetCount: 0,
-			detachRequestedTime:   time.Time{},
+			nodeName:            nodeName,
+			mountedByNode:       true, // Assume mounted, until proven otherwise
+			detachRequestedTime: time.Time{},
 		}
 	} else {
 		glog.V(5).Infof("Volume %q is already added to attachedVolume list to the node %q",
@@ -331,23 +321,13 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 }
 
 func (asw *actualStateOfWorld) SetVolumeMountedByNode(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
 	volumeObj, nodeObj, err := asw.getNodeAndVolume(volumeName, nodeName)
 	if err != nil {
 		return fmt.Errorf("Failed to SetVolumeMountedByNode with error: %v", err)
-	}
-
-	if mounted {
-		// Increment set count
-		nodeObj.mountedByNodeSetCount = nodeObj.mountedByNodeSetCount + 1
-	} else {
-		// Do not allow value to be reset unless it has been set at least once
-		if nodeObj.mountedByNodeSetCount == 0 && !forceUnmount {
-			return nil
-		}
 	}
 
 	nodeObj.mountedByNode = mounted
