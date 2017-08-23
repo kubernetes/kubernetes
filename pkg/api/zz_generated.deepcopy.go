@@ -4944,6 +4944,15 @@ func (in *ResourceQuotaSpec) DeepCopyInto(out *ResourceQuotaSpec) {
 		*out = make([]ResourceQuotaScope, len(*in))
 		copy(*out, *in)
 	}
+	if in.Priority != nil {
+		in, out := &in.Priority, &out.Priority
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	return
 }
 

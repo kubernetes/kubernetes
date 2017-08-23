@@ -8731,6 +8731,13 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeNotBestEffort},
 	}
 
+	validPriorityClassNameSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		PriorityClassName: "valid-name",
+	}
+
 	// storage is not yet supported as a quota tracked resource
 	invalidQuotaResourceSpec := api.ResourceQuotaSpec{
 		Hard: api.ResourceList{
@@ -8787,6 +8794,13 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScope("foo")},
 	}
 
+	invalidPriorityClassNameSpec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU: resource.MustParse("100"),
+		},
+		PriorityClassName: "invalid_name",
+	}
+
 	successCases := []api.ResourceQuota{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -8829,6 +8843,13 @@ func TestValidateResourceQuota(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: nonBestEffortSpec,
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "abc",
+				Namespace: "foo",
+			},
+			Spec: validPriorityClassNameSpec,
 		},
 	}
 
@@ -8881,6 +8902,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-scope-name": {
 			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidScopeNameSpec},
 			"unsupported scope",
+		},
+		"invalid-priority-class-name": {
+			api.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidPriorityClassNameSpec},
+			invalidPriorityClassName,
 		},
 	}
 	for k, v := range errorCases {
