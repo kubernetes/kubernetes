@@ -17,6 +17,11 @@ limitations under the License.
 package features
 
 import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -60,4 +65,49 @@ func Keys(featureList FeatureList) []string {
 var InitFeatureGates = FeatureList{
 	SelfHosting:         {Default: false, PreRelease: utilfeature.Beta},
 	StoreCertsInSecrets: {Default: false, PreRelease: utilfeature.Alpha},
+}
+
+// KnownFeatures returns a slice of strings describing the FeatureList features.
+func KnownFeatures(f *FeatureList) []string {
+	var known []string
+	for k, v := range *f {
+		pre := ""
+		if v.PreRelease != utilfeature.GA {
+			pre = fmt.Sprintf("%s - ", v.PreRelease)
+		}
+		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.Default))
+	}
+	sort.Strings(known)
+	return known
+}
+
+// NewFeatureGate parse a string of the form "key1=value1,key2=value2,..." into a
+// map[string]bool of known keys or returns an error.
+func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
+	featureGate := map[string]bool{}
+	for _, s := range strings.Split(value, ",") {
+		if len(s) == 0 {
+			continue
+		}
+
+		arr := strings.SplitN(s, "=", 2)
+		if len(arr) != 2 {
+			return nil, fmt.Errorf("missing bool value for feature-gate key:%s", s)
+		}
+
+		k := strings.TrimSpace(arr[0])
+		v := strings.TrimSpace(arr[1])
+
+		if !Supports(*f, k) {
+			return nil, fmt.Errorf("unrecognized feature-gate key: %s", k)
+		}
+
+		boolValue, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
+		}
+		featureGate[k] = boolValue
+	}
+
+	return featureGate, nil
 }

@@ -17,10 +17,13 @@ limitations under the License.
 package phases
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -29,13 +32,19 @@ import (
 
 // NewCmdSelfhosting returns the self-hosting Cobra command
 func NewCmdSelfhosting() *cobra.Command {
-	var kubeConfigFile string
+	var kubeConfigFile, featureFlagsString string
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	cmd := &cobra.Command{
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted"},
 		Short:   "Make a kubeadm cluster self-hosted.",
 		Run: func(cmd *cobra.Command, args []string) {
+
+			var err error
+			if cfg.FeatureFlags, err = features.NewFeatureGate(&features.InitFeatureGates, featureFlagsString); err != nil {
+				kubeadmutil.CheckErr(err)
+			}
+
 			api.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			api.Scheme.Convert(cfg, internalcfg, nil)
@@ -48,5 +57,8 @@ func NewCmdSelfhosting() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+	cmd.Flags().StringVar(&featureFlagsString, "feature-gates", featureFlagsString, "A set of key=value pairs that describe feature gates for various features."+
+		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+
 	return cmd
 }
