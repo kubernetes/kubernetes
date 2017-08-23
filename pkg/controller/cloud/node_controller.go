@@ -228,7 +228,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 			time.Sleep(retrySleepTime)
 		}
 		if currentReadyCondition == nil {
-			glog.Errorf("Update status of Node %v from CloudNodeController exceeds retry count.", node.Name)
+			glog.Errorf("Update status of Node %v from CloudNodeController exceeds retry count or the Node was deleted.", node.Name)
 			continue
 		}
 		// If the known node status says that Node is NotReady, then check if the node has been removed
@@ -262,7 +262,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 	}
 }
 
-// This processes nodes that were added into the cluster, and cloud initializea them if appropriate
+// This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
