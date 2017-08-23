@@ -19,11 +19,13 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/api"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
@@ -38,7 +40,7 @@ func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
 	}
 }
 
-func (v *SchemaValidation) Validate(data []byte) error {
+func (v *SchemaValidation) ValidateBytes(data []byte) error {
 	obj, err := parse(data)
 	if err != nil {
 		return err
@@ -49,21 +51,48 @@ func (v *SchemaValidation) Validate(data []byte) error {
 		return err
 	}
 
+	if strings.HasSuffix(gvk.Kind, "List") {
+		return utilerrors.NewAggregate(v.validateList(obj))
+	}
+
+	return utilerrors.NewAggregate(v.validateResource(obj, gvk))
+}
+
+func (v *SchemaValidation) validateList(object interface{}) []error {
+	fields := object.(map[string]interface{})
+	if fields == nil {
+		return []error{errors.New("invalid object to validate")}
+	}
+
+	errs := []error{}
+	for _, item := range fields["items"].([]interface{}) {
+		if gvk, err := getObjectKind(item); err != nil {
+			errs = append(errs, err)
+		} else {
+			errs = append(errs, v.validateResource(item, gvk)...)
+		}
+	}
+	return errs
+}
+
+func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
+	if !api.Registry.IsEnabledVersion(gvk.GroupVersion()) {
+		// if we don't have this in our scheme, just skip
+		// validation because its an object we don't recognize
+		return nil
+	}
+
 	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
-		return fmt.Errorf("unknown object type %q", gvk)
+		return []error{fmt.Errorf("unknown object type %#v", gvk)}
 	}
 
 	rootValidation, err := itemFactory(openapi.NewPath(gvk.Kind), obj)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	resource.Accept(rootValidation)
-	errs := rootValidation.Errors()
-	if errs != nil {
-		return utilerrors.NewAggregate(errs)
-	}
-	return nil
+	return rootValidation.Errors()
 }
 
 func parse(data []byte) (interface{}, error) {
@@ -91,6 +120,7 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 		return schema.GroupVersionKind{}, errors.New("apiVersion isn't string type")
 	}
 	version := apiutil.GetVersion(apiVersion.(string))
+	group := apiutil.GetGroup(apiVersion.(string))
 	kind := fields["kind"]
 	if kind == nil {
 		return schema.GroupVersionKind{}, errors.New("kind not set")
@@ -99,5 +129,5 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 		return schema.GroupVersionKind{}, errors.New("kind isn't string type")
 	}
 
-	return schema.GroupVersionKind{Kind: kind.(string), Version: version}, nil
+	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind.(string)}, nil
 }

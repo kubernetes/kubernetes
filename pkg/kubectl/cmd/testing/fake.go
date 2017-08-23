@@ -411,7 +411,7 @@ func (f *FakeFactory) ResolveImage(name string) (string, error) {
 	return name, nil
 }
 
-func (f *FakeFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *FakeFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
@@ -699,7 +699,7 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 	}
 }
 
-func (f *fakeAPIFactory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *fakeAPIFactory) Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
