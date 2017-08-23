@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"archive/tar"
 	"bytes"
 	"io"
 	"io/ioutil"
@@ -24,6 +25,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -129,7 +131,7 @@ func TestTarUntar(t *testing.T) {
 			data: "bazblahfoo",
 		},
 		{
-			name: "some/other/directory",
+			name: "some/other/directory/",
 			data: "with more data here",
 		},
 		{
@@ -157,7 +159,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	writer := &bytes.Buffer{}
-	if err := makeTar(dir, writer); err != nil {
+	if err := makeTar(dir, dir2, writer); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -291,4 +293,84 @@ func TestCopyToLocalFileOrDir(t *testing.T) {
 		}()
 	}
 
+}
+
+func TestTarDestinationName(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "input")
+	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
+	if err != nil || err2 != nil {
+		t.Errorf("unexpected error: %v | %v", err, err2)
+		t.FailNow()
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unexpected error cleaning up: %v", err)
+		}
+		if err := os.RemoveAll(dir2); err != nil {
+			t.Errorf("Unexpected error cleaning up: %v", err)
+		}
+	}()
+
+	files := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "foo",
+			data: "foobarbaz",
+		},
+		{
+			name: "dir/blah",
+			data: "bazblahfoo",
+		},
+		{
+			name: "some/other/directory",
+			data: "with more data here",
+		},
+		{
+			name: "blah",
+			data: "same file name different data",
+		},
+	}
+
+	// ensure files exist on disk
+	for _, file := range files {
+		filepath := path.Join(dir, file.name)
+		if err := os.MkdirAll(path.Dir(filepath), 0755); err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		f, err := os.Create(filepath)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		defer f.Close()
+		if _, err := io.Copy(f, bytes.NewBuffer([]byte(file.data))); err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+	}
+
+	reader, writer := io.Pipe()
+	go func() {
+		if err := makeTar(dir, dir2, writer); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}()
+
+	tarReader := tar.NewReader(reader)
+	for {
+		hdr, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+
+		if !strings.HasPrefix(hdr.Name, path.Base(dir2)) {
+			t.Errorf("expected %q as destination filename prefix, saw: %q", path.Base(dir2), hdr.Name)
+		}
+	}
 }
