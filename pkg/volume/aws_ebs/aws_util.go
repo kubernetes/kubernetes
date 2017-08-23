@@ -71,15 +71,13 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 		return "", 0, nil, "", err
 	}
 
-	// AWS volumes don't have Name field, store the name in Name tag		 +	tags := aws.GetAdditionalTagsFromAnnotation(c.options.PVC.Annotations, aws.VolumeClaimAnnotationBlockStorageAdditionalTags)
+	// AWS volumes don't have Name field, store the name in Name tag
 	var tags map[string]string
 	if c.options.CloudTags == nil {
-	    tags = make(map[string]string)
+		tags = make(map[string]string)
 	} else {
 		tags = *c.options.CloudTags
 	}
-
-	// AWS volumes don't have Name field, store the name in Name tag
 	tags["Name"] = volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
