@@ -465,15 +465,6 @@ def send_data(tls):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('kube-api.connected')
-def push_api_data(kube_api):
-    ''' Send configuration to remote consumer.'''
-    # Since all relations already have the private ip address, only
-    # send the port on the relation object to all consumers.
-    # The kubernetes api-server uses 6443 for the default secure port.
-    kube_api.set_api_port('6443')
-
-
 @when('kubernetes-master.components.started')
 def configure_cdk_addons():
     ''' Configure CDK addons '''
