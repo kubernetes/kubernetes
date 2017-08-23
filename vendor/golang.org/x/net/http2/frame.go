@@ -122,7 +122,7 @@ var flagName = map[FrameType]map[Flags]string{
 // a frameParser parses a frame given its FrameHeader and payload
 // bytes. The length of payload will always equal fh.Length (which
 // might be 0).
-type frameParser func(fc *frameCache, fh FrameHeader, payload []byte) (Frame, error)
+type frameParser func(fh FrameHeader, payload []byte) (Frame, error)
 
 var frameParsers = map[FrameType]frameParser{
 	FrameData:         parseDataFrame,
@@ -312,7 +312,7 @@ type Framer struct {
 	MaxHeaderListSize uint32
 
 	// TODO: track which type of frame & with which flags was sent
-	// last. Then return an error (unless AllowIllegalWrites) if
+	// last.  Then return an error (unless AllowIllegalWrites) if
 	// we're in the middle of a header block and a
 	// non-Continuation or Continuation on a different stream is
 	// attempted to be written.
@@ -323,8 +323,6 @@ type Framer struct {
 	debugFramerBuf    *bytes.Buffer
 	debugReadLoggerf  func(string, ...interface{})
 	debugWriteLoggerf func(string, ...interface{})
-
-	frameCache *frameCache // nil if frames aren't reused (default)
 }
 
 func (fr *Framer) maxHeaderListSize() uint32 {
@@ -399,27 +397,6 @@ const (
 	minMaxFrameSize = 1 << 14
 	maxFrameSize    = 1<<24 - 1
 )
-
-// SetReuseFrames allows the Framer to reuse Frames.
-// If called on a Framer, Frames returned by calls to ReadFrame are only
-// valid until the next call to ReadFrame.
-func (fr *Framer) SetReuseFrames() {
-	if fr.frameCache != nil {
-		return
-	}
-	fr.frameCache = &frameCache{}
-}
-
-type frameCache struct {
-	dataFrame DataFrame
-}
-
-func (fc *frameCache) getDataFrame() *DataFrame {
-	if fc == nil {
-		return &DataFrame{}
-	}
-	return &fc.dataFrame
-}
 
 // NewFramer returns a Framer that writes frames to w and reads them from r.
 func NewFramer(w io.Writer, r io.Reader) *Framer {
@@ -500,7 +477,7 @@ func (fr *Framer) ReadFrame() (Frame, error) {
 	if _, err := io.ReadFull(fr.r, payload); err != nil {
 		return nil, err
 	}
-	f, err := typeFrameParser(fh.Type)(fr.frameCache, fh, payload)
+	f, err := typeFrameParser(fh.Type)(fh, payload)
 	if err != nil {
 		if ce, ok := err.(connError); ok {
 			return nil, fr.connError(ce.Code, ce.Reason)
@@ -588,7 +565,7 @@ func (f *DataFrame) Data() []byte {
 	return f.data
 }
 
-func parseDataFrame(fc *frameCache, fh FrameHeader, payload []byte) (Frame, error) {
+func parseDataFrame(fh FrameHeader, payload []byte) (Frame, error) {
 	if fh.StreamID == 0 {
 		// DATA frames MUST be associated with a stream. If a
 		// DATA frame is received whose stream identifier
@@ -597,9 +574,9 @@ func parseDataFrame(fc *frameCache, fh FrameHeader, payload []byte) (Frame, erro
 		// PROTOCOL_ERROR.
 		return nil, connError{ErrCodeProtocol, "DATA frame with stream ID 0"}
 	}
-	f := fc.getDataFrame()
-	f.FrameHeader = fh
-
+	f := &DataFrame{
+		FrameHeader: fh,
+	}
 	var padSize byte
 	if fh.Flags.Has(FlagDataPadded) {
 		var err error
@@ -623,7 +600,6 @@ var (
 	errStreamID    = errors.New("invalid stream ID")
 	errDepStreamID = errors.New("invalid dependent stream ID")
 	errPadLength   = errors.New("pad length too large")
-	errPadBytes    = errors.New("padding bytes must all be zeros unless AllowIllegalWrites is enabled")
 )
 
 func validStreamIDOrZero(streamID uint32) bool {
@@ -647,7 +623,6 @@ func (f *Framer) WriteData(streamID uint32, endStream bool, data []byte) error {
 //
 // If pad is nil, the padding bit is not sent.
 // The length of pad must not exceed 255 bytes.
-// The bytes of pad must all be zero, unless f.AllowIllegalWrites is set.
 //
 // It will perform exactly one Write to the underlying Writer.
 // It is the caller's responsibility not to violate the maximum frame size
@@ -656,18 +631,8 @@ func (f *Framer) WriteDataPadded(streamID uint32, endStream bool, data, pad []by
 	if !validStreamID(streamID) && !f.AllowIllegalWrites {
 		return errStreamID
 	}
-	if len(pad) > 0 {
-		if len(pad) > 255 {
-			return errPadLength
-		}
-		if !f.AllowIllegalWrites {
-			for _, b := range pad {
-				if b != 0 {
-					// "Padding octets MUST be set to zero when sending."
-					return errPadBytes
-				}
-			}
-		}
+	if len(pad) > 255 {
+		return errPadLength
 	}
 	var flags Flags
 	if endStream {
@@ -695,10 +660,10 @@ type SettingsFrame struct {
 	p []byte
 }
 
-func parseSettingsFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseSettingsFrame(fh FrameHeader, p []byte) (Frame, error) {
 	if fh.Flags.Has(FlagSettingsAck) && fh.Length > 0 {
 		// When this (ACK 0x1) bit is set, the payload of the
-		// SETTINGS frame MUST be empty. Receipt of a
+		// SETTINGS frame MUST be empty.  Receipt of a
 		// SETTINGS frame with the ACK flag set and a length
 		// field value other than 0 MUST be treated as a
 		// connection error (Section 5.4.1) of type
@@ -707,7 +672,7 @@ func parseSettingsFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) 
 	}
 	if fh.StreamID != 0 {
 		// SETTINGS frames always apply to a connection,
-		// never a single stream. The stream identifier for a
+		// never a single stream.  The stream identifier for a
 		// SETTINGS frame MUST be zero (0x0).  If an endpoint
 		// receives a SETTINGS frame whose stream identifier
 		// field is anything other than 0x0, the endpoint MUST
@@ -797,7 +762,7 @@ type PingFrame struct {
 
 func (f *PingFrame) IsAck() bool { return f.Flags.Has(FlagPingAck) }
 
-func parsePingFrame(_ *frameCache, fh FrameHeader, payload []byte) (Frame, error) {
+func parsePingFrame(fh FrameHeader, payload []byte) (Frame, error) {
 	if len(payload) != 8 {
 		return nil, ConnectionError(ErrCodeFrameSize)
 	}
@@ -837,7 +802,7 @@ func (f *GoAwayFrame) DebugData() []byte {
 	return f.debugData
 }
 
-func parseGoAwayFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseGoAwayFrame(fh FrameHeader, p []byte) (Frame, error) {
 	if fh.StreamID != 0 {
 		return nil, ConnectionError(ErrCodeProtocol)
 	}
@@ -877,7 +842,7 @@ func (f *UnknownFrame) Payload() []byte {
 	return f.p
 }
 
-func parseUnknownFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseUnknownFrame(fh FrameHeader, p []byte) (Frame, error) {
 	return &UnknownFrame{fh, p}, nil
 }
 
@@ -888,7 +853,7 @@ type WindowUpdateFrame struct {
 	Increment uint32 // never read with high bit set
 }
 
-func parseWindowUpdateFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseWindowUpdateFrame(fh FrameHeader, p []byte) (Frame, error) {
 	if len(p) != 4 {
 		return nil, ConnectionError(ErrCodeFrameSize)
 	}
@@ -953,12 +918,12 @@ func (f *HeadersFrame) HasPriority() bool {
 	return f.FrameHeader.Flags.Has(FlagHeadersPriority)
 }
 
-func parseHeadersFrame(_ *frameCache, fh FrameHeader, p []byte) (_ Frame, err error) {
+func parseHeadersFrame(fh FrameHeader, p []byte) (_ Frame, err error) {
 	hf := &HeadersFrame{
 		FrameHeader: fh,
 	}
 	if fh.StreamID == 0 {
-		// HEADERS frames MUST be associated with a stream. If a HEADERS frame
+		// HEADERS frames MUST be associated with a stream.  If a HEADERS frame
 		// is received whose stream identifier field is 0x0, the recipient MUST
 		// respond with a connection error (Section 5.4.1) of type
 		// PROTOCOL_ERROR.
@@ -1080,7 +1045,7 @@ type PriorityParam struct {
 	Exclusive bool
 
 	// Weight is the stream's zero-indexed weight. It should be
-	// set together with StreamDep, or neither should be set. Per
+	// set together with StreamDep, or neither should be set.  Per
 	// the spec, "Add one to the value to obtain a weight between
 	// 1 and 256."
 	Weight uint8
@@ -1090,7 +1055,7 @@ func (p PriorityParam) IsZero() bool {
 	return p == PriorityParam{}
 }
 
-func parsePriorityFrame(_ *frameCache, fh FrameHeader, payload []byte) (Frame, error) {
+func parsePriorityFrame(fh FrameHeader, payload []byte) (Frame, error) {
 	if fh.StreamID == 0 {
 		return nil, connError{ErrCodeProtocol, "PRIORITY frame with stream ID 0"}
 	}
@@ -1137,7 +1102,7 @@ type RSTStreamFrame struct {
 	ErrCode ErrCode
 }
 
-func parseRSTStreamFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseRSTStreamFrame(fh FrameHeader, p []byte) (Frame, error) {
 	if len(p) != 4 {
 		return nil, ConnectionError(ErrCodeFrameSize)
 	}
@@ -1167,7 +1132,7 @@ type ContinuationFrame struct {
 	headerFragBuf []byte
 }
 
-func parseContinuationFrame(_ *frameCache, fh FrameHeader, p []byte) (Frame, error) {
+func parseContinuationFrame(fh FrameHeader, p []byte) (Frame, error) {
 	if fh.StreamID == 0 {
 		return nil, connError{ErrCodeProtocol, "CONTINUATION frame with stream ID 0"}
 	}
@@ -1217,7 +1182,7 @@ func (f *PushPromiseFrame) HeadersEnded() bool {
 	return f.FrameHeader.Flags.Has(FlagPushPromiseEndHeaders)
 }
 
-func parsePushPromise(_ *frameCache, fh FrameHeader, p []byte) (_ Frame, err error) {
+func parsePushPromise(fh FrameHeader, p []byte) (_ Frame, err error) {
 	pp := &PushPromiseFrame{
 		FrameHeader: fh,
 	}

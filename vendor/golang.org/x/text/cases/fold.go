@@ -18,15 +18,7 @@ func (t *caseFolder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err
 	return c.ret()
 }
 
-func (t *caseFolder) Span(src []byte, atEOF bool) (n int, err error) {
-	c := context{src: src, atEOF: atEOF}
-	for c.next() && isFoldFull(&c) {
-		c.checkpoint()
-	}
-	return c.retSpan()
-}
-
-func makeFold(o options) transform.SpanningTransformer {
+func makeFold(o options) transform.Transformer {
 	// TODO: Special case folding, through option Language, Special/Turkic, or
 	// both.
 	// TODO: Implement Compact options.
