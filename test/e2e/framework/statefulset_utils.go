@@ -197,10 +197,12 @@ func getStatefulSetPodNameAtIndex(index int, ss *apps.StatefulSet) string {
 }
 
 // Scale scales ss to count replicas.
-func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
+func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) (*apps.StatefulSet, error) {
 	name := ss.Name
 	ns := ss.Namespace
-	s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
+
+	Logf("Scaling statefulset %s to %d", name, count)
+	ss = s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
 
 	var statefulPodList *v1.PodList
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
@@ -218,9 +220,9 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
 		}
-		return fmt.Errorf("Failed to scale statefulset to %d in %v. Remaining pods:\n%v", count, StatefulSetTimeout, unhealthy)
+		return ss, fmt.Errorf("Failed to scale statefulset to %d in %v. Remaining pods:\n%v", count, StatefulSetTimeout, unhealthy)
 	}
-	return nil
+	return ss, nil
 }
 
 // UpdateReplicas updates the replicas of ss to count.
@@ -231,11 +233,16 @@ func (s *StatefulSetTester) UpdateReplicas(ss *apps.StatefulSet, count int32) {
 // Restart scales ss to 0 and then back to its previous number of replicas.
 func (s *StatefulSetTester) Restart(ss *apps.StatefulSet) {
 	oldReplicas := *(ss.Spec.Replicas)
-	ExpectNoError(s.Scale(ss, 0))
+	ss, err := s.Scale(ss, 0)
+	ExpectNoError(err)
+	// Wait for controller to report the desired number of Pods.
+	// This way we know the controller has observed all Pod deletions
+	// before we scale it back up.
+	s.WaitForStatusReplicas(ss, 0)
 	s.update(ss.Namespace, ss.Name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = oldReplicas })
 }
 
-func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) {
+func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) *apps.StatefulSet {
 	for i := 0; i < 3; i++ {
 		ss, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -244,13 +251,14 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 		update(ss)
 		ss, err = s.c.AppsV1beta1().StatefulSets(ns).Update(ss)
 		if err == nil {
-			return
+			return ss
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
 			Failf("failed to update statefulset %q: %v", name, err)
 		}
 	}
 	Failf("too many retries draining statefulset %q", name)
+	return nil
 }
 
 // GetPodList gets the current Pods in ss.
@@ -669,12 +677,13 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	// Scale down each statefulset, then delete it completely.
 	// Deleting a pvc without doing this will leak volumes, #25101.
 	errList := []string{}
-	for _, ss := range ssList.Items {
-		Logf("Scaling statefulset %v to 0", ss.Name)
-		if err := sst.Scale(&ss, 0); err != nil {
+	for i := range ssList.Items {
+		ss := &ssList.Items[i]
+		var err error
+		if ss, err = sst.Scale(ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.WaitForStatusReplicas(&ss, 0)
+		sst.WaitForStatusReplicas(ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
