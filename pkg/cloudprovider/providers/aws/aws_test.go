@@ -807,25 +807,29 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-c0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
-	result, err = c.findELBSubnets(false)
-	if err != nil {
-		t.Errorf("Error listing subnets: %v", err)
-		return
-	}
-
-	if len(result) != 3 {
-		t.Errorf("Expected 3 subnets but got %d", len(result))
-		return
-	}
-
-	expected := []*string{aws.String("subnet-a0000001"), aws.String("subnet-b0000001"), aws.String("subnet-c0000000")}
-	for _, s := range result {
-		if !contains(expected, s) {
-			t.Errorf("Unexpected subnet '%s' found", s)
+	expected := []*string{}
+	// Test with both public and private ELBs.
+	for _, internalElb := range [2]bool{false, true} {
+		result, err = c.findELBSubnets(internalElb)
+		if err != nil {
+			t.Errorf("Error listing subnets: %v", err)
 			return
 		}
-	}
 
+		if len(result) != 3 {
+			t.Errorf("Expected 3 subnets but got %d", len(result))
+			return
+		}
+
+		expected = []*string{aws.String("subnet-a0000001"), aws.String("subnet-b0000001"), aws.String("subnet-c0000000")}
+		for _, s := range result {
+			if !contains(expected, s) {
+				t.Errorf("Unexpected subnet '%s' found", s)
+				return
+			}
+		}
+
+	}
 	delete(routeTables, "subnet-c0000002")
 
 	// test with 6 subnets from 3 different AZs
@@ -863,6 +867,27 @@ func TestSubnetIDsinVPC(t *testing.T) {
 			return
 		}
 	}
+
+
+	result, err = c.findELBSubnets(true)
+	if err != nil {
+		t.Errorf("Error listing subnets: %v", err)
+		return
+	}
+
+	if len(result) != 3 {
+		t.Errorf("Expected 3 subnets but got %d", len(result))
+		return
+	}
+
+	expected = []*string{aws.String("subnet-c0000000"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
+	for _, s := range result {
+		if !contains(expected, s) {
+			t.Errorf("Unexpected subnet '%s' found", s)
+			return
+		}
+	}
+
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
