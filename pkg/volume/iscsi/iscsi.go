@@ -28,17 +28,15 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&iscsiPlugin{nil}}
 }
 
 type iscsiPlugin struct {
 	host volume.VolumeHost
-	exe  exec.Interface
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -154,6 +152,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		fsType:       iscsi.FSType,
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		exec:         exec,
 		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
@@ -173,12 +172,8 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 			plugin:  plugin,
 		},
 		mounter: mounter,
+		exec:    exec,
 	}, nil
-}
-
-func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }
 
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -222,6 +217,7 @@ type iscsiDiskMounter struct {
 	readOnly     bool
 	fsType       string
 	mounter      *mount.SafeFormatAndMount
+	exec         mount.Exec
 	deviceUtil   ioutil.DeviceUtil
 	mountOptions []string
 }
@@ -259,6 +255,7 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
 	mounter mount.Interface
+	exec    mount.Exec
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}
