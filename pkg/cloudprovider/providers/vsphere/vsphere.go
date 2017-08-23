@@ -801,7 +801,7 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, nodeName k8stypes.NodeName) (di
 		}
 
 		scsiControllersOfRequiredType := getSCSIControllersOfType(vmDevices, diskControllerType)
-		scsiController := getAvailableSCSIController(scsiControllersOfRequiredType)
+		scsiController = getAvailableSCSIController(scsiControllersOfRequiredType)
 		if scsiController == nil {
 			glog.Errorf("cannot find SCSI controller in VM")
 			// attempt clean up of scsi controller
