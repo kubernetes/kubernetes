@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 type azureDiskDetacher struct {
@@ -171,9 +170,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	newDevicePath := ""
 
 	err = wait.Poll(1*time.Second, timeout, func() (bool, error) {
-		exe := exec.New()
-
-		if newDevicePath, err = findDiskByLun(lun, io, exe); err != nil {
+		if newDevicePath, err = findDiskByLun(lun, io); err != nil {
 			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
 
@@ -182,7 +179,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
 			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
 			// the root case on Azure.
-			formatIfNotFormatted(newDevicePath, *volumeSource.FSType)
+			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, a.plugin.host.GetExec(a.plugin.GetPluginName()))
 			return true, nil
 		}
 

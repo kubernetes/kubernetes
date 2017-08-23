@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	libstrings "strings"
 
@@ -35,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -158,6 +156,7 @@ type ioHandler interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Readlink(name string) (string, error)
+	ReadFile(filename string) ([]byte, error)
 }
 
 //TODO: check if priming the iscsi interface is actually needed
@@ -174,6 +173,10 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 func (handler *osIOHandler) Readlink(name string) (string, error) {
 	return os.Readlink(name)
+}
+
+func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
+	return ioutil.ReadFile(filename)
 }
 
 // exclude those used by azure as resource and OS root in /dev/disk/azure
@@ -209,13 +212,13 @@ func scsiHostRescan(io ioHandler) {
 	}
 }
 
-func findDiskByLun(lun int, io ioHandler, exe exec.Interface) (string, error) {
+func findDiskByLun(lun int, io ioHandler) (string, error) {
 	azureDisks := listAzureDiskPath(io)
-	return findDiskByLunWithConstraint(lun, io, exe, azureDisks)
+	return findDiskByLunWithConstraint(lun, io, azureDisks)
 }
 
 // finds a device mounted to "current" node
-func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azureDisks []string) (string, error) {
+func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (string, error) {
 	var err error
 	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
@@ -237,18 +240,30 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azur
 			if lun == l {
 				// find the matching LUN
 				// read vendor and model to ensure it is a VHD disk
-				vendor := path.Join(sys_path, name, "vendor")
-				model := path.Join(sys_path, name, "model")
-				out, err := exe.Command("cat", vendor, model).CombinedOutput()
+				vendorPath := path.Join(sys_path, name, "vendor")
+				vendorBytes, err := io.ReadFile(vendorPath)
 				if err != nil {
-					glog.V(4).Infof("azure disk - failed to cat device vendor and model, err: %v", err)
+					glog.Errorf("failed to read device vendor, err: %v", err)
 					continue
 				}
-				matched, err := regexp.MatchString("^MSFT[ ]{0,}\nVIRTUAL DISK[ ]{0,}\n$", libstrings.ToUpper(string(out)))
-				if err != nil || !matched {
-					glog.V(4).Infof("azure disk - doesn't match VHD, output %v, error %v", string(out), err)
+				vendor := libstrings.TrimSpace(string(vendorBytes))
+				if libstrings.ToUpper(vendor) != "MSFT" {
+					glog.V(4).Infof("vendor doesn't match VHD, got %s", vendor)
 					continue
 				}
+
+				modelPath := path.Join(sys_path, name, "model")
+				modelBytes, err := io.ReadFile(modelPath)
+				if err != nil {
+					glog.Errorf("failed to read device model, err: %v", err)
+					continue
+				}
+				model := libstrings.TrimSpace(string(modelBytes))
+				if libstrings.ToUpper(model) != "VIRTUAL DISK" {
+					glog.V(4).Infof("model doesn't match VHD, got %s", model)
+					continue
+				}
+
 				// find a disk, validate name
 				dir := path.Join(sys_path, name, "block")
 				if dev, err := io.ReadDir(dir); err == nil {
@@ -270,8 +285,8 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, exe exec.Interface, azur
 	return "", err
 }
 
-func formatIfNotFormatted(disk string, fstype string) {
-	notFormatted, err := diskLooksUnformatted(disk)
+func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
+	notFormatted, err := diskLooksUnformatted(disk, exec)
 	if err == nil && notFormatted {
 		args := []string{disk}
 		// Disk is unformatted so format it.
@@ -283,9 +298,8 @@ func formatIfNotFormatted(disk string, fstype string) {
 			args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", disk}
 		}
 		glog.Infof("azureDisk - Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", disk, fstype, args)
-		runner := exec.New()
-		cmd := runner.Command("mkfs."+fstype, args...)
-		_, err := cmd.CombinedOutput()
+
+		_, err := exec.Run("mkfs."+fstype, args...)
 		if err == nil {
 			// the disk has been formatted successfully try to mount it again.
 			glog.Infof("azureDisk - Disk successfully formatted (mkfs): %s - %s %s", fstype, disk, "tt")
@@ -300,12 +314,10 @@ func formatIfNotFormatted(disk string, fstype string) {
 	}
 }
 
-func diskLooksUnformatted(disk string) (bool, error) {
+func diskLooksUnformatted(disk string, exec mount.Exec) (bool, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
-	runner := exec.New()
-	cmd := runner.Command("lsblk", args...)
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := cmd.CombinedOutput()
+	dataOut, err := exec.Run("lsblk", args...)
 	if err != nil {
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return false, err
