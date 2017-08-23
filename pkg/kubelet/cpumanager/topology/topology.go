@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
+// CPUDetails is a map from CPU ID to Core ID and Socket ID.
 type CPUDetails map[int]CPUInfo
 
 // CPUTopology contains details of node cpu, where :
@@ -38,6 +39,8 @@ type CPUTopology struct {
 	NumReservedCores int
 }
 
+// CPUsPerCore returns the number of logical CPUs are associated with
+// each core.
 func (topo *CPUTopology) CPUsPerCore() int {
 	if topo.NumCores == 0 {
 		return 0
@@ -45,6 +48,8 @@ func (topo *CPUTopology) CPUsPerCore() int {
 	return topo.NumCPUs / topo.NumCores
 }
 
+// CPUsPerSocket returns the number of logical CPUs are associated with
+// each socket.
 func (topo *CPUTopology) CPUsPerSocket() int {
 	if topo.NumSockets == 0 {
 		return 0
@@ -52,13 +57,13 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 	return topo.NumCPUs / topo.NumSockets
 }
 
-// CPUInfo holds information on where cpu is
+// CPUInfo contains the socket and core IDs associated with a CPU.
 type CPUInfo struct {
 	SocketID int
 	CoreID   int
 }
 
-// Returns a new CPUDetails object with only `cpus` remaining.
+// KeepOnly returns a new CPUDetails object with only the supplied cpus.
 func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 	result := CPUDetails{}
 	for cpu, info := range d {
@@ -69,6 +74,8 @@ func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 	return result
 }
 
+// Sockets returns all of the socket IDs associated with the CPUs in this
+// CPUDetails.
 func (d CPUDetails) Sockets() cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for _, info := range d {
@@ -77,6 +84,8 @@ func (d CPUDetails) Sockets() cpuset.CPUSet {
 	return result
 }
 
+// CPUsInSocket returns all of the logical CPU IDs associated with the
+// given socket ID in this CPUDetails.
 func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for cpu, info := range d {
@@ -87,6 +96,8 @@ func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
 	return result
 }
 
+// Cores returns all of the core IDs associated with the CPUs in this
+// CPUDetails.
 func (d CPUDetails) Cores() cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for _, info := range d {
@@ -95,6 +106,8 @@ func (d CPUDetails) Cores() cpuset.CPUSet {
 	return result
 }
 
+// CoresInSocket returns all of the core IDs associated with the given
+// socket ID in this CPUDetails.
 func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for _, info := range d {
@@ -105,6 +118,7 @@ func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
 	return result
 }
 
+// CPUs returns all of the logical CPU IDs in this CPUDetails.
 func (d CPUDetails) CPUs() cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for cpuID := range d {
@@ -113,6 +127,8 @@ func (d CPUDetails) CPUs() cpuset.CPUSet {
 	return result
 }
 
+// CPUsInCore returns all of the logical CPU IDs associated with the
+// given core ID in this CPUDetails.
 func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
 	result := cpuset.NewCPUSet()
 	for cpu, info := range d {
