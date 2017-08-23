@@ -356,6 +356,33 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// test to verify kube-controller-manager does not stop working when encountering invalid apiservice.
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1beta1.registry.wardle.com"},
+		Spec: apiregistrationv1beta1.APIServiceSpec{
+			Service: &apiregistrationv1beta1.ServiceReference{
+				Namespace: "kube-wardle",
+				Name:      "api",
+			},
+			Group:                "registry.wardle.com",
+			Version:              "v1beta1",
+			CABundle:             wardleCA,
+			GroupPriorityMinimum: 2000,
+			VersionPriority:      10,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// this is ugly, but sleep just a little bit so that the watch is probably observed.  Since nothing will actually be added to discovery
+	// (the service is missing), we don't have an external signal.
+	time.Sleep(100 * time.Millisecond)
+	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// TODO figure out how to turn on enough of services and dns to run more
 }
 
