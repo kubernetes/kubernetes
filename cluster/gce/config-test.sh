@@ -358,4 +358,4 @@ PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
 ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"
 
 # Optional: Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
-KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
+KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-true}" # true, false
