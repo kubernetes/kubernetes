@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -141,8 +142,18 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 }
 
 // Handles returns true if the evaluator should handle the specified operation.
-func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
-	return admission.Create == operation
+func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
+	op := a.GetOperation()
+	if op == admission.Create {
+		return true
+	}
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		// fail closed, will try to give an evaluation.
+		return true
+	}
+	// only uninitialized pvc might be updated.
+	return updateUninitialized
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item

@@ -375,8 +375,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
-	op := a.GetOperation()
-	if !evaluator.Handles(op) {
+	if !evaluator.Handles(a) {
 		return quotas, nil
 	}
 
@@ -463,7 +462,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
 	}
 
-	if admission.Update == op {
+	if admission.Update == a.GetOperation() {
 		prevItem := a.GetOldObject()
 		if prevItem == nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("unable to get previous usage since prior version of object was not found"))
@@ -529,8 +528,7 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 	}
 	// for this kind, check if the operation could mutate any quota resources
 	// if no resources tracked by quota are impacted, then just return
-	op := a.GetOperation()
-	if !evaluator.Handles(op) {
+	if !evaluator.Handles(a) {
 		return nil
 	}
 

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -131,10 +132,19 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Pod")
 }
 
-// Handles returns true of the evaluator should handle the specified operation.
-func (p *podEvaluator) Handles(operation admission.Operation) bool {
-	// TODO: update this if/when pods support resizing resource requirements.
-	return admission.Create == operation
+// Handles returns true of the evaluator should handle the specified attributes.
+func (p *podEvaluator) Handles(a admission.Attributes) bool {
+	op := a.GetOperation()
+	if op == admission.Create {
+		return true
+	}
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		// fail closed, will try to give an evaluation.
+		return true
+	}
+	// only uninitialized pods might be updated.
+	return updateUninitialized
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
