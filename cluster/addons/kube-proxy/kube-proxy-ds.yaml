@@ -46,17 +46,11 @@ spec:
         command:
         - /bin/sh
         - -c
-        - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+        - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
         {{container_env}}
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /etc/ssl/certs
-          name: etc-ssl-certs
-          readOnly: true
-        - mountPath: /usr/share/ca-certificates
-          name: usr-ca-certs
-          readOnly: true
         - mountPath: /var/log
           name: varlog
           readOnly: false
@@ -67,12 +61,6 @@ spec:
           name: xtables-lock
           readOnly: false
       volumes:
-      - name: etc-ssl-certs
-        hostPath:
-          path: /etc/ssl/certs
-      - name: usr-ca-certs
-        hostPath:
-          path: /usr/share/ca-certificates
       - name: varlog
         hostPath:
           path: /var/log
@@ -85,3 +73,4 @@ spec:
       - name: run
         hostPath:
           path: /run
+      serviceAccountName: kube-proxy

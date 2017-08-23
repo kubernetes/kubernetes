@@ -692,8 +692,8 @@ function create-master-kubelet-auth {
   fi
 }
 
-function create-kubeproxy-kubeconfig {
-  echo "Creating kube-proxy kubeconfig file"
+function create-kubeproxy-user-kubeconfig {
+  echo "Creating kube-proxy user kubeconfig file"
   cat <<EOF >/var/lib/kube-proxy/kubeconfig
 apiVersion: v1
 kind: Config
@@ -711,6 +711,30 @@ contexts:
     user: kube-proxy
   name: service-account-context
 current-context: service-account-context
+EOF
+}
+
+function create-kubeproxy-serviceaccount-kubeconfig {
+  echo "Creating kube-proxy serviceaccount kubeconfig file"
+  cat <<EOF >/var/lib/kube-proxy/kubeconfig
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://${KUBERNETES_MASTER_NAME}
+  name: default
+contexts:
+- context:
+    cluster: default
+    namespace: default
+    user: default
+  name: default
+current-context: default
+users:
+- name: default
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
 EOF
 }
 
@@ -1926,7 +1950,11 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
 else
   create-node-pki
   create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
-  create-kubeproxy-kubeconfig
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    create-kubeproxy-user-kubeconfig
+  else
+    create-kubeproxy-serviceaccount-kubeconfig
+  fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     create-node-problem-detector-kubeconfig
   fi
