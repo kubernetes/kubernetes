@@ -81,6 +81,18 @@ var storageClasses = []*storage.StorageClass{
 		Parameters:    class1Parameters,
 		ReclaimPolicy: &deleteReclaimPolicy,
 	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "unsupported-mountoptions",
+		},
+		Provisioner:   mockPluginName,
+		Parameters:    class1Parameters,
+		ReclaimPolicy: &deleteReclaimPolicy,
+		MountOptions:  []string{"foo"},
+	},
 }
 
 // call to storageClass 1, returning an error
@@ -391,6 +403,17 @@ func TestProvisionSync(t *testing.T) {
 				[]provisionCall{provision1Success},
 				testSyncClaim,
 			),
+		},
+		{
+			// No provisioning + warning event with unsupported storageClass.mountOptions
+			"11-20 - unsupported storageClass.mountOptions",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions),
+			newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions, annStorageProvisioner),
+			// Expect event to be prefixed with "Mount options" because saving PV will fail anyway
+			[]string{"Warning ProvisioningFailed Mount options"},
+			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
 	runSyncTests(t, tests, storageClasses)

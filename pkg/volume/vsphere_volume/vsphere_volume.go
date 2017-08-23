@@ -379,6 +379,7 @@ func (v *vsphereVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 					StoragePolicyID:   volSpec.StoragePolicyID,
 				},
 			},
+			MountOptions: v.options.MountOptions,
 		},
 	}
 	if len(v.options.PVC.Spec.AccessModes) == 0 {

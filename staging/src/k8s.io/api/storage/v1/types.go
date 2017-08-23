@@ -49,6 +49,12 @@ type StorageClass struct {
 	// created with this reclaimPolicy. Defaults to Delete.
 	// +optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
+
+	// Dynamically provisioned PersistentVolumes of this storage class are
+	// created with these mountOptions, e.g. ["ro", "soft"]. Not validated -
+	// mount of the PVs will simply fail if one is invalid.
+	// +optional
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,5,opt,name=mountOptions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

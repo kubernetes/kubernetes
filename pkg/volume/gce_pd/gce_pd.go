@@ -410,6 +410,7 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 					FSType:    fstype,
 				},
 			},
+			MountOptions: c.options.MountOptions,
 		},
 	}
 	if len(c.options.PVC.Spec.AccessModes) == 0 {
