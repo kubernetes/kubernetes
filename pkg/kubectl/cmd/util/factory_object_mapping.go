@@ -407,7 +407,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 func (f *ring1Factory) Validator(validate, openapi bool, cacheDir string) (validation.Schema, error) {
 	if validate {
 		if openapi {
-			resources, err := f.OpenAPISchema(cacheDir)
+			resources, err := f.OpenAPISchema()
 			if err == nil {
 				return validation.ConjunctiveSchema{
 					openapivalidation.NewSchemaValidation(resources),
