@@ -134,7 +134,6 @@ kube::golang::test_targets() {
     cmd/genkubedocs
     cmd/genman
     cmd/genyaml
-    cmd/mungedocs
     cmd/genswaggertypedocs
     cmd/linkcheck
     federation/cmd/genfeddocs

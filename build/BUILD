@@ -137,7 +137,6 @@ filegroup(
         "//cmd/genyaml",
         "//cmd/kubemark",  # TODO: server platforms only
         "//cmd/linkcheck",
-        "//cmd/mungedocs",
         "//federation/cmd/genfeddocs",
         "//test/e2e:e2e.test",
         "//test/e2e_node:e2e_node.test",  # TODO: server platforms only
