@@ -1274,6 +1274,12 @@ message ISCSIVolumeSource {
   // CHAP secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
+
+  // Custom iSCSI initiator name.
+  // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+  // <target portal>:<volume name> will be created for the connection.
+  // +optional
+  optional string initiatorName = 12;
 }
 
 // Maps a string key to a path within a volume.

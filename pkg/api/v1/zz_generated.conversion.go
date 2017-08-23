@@ -1870,6 +1870,7 @@ func autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *v1.ISCSIVolum
 	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
+	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))
 	return nil
 }
 
@@ -1889,6 +1890,7 @@ func autoConvert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolu
 	out.DiscoveryCHAPAuth = in.DiscoveryCHAPAuth
 	out.SessionCHAPAuth = in.SessionCHAPAuth
 	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
+	out.InitiatorName = (*string)(unsafe.Pointer(in.InitiatorName))
 	return nil
 }
 
