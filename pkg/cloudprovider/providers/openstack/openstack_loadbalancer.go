@@ -68,20 +68,19 @@ const (
 	activeStatus = "ACTIVE"
 	errorStatus  = "ERROR"
 
-	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
+	// service annotations that override their corresponding default (i.e. from cloud-config) settings
+	ServiceAnnotationLoadBalancerFloatingNetworkId    = "loadbalancer.openstack.org/floating-network-id"
+	ServiceAnnotationLoadBalancerProvider             = "service.beta.kubernetes.io/openstack-load-balancer-provider"
+	ServiceAnnotationLoadBalancerSubnetID             = "service.beta.kubernetes.io/openstack-load-balancer-subnet-id"
+	ServiceAnnotationLoadBalancerFloatingNetworkID    = "service.beta.kubernetes.io/openstack-load-balancer-floating-network-id"
+	ServiceAnnotationLoadBalancerLBMethod             = "service.beta.kubernetes.io/openstack-load-balancer-lb-method"
+	ServiceAnnotationLoadBalancerCreateMonitor        = "service.beta.kubernetes.io/openstack-load-balancer-create-monitor"
+	ServiceAnnotationLoadBalancerMonitorDelay         = "service.beta.kubernetes.io/openstack-load-balancer-monitor-delay"
+	ServiceAnnotationLoadBalancerMonitorTimeout       = "service.beta.kubernetes.io/openstack-load-balancer-monitor-timeout"
+	ServiceAnnotationLoadBalancerMonitorMaxRetries    = "service.beta.kubernetes.io/openstack-load-balancer-monitor-max-retries"
+	ServiceAnnotationLoadBalancerManageSecurityGroups = "service.beta.kubernetes.io/openstack-load-balancer-manage-security-groups"
+	ServiceAnnotationLoadBalancerNodeSecurityGroupID  = "service.beta.kubernetes.io/openstack-load-balancer-node-security-group-id"
 )
-
-// svcAnnotationProvider and svcAnnotationSubnetID are service annotations that override their corresponding default (i.e. from cloud-config) settings
-const ServiceAnnotationLoadBalancerProvider = "service.beta.kubernetes.io/openstack-load-balancer-provider"
-const ServiceAnnotationLoadBalancerSubnetID = "service.beta.kubernetes.io/openstack-load-balancer-subnet-id"
-const ServiceAnnotationLoadBalancerFloatingNetworkID = "service.beta.kubernetes.io/openstack-load-balancer-floating-network-id"
-const ServiceAnnotationLoadBalancerLBMethod = "service.beta.kubernetes.io/openstack-load-balancer-lb-method"
-const ServiceAnnotationLoadBalancerCreateMonitor = "service.beta.kubernetes.io/openstack-load-balancer-create-monitor"
-const ServiceAnnotationLoadBalancerMonitorDelay = "service.beta.kubernetes.io/openstack-load-balancer-monitor-delay"
-const ServiceAnnotationLoadBalancerMonitorTimeout = "service.beta.kubernetes.io/openstack-load-balancer-monitor-timeout"
-const ServiceAnnotationLoadBalancerMonitorMaxRetries = "service.beta.kubernetes.io/openstack-load-balancer-monitor-max-retries"
-const ServiceAnnotationLoadBalancerManageSecurityGroups = "service.beta.kubernetes.io/openstack-load-balancer-manage-security-groups"
-const ServiceAnnotationLoadBalancerNodeSecurityGroupID = "service.beta.kubernetes.io/openstack-load-balancer-node-security-group-id"
 
 // LoadBalancer implementation for LBaaS v1
 type LbaasV1 struct {
@@ -521,11 +520,11 @@ func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, d
 		return defaultSetting
 	}
 	if annotationValue, ok := service.Annotations[annotationKey]; ok {
-		//if there is an annotation for this setting, set the "setting" var to it
+		//if there is an annotation for this setting, return it
 		glog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
 		return annotationValue
 	}
-	//if there is no annotation, set "settings" var to the value from cloud config
+	//if there is no annotation, return default setting
 	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
 	return defaultSetting
 }
@@ -553,7 +552,7 @@ func getBoolFromServiceAnnotation(service *v1.Service, annotationKey string, def
 
 //getDurationFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
 func getDurationFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting MyDuration, enabledFlag bool) MyDuration {
-	glog.V(4).Infof("getBoolFromServiceAnnotation(%v, %v, %v, %v)", service, annotationKey, defaultSetting, enabledFlag)
+	glog.V(4).Infof("getDurationFromServiceAnnotation(%v, %v, %v, %v)", service, annotationKey, defaultSetting, enabledFlag)
 	if !enabledFlag {
 		return defaultSetting
 	}
@@ -566,6 +565,27 @@ func getDurationFromServiceAnnotation(service *v1.Service, annotationKey string,
 			return defaultSetting
 		}
 		return MyDuration{setting}
+	}
+	//if there is no annotation, set "settings" var to the value from cloud config
+	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
+	return defaultSetting
+}
+
+//getUint64FromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
+func getUint64FromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting uint64, enabledFlag bool) MyDuration {
+	glog.V(4).Infof("getUint64FromServiceAnnotation(%v, %v, %v, %v)", service, annotationKey, defaultSetting, enabledFlag)
+	if !enabledFlag {
+		return defaultSetting
+	}
+	if annotationValue, ok := service.Annotations[annotationKey]; ok {
+		//if there is an annotation for this setting, set the "setting" var to it
+		glog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
+		setting, err := uint64(lbaas.opts.MonitorMaxRetries)
+		if err != nil {
+			glog.Errorf("Failed to convert annotation \"%v\" from string to uint64. Falling back on default setting \"%v\" : %v", annotationValue, defaultSetting, err)
+			return defaultSetting
+		}
+		return setting
 	}
 	//if there is no annotation, set "settings" var to the value from cloud config
 	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
@@ -629,21 +649,6 @@ func nodeAddressForLB(node *v1.Node) (string, error) {
 	}
 
 	return addrs[0].Address, nil
-}
-
-//getStringFromServiceAnnotation searches a given v1.Service for a specific annotationKey and either returns the annotation's value or a specified defaultSetting
-func getStringFromServiceAnnotation(service *v1.Service, annotationKey string, defaultSetting string) string {
-	glog.V(4).Infof("getStringFromServiceAnnotation(%v, %v, %v)", service, annotationKey, defaultSetting)
-	if annotationValue, ok := service.Annotations[annotationKey]; ok {
-		//if there is an annotation for this setting, set the "setting" var to it
-		// annotationValue can be empty, it is working as designed
-		// it makes possible for instance provisioning loadbalancer without floatingip
-		glog.V(4).Infof("Found a Service Annotation: %v = %v", annotationKey, annotationValue)
-		return annotationValue
-	}
-	//if there is no annotation, set "settings" var to the value from cloud config
-	glog.V(4).Infof("Could not find a Service Annotation; falling back on cloud-config setting: %v = %v", annotationKey, defaultSetting)
-	return defaultSetting
 }
 
 // getSubnetIDForLB returns subnet-id for a specific node
@@ -865,11 +870,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		monitorTimeout := getDurationFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorTimeout, lbaas.opts.MonitorTimeout, lbaas.opts.EnableAnnotationMonitorTimeout)
 
 		// if this service has an annotation for MonitorMaxRetries, use that instead
-		_monitorMaxRetries := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorMaxRetries, strconv.FormatUint(uint64(lbaas.opts.MonitorMaxRetries), 10), lbaas.opts.EnableAnnotationMonitorMaxRetries)
-		monitorMaxRetries, err := strconv.ParseInt(_monitorMaxRetries, 10, 64)
-		if err != nil {
-			glog.Errorf("Failed to parse MonitorMaxRetries service annotation: %v; %v", _monitorMaxRetries, err)
-		}
+		monitorMaxRetries := getUint64StringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorMaxRetries, lbaas.opts.MonitorMaxRetries, lbaas.opts.EnableAnnotationMonitorMaxRetries)
 
 		if monitorID == "" && createMonitor {
 			glog.V(4).Infof("Creating monitor for pool %s", pool.ID)
@@ -1224,12 +1225,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	// if this service has an annotation for floating network ID, use that instead of the default
 	floatingNetworkID := getStringFromServiceAnnotation(service, ServiceAnnotationLoadBalancerFloatingNetworkID, lbaas.opts.FloatingNetworkId, lbaas.opts.EnableAnnotationFloatingNetworkId)
 
-	if floatingNetworkID != "" && loadbalancer != nil && loadbalancer.VipPortID != "" {
+	if loadbalancer != nil && loadbalancer.VipPortID != "" {
 		portID := loadbalancer.VipPortID
-		port, err := getPortByIP(lbaas.network, loadbalancer.VipAddress)
-		if err != nil {
-			return err
-		}
 
 		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
@@ -1493,11 +1490,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	monitorTimeout := getDurationFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorTimeout, lb.opts.MonitorTimeout, lb.opts.EnableAnnotationMonitorTimeout)
 
 	// if this service has an annotation for MonitorMaxRetries, use that instead
-	_monitorMaxRetries := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorMaxRetries, strconv.FormatUint(uint64(lb.opts.MonitorMaxRetries), 10), lb.opts.EnableAnnotationMonitorMaxRetries)
-	monitorMaxRetries, err := strconv.ParseInt(_monitorMaxRetries, 10, 64)
-	if err != nil {
-		glog.Errorf("Failed to parse MonitorMaxRetries service annotation: %v; %v", _monitorMaxRetries, err)
-	}
+	monitorMaxRetries := getUint64StringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerMonitorMaxRetries, lbaas.opts.MonitorMaxRetries, lbaas.opts.EnableAnnotationMonitorMaxRetries)
 
 	var mon *monitors.Monitor
 	if createMonitor {
