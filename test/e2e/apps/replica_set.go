@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -206,7 +205,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		cond := getCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
 		return cond != nil, nil
 
 	})
@@ -236,7 +235,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		cond := getCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
 		return cond == nil, nil
 	})
 	if err == wait.ErrWaitTimeout {
@@ -336,4 +335,14 @@ func testRSReleaseControlledNotMatching(f *framework.Framework) {
 		return true, nil
 	})
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// getCondition returns a replicaset condition with the provided type if it exists.
+func getCondition(status extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) *extensions.ReplicaSetCondition {
+	for _, c := range status.Conditions {
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
 }

@@ -84,6 +84,8 @@ items:
     - deployments
     - deployments/rollback
     - deployments/scale
+    - replicasets
+    - replicasets/scale
     - statefulsets
     verbs:
     - create
@@ -265,6 +267,8 @@ items:
     - deployments
     - deployments/rollback
     - deployments/scale
+    - replicasets
+    - replicasets/scale
     - statefulsets
     verbs:
     - create
@@ -608,6 +612,7 @@ items:
     - list
     - watch
   - apiGroups:
+    - apps
     - extensions
     resources:
     - replicasets
@@ -937,6 +942,8 @@ items:
     resources:
     - deployments
     - deployments/scale
+    - replicasets
+    - replicasets/scale
     - statefulsets
     verbs:
     - get

@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,18 +40,18 @@ func testLabels() map[string]string {
 	return map[string]string{"name": "test"}
 }
 
-func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
+func newRS(name, namespace string, replicas int) *v1beta2.ReplicaSet {
 	replicasCopy := int32(replicas)
-	return &v1beta1.ReplicaSet{
+	return &v1beta2.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1beta2",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: v1beta1.ReplicaSetSpec{
+		Spec: v1beta2.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: testLabels(),
 			},
@@ -102,7 +102,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 // sets and pods are rsNum and podNum. It returns error if the
 // communication with the API server fails.
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rsNum, podNum int) (bool, error) {
-	rsClient := clientSet.Extensions().ReplicaSets(namespace)
+	rsClient := clientSet.AppsV1beta2().ReplicaSets(namespace)
 	podClient := clientSet.Core().Pods(namespace)
 	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -137,7 +137,7 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "rs-informers")), resyncPeriod)
 
 	rm := replicaset.NewReplicaSetController(
-		informers.Extensions().V1beta1().ReplicaSets(),
+		informers.Apps().V1beta2().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
@@ -169,48 +169,48 @@ func TestAdoption(t *testing.T) {
 	boolPtr := func(b bool) *bool { return &b }
 	testCases := []struct {
 		name                    string
-		existingOwnerReferences func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference
-		expectedOwnerReferences func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference
+		existingOwnerReferences func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference
+		expectedOwnerReferences func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference
 	}{
 		{
 			"pod refers rs as an owner, not a controller",
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet"}}
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet"}}
 			},
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
 			"pod doesn't have owner references",
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{}
 			},
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers rs as a controller",
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true)}}
 			},
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers other rs as the controller, refers the rs as an owner",
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true)},
-					{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet"},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true)},
+					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet"},
 				}
 			},
-			func(rs *v1beta1.ReplicaSet) []metav1.OwnerReference {
+			func(rs *v1beta2.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "extensions/v1beta1", Kind: "ReplicaSet", Controller: boolPtr(true)},
-					{UID: rs.UID, Name: rs.Name, APIVersion: "extensions/v1beta1", Kind: "ReplicaSet"},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1beta2", Kind: "ReplicaSet", Controller: boolPtr(true)},
+					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1beta2", Kind: "ReplicaSet"},
 				}
 			},
 		},
@@ -222,7 +222,7 @@ func TestAdoption(t *testing.T) {
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("rs-adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
-		rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+		rsClient := clientSet.AppsV1beta2().ReplicaSets(ns.Name)
 		podClient := clientSet.Core().Pods(ns.Name)
 		const rsName = "rs"
 		rs, err := rsClient.Create(newRS(rsName, ns.Name, 1))
@@ -259,8 +259,8 @@ func TestAdoption(t *testing.T) {
 	}
 }
 
-func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*v1beta1.ReplicaSet, pods []*v1.Pod, ns string) {
-	rsClient := clientSet.Extensions().ReplicaSets(ns)
+func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*v1beta2.ReplicaSet, pods []*v1.Pod, ns string) {
+	rsClient := clientSet.AppsV1beta2().ReplicaSets(ns)
 	podClient := clientSet.Core().Pods(ns)
 	for _, rs := range rss {
 		if _, err := rsClient.Create(rs); err != nil {
@@ -274,8 +274,8 @@ func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*v1beta1.R
 	}
 }
 
-func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *v1beta1.ReplicaSet, ns string) {
-	rsClient := clientSet.Extensions().ReplicaSets(ns)
+func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *v1beta2.ReplicaSet, ns string) {
+	rsClient := clientSet.AppsV1beta2().ReplicaSets(ns)
 	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 		updatedRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
 		if err != nil {
@@ -307,7 +307,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	pod1.Labels["uniqueKey"] = "1"
 	pod2 := newMatchingPod("pod2", ns.Name)
 	pod2.Labels["uniqueKey"] = "2"
-	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
+	createRSsPods(t, clientSet, []*v1beta2.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -316,7 +316,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 
 	// change the rs's selector to match both pods
 	patch := `{"spec":{"selector":{"matchLabels": {"uniqueKey":null}}}}`
-	rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1beta2().ReplicaSets(ns.Name)
 	rs, err := rsClient.Patch(rs.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replica set: %v", err)
@@ -346,7 +346,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	pod1.Labels["uniqueKey"] = "1"
 	pod2 := newMatchingPod("pod2", ns.Name)
 	pod2.Labels["uniqueKey"] = "2"
-	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
+	createRSsPods(t, clientSet, []*v1beta2.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -356,7 +356,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 	// change the rs's selector to match both pods
 	patch := `{"spec":{"selector":{"matchLabels": {"uniqueKey":"1"}},"template":{"metadata":{"labels":{"uniqueKey":"1"}}}}}`
-	rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+	rsClient := clientSet.AppsV1beta2().ReplicaSets(ns.Name)
 	rs, err := rsClient.Patch(rs.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replica set: %v", err)
@@ -391,7 +391,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	rs := newRS("rs", ns.Name, 2)
 	pod1 := newMatchingPod("pod1", ns.Name)
 	pod2 := newMatchingPod("pod2", ns.Name)
-	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
+	createRSsPods(t, clientSet, []*v1beta2.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
@@ -439,7 +439,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	pod1.Labels["uniqueKey"] = "1"
 	pod2 := newMatchingPod("pod2", ns.Name)
 	pod2.Labels["uniqueKey"] = "2"
-	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
+	createRSsPods(t, clientSet, []*v1beta2.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
