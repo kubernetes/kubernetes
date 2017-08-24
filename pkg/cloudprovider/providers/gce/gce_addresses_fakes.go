@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
@@ -102,4 +103,12 @@ func (cas *FakeCloudAddressService) GetRegionAddressByIP(region, ipAddress strin
 		}
 	}
 	return nil, makeGoogleAPINotFoundError("")
+}
+
+func (cas *FakeCloudAddressService) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
+	return fmt.Errorf("not implemented")
 }

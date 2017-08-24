@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 
@@ -40,10 +39,7 @@ var (
 )
 
 func newLoadBalancerMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"loadbalancer_" + request, region, unusedMetricLabel},
-	}
+	return newGenericMetricContext("loadbalancer", request, region, unusedMetricLabel, computeV1Version)
 }
 
 type lbScheme string

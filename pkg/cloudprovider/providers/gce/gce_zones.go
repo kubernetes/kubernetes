@@ -18,7 +18,6 @@ package gce
 
 import (
 	"fmt"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -27,10 +26,7 @@ import (
 )
 
 func newZonesMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"zones_" + request, region, unusedMetricLabel},
-	}
+	return newGenericMetricContext("zones", request, region, unusedMetricLabel, computeV1Version)
 }
 
 // GetZone creates a cloudprovider.Zone of the current zone and region

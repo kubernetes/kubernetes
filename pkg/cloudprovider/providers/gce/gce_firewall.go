@@ -17,16 +17,11 @@ limitations under the License.
 package gce
 
 import (
-	"time"
-
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newFirewallMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"firewall_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("firewall", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetFirewall returns the Firewall by name.

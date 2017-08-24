@@ -41,10 +41,7 @@ const (
 )
 
 func newInstancesMetricContext(request, zone string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"instances_" + request, unusedMetricLabel, zone},
-	}
+	return newGenericMetricContext("instances", request, unusedMetricLabel, zone, computeV1Version)
 }
 
 func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {

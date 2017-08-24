@@ -83,6 +83,7 @@ go_test(
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
         "gce_test.go",
+        "metrics_test.go",
     ],
     library = ":go_default_library",
     deps = [
