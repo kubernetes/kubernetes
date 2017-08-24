@@ -739,14 +739,14 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		return nil, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
 
-	expanderPlugin, err := volumePlugin.NewExpander()
+	expanderPlugin, err := volumePlugin.NewExpander(pvcWithResizeRequest.VolumeSpec)
 
 	if err != nil {
 		return nil, fmt.Errorf("Error creating expander plugin for volume %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
 
 	expandFunc := func() error {
-		expandErr := expanderPlugin.ExpandVolumeDevice(pvcWithResizeRequest.VolumeSpec, pvcWithResizeRequest.ExpectedSize, pvcWithResizeRequest.CurrentSize)
+		expandErr := expanderPlugin.ExpandVolumeDevice(pvcWithResizeRequest.ExpectedSize, pvcWithResizeRequest.CurrentSize)
 
 		if expandErr != nil {
 			glog.Errorf("Error expanding volume through cloudprovider for volume %q : %v", pvcWithResizeRequest.QualifiedName(), expandErr)
