@@ -998,7 +998,7 @@ func TestValidateGlusterfs(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		errs := validateGlusterfs(tc.gfs, field.NewPath("field"))
+		errs := validateGlusterfsVolumeSource(tc.gfs, field.NewPath("field"))
 
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
