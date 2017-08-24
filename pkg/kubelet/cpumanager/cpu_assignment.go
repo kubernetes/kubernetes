@@ -35,7 +35,7 @@ type cpuAccumulator struct {
 func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) *cpuAccumulator {
 	return &cpuAccumulator{
 		topo:          topo,
-		details:       topo.CPUtopoDetails.KeepOnly(availableCPUs),
+		details:       topo.CPUDetails.KeepOnly(availableCPUs),
 		numCPUsNeeded: numCPUs,
 		result:        cpuset.NewCPUSet(),
 	}
@@ -85,7 +85,7 @@ func (a *cpuAccumulator) freeCores() []int {
 
 // Returns CPU IDs as a slice sorted by:
 // - socket affinity with result
-// - number of CPUs available on the same sockett
+// - number of CPUs available on the same socket
 // - number of CPUs available on the same core
 // - socket ID.
 // - core ID.
@@ -99,16 +99,16 @@ func (a *cpuAccumulator) freeCPUs() []int {
 			iCore := cores[i]
 			jCore := cores[j]
 
-			iCPUs := a.topo.CPUtopoDetails.CPUsInCore(iCore).AsSlice()
-			jCPUs := a.topo.CPUtopoDetails.CPUsInCore(jCore).AsSlice()
+			iCPUs := a.topo.CPUDetails.CPUsInCore(iCore).AsSlice()
+			jCPUs := a.topo.CPUDetails.CPUsInCore(jCore).AsSlice()
 
-			iSocket := a.topo.CPUtopoDetails[iCPUs[0]].SocketID
-			jSocket := a.topo.CPUtopoDetails[jCPUs[0]].SocketID
+			iSocket := a.topo.CPUDetails[iCPUs[0]].SocketID
+			jSocket := a.topo.CPUDetails[jCPUs[0]].SocketID
 
 			// Compute the number of CPUs in the result reside on the same socket
 			// as each core.
-			iSocketColoScore := a.topo.CPUtopoDetails.CPUsInSocket(iSocket).Intersection(a.result).Size()
-			jSocketColoScore := a.topo.CPUtopoDetails.CPUsInSocket(jSocket).Intersection(a.result).Size()
+			iSocketColoScore := a.topo.CPUDetails.CPUsInSocket(iSocket).Intersection(a.result).Size()
+			jSocketColoScore := a.topo.CPUDetails.CPUsInSocket(jSocket).Intersection(a.result).Size()
 
 			// Compute the number of available CPUs available on the same socket
 			// as each core.

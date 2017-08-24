@@ -43,11 +43,9 @@ func (p *nonePolicy) Start(s state.State) {
 }
 
 func (p *nonePolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
-	glog.Infof("[cpumanager] none policy: RegisterContainer [%s] (%s) of pod %s", containerID, container.Name, pod.Name)
 	return nil
 }
 
 func (p *nonePolicy) UnregisterContainer(s state.State, containerID string) error {
-	glog.Infof("[cpumanager] none policy: UnregisterContainer [%s]", containerID)
 	return nil
 }

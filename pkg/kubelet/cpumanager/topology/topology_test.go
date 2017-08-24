@@ -59,7 +59,7 @@ func Test_Discover(t *testing.T) {
 				NumSockets:     1,
 				NumCores:       4,
 				HyperThreading: true,
-				CPUtopoDetails: map[int]CPUInfo{
+				CPUDetails: map[int]CPUInfo{
 					0: {CoreID: 0, SocketID: 0},
 					1: {CoreID: 1, SocketID: 0},
 					2: {CoreID: 2, SocketID: 0},
@@ -96,7 +96,7 @@ func Test_Discover(t *testing.T) {
 				NumSockets:     2,
 				NumCores:       4,
 				HyperThreading: false,
-				CPUtopoDetails: map[int]CPUInfo{
+				CPUDetails: map[int]CPUInfo{
 					0: {CoreID: 0, SocketID: 0},
 					1: {CoreID: 1, SocketID: 1},
 					2: {CoreID: 2, SocketID: 0},

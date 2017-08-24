@@ -26,7 +26,7 @@ var (
 		NumSockets:     1,
 		NumCores:       4,
 		HyperThreading: true,
-		CPUtopoDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[int]topology.CPUInfo{
 			0: {CoreID: 0, SocketID: 0},
 			1: {CoreID: 1, SocketID: 0},
 			2: {CoreID: 2, SocketID: 0},
@@ -43,7 +43,7 @@ var (
 		NumSockets:     2,
 		NumCores:       6,
 		HyperThreading: true,
-		CPUtopoDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[int]topology.CPUInfo{
 			0:  {CoreID: 0, SocketID: 0},
 			1:  {CoreID: 1, SocketID: 1},
 			2:  {CoreID: 2, SocketID: 0},
@@ -64,7 +64,7 @@ var (
 		NumSockets:     2,
 		NumCores:       8,
 		HyperThreading: false,
-		CPUtopoDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[int]topology.CPUInfo{
 			0: {CoreID: 0, SocketID: 0},
 			1: {CoreID: 1, SocketID: 0},
 			2: {CoreID: 2, SocketID: 0},

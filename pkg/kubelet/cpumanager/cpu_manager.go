@@ -51,11 +51,9 @@ type policyName string
 type Manager interface {
 	Start()
 
-	// RegisterContainer registers a container with the cpuset manager
-	// resulting in synchronous setting on the container cpuset.  This
-	// is called after RegisterContainer(), which creates the containerID, and
-	// before StartContainer(), such that the cpuset is configured before
-	// the container starts
+	// RegisterContainer is called between container creation and container start
+	// so that initial CPU affinity settings can be written through to the
+	// container runtime before the first process begins to execute.
 	RegisterContainer(p *v1.Pod, c *v1.Container, containerID string) error
 
 	// UnregisterContainer is called near UnregisterContainer() so that the manager

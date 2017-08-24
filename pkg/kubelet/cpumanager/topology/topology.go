@@ -35,7 +35,7 @@ type CPUTopology struct {
 	NumCores         int
 	HyperThreading   bool
 	NumSockets       int
-	CPUtopoDetails   CPUDetails
+	CPUDetails       CPUDetails
 	NumReservedCores int
 }
 
@@ -146,7 +146,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}
 
-	CPUtopoDetails := CPUDetails{}
+	CPUDetails := CPUDetails{}
 
 	numCPUs := machineInfo.NumCores
 	htEnabled := false
@@ -155,7 +155,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		numPhysicalCores += len(socket.Cores)
 		for _, core := range socket.Cores {
 			for _, cpu := range core.Threads {
-				CPUtopoDetails[cpu] = CPUInfo{
+				CPUDetails[cpu] = CPUInfo{
 					CoreID:   core.Id,
 					SocketID: socket.Id,
 				}
@@ -172,6 +172,6 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 		NumSockets:     len(machineInfo.Topology),
 		NumCores:       numPhysicalCores,
 		HyperThreading: htEnabled,
-		CPUtopoDetails: CPUtopoDetails,
+		CPUDetails:     CPUDetails,
 	}, nil
 }

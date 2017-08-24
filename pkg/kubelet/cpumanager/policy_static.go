@@ -37,7 +37,7 @@ type staticPolicy struct {
 // Ensure staticPolicy implements Policy interface
 var _ Policy = &staticPolicy{}
 
-// NewStaticPolicy returns a cupset manager policy that does not change
+// NewStaticPolicy returns a cpuset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
 // the main container process starts.
 func NewStaticPolicy(topology *topology.CPUTopology) Policy {
