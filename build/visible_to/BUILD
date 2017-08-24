@@ -30,6 +30,7 @@ package_group(
     packages = [
         "//cmd/gendocs",
         "//cmd/genman",
+        "//cmd/genslateyaml",
         "//cmd/genyaml",
     ],
 )
