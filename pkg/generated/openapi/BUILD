@@ -31,6 +31,7 @@ openapi_library(
         "k8s.io/api/batch/v1",
         "k8s.io/api/batch/v1beta1",
         "k8s.io/api/batch/v2alpha1",
+        "k8s.io/api/bulk/v1alpha1",
         "k8s.io/api/certificates/v1beta1",
         "k8s.io/api/core/v1",
         "k8s.io/api/extensions/v1beta1",
@@ -53,7 +54,11 @@ openapi_library(
         "k8s.io/apimachinery/pkg/util/intstr",
         "k8s.io/apimachinery/pkg/version",
         "k8s.io/apiserver/pkg/apis/audit/v1alpha1",
+<<<<<<< HEAD
         "k8s.io/apiserver/pkg/apis/audit/v1beta1",
+=======
+        "k8s.io/apiserver/pkg/apis/bulk/v1alpha1",
+>>>>>>> Add internal types for bulk api
         "k8s.io/apiserver/pkg/apis/example/v1",
         "k8s.io/client-go/pkg/version",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",

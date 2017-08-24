@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package bulk
 
 import (
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -25,19 +27,19 @@ import (
 
 // BulkRequest contains a single request to bulk api.
 type BulkRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Opaque identifier used to match requests and responses.
 	// +optional
-	RequestID string `json:"requestId,omitempty" protobuf:"bytes,1,opt,name=requestId"`
+	RequestID string
 
 	// Starts new watch.
 	// +optional
-	Watch *WatchOperation `json:"watch,omitempty" protobuf:"bytes,2,opt,name=watch"`
+	Watch *WatchOperation
 
 	// Stops existing watch.
 	// +optional
-	StopWatch *StopWatchOperation `json:"stopWatch,omitempty" protobuf:"bytes,3,opt,name=stopWatch"`
+	StopWatch *StopWatchOperation
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -45,95 +47,90 @@ type BulkRequest struct {
 
 // BulkResponse contains a single response from bulk api.
 type BulkResponse struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// Opaque identifier propagated from the request.
-	// Null for messages issued by server (WatchEvent, WatchStopped triggered by server)
+	// Is null form messages issued by server (events, watch aborts).
 	// +optional
-	RequestID *string `json:"requestId,omitempty" protobuf:"bytes,1,opt,name=requestId"`
+	RequestID *string
 
-	// Contains error details when request was failed.
+	// Contains error details when request (watch, watchStop etc) was failed.
 	// +optional
-	Failure *metav1.Status `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
+	Failure *metav1.Status
 
-	// Sent when watch was manually stopped.
+	// Sent when watch was stopped (by server or client).
 	// +optional
-	WatchStopped *WatchStopped `json:"watchStopped,omitempty" protobuf:"bytes,3,opt,name=watchStopped"`
+	WatchStopped *WatchStopped
 
 	// Sent when new watch was started.
 	// +optional
-	WatchStarted *WatchStarted `json:"watchStarted,omitempty" protobuf:"bytes,4,opt,name=watchStarted"`
+	WatchStarted *WatchStarted
 
 	// Contains single watch event.
 	// +optional
-	WatchEvent *BulkWatchEvent `json:"watchEvent,omitempty" protobuf:"bytes,5,opt,name=watchEvent"`
+	WatchEvent *BulkWatchEvent
 }
 
-// Selector
+// ResourceSelector identifies selected resource.
 type ResourceSelector struct {
 
-	// Resource identifier.  This is not the kind.  For example: pods
-	Resource string `json:"resource" protobuf:"bytes,3,opt,name=resource"`
+	// Resource identifier.
+	Resource string
 
 	// Name of APIGroup, defaults to core API group.
-	// +optional
-	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
+	Group string
 
 	// Version of APIGroup, defaults to preferred version.
-	// +optional
-	Version string `json:"version,omitempty" protobuf:"bytes,2,opt,name=version"`
+	Version string
 
-	// Namespace
-	// +optional
-	Namespace string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
+	// Namespace.
+	Namespace string
 
-	// Name of the single resource object
-	// +optional
-	Name string `json:"name,omitempty" protobuf:"bytes,5,opt,name=namespace"`
+	// Name of the single resource object (empty for lists).
+	Name string
 
 	// Query options used to filter watched resources.
 	// Field 'Watch' is ignored by bulk api.
-	// +optional
-	Options *metav1.ListOptions `json:"options" protobuf:"bytes,3,name=options"`
+	Options *metainternalversion.ListOptions
 }
 
 // BulkWatchEvent represents a single event to a watched resource.
 type BulkWatchEvent struct {
 
 	// Identifier of the watch.
-	WatchID string `json:"watchId" protobuf:"bytes,1,name=watchId"`
+	WatchID string
 
-	// Watch event.
-	Event metav1.WatchEvent `json:",inline" protobuf:"bytes,2,name=event"`
+	// Watch event
+	Event watch.Event
 }
 
 // WatchStarted is a return value when new watch was started.
 type WatchStarted struct {
 
 	// Identifier of the watch.
-	WatchID string `json:"watchId" protobuf:"bytes,1,name=watchId"`
+	WatchID string
 }
 
 // WatchStopped is a return value when existing watch was stopped.
 type WatchStopped struct {
 
 	// Identifier of the watch.
-	WatchID string `json:"watchId" protobuf:"bytes,1,name=watchId"`
+	WatchID string
 }
 
 // WatchOperation is a request to start new watch.
 type WatchOperation struct {
 
 	// Identifier of the watch.
-	WatchID string `json:"watchId" protobuf:"bytes,1,name=watchId"`
+	WatchID string
 
 	// Selector.
-	Selector ResourceSelector `json:"selector" protobuf:"bytes,2,name=selector"`
+	Selector ResourceSelector
 }
 
 // StopWatchOperation is a request to stop existing watch.
 type StopWatchOperation struct {
 
 	// Identifier of the watch.
-	WatchID string `json:"watchId" protobuf:"bytes,1,name=watchId"`
+	WatchID string
 }
