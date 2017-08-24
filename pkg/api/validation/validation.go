@@ -3409,7 +3409,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 		}
 	}
 
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate container resource name
@@ -3422,7 +3422,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate resource names that can go in a resource quota
@@ -3434,7 +3434,7 @@ func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate limit range types
