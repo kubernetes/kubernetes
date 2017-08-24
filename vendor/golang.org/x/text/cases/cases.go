@@ -35,7 +35,7 @@ import (
 // A Caser may be stateful and should therefore not be shared between
 // goroutines.
 type Caser struct {
-	t transform.Transformer
+	t transform.SpanningTransformer
 }
 
 // Bytes returns a new byte slice with the result of converting b to the case
@@ -56,10 +56,15 @@ func (c Caser) String(s string) string {
 // Transform.
 func (c Caser) Reset() { c.t.Reset() }
 
-// Transform implements the Transformer interface and transforms the given input
-// to the case form implemented by c.
+// Transform implements the transform.Transformer interface and transforms the
+// given input to the case form implemented by c.
 func (c Caser) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	return c.t.Transform(dst, src, atEOF)
+}
+
+// Span implements the transform.SpanningTransformer interface.
+func (c Caser) Span(src []byte, atEOF bool) (n int, err error) {
+	return c.t.Span(src, atEOF)
 }
 
 // Upper returns a Caser for language-specific uppercasing.
@@ -83,14 +88,20 @@ func Title(t language.Tag, opts ...Option) Caser {
 //
 // Case folding does not normalize the input and may not preserve a normal form.
 // Use the collate or search package for more convenient and linguistically
-// sound comparisons.  Use unicode/precis for string comparisons where security
-// aspects are a concern.
+// sound comparisons. Use golang.org/x/text/secure/precis for string comparisons
+// where security aspects are a concern.
 func Fold(opts ...Option) Caser {
 	return Caser{makeFold(getOpts(opts...))}
 }
 
 // An Option is used to modify the behavior of a Caser.
-type Option func(o *options)
+type Option func(o options) options
+
+// TODO: consider these options to take a boolean as well, like FinalSigma.
+// The advantage of using this approach is that other providers of a lower-case
+// algorithm could set different defaults by prefixing a user-provided slice
+// of options with their own. This is handy, for instance, for the precis
+// package which would override the default to not handle the Greek final sigma.
 
 var (
 	// NoLower disables the lowercasing of non-leading letters for a title
@@ -110,20 +121,42 @@ type options struct {
 
 	// TODO: segmenter, max ignorable, alternative versions, etc.
 
-	noFinalSigma bool // Only used for testing.
+	ignoreFinalSigma bool
 }
 
 func getOpts(o ...Option) (res options) {
 	for _, f := range o {
-		f(&res)
+		res = f(res)
 	}
 	return
 }
 
-func noLower(o *options) {
+func noLower(o options) options {
 	o.noLower = true
+	return o
 }
 
-func compact(o *options) {
+func compact(o options) options {
 	o.simple = true
+	return o
+}
+
+// HandleFinalSigma specifies whether the special handling of Greek final sigma
+// should be enabled. Unicode prescribes handling the Greek final sigma for all
+// locales, but standards like IDNA and PRECIS override this default.
+func HandleFinalSigma(enable bool) Option {
+	if enable {
+		return handleFinalSigma
+	}
+	return ignoreFinalSigma
+}
+
+func ignoreFinalSigma(o options) options {
+	o.ignoreFinalSigma = true
+	return o
+}
+
+func handleFinalSigma(o options) options {
+	o.ignoreFinalSigma = false
+	return o
 }

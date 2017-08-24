@@ -28,9 +28,6 @@ func (c info) cccType() info {
 // only makes sense, though, if the performance and/or space penalty of using
 // the generic breaker is big. Extra data will only be needed for non-cased
 // runes, which means there are sufficient bits left in the caseType.
-// Also note that the standard breaking algorithm doesn't always make sense
-// for title casing. For example, a4a -> A4a, but a"4a -> A"4A (where " stands
-// for modifier \u0308).
 // ICU prohibits breaking in such cases as well.
 
 // For the purpose of title casing we use an approximation of the Unicode Word
@@ -41,17 +38,19 @@ func (c info) cccType() info {
 // categories, with associated rules:
 //
 // 1) Letter:
-//    ALetter, Hebrew_Letter, Numeric, ExtendNumLet, Extend.
+//    ALetter, Hebrew_Letter, Numeric, ExtendNumLet, Extend, Format_FE, ZWJ.
 //    Rule: Never break between consecutive runes of this category.
 //
 // 2) Mid:
-//    Format, MidLetter, MidNumLet, Single_Quote.
-//    (Cf. case-ignorable: MidLetter, MidNumLet or cat is Mn, Me, Cf, Lm or Sk).
+//    MidLetter, MidNumLet, Single_Quote.
+//    (Cf. case-ignorable: MidLetter, MidNumLet, Single_Quote or cat is Mn,
+//    Me, Cf, Lm or Sk).
 //    Rule: Don't break between Letter and Mid, but break between two Mids.
 //
 // 3) Break:
-//    Any other category, including NewLine, CR, LF and Double_Quote. These
-//    categories should always result in a break between two cased letters.
+//    Any other category: NewLine, MidNum, CR, LF, Double_Quote, Katakana, and
+//    Other.
+//    These categories should always result in a break between two cased letters.
 //    Rule: Always break.
 //
 // Note 1: the Katakana and MidNum categories can, in esoteric cases, result in
