@@ -407,6 +407,7 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /bulk/*
     - /healthz
     - /swaggerapi
     - /swaggerapi/*
