@@ -23,18 +23,8 @@ import (
 	containermanager "k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-// MaxCrashLoopThreshold is the maximum allowed KubeletConfiguraiton.CrashLoopThreshold
-const MaxCrashLoopThreshold = 10
-
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	// restrict crashloop threshold to between 0 and `maxCrashLoopThreshold`, inclusive
-	// more than `maxStartups=maxCrashLoopThreshold` adds unnecessary bloat to the .startups.json file,
-	// and negative values would be silly.
-	if kc.CrashLoopThreshold < 0 || kc.CrashLoopThreshold > MaxCrashLoopThreshold {
-		return fmt.Errorf("field `CrashLoopThreshold` must be between 0 and %d, inclusive", MaxCrashLoopThreshold)
-	}
-
 	if !kc.CgroupsPerQOS && len(kc.EnforceNodeAllocatable) > 0 {
 		return fmt.Errorf("node allocatable enforcement is not supported unless Cgroups Per QOS feature is turned on")
 	}

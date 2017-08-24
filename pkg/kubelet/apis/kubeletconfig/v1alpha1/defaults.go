@@ -53,9 +53,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.ConfigTrialDuration == nil {
 		obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}
 	}
-	if obj.CrashLoopThreshold == nil {
-		obj.CrashLoopThreshold = utilpointer.Int32Ptr(10)
-	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = boolVar(true)
 	}

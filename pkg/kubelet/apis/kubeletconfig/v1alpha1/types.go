@@ -51,17 +51,8 @@ type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Only used for dynamic configuration.
-	// The length of the trial period for this configuration. If the Kubelet records CrashLoopThreshold or
-	// more startups during this period, the current configuration will be marked bad and the
-	// Kubelet will roll-back to the last-known-good. Default 10 minutes.
+	// The length of the trial period for this configuration. This configuration will become the last-known-good after this duration.
 	ConfigTrialDuration *metav1.Duration `json:"configTrialDuration"`
-	// Only used for dynamic configuration.
-	// If this number of Kubelet "crashes" during ConfigTrialDuration meets this threshold,
-	// the configuration fails the trial and the Kubelet rolls back to its last-known-good config.
-	// Crash-loops are detected by counting Kubelet startups, so one startup is implicitly added
-	// to this threshold to always allow a single restart per config change.
-	// Default 10, mimimum allowed is 0, maximum allowed is 10.
-	CrashLoopThreshold *int32 `json:"crashLoopThreshold"`
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string `json:"podManifestPath"`
