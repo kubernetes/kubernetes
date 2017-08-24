@@ -427,6 +427,12 @@ EOF
 multizone = ${MULTIZONE}
 EOF
   fi
+  if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+alpha-features = ${GCE_ALPHA_FEATURES}
+EOF
+  fi
   if [[ "${use_cloud_config}" != "true" ]]; then
     rm -f /etc/gce.conf
   fi
