@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -343,10 +344,18 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := rollbackStorage.Create(ctx, &test.rollback, false); !test.errOK(err) {
+		rollbackRespStatus, err := rollbackStorage.Create(ctx, &test.rollback, false)
+		if !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
-			// If rollback succeeded, verify Rollback field of deployment
+			// If rollback succeeded, verify Rollback response and Rollback field of deployment
+			status, ok := rollbackRespStatus.(*metav1.Status)
+			if !ok {
+				t.Errorf("%s: unexpected response format", k)
+			}
+			if status.Code != http.StatusOK || status.Status != metav1.StatusSuccess {
+				t.Errorf("%s: unexpected response, code: %d, status: %s", k, status.Code, status.Status)
+			}
 			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
