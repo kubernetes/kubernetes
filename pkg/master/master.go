@@ -278,9 +278,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
-	if err := m.GenericAPIServer.AddPostStartHook("ca-registration", c.ClientCARegistrationHook.PostStartHook); err != nil {
-		glog.Fatalf("Error registering PostStartHook %q: %v", "ca-registration", err)
-	}
+	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ClientCARegistrationHook.PostStartHook)
 
 	return m, nil
 }
@@ -294,9 +292,7 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptio
 	if c.EnableCoreControllers {
 		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient)
-		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
-			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
-		}
+		m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
 	}
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
@@ -341,9 +337,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 			if err != nil {
 				glog.Fatalf("Error building PostStartHook: %v", err)
 			}
-			if err := m.GenericAPIServer.AddPostStartHook(name, hook); err != nil {
-				glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
-			}
+			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
