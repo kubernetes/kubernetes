@@ -61,3 +61,10 @@ func (self *ResourceList) StorageOverlay() *resource.Quantity {
 	}
 	return &resource.Quantity{}
 }
+
+func (self *ResourceList) StorageEphemeral() *resource.Quantity {
+	if val, ok := (*self)[ResourceEphemeralStorage]; ok {
+		return &val
+	}
+	return &resource.Quantity{}
+}
