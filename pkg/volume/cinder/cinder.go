@@ -276,13 +276,6 @@ type cinderVolume struct {
 	volume.MetricsNil
 }
 
-func detachDiskLogError(cd *cinderVolume) {
-	err := cd.manager.DetachDisk(&cinderVolumeUnmounter{cd})
-	if err != nil {
-		glog.Warningf("Failed to detach disk: %v (%v)", cd, err)
-	}
-}
-
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        b.readOnly,
@@ -309,7 +302,6 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	b.plugin.volumeLocks.LockKey(b.pdName)
 	defer b.plugin.volumeLocks.UnlockKey(b.pdName)
 
-	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
@@ -327,9 +319,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		// TODO: we should really eject the attach/detach out into its own control loop.
 		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
-		detachDiskLogError(b.cinderVolume)
 		return err
 	}
 
@@ -360,8 +350,6 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			}
 		}
 		os.Remove(dir)
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(b.cinderVolume)
 		glog.Errorf("Failed to mount %s: %v", dir, err)
 		return err
 	}
