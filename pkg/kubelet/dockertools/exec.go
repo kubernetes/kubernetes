@@ -111,6 +111,9 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 type NativeExecHandler struct{}
 
 func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
+	done := make(chan struct{})
+	defer close(done)
+
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
@@ -125,9 +128,23 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 
 	// Have to start this before the call to client.StartExec because client.StartExec is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
-	kubecontainer.HandleResizing(resize, func(size term.Size) {
-		client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
-	})
+
+	// We also have to delay attempting to send a terminal resize request to docker until after the
+	// exec has started; otherwise, the initial resize request will fail.
+	execStarted := make(chan struct{})
+	go func() {
+		select {
+		case <-execStarted:
+			// client.StartExec has started the exec, so we can start resizing
+		case <-done:
+			// ExecInContainer has returned, so short-circuit
+			return
+		}
+
+		kubecontainer.HandleResizing(resize, func(size term.Size) {
+			client.ResizeExecTTY(execObj.ID, int(size.Height), int(size.Width))
+		})
+	}()
 
 	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
 	streamOpts := StreamOptions{
@@ -135,6 +152,7 @@ func (*NativeExecHandler) ExecInContainer(client DockerInterface, container *doc
 		OutputStream: stdout,
 		ErrorStream:  stderr,
 		RawTerminal:  tty,
+		ExecStarted:  execStarted,
 	}
 	err = client.StartExec(execObj.ID, startOpts, streamOpts)
 	if err != nil {
