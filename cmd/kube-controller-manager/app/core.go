@@ -190,18 +190,21 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 }
 
 func startVolumeExpandController(ctx ControllerContext) (bool, error) {
-	expandController, expandControllerErr := expand.NewExpandController(
-		ctx.ClientBuilder.ClientOrDie("expand-controller"),
-		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		ctx.InformerFactory.Core().V1().PersistentVolumes(),
-		ctx.Cloud,
-		ProbeAttachableVolumePlugins(ctx.Options.VolumeConfiguration))
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		expandController, expandControllerErr := expand.NewExpandController(
+			ctx.ClientBuilder.ClientOrDie("expand-controller"),
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			ctx.InformerFactory.Core().V1().PersistentVolumes(),
+			ctx.Cloud,
+			ProbeExpandableVolumePlugins(ctx.Options.VolumeConfiguration))
 
-	if expandControllerErr != nil {
-		return true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
+		if expandControllerErr != nil {
+			return true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
+		}
+		go expandController.Run(ctx.Stop)
+		return true, nil
 	}
-	go expandController.Run(ctx.Stop)
-	return true, nil
+	return false, nil
 }
 
 func startEndpointController(ctx ControllerContext) (bool, error) {

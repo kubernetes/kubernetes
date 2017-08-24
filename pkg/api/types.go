@@ -547,20 +547,16 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 }
 
-type PvcConditionType string
+type PersistentVolumeClaimConditionType string
 
 // These are valid conditions of Pvc
 const (
 	// An user trigger resize of pvc has been started
-	PvcResizeStarted PvcConditionType = "ResizeStarted"
-	// PvcReady means an operation in progress on PVC is finished successfuly
-	PvcReady PvcConditionType = "Ready"
-	// PvcResizeFailed means user trigged resize of PVC has failed
-	PvcResizeFailed PvcConditionType = "ResizeFailed"
+	PersistentVolumeClaimResizeStarted PersistentVolumeClaimConditionType = "ResizeStarted"
 )
 
-type PvcCondition struct {
-	Type   PvcConditionType
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType
 	Status ConditionStatus
 	// +optional
 	LastProbeTime metav1.Time
@@ -583,7 +579,7 @@ type PersistentVolumeClaimStatus struct {
 	// +optional
 	Capacity ResourceList
 	// +optional
-	Conditions []PvcCondition
+	Conditions []PersistentVolumeClaimCondition
 }
 
 type PersistentVolumeAccessMode string
