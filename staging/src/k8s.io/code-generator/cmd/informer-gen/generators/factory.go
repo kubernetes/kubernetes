@@ -57,6 +57,8 @@ func (g *factoryGenerator) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *factoryGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
+	imports = append(imports, "github.com/golang/glog")
+	imports = append(imports, "runtime/debug")
 	return
 }
 
@@ -95,13 +97,14 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 var sharedInformerFactoryStruct = `
 type sharedInformerFactory struct {
 	client {{.clientSetInterface|raw}}
-	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 
+	// lock guards informers, started, startedInformers, stopCh
+	lock {{.syncMutex|raw}}
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
-	// startedInformers is used for tracking which informers have been started.
-	// This allows Start() to be called multiple times safely.
+	started bool
 	startedInformers map[{{.reflectType|raw}}]bool
+	stopCh <-chan struct{}
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
@@ -119,12 +122,22 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
   f.lock.Lock()
   defer f.lock.Unlock()
 
+  if f.started {
+  	glog.Warning("Invalid attempt to try to start the shared informer factory multiple times. This is a no-op but you should remove this invocation")
+  	debug.PrintStack()
+  	return
+	}
+
+	f.stopCh = stopCh
+
   for informerType, informer := range f.informers {
     if !f.startedInformers[informerType] {
-      go informer.Run(stopCh)
+      go informer.Run(f.stopCh)
       f.startedInformers[informerType] = true
     }
   }
+
+  f.started = true
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
@@ -149,8 +162,9 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
        return res
 }
 
-// InternalInformerFor returns the SharedIndexInformer for obj using an internal
-// client.
+// InformerFor returns the SharedIndexInformer for obj. If the factory has already been started and
+// this is the first time this particular informer has been referenced, the informer will be
+// automatically started. Otherwise, the informer will be started when Start() is invoked.
 func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
   defer f.lock.Unlock()
@@ -160,8 +174,14 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   if exists {
     return informer
   }
+
   informer = newFunc(f.client, f.defaultResync)
   f.informers[informerType] = informer
+
+  if f.started {
+  	go informer.Run(f.stopCh)
+  	f.startedInformers[informerType] = true
+	}
 
   return informer
 }
