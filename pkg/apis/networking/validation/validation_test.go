@@ -128,9 +128,60 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				PodSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
 				Ingress: []networking.NetworkPolicyIngressRule{
 					{
 						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
 							{
 								IPBlock: &networking.IPBlock{
 									CIDR:   "192.168.0.0/16",
@@ -249,6 +300,23 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				Ingress: []networking.NetworkPolicyIngressRule{
 					{
 						From: []networking.NetworkPolicyPeer{
+							{
+								PodSelector: &metav1.LabelSelector{
+									MatchLabels: invalidSelector,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid egress.to.podSelector": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
 							{
 								PodSelector: &metav1.LabelSelector{
 									MatchLabels: invalidSelector,
