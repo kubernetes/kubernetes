@@ -2458,7 +2458,7 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !internalELB && !isPublic {
+		if !isPublic {
 			glog.V(2).Infof("Ignoring private subnet for public ELB %q", id)
 			continue
 		}
