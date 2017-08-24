@@ -30,5 +30,11 @@ kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 
-gazelle fix -build_file_name=BUILD,BUILD.bazel -external=vendored -mode=fix -repo_root="$(kube::realpath ${KUBE_ROOT})"
-kazel -root="$(kube::realpath ${KUBE_ROOT})"
+"${KUBE_ROOT}/hack/run-in-gopath.sh" \
+    gazelle fix \
+        -build_file_name=BUILD,BUILD.bazel \
+        -external=vendored \
+        -mode=fix \
+
+"${KUBE_ROOT}/hack/run-in-gopath.sh" \
+    kazel

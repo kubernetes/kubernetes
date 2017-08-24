@@ -19,6 +19,20 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
-"${KUBE_ROOT}/build/run.sh" \
-    "${KUBE_ROOT}/hack/godep-restore-dockerized.sh" "$@"
+kube::golang::setup_env
+
+if kube::util::godep_restored >/dev/null 2>&1; then
+    kube::log::status "Dependencies appear to be current - skipping download"
+    exit 0
+fi
+
+kube::log::status "Ensuring the right version of godep"
+kube::util::ensure_godep_version v79
+
+kube::log::status "Downloading kubernetes godeps - this might take a while"
+GOPATH="${GOPATH}:$(pwd)/staging" godep restore "$@"
+
+kube::log::status "Done"

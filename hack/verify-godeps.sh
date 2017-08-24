@@ -89,9 +89,6 @@ pushd "${_kubetmp}" 2>&1 > /dev/null
   # Restore the Godeps into our temp directory
   hack/godep-restore.sh
 
-  # Destroy deps in the copy of the kube tree
-  rm -rf ./Godeps ./vendor
-
   # For some reason the kube tree needs to be a git repo for the godep tool to
   # run. Doesn't make sense.
   git init > /dev/null 2>&1
