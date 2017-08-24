@@ -24,13 +24,13 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 )
 
-// rest implements a RESTStorage for API services against etcd
+// REST implements a RESTStorage for API services against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, copier runtime.ObjectCopier, strategy CustomResourceDefinitionStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, copier runtime.ObjectCopier, strategy customResourceDefinitionStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
 		Copier:  copier,
 		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
