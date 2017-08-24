@@ -21,13 +21,31 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/golang/glog"
 )
+
+// HandlerOptions is used when register EventHandler. It allows user to specify
+// ResyncPeriod and if the handlers should be invoked for uninitialized objects.
+type HandlerOptions struct {
+	IncludeUninitialized bool
+	ResyncPeriod         time.Duration
+}
+
+// SharedInformerOptions is used when creating shared informers. It allows user
+// to specify ResyncPeriod and if the informer should list/watch uninitialized
+// objects.
+type SharedInformerOptions struct {
+	IncludeUninitialized bool
+	ResyncPeriod         time.Duration
+}
 
 // SharedInformer has a shared data cache and is capable of distributing notifications for changes
 // to the cache to multiple listeners who registered via AddEventHandler. If you use this, there is
@@ -39,6 +57,8 @@ import (
 // controllers. Extending the broadcaster would have required us keep duplicate caches for each
 // watch.
 type SharedInformer interface {
+	// AddEventHandlerWithOptions
+	AddEventHandlerWithOptions(handler ResourceEventHandler, options HandlerOptions)
 	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
 	// period.  Events to a single handler are delivered sequentially, but there is no coordination
 	// between different handlers.
@@ -83,6 +103,34 @@ func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEve
 		objectType:                      objType,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		clock: realClock,
+	}
+	return sharedIndexInformer
+}
+
+func NewSharedIndexInformerWithOptions(lw ListerWatcher, options SharedInformerOptions, objType runtime.Object, indexers Indexers) SharedIndexInformer {
+	realClock := &clock.RealClock{}
+	decoratedLW := lw
+	if options.IncludeUninitialized == true {
+		decoratedLW = &ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.IncludeUninitialized = true
+				return lw.List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.IncludeUninitialized = true
+				return lw.Watch(options)
+			},
+		}
+	}
+	sharedIndexInformer := &sharedIndexInformer{
+		processor:                       &sharedProcessor{clock: realClock},
+		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:                   decoratedLW,
+		objectType:                      objType,
+		resyncCheckPeriod:               options.ResyncPeriod,
+		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
 		clock: realClock,
 	}
@@ -285,6 +333,23 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) {
+	options := HandlerOptions{ResyncPeriod: resyncPeriod}
+	s.AddEventHandlerWithOptions(handler, options)
+}
+
+func newMatchInitialized() FilterFunc {
+	return func(obj interface{}) bool {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+			return false
+		}
+		initializers := accessor.GetInitializers()
+		return initializers == nil
+	}
+}
+
+func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHandler, options HandlerOptions) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -293,6 +358,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		return
 	}
 
+	resyncPeriod := options.ResyncPeriod
 	if resyncPeriod > 0 {
 		if resyncPeriod < minimumResyncPeriod {
 			glog.Warningf("resyncPeriod %d is too small. Changing it to the minimum allowed value of %d", resyncPeriod, minimumResyncPeriod)
@@ -313,7 +379,12 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now())
+	var filter FilterFunc
+	filter = newMatchInitialized()
+	if options.IncludeUninitialized {
+		filter = nil
+	}
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), filter)
 
 	if !s.started {
 		s.processor.addListener(listener)
@@ -459,6 +530,8 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 	}
 }
 
+type FilterFunc func(obj interface{}) bool
+
 type processorListener struct {
 	nextCh chan interface{}
 	addCh  chan interface{}
@@ -475,15 +548,18 @@ type processorListener struct {
 	nextResync time.Time
 	// resyncLock guards access to resyncPeriod and nextResync
 	resyncLock sync.Mutex
+
+	filter FilterFunc
 }
 
-func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time) *processorListener {
+func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, filter FilterFunc) *processorListener {
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
+		filter:                filter,
 	}
 
 	ret.determineNextResync(now)
@@ -540,10 +616,23 @@ func (p *processorListener) run() {
 	for next := range p.nextCh {
 		switch notification := next.(type) {
 		case updateNotification:
+			if p.filter != nil && !p.filter(notification.newObj) {
+				continue
+			}
+			if p.filter != nil && !p.filter(notification.oldObj) {
+				p.handler.OnAdd(notification.newObj)
+				continue
+			}
 			p.handler.OnUpdate(notification.oldObj, notification.newObj)
 		case addNotification:
+			if p.filter != nil && !p.filter(notification.newObj) {
+				continue
+			}
 			p.handler.OnAdd(notification.newObj)
 		case deleteNotification:
+			if p.filter != nil && !p.filter(notification.oldObj) {
+				continue
+			}
 			p.handler.OnDelete(notification.oldObj)
 		default:
 			utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
