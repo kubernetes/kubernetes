@@ -739,7 +739,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -749,7 +749,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
+
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadOnlyMany,
@@ -839,7 +842,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
-	validSizeUpdate := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -849,8 +852,11 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("15G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
-	invalidSizeUpdate := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+
+	invalidSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -860,7 +866,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
@@ -9111,8 +9120,8 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}, api.PersistentVolumeClaimStatus{
 		Phase: api.ClaimPending,
-		Conditions: []api.PvcCondition{
-			{Type: api.PvcResizeStarted, Status: api.ConditionTrue},
+		Conditions: []api.PersistentVolumeClaimCondition{
+			{Type: api.PersistentVolumeClaimResizeStarted, Status: api.ConditionTrue},
 		},
 	})
 	scenarios := map[string]struct {

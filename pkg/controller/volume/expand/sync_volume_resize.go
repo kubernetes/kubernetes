@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -34,17 +38,20 @@ type syncResize struct {
 	loopPeriod  time.Duration
 	resizeMap   cache.VolumeResizeMap
 	opsExecutor operationexecutor.OperationExecutor
+	kubeClient  clientset.Interface
 }
 
 // NewSyncVolumeResize returns actual volume resize handler
 func NewSyncVolumeResize(
 	loopPeriod time.Duration,
 	opsExecutor operationexecutor.OperationExecutor,
-	resizeMap cache.VolumeResizeMap) SyncVolumeResize {
+	resizeMap cache.VolumeResizeMap,
+	kubeClient clientset.Interface) SyncVolumeResize {
 	rc := &syncResize{
 		loopPeriod:  loopPeriod,
 		opsExecutor: opsExecutor,
 		resizeMap:   resizeMap,
+		kubeClient:  kubeClient,
 	}
 	return rc
 }
@@ -55,28 +62,40 @@ func (rc *syncResize) Run(stopCh <-chan struct{}) {
 
 func (rc *syncResize) Sync() {
 	// Resize PVCs that require resize
-	for _, pvcWithResizeRequest := range rc.resizeMap.GetPvcsWithResizeRequest() {
+	for _, pvcWithResizeRequest := range rc.resizeMap.GetPVCsWithResizeRequest() {
 		uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePvcKey())
-		if rc.opsExecutor.IsOperationPending(uniqueVolumeKey, "") {
-			glog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.UniquePvcKey())
+		updatedClaim, err := markPVCResizeInProgress(pvcWithResizeRequest, rc.kubeClient)
+		if err != nil {
+			glog.V(5).Infof("Error setting PVC %s in progress with error : %v", pvcWithResizeRequest.QualifiedName(), err)
 			continue
 		}
-		growFuncError := rc.opsExecutor.ExpandVolume(pvcWithResizeRequest, rc.resizeMap)
-		if growFuncError != nil {
-			glog.Errorf("Error growing pvc with %v", growFuncError)
+		if updatedClaim != nil {
+			pvcWithResizeRequest.PVC = updatedClaim
 		}
-		glog.Infof("Resizing PVC %s", pvcWithResizeRequest.CurrentSize)
-	}
 
-	// For PVCs whose API objects updates failed the first time, try again
-	for _, pvcWithUpdateNeeded := range rc.resizeMap.GetPvcsWithUpdateNeeded() {
-		switch *pvcWithUpdateNeeded.UpdateNeeded {
-		case cache.Resized:
-			rc.resizeMap.MarkAsResized(pvcWithUpdateNeeded)
-		case cache.ResizeFailed:
-			rc.resizeMap.MarkResizeFailed(pvcWithUpdateNeeded, *pvcWithUpdateNeeded.FailedReason)
-		case cache.FsResize:
-			rc.resizeMap.MarkForFileSystemResize(pvcWithUpdateNeeded)
+		if rc.opsExecutor.IsOperationPending(uniqueVolumeKey, "") {
+			glog.V(10).Infof("Operation for PVC %v is already pending", pvcWithResizeRequest.QualifiedName())
+			continue
+		}
+		glog.V(5).Infof(" Starting opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
+		growFuncError := rc.opsExecutor.ExpandVolume(pvcWithResizeRequest, rc.resizeMap)
+		if growFuncError != nil && !exponentialbackoff.IsExponentialBackoff(growFuncError) {
+			glog.Errorf("Error growing pvc %s with %v", pvcWithResizeRequest.QualifiedName(), growFuncError)
+		}
+		if growFuncError == nil {
+			glog.V(5).Infof("Started opsExecutor.ExpandVolume for volume %s", pvcWithResizeRequest.QualifiedName())
 		}
 	}
+}
+
+func markPVCResizeInProgress(pvcWithResizeRequest *cache.PvcWithResizeRequest, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	// Mark PVC as Resize Started
+	progressCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimResizeStarted,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+	}
+	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
+
+	return util.UpdatePVCCondition(pvcWithResizeRequest.PVC, conditions, kubeClient)
 }

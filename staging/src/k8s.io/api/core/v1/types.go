@@ -630,22 +630,18 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 }
 
-// PvcConditionType is a valid value of PvcCondition.Type
-type PvcConditionType string
+// PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
+type PersistentVolumeClaimConditionType string
 
 const (
-	// Ready means any pending operation on pvc is successfully completed
-	PvcReady PvcConditionType = "Ready"
-	// An user trigger resize of pvc has been started
-	PvcResizeStarted PvcConditionType = "ResizeStarted"
-	// PvcResizeFailed means user trigged resize of PVC has failed
-	PvcResizeFailed PvcConditionType = "ResizeFailed"
+	// PersistentVolumeClaimResizeStarted - a user trigger resize of pvc has been started
+	PersistentVolumeClaimResizeStarted PersistentVolumeClaimConditionType = "ResizeStarted"
 )
 
-// PvcCondition contails details about state of pvc
-type PvcCondition struct {
-	Type   PvcConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PvcConditionType"`
-	Status ConditionStatus  `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+// PersistentVolumeClaimCondition contails details about state of pvc
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
+	Status ConditionStatus                    `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time we probed the condition.
 	// +optional
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
@@ -676,7 +672,7 @@ type PersistentVolumeClaimStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
-	Conditions []PvcCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 }
 
 type PersistentVolumeAccessMode string

@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -203,7 +204,8 @@ type AttachableVolumePlugin interface {
 // expanded
 type ExpandableVolumePlugin interface {
 	VolumePlugin
-	NewExpander(spec *Spec) (Expander, error)
+	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error)
+	RequiresFSResize() bool
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.

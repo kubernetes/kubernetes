@@ -193,13 +193,6 @@ type BulkVolumeVerifier interface {
 	BulkVerifyVolumes(volumesByNode map[types.NodeName][]*Spec) (map[types.NodeName]map[*Spec]bool, error)
 }
 
-type Expander interface {
-	// ExpandVolume expands the volume device via cloudprovider api call
-	ExpandVolumeDevice(newSize resource.Quantity, oldSize resource.Quantity) error
-	// Check if volume type also requires File system resize
-	RequiresFSResize() bool
-}
-
 // Detacher can detach a volume from a node.
 type Detacher interface {
 	// Detach the given device from the node with the given Name.
