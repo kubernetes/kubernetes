@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,9 +18,6 @@ go_library(
         "helpers.go",
         "printing.go",
         "shortcut_restmapper.go",
-    ],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
     ],
     deps = [
         "//federation/apis/federation:go_default_library",
@@ -87,9 +86,6 @@ go_test(
         "//api/swagger-spec",
     ],
     library = ":go_default_library",
-    visibility = [
-        "//build/visible_to:COMMON_testing",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -146,5 +142,5 @@ filegroup(
         "//pkg/kubectl/cmd/util/sanity:all-srcs",
     ],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
+    visibility = ["//visibility:public"],
 )

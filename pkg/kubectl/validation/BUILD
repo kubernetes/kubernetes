@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 licenses(["notice"])
 
 load(
@@ -10,7 +12,6 @@ exports_files(
     srcs = [
         "testdata/v1/validPod.yaml",
     ],
-    visibility = ["//build/visible_to:COMMON_testing"],
 )
 
 filegroup(
@@ -23,7 +24,6 @@ filegroup(
         "testdata/v1/invalidPod4.yaml",
         "testdata/v1/validPod.yaml",
     ],
-    visibility = ["//build/visible_to:COMMON_testing"],
 )
 
 go_test(
@@ -52,7 +52,6 @@ go_library(
     name = "go_default_library",
     srcs = ["schema.go"],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_validation_CONSUMERS"],
     deps = [
         "//pkg/api/util:go_default_library",
         "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
@@ -74,5 +73,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_validation_CONSUMERS"],
+    visibility = ["//visibility:public"],
 )
