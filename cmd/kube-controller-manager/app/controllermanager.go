@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
@@ -397,7 +398,11 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 
 func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	options := cache.SharedInformerOptions{
+		IncludeUninitialized: true,
+		ResyncPeriod:         ResyncPeriod(s)(),
+	}
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, options)
 
 	availableResources, err := GetAvailableResources(rootClientBuilder)
 	if err != nil {

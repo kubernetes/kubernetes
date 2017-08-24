@@ -108,6 +108,7 @@ func (jm *CronJobController) syncAll() {
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
 	// Note that this only works because we are NOT using any caches here.
+	// TODO: this should List uninitialized jobs as well, to avoid recreating jobs.
 	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
@@ -320,6 +321,7 @@ func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobC
 		return
 	}
 	jobResp, err := jc.CreateJob(sj.Namespace, jobReq)
+	// TODO: need to handle timeout due to slow initialization
 	if err != nil {
 		recorder.Eventf(sj, v1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return

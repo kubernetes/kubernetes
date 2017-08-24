@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
@@ -111,11 +110,11 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,
-	})
+	}, cache.HandlerOptions{IncludeUninitialized: true})
 	jm.podStore = podInformer.Lister()
 	jm.podStoreSynced = podInformer.Informer().HasSynced
 
@@ -359,7 +358,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 	}
 	// List all pods to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to this controller.
-	pods, err := jm.podStore.Pods(j.Namespace).List(labels.Everything())
+	pods, err := jm.podStore.Pods(j.Namespace).ListWithOptions(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return nil, err
 	}

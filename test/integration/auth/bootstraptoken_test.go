@@ -42,6 +42,10 @@ func (b bootstrapSecrets) List(selector labels.Selector) (ret []*api.Secret, err
 	return b, nil
 }
 
+func (b bootstrapSecrets) ListWithOptions(options metav1.ListOptions) (ret []*api.Secret, err error) {
+	return b, nil
+}
+
 func (b bootstrapSecrets) Get(name string) (*api.Secret, error) {
 	return b[0], nil
 }

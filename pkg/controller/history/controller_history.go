@@ -389,6 +389,7 @@ func (fh *fakeHistory) CreateControllerRevision(parent metav1.Object, revision *
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
 		created, err := fh.addRevision(clone)
 		if errors.IsAlreadyExists(err) {
+			// TODO: only increment the collisionCount if the controllerRevision spec is different
 			*collisionCount++
 			continue
 		}

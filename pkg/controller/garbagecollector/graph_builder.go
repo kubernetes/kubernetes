@@ -132,6 +132,7 @@ func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource)
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
+			options.IncludeUninitialized = true
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
 				List(options)
@@ -142,6 +143,7 @@ func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource)
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
+			options.IncludeUninitialized = true
 			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
 				Resource(&apiResource, metav1.NamespaceAll).
 				Watch(options)
@@ -188,7 +190,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	if err == nil {
 		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
 		// need to clone because it's from a shared cache
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+		shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{IncludeUninitialized: true})
 		return shared.Informer().GetController(), nil
 	} else {
 		glog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)

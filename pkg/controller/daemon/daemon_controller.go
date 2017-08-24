@@ -181,11 +181,11 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addPod,
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
-	})
+	}, cache.HandlerOptions{IncludeUninitialized: true})
 	dsc.podLister = podInformer.Lister()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
@@ -737,7 +737,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 
 	// List all pods to include those that don't match the selector anymore but
 	// have a ControllerRef pointing to this controller.
-	pods, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
+	pods, err := dsc.podLister.Pods(ds.Namespace).ListWithOptions(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return nil, err
 	}
@@ -1172,7 +1172,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 
 	pods := []*v1.Pod{}
 
-	podList, err := dsc.podLister.List(labels.Everything())
+	podList, err := dsc.podLister.ListWithOptions(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return nil, nil, err
 	}
