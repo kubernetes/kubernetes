@@ -31,7 +31,7 @@ func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	deleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -39,20 +39,20 @@ func TestReplaceObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				deleted = true
 				fallthrough
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodPut:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodGet:
 				statusCode := http.StatusOK
 				if deleted {
 					statusCode = http.StatusNotFound
 				}
-				return &http.Response{StatusCode: statusCode, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -87,7 +87,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	redisMasterDeleted := false
 	frontendDeleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -96,33 +96,33 @@ func TestReplaceMultipleObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				redisMasterDeleted = true
 				fallthrough
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodPut:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodGet:
 				statusCode := http.StatusOK
 				if redisMasterDeleted {
 					statusCode = http.StatusNotFound
 				}
-				return &http.Response{StatusCode: statusCode, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == http.MethodDelete:
 				frontendDeleted = true
 				fallthrough
 			case p == "/namespaces/test/services/frontend" && m == http.MethodPut:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == http.MethodGet:
 				statusCode := http.StatusOK
 				if frontendDeleted {
 					statusCode = http.StatusNotFound
 				}
-				return &http.Response{StatusCode: statusCode, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/services" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -157,7 +157,7 @@ func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	created := map[string]bool{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -165,21 +165,21 @@ func TestReplaceDirectory(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.Namespace{})}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == http.MethodPut:
 				created[p] = true
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == http.MethodGet:
 				statusCode := http.StatusNotFound
 				if created[p] {
 					statusCode = http.StatusOK
 				}
-				return &http.Response{StatusCode: statusCode, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: statusCode, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == http.MethodDelete:
 				delete(created, p)
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers") && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -214,18 +214,18 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == http.MethodGet || m == http.MethodDelete):
-				return &http.Response{StatusCode: http.StatusNotFound, Header: defaultHeader(), Body: stringBody("")}, nil
+				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

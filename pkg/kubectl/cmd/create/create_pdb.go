@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -68,7 +68,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 
 // CreatePodDisruptionBudget implements the behavior to run the create pdb command.
 func CreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

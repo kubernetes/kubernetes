@@ -14,44 +14,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
 	"net/http"
 	"testing"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
+var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+
 func TestExtraArgsFail(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
 	f, _, _, _ := cmdtesting.NewAPIFactory()
 	c := NewCmdCreate(f, buf, errBuf)
-	if ValidateArgs(c, []string{"rc"}) == nil {
+	if ValidateArguments(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestCreateObject(t *testing.T) {
-	initTestErrorHandler(t)
-	_, _, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "redis-master-controller"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -63,7 +66,7 @@ func TestCreateObject(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(f, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -74,20 +77,20 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestCreateMultipleObject(t *testing.T) {
-	initTestErrorHandler(t)
-	_, svc, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, svc, rc := cmdtesting.TestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -99,8 +102,8 @@ func TestCreateMultipleObject(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(f, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -111,19 +114,19 @@ func TestCreateMultipleObject(t *testing.T) {
 }
 
 func TestCreateDirectory(t *testing.T) {
-	initTestErrorHandler(t)
-	_, _, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "name"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -135,7 +138,7 @@ func TestCreateDirectory(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(f, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 

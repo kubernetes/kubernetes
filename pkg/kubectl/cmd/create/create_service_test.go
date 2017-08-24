@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -30,14 +30,14 @@ func TestCreateService(t *testing.T) {
 	service := &api.Service{}
 	service.Name = "my-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, service)}, nil
+				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, service)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -60,14 +60,14 @@ func TestCreateServiceNodePort(t *testing.T) {
 	service := &api.Service{}
 	service.Name = "my-node-port-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, service)}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, service)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -90,14 +90,14 @@ func TestCreateServiceExternalName(t *testing.T) {
 	service := &api.Service{}
 	service.Name = "my-external-name-service"
 	f, tf, codec, negSer := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, service)}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, service)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

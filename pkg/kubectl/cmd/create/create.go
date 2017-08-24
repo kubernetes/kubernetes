@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
+// CreateOptions is the start of the data required to perform the operation.
 type CreateOptions struct {
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
@@ -55,6 +56,7 @@ var (
 		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`))
 )
 
+// NewCmdCreate is a command to create a resource.
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	var options CreateOptions
 
@@ -69,7 +71,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(ValidateArgs(cmd, args))
+			cmdutil.CheckErr(validateArguments(cmd, args))
 			cmdutil.CheckErr(RunCreate(f, cmd, out, errOut, &options))
 		},
 	}
@@ -88,7 +90,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 
-	// create subcommands
+	// Add subcommands.
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
 	cmd.AddCommand(NewCmdCreateQuota(f, out))
 	cmd.AddCommand(NewCmdCreateSecret(f, out, errOut))
@@ -104,13 +106,14 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func ValidateArgs(cmd *cobra.Command, args []string) error {
+func validateArguments(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
 	return nil
 }
 
+// RunCreate does the work.
 func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *CreateOptions) error {
 	if options.EditBeforeCreate {
 		return RunEditOnCreate(f, out, errOut, cmd, &options.FilenameOptions)
@@ -167,7 +170,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		}
 
 		if !dryRun {
-			if err := createAndRefresh(info); err != nil {
+			if err := CreateAndRefresh(info); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 		}
@@ -194,6 +197,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	return nil
 }
 
+// RunEditOnCreate runs edit options for the command.
 func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
 	editOptions := &editor.EditOptions{
 		EditMode:        editor.EditBeforeCreateMode,
@@ -216,8 +220,8 @@ func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Comman
 	return editOptions.Run()
 }
 
-// createAndRefresh creates an object from input info and refreshes info with that object
-func createAndRefresh(info *resource.Info) error {
+// CreateAndRefresh creates an object from input info and refreshes info with that object.
+func CreateAndRefresh(info *resource.Info) error {
 	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 	if err != nil {
 		return err
@@ -226,15 +230,7 @@ func createAndRefresh(info *resource.Info) error {
 	return nil
 }
 
-// NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
-func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) == 0 {
-		return "", cmdutil.UsageErrorf(cmd, "NAME is required")
-	}
-	return args[0], nil
-}
-
-// CreateSubcommandOptions is an options struct to support create subcommands
+// CreateSubcommandOptions is an options struct to support create subcommands.
 type CreateSubcommandOptions struct {
 	// Name of resource being created
 	Name string

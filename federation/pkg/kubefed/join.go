@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
-	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
+	cmdcreate "k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
@@ -273,7 +273,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	glog.V(2).Info("Created a generator for the cluster API object")
 
 	glog.V(2).Info("Running create cluster command against the federation API server")
-	err = kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
+	err = cmdcreate.RunCreateSubcommand(f, cmd, cmdOut, &cmdcreate.CreateSubcommandOptions{
 		Name:                joiningClusterName,
 		StructuredGenerator: generator,
 		DryRun:              dryRun,

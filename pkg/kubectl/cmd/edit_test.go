@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -149,7 +150,7 @@ func TestEdit(t *testing.T) {
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 				}
 			}
-			return &http.Response{StatusCode: step.ResponseStatusCode, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
+			return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
 		}
 	}
 
@@ -208,7 +209,7 @@ func TestEdit(t *testing.T) {
 		}
 
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		tf.Printer = &cmdtesting.TestPrinter{}
 		tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 			versionedAPIPath := ""
 			if mapping.GroupVersionKind.Group == "" {
@@ -227,7 +228,7 @@ func TestEdit(t *testing.T) {
 		if len(testcase.Namespace) > 0 {
 			tf.Namespace = testcase.Namespace
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 		tf.Command = "edit test cmd invocation"
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
@@ -237,7 +238,7 @@ func TestEdit(t *testing.T) {
 		case "edit":
 			cmd = NewCmdEdit(f, buf, errBuf)
 		case "create":
-			cmd = NewCmdCreate(f, buf, errBuf)
+			cmd = create.NewCmdCreate(f, buf, errBuf)
 			cmd.Flags().Set("edit", "true")
 		case "edit-last-applied":
 			cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)

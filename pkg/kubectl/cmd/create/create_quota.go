@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -64,7 +64,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 // CreateQuota implements the behavior to run the create quota command
 func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

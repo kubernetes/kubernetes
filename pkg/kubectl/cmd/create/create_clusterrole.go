@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -53,12 +53,13 @@ var (
 	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
 )
 
+// CreateClusterRoleOptions holds the data for the create clusterrole operation.
 type CreateClusterRoleOptions struct {
 	*CreateRoleOptions
 	NonResourceURLs []string
 }
 
-// ClusterRole is a command to ease creating ClusterRoles.
+// NewCmdCreateClusterRole is a command to ease creating ClusterRoles.
 func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateClusterRoleOptions{
 		CreateRoleOptions: &CreateRoleOptions{
@@ -88,8 +89,9 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	return cmd
 }
 
+// Complete adapts from the command line args and factory to the data required.
 func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	// Remove duplicate nonResourceURLs
+	// Remove duplicate nonResourceURLs.
 	nonResourceURLs := []string{}
 	for _, n := range c.NonResourceURLs {
 		if !arrayContains(nonResourceURLs, n) {
@@ -101,12 +103,13 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	return c.CreateRoleOptions.Complete(f, cmd, args)
 }
 
+// Validate checks the cluster role options for sufficient information to run the command.
 func (c *CreateClusterRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
 
-	// validate verbs.
+	// Validate verbs.
 	if len(c.Verbs) == 0 {
 		return fmt.Errorf("at least one verb must be specified")
 	}
@@ -115,7 +118,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 		return fmt.Errorf("one of resource or nonResourceURL must be specified")
 	}
 
-	// validate resources
+	// validate resources.
 	if len(c.Resources) > 0 {
 		for _, v := range c.Verbs {
 			if !arrayContains(validResourceVerbs, v) {
@@ -127,7 +130,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 		}
 	}
 
-	//validate non-resource-url
+	// Validate non-resource-url.
 	if len(c.NonResourceURLs) > 0 {
 		for _, v := range c.Verbs {
 			if !arrayContains(validNonResourceVerbs, v) {
@@ -154,6 +157,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 
 }
 
+// RunCreateRole runs command to create a cluster role.
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	clusterRole := &rbac.ClusterRole{}
 	clusterRole.Name = c.Name

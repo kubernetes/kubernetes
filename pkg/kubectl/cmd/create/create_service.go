@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -88,7 +88,7 @@ func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
 
 // CreateServiceClusterIP implements the behavior to run the create service clusterIP command
 func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Com
 
 // CreateServiceNodePort is the implementation of the create service nodeport command
 func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra
 
 // CreateServiceLoadBalancer is the implementation of the service loadbalancer command
 func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra
 
 // CreateExternalNameService is the implementation of the service externalname command
 func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

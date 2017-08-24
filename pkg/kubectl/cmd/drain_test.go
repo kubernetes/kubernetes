@@ -159,9 +159,9 @@ func TestCordon(t *testing.T) {
 				m := &MyReq{req}
 				switch {
 				case m.isFor("GET", "/nodes/node"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 				case m.isFor("GET", "/nodes/bar"):
-					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("nope")}, nil
+					return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
 				case m.isFor("PATCH", "/nodes/node"):
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
@@ -183,14 +183,14 @@ func TestCordon(t *testing.T) {
 						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, new_node.Spec.Unschedulable)
 					}
 					updated = true
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 				default:
 					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 					return nil, nil
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := test.cmd(f, buf)
@@ -632,19 +632,19 @@ func TestDrain(t *testing.T) {
 						}
 						return genResponseWithJsonEncodedBody(resourceList)
 					case m.isFor("GET", "/nodes/node"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 					case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
 					case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(testapi.Extensions.Codec(), &ds)}, nil
 					case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
+						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
 					case m.isFor("GET", "/namespaces/default/jobs/job"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(testapi.Batch.Codec(), &job)}, nil
 					case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
 					case m.isFor("GET", "/namespaces/default/pods/bar"):
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.Pod{})}, nil
 					case m.isFor("GET", "/pods"):
 						values, err := url.ParseQuery(req.URL.RawQuery)
 						if err != nil {
@@ -655,9 +655,9 @@ func TestDrain(t *testing.T) {
 						if !reflect.DeepEqual(get_params, values) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, get_params, values)
 						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.PodList{Items: test.pods})}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.PodList{Items: test.pods})}, nil
 					case m.isFor("GET", "/replicationcontrollers"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
 					case m.isFor("PATCH", "/nodes/node"):
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
@@ -678,20 +678,20 @@ func TestDrain(t *testing.T) {
 						if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
 						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 					case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 						deleted = true
-						return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
+						return &http.Response{StatusCode: 204, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
 					case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
 						evicted = true
-						return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policy.Eviction{})}, nil
+						return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.PolicyObjBody(&policy.Eviction{})}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil
 					}
 				}),
 			}
-			tf.ClientConfig = defaultClientConfig()
+			tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})

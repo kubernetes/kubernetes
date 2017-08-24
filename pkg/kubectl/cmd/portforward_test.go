@@ -74,8 +74,8 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
@@ -84,7 +84,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 		ff := &fakePortForwarder{}
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")

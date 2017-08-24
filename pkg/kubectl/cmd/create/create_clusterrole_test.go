@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -58,7 +58,7 @@ func TestCreateClusterRole(t *testing.T) {
 	tf.Printer = printer
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 	tests := map[string]struct {
 		verbs               string
@@ -166,7 +166,7 @@ func TestCreateClusterRole(t *testing.T) {
 
 func TestClusterRoleValidate(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Namespace = "test"
 
 	tests := map[string]struct {

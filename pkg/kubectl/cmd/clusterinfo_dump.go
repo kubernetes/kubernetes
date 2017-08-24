@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
-// NewCmdCreateSecret groups subcommands to create various types of secrets
+// NewCmdClusterInfoDump groups subcommands to create various types of secrets
 func NewCmdClusterInfoDump(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dump",

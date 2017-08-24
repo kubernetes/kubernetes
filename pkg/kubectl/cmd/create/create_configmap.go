@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -57,7 +57,7 @@ var (
 		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
 )
 
-// ConfigMap is a command to ease creating ConfigMaps.
+// NewCmdCreateConfigMap is a command to ease creating ConfigMaps.
 func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
@@ -82,7 +82,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 // CreateConfigMap is the implementation of the create configmap command.
 func CreateConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

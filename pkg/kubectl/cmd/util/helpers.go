@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -58,6 +59,14 @@ const (
 
 type debugError interface {
 	DebugError() (msg string, args []interface{})
+}
+
+// TODO turn this into reusable method checking available resources
+func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
+	resources := discovery.FilteredBy(discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return resource.GroupVersion().String() == gv && resource.Resource == r.Name
+	}), resourcesList)
+	return len(resources) != 0
 }
 
 // AddSourceToErr adds handleResourcePrefix and source string to error message.
@@ -835,4 +844,12 @@ func ManualStrip(file []byte) []byte {
 		}
 	}
 	return stripped
+}
+
+// NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
+func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
+	if len(args) == 0 {
+		return "", UsageErrorf(cmd, "NAME is required")
+	}
+	return args[0], nil
 }

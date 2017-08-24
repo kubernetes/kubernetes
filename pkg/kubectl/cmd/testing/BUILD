@@ -6,7 +6,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cmd.go",
         "fake.go",
+        "get.go",
         "zz_generated.deepcopy.go",
     ],
     visibility = [
@@ -16,6 +18,7 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/api/testing:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

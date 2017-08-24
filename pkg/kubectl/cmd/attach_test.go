@@ -143,13 +143,13 @@ func TestPodAndContainerAttach(t *testing.T) {
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if test.obj != nil {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.obj)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.obj)}, nil
 				}
 				return nil, nil
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -221,11 +221,11 @@ func TestAttach(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				case p == test.fetchPodPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", p, req.Method, req.URL, req)
@@ -308,11 +308,11 @@ func TestAttachWarnings(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				case p == test.fetchPodPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 					return nil, fmt.Errorf("unexpected request")

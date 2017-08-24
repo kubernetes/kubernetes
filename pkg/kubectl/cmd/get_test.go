@@ -122,11 +122,11 @@ func testComponentStatusData() *api.ComponentStatusList {
 func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	_, _, codec, _ := cmdtesting.NewTestFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
@@ -138,7 +138,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	cmd.Run(cmd, []string{"type", "foo"})
 
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
-	actual := tf.Printer.(*testPrinter).Objects
+	actual := tf.Printer.(*cmdtesting.TestPrinter).Objects
 	if len(actual) != len(expected) {
 		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
@@ -167,11 +167,11 @@ func TestGetSchemaObject(t *testing.T) {
 	tf.Mapper = testapi.Default.RESTMapper()
 	tf.Typer = api.Scheme
 	codec := testapi.Default.Codec()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
@@ -190,14 +190,14 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	// overide the openAPISchema function to return custom output
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -209,7 +209,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := []runtime.Object{&pods.Items[0]}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -247,11 +247,11 @@ func TestGetObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -262,7 +262,7 @@ func TestGetObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := []runtime.Object{&pods.Items[0]}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -270,7 +270,7 @@ func TestGetObjects(t *testing.T) {
 }
 
 func TestGetObjectsFiltered(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	pods, _, _ := testData()
 	pods.Items[0].Status.Phase = api.PodFailed
@@ -299,11 +299,11 @@ func TestGetObjectsFiltered(t *testing.T) {
 	for i, test := range testCases {
 		t.Logf("%d", i)
 		f, tf, codec, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
+		tf.Printer = &cmdtesting.TestPrinter{GenericPrinter: test.genericPrinter}
 		tf.UnstructuredClient = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: unstructuredSerializer,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
+			Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.resp)},
 		}
 		tf.Namespace = "test"
 		buf := bytes.NewBuffer([]byte{})
@@ -316,7 +316,7 @@ func TestGetObjectsFiltered(t *testing.T) {
 		}
 		cmd.Run(cmd, test.args)
 
-		verifyObjects(t, test.expect, tf.Printer.(*testPrinter).Objects)
+		verifyObjects(t, test.expect, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 		if len(buf.String()) == 0 {
 			t.Errorf("%d: unexpected empty output", i)
@@ -325,7 +325,7 @@ func TestGetObjectsFiltered(t *testing.T) {
 }
 
 func TestGetObjectIgnoreNotFound(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	ns := &api.NamespaceList{
 		ListMeta: metav1.ListMeta{
@@ -340,16 +340,16 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	}
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.Printer = &cmdtesting.TestPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
-				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
 			case p == "/api/v1/namespaces/test" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ns.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ns.Items[0])}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -393,11 +393,11 @@ func TestGetSortedObjects(t *testing.T) {
 	}
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
@@ -414,7 +414,7 @@ func TestGetSortedObjects(t *testing.T) {
 
 	// expect sorted: a,b,c
 	expected := []runtime.Object{&pods.Items[2], &pods.Items[1], &pods.Items[0]}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -452,11 +452,11 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.Printer = &cmdtesting.TestPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -468,7 +468,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods.Items[0]}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -479,11 +479,11 @@ func TestGetListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -497,7 +497,7 @@ func TestGetListObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -520,11 +520,11 @@ func TestGetAllListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -539,7 +539,7 @@ func TestGetAllListObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -550,11 +550,11 @@ func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, statuses)},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -568,7 +568,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -579,16 +579,16 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -607,7 +607,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -618,16 +618,16 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.Printer = &cmdtesting.TestPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -645,7 +645,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	actual := tf.Printer.(*testPrinter).Objects
+	actual := tf.Printer.(*cmdtesting.TestPrinter).Objects
 	fn := func(obj runtime.Object) unstructured.Unstructured {
 		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
 		if err != nil {
@@ -683,7 +683,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
@@ -693,9 +693,9 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -716,7 +716,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -735,16 +735,16 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	}
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/nodes/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, node)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, node)}, nil
 			case "/namespaces/test/services/bar":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -761,7 +761,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
 	expected := []runtime.Object{&svc.Items[0], node}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -772,11 +772,11 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.Printer = &cmdtesting.TestPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -867,7 +867,7 @@ func TestWatchSelector(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	podList := &api.PodList{
 		Items: pods,
 		ListMeta: metav1.ListMeta{
@@ -884,9 +884,9 @@ func TestWatchSelector(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
 				} else {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 				}
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -906,7 +906,7 @@ func TestWatchSelector(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := []runtime.Object{&pods[0], &pods[1], events[2].Object, events[3].Object}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -917,17 +917,17 @@ func TestWatchResource(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -948,7 +948,7 @@ func TestWatchResource(t *testing.T) {
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := []runtime.Object{&pods[1], events[2].Object, events[3].Object}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -959,17 +959,17 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/replicationcontrollers/cassandra":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/replicationcontrollers":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -991,7 +991,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods[1], events[2].Object, events[3].Object}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -1002,17 +1002,17 @@ func TestWatchOnlyResource(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1033,7 +1033,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := []runtime.Object{events[2].Object, events[3].Object}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
@@ -1044,7 +1044,7 @@ func TestWatchOnlyList(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	podList := &api.PodList{
 		Items: pods,
 		ListMeta: metav1.ListMeta{
@@ -1058,9 +1058,9 @@ func TestWatchOnlyList(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
 				} else {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 				}
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -1079,7 +1079,7 @@ func TestWatchOnlyList(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := []runtime.Object{events[2].Object, events[3].Object}
-	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+	verifyObjects(t, expected, tf.Printer.(*cmdtesting.TestPrinter).Objects)
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")

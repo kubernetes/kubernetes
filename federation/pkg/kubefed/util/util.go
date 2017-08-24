@@ -36,7 +36,6 @@ import (
 	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"github.com/spf13/cobra"
@@ -150,7 +149,7 @@ func (o *SubcommandOptions) Bind(flags *pflag.FlagSet) {
 }
 
 func (o *SubcommandOptions) SetName(cmd *cobra.Command, args []string) error {
-	name, err := kubectlcmd.NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

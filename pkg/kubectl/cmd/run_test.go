@@ -167,7 +167,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path == "/namespaces/test/replicationcontrollers" {
-					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
+					return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -285,7 +285,7 @@ func TestGenerateService(t *testing.T) {
 		sawPOST := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
-		tf.Printer = &testPrinter{}
+		tf.Printer = &cmdtesting.TestPrinter{}
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
@@ -293,7 +293,7 @@ func TestGenerateService(t *testing.T) {
 				switch p, m := req.URL.Path, req.Method; {
 				case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
 					sawPOST = true
-					body := objBody(codec, &test.service)
+					body := cmdtesting.ObjBody(codec, &test.service)
 					data, err := ioutil.ReadAll(req.Body)
 					if err != nil {
 						t.Fatalf("unexpected error: %v", err)
@@ -309,7 +309,7 @@ func TestGenerateService(t *testing.T) {
 					if !reflect.DeepEqual(&test.service, svc) {
 						t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
@@ -426,11 +426,11 @@ func TestRunValidations(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewTestFactory()
-		tf.Printer = &testPrinter{}
+		tf.Printer = &cmdtesting.TestPrinter{}
 		tf.Client = &fake.RESTClient{
 			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
+			Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
