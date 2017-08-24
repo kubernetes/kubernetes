@@ -42,7 +42,7 @@ func (gce *GCECloud) CreateSslCertificate(sslCerts *compute.SslCertificate) (*co
 		return nil, mc.Observe(err)
 	}
 
-	if err = gce.waitForGlobalOp(op, mc); err != nil {
+	if err = gce.waitForGlobalOp(op, gce.projectID, mc); err != nil {
 		return nil, mc.Observe(err)
 	}
 
@@ -62,7 +62,7 @@ func (gce *GCECloud) DeleteSslCertificate(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListSslCertificates lists all SslCertificates in the project.

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"fmt"
+
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -493,6 +494,7 @@ func (manager *FakeServiceManager) DeleteDisk(
 
 func (manager *FakeServiceManager) WaitForZoneOp(
 	op *compute.Operation,
+	projectID string,
 	zone string,
 	mc *metricContext) error {
 	if op == manager.op {

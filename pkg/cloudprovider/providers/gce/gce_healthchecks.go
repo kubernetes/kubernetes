@@ -61,7 +61,7 @@ func (gce *GCECloud) UpdateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteHttpHealthCheck deletes the given HttpHealthCheck by name.
@@ -72,7 +72,7 @@ func (gce *GCECloud) DeleteHttpHealthCheck(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // CreateHttpHealthCheck creates the given HttpHealthCheck.
@@ -83,7 +83,7 @@ func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListHttpHealthChecks lists all HttpHealthChecks in the project.
@@ -113,7 +113,7 @@ func (gce *GCECloud) UpdateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error 
 		return err
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteHttpsHealthCheck deletes the given HttpsHealthCheck by name.
@@ -124,7 +124,7 @@ func (gce *GCECloud) DeleteHttpsHealthCheck(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // CreateHttpsHealthCheck creates the given HttpsHealthCheck.
@@ -135,7 +135,7 @@ func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error 
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListHttpsHealthChecks lists all HttpsHealthChecks in the project.
@@ -163,7 +163,7 @@ func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteHealthCheck deletes the given HealthCheck by name.
@@ -174,7 +174,7 @@ func (gce *GCECloud) DeleteHealthCheck(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // CreateHealthCheck creates the given HealthCheck.
@@ -185,7 +185,7 @@ func (gce *GCECloud) CreateHealthCheck(hc *compute.HealthCheck) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListHealthChecks lists all HealthCheck in the project.

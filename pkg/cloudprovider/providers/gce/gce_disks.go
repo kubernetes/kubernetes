@@ -111,7 +111,7 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(attachOp, disk.Zone, mc)
+	return gce.waitForZoneOp(attachOp, gce.projectID, disk.Zone, mc)
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
@@ -136,7 +136,7 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(detachOp, inst.Zone, mc)
+	return gce.waitForZoneOp(detachOp, gce.projectID, inst.Zone, mc)
 }
 
 func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
@@ -252,7 +252,7 @@ func (gce *GCECloud) CreateDisk(
 		return mc.Observe(err)
 	}
 
-	err = gce.manager.WaitForZoneOp(createOp, zone, mc)
+	err = gce.manager.WaitForZoneOp(createOp, gce.projectID, zone, mc)
 	if isGCEError(err, "alreadyExists") {
 		glog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
@@ -415,7 +415,7 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.manager.WaitForZoneOp(deleteOp, disk.Zone, mc)
+	return gce.manager.WaitForZoneOp(deleteOp, gce.projectID, disk.Zone, mc)
 }
 
 // Converts a Disk resource to an AttachedDisk resource.

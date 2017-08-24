@@ -35,7 +35,7 @@ func (gce *GCECloud) CreateGlobalForwardingRule(rule *compute.ForwardingRule) er
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // SetProxyForGlobalForwardingRule links the given TargetHttp(s)Proxy with the given GlobalForwardingRule.
@@ -48,7 +48,7 @@ func (gce *GCECloud) SetProxyForGlobalForwardingRule(forwardingRuleName, targetP
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteGlobalForwardingRule deletes the GlobalForwardingRule by name.
@@ -59,7 +59,7 @@ func (gce *GCECloud) DeleteGlobalForwardingRule(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // GetGlobalForwardingRule returns the GlobalForwardingRule by name.
@@ -108,7 +108,7 @@ func (gce *GCECloud) CreateRegionForwardingRule(rule *compute.ForwardingRule, re
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // CreateAlphaRegionForwardingRule creates and returns an Alpha
@@ -120,7 +120,7 @@ func (gce *GCECloud) CreateAlphaRegionForwardingRule(rule *computealpha.Forwardi
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // DeleteRegionForwardingRule deletes the RegionalForwardingRule by name & region.
@@ -131,5 +131,5 @@ func (gce *GCECloud) DeleteRegionForwardingRule(name, region string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }

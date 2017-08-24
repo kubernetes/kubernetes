@@ -136,7 +136,7 @@ type ServiceManager interface {
 	DeleteDisk(project string, zone string, disk string) (*compute.Operation, error)
 
 	// Waits until GCE reports the given operation in the given zone as done.
-	WaitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error
+	WaitForZoneOp(op *compute.Operation, projectID string, zone string, mc *metricContext) error
 }
 
 type GCEServiceManager struct {
@@ -626,6 +626,6 @@ func (manager *GCEServiceManager) DeleteDisk(
 	return manager.gce.service.Disks.Delete(project, zone, diskName).Do()
 }
 
-func (manager *GCEServiceManager) WaitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error {
-	return manager.gce.waitForZoneOp(op, zone, mc)
+func (manager *GCEServiceManager) WaitForZoneOp(op *compute.Operation, projectID string, zone string, mc *metricContext) error {
+	return manager.gce.waitForZoneOp(op, projectID, zone, mc)
 }

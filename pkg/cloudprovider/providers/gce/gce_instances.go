@@ -231,7 +231,7 @@ func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error 
 			return false, nil
 		}
 
-		if err := gce.waitForGlobalOp(op, mc); err != nil {
+		if err := gce.waitForGlobalOp(op, gce.projectID, mc); err != nil {
 			glog.Errorf("Could not Set Metadata: %v", err)
 			return false, nil
 		}

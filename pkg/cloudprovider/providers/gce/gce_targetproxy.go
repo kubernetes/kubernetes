@@ -40,7 +40,7 @@ func (gce *GCECloud) CreateTargetHttpProxy(proxy *compute.TargetHttpProxy) error
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // SetUrlMapForTargetHttpProxy sets the given UrlMap for the given TargetHttpProxy.
@@ -51,7 +51,7 @@ func (gce *GCECloud) SetUrlMapForTargetHttpProxy(proxy *compute.TargetHttpProxy,
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteTargetHttpProxy deletes the TargetHttpProxy by name.
@@ -64,7 +64,7 @@ func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 		}
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListTargetHttpProxies lists all TargetHttpProxies in the project.
@@ -91,7 +91,7 @@ func (gce *GCECloud) CreateTargetHttpsProxy(proxy *compute.TargetHttpsProxy) err
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // SetUrlMapForTargetHttpsProxy sets the given UrlMap for the given TargetHttpsProxy.
@@ -102,7 +102,7 @@ func (gce *GCECloud) SetUrlMapForTargetHttpsProxy(proxy *compute.TargetHttpsProx
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // SetSslCertificateForTargetHttpsProxy sets the given SslCertificate for the given TargetHttpsProxy.
@@ -113,7 +113,7 @@ func (gce *GCECloud) SetSslCertificateForTargetHttpsProxy(proxy *compute.TargetH
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteTargetHttpsProxy deletes the TargetHttpsProxy by name.
@@ -126,7 +126,7 @@ func (gce *GCECloud) DeleteTargetHttpsProxy(name string) error {
 		}
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListTargetHttpsProxies lists all TargetHttpsProxies in the project.
