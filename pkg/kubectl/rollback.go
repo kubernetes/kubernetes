@@ -31,13 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -267,7 +267,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	// Skip if the revision already matches current DaemonSet
-	done, err := daemon.Match(versionedDS, toHistory)
+	done, err := match(versionedDS, toHistory)
 	if err != nil {
 		return "", err
 	}
@@ -281,6 +281,44 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	return rollbackSuccess, nil
+}
+
+// match check if the given DaemonSet's template matches the template stored in the given history.
+// TODO: This is copied from pkg/controller/daemon, de-duplicate it after migrating from extensions to apps
+func match(ds *externalextensions.DaemonSet, history *appsv1beta1.ControllerRevision) (bool, error) {
+	patch, err := getPatch(ds)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+// TODO: This is copied from pkg/controller/daemon, de-duplicate it after migrating from extensions to apps
+func getPatch(ds *externalextensions.DaemonSet) ([]byte, error) {
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	err = json.Unmarshal(dsBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+
+	// Create a patch of the DaemonSet that replaces spec.template
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 func revisionNotFoundErr(r int64) error {

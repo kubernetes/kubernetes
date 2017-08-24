@@ -293,6 +293,7 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
+// NOTE: This is duplicated in pkg/kubectl, if anything changed here, code needs to be updated there too
 func Match(ds *apps.DaemonSet, history *apps.ControllerRevision) (bool, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
@@ -305,6 +306,7 @@ func Match(ds *apps.DaemonSet, history *apps.ControllerRevision) (bool, error) {
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
+// NOTE: This is duplicated in pkg/kubectl, if anything changed here, code needs to be updated there too
 func getPatch(ds *apps.DaemonSet) ([]byte, error) {
 	dsBytes, err := json.Marshal(ds)
 	if err != nil {
