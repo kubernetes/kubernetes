@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type ReplicationControllerLister interface {
 	// List lists all ReplicationControllers in the indexer.
 	List(selector labels.Selector) (ret []*api.ReplicationController, err error)
+	// ListWithOptions lists all ReplicationControllers in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ReplicationController, err error)
 	// ReplicationControllers returns an object that can list and get ReplicationControllers.
 	ReplicationControllers(namespace string) ReplicationControllerNamespaceLister
 	ReplicationControllerListerExpansion
@@ -52,6 +56,15 @@ func (s *replicationControllerLister) List(selector labels.Selector) (ret []*api
 	return ret, err
 }
 
+// ListWithOptions lists all ReplicationControllers in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *replicationControllerLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ReplicationController, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.ReplicationController))
+	})
+	return ret, err
+}
+
 // ReplicationControllers returns an object that can list and get ReplicationControllers.
 func (s *replicationControllerLister) ReplicationControllers(namespace string) ReplicationControllerNamespaceLister {
 	return replicationControllerNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *replicationControllerLister) ReplicationControllers(namespace string) R
 type ReplicationControllerNamespaceLister interface {
 	// List lists all ReplicationControllers in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.ReplicationController, err error)
+	// ListWithOptions lists all ReplicationControllers that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ReplicationController, err error)
 	// Get retrieves the ReplicationController from the indexer for a given namespace and name.
 	Get(name string) (*api.ReplicationController, error)
 	ReplicationControllerNamespaceListerExpansion
@@ -76,6 +93,15 @@ type replicationControllerNamespaceLister struct {
 // List lists all ReplicationControllers in the indexer for a given namespace.
 func (s replicationControllerNamespaceLister) List(selector labels.Selector) (ret []*api.ReplicationController, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ReplicationController))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ReplicationControllers that matches the options
+// in the indexer for a given namespace.
+func (s replicationControllerNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ReplicationController, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.ReplicationController))
 	})
 	return ret, err

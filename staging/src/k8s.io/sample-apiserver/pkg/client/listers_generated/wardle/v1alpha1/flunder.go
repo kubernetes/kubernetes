@@ -20,6 +20,7 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -29,6 +30,9 @@ import (
 type FlunderLister interface {
 	// List lists all Flunders in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.Flunder, err error)
+	// ListWithOptions lists all Flunders in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Flunder, err error)
 	// Flunders returns an object that can list and get Flunders.
 	Flunders(namespace string) FlunderNamespaceLister
 	FlunderListerExpansion
@@ -52,6 +56,15 @@ func (s *flunderLister) List(selector labels.Selector) (ret []*v1alpha1.Flunder,
 	return ret, err
 }
 
+// ListWithOptions lists all Flunders in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *flunderLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Flunder, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.Flunder))
+	})
+	return ret, err
+}
+
 // Flunders returns an object that can list and get Flunders.
 func (s *flunderLister) Flunders(namespace string) FlunderNamespaceLister {
 	return flunderNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *flunderLister) Flunders(namespace string) FlunderNamespaceLister {
 type FlunderNamespaceLister interface {
 	// List lists all Flunders in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1alpha1.Flunder, err error)
+	// ListWithOptions lists all Flunders that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Flunder, err error)
 	// Get retrieves the Flunder from the indexer for a given namespace and name.
 	Get(name string) (*v1alpha1.Flunder, error)
 	FlunderNamespaceListerExpansion
@@ -76,6 +93,15 @@ type flunderNamespaceLister struct {
 // List lists all Flunders in the indexer for a given namespace.
 func (s flunderNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.Flunder, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.Flunder))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Flunders that matches the options
+// in the indexer for a given namespace.
+func (s flunderNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Flunder, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.Flunder))
 	})
 	return ret, err

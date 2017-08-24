@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
@@ -29,6 +30,9 @@ import (
 type ControllerRevisionLister interface {
 	// List lists all ControllerRevisions in the indexer.
 	List(selector labels.Selector) (ret []*apps.ControllerRevision, err error)
+	// ListWithOptions lists all ControllerRevisions in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*apps.ControllerRevision, err error)
 	// ControllerRevisions returns an object that can list and get ControllerRevisions.
 	ControllerRevisions(namespace string) ControllerRevisionNamespaceLister
 	ControllerRevisionListerExpansion
@@ -52,6 +56,15 @@ func (s *controllerRevisionLister) List(selector labels.Selector) (ret []*apps.C
 	return ret, err
 }
 
+// ListWithOptions lists all ControllerRevisions in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *controllerRevisionLister) ListWithOptions(options metav1.ListOptions) (ret []*apps.ControllerRevision, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*apps.ControllerRevision))
+	})
+	return ret, err
+}
+
 // ControllerRevisions returns an object that can list and get ControllerRevisions.
 func (s *controllerRevisionLister) ControllerRevisions(namespace string) ControllerRevisionNamespaceLister {
 	return controllerRevisionNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *controllerRevisionLister) ControllerRevisions(namespace string) Control
 type ControllerRevisionNamespaceLister interface {
 	// List lists all ControllerRevisions in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*apps.ControllerRevision, err error)
+	// ListWithOptions lists all ControllerRevisions that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*apps.ControllerRevision, err error)
 	// Get retrieves the ControllerRevision from the indexer for a given namespace and name.
 	Get(name string) (*apps.ControllerRevision, error)
 	ControllerRevisionNamespaceListerExpansion
@@ -76,6 +93,15 @@ type controllerRevisionNamespaceLister struct {
 // List lists all ControllerRevisions in the indexer for a given namespace.
 func (s controllerRevisionNamespaceLister) List(selector labels.Selector) (ret []*apps.ControllerRevision, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*apps.ControllerRevision))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ControllerRevisions that matches the options
+// in the indexer for a given namespace.
+func (s controllerRevisionNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*apps.ControllerRevision, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*apps.ControllerRevision))
 	})
 	return ret, err

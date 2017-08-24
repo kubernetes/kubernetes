@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type ServiceAccountLister interface {
 	// List lists all ServiceAccounts in the indexer.
 	List(selector labels.Selector) (ret []*api.ServiceAccount, err error)
+	// ListWithOptions lists all ServiceAccounts in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ServiceAccount, err error)
 	// ServiceAccounts returns an object that can list and get ServiceAccounts.
 	ServiceAccounts(namespace string) ServiceAccountNamespaceLister
 	ServiceAccountListerExpansion
@@ -52,6 +56,15 @@ func (s *serviceAccountLister) List(selector labels.Selector) (ret []*api.Servic
 	return ret, err
 }
 
+// ListWithOptions lists all ServiceAccounts in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *serviceAccountLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ServiceAccount, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.ServiceAccount))
+	})
+	return ret, err
+}
+
 // ServiceAccounts returns an object that can list and get ServiceAccounts.
 func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountNamespaceLister {
 	return serviceAccountNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountN
 type ServiceAccountNamespaceLister interface {
 	// List lists all ServiceAccounts in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.ServiceAccount, err error)
+	// ListWithOptions lists all ServiceAccounts that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ServiceAccount, err error)
 	// Get retrieves the ServiceAccount from the indexer for a given namespace and name.
 	Get(name string) (*api.ServiceAccount, error)
 	ServiceAccountNamespaceListerExpansion
@@ -76,6 +93,15 @@ type serviceAccountNamespaceLister struct {
 // List lists all ServiceAccounts in the indexer for a given namespace.
 func (s serviceAccountNamespaceLister) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ServiceAccount))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ServiceAccounts that matches the options
+// in the indexer for a given namespace.
+func (s serviceAccountNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ServiceAccount, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.ServiceAccount))
 	})
 	return ret, err

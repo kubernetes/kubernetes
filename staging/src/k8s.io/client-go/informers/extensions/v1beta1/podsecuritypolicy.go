@@ -60,8 +60,27 @@ func NewPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time
 	)
 }
 
-func defaultPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPodSecurityPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewPodSecurityPolicyInformerWithOptions constructs a new informer for PodSecurityPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodSecurityPolicyInformerWithOptions(client kubernetes.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.ExtensionsV1beta1().PodSecurityPolicies().List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.ExtensionsV1beta1().PodSecurityPolicies().Watch(options)
+			},
+		},
+		options,
+		&extensions_v1beta1.PodSecurityPolicy{},
+		indexers,
+	)
+}
+
+func defaultPodSecurityPolicyInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewPodSecurityPolicyInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {

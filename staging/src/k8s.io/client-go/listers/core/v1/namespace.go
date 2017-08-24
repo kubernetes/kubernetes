@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -30,6 +31,9 @@ import (
 type NamespaceLister interface {
 	// List lists all Namespaces in the indexer.
 	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+	// ListWithOptions lists all Namespaces in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Namespace, err error)
 	// Get retrieves the Namespace from the index for a given name.
 	Get(name string) (*v1.Namespace, error)
 	NamespaceListerExpansion
@@ -48,6 +52,15 @@ func NewNamespaceLister(indexer cache.Indexer) NamespaceLister {
 // List lists all Namespaces in the indexer.
 func (s *namespaceLister) List(selector labels.Selector) (ret []*v1.Namespace, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Namespace))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Namespaces in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *namespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Namespace, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.Namespace))
 	})
 	return ret, err

@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type ConfigMapLister interface {
 	// List lists all ConfigMaps in the indexer.
 	List(selector labels.Selector) (ret []*api.ConfigMap, err error)
+	// ListWithOptions lists all ConfigMaps in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ConfigMap, err error)
 	// ConfigMaps returns an object that can list and get ConfigMaps.
 	ConfigMaps(namespace string) ConfigMapNamespaceLister
 	ConfigMapListerExpansion
@@ -52,6 +56,15 @@ func (s *configMapLister) List(selector labels.Selector) (ret []*api.ConfigMap, 
 	return ret, err
 }
 
+// ListWithOptions lists all ConfigMaps in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *configMapLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ConfigMap, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.ConfigMap))
+	})
+	return ret, err
+}
+
 // ConfigMaps returns an object that can list and get ConfigMaps.
 func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister {
 	return configMapNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister 
 type ConfigMapNamespaceLister interface {
 	// List lists all ConfigMaps in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.ConfigMap, err error)
+	// ListWithOptions lists all ConfigMaps that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ConfigMap, err error)
 	// Get retrieves the ConfigMap from the indexer for a given namespace and name.
 	Get(name string) (*api.ConfigMap, error)
 	ConfigMapNamespaceListerExpansion
@@ -76,6 +93,15 @@ type configMapNamespaceLister struct {
 // List lists all ConfigMaps in the indexer for a given namespace.
 func (s configMapNamespaceLister) List(selector labels.Selector) (ret []*api.ConfigMap, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ConfigMap))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ConfigMaps that matches the options
+// in the indexer for a given namespace.
+func (s configMapNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ConfigMap, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.ConfigMap))
 	})
 	return ret, err

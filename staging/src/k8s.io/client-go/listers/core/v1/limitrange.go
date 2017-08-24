@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type LimitRangeLister interface {
 	// List lists all LimitRanges in the indexer.
 	List(selector labels.Selector) (ret []*v1.LimitRange, err error)
+	// ListWithOptions lists all LimitRanges in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.LimitRange, err error)
 	// LimitRanges returns an object that can list and get LimitRanges.
 	LimitRanges(namespace string) LimitRangeNamespaceLister
 	LimitRangeListerExpansion
@@ -52,6 +56,15 @@ func (s *limitRangeLister) List(selector labels.Selector) (ret []*v1.LimitRange,
 	return ret, err
 }
 
+// ListWithOptions lists all LimitRanges in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *limitRangeLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.LimitRange, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.LimitRange))
+	})
+	return ret, err
+}
+
 // LimitRanges returns an object that can list and get LimitRanges.
 func (s *limitRangeLister) LimitRanges(namespace string) LimitRangeNamespaceLister {
 	return limitRangeNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *limitRangeLister) LimitRanges(namespace string) LimitRangeNamespaceList
 type LimitRangeNamespaceLister interface {
 	// List lists all LimitRanges in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.LimitRange, err error)
+	// ListWithOptions lists all LimitRanges that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.LimitRange, err error)
 	// Get retrieves the LimitRange from the indexer for a given namespace and name.
 	Get(name string) (*v1.LimitRange, error)
 	LimitRangeNamespaceListerExpansion
@@ -76,6 +93,15 @@ type limitRangeNamespaceLister struct {
 // List lists all LimitRanges in the indexer for a given namespace.
 func (s limitRangeNamespaceLister) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.LimitRange))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all LimitRanges that matches the options
+// in the indexer for a given namespace.
+func (s limitRangeNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.LimitRange, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.LimitRange))
 	})
 	return ret, err

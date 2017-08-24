@@ -21,6 +21,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type DaemonSetLister interface {
 	// List lists all DaemonSets in the indexer.
 	List(selector labels.Selector) (ret []*v1beta1.DaemonSet, err error)
+	// ListWithOptions lists all DaemonSets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.DaemonSet, err error)
 	// DaemonSets returns an object that can list and get DaemonSets.
 	DaemonSets(namespace string) DaemonSetNamespaceLister
 	DaemonSetListerExpansion
@@ -52,6 +56,15 @@ func (s *daemonSetLister) List(selector labels.Selector) (ret []*v1beta1.DaemonS
 	return ret, err
 }
 
+// ListWithOptions lists all DaemonSets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *daemonSetLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.DaemonSet, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.DaemonSet))
+	})
+	return ret, err
+}
+
 // DaemonSets returns an object that can list and get DaemonSets.
 func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister {
 	return daemonSetNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister 
 type DaemonSetNamespaceLister interface {
 	// List lists all DaemonSets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1beta1.DaemonSet, err error)
+	// ListWithOptions lists all DaemonSets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.DaemonSet, err error)
 	// Get retrieves the DaemonSet from the indexer for a given namespace and name.
 	Get(name string) (*v1beta1.DaemonSet, error)
 	DaemonSetNamespaceListerExpansion
@@ -76,6 +93,15 @@ type daemonSetNamespaceLister struct {
 // List lists all DaemonSets in the indexer for a given namespace.
 func (s daemonSetNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.DaemonSet, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.DaemonSet))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all DaemonSets that matches the options
+// in the indexer for a given namespace.
+func (s daemonSetNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.DaemonSet, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta1.DaemonSet))
 	})
 	return ret, err

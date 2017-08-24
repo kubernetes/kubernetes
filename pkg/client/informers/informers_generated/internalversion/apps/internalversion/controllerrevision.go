@@ -60,8 +60,27 @@ func NewControllerRevisionInformer(client internalclientset.Interface, namespace
 	)
 }
 
-func defaultControllerRevisionInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewControllerRevisionInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewControllerRevisionInformerWithOptions constructs a new informer for ControllerRevision type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewControllerRevisionInformerWithOptions(client internalclientset.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Apps().ControllerRevisions(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Apps().ControllerRevisions(namespace).Watch(options)
+			},
+		},
+		options,
+		&apps.ControllerRevision{},
+		indexers,
+	)
+}
+
+func defaultControllerRevisionInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewControllerRevisionInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {

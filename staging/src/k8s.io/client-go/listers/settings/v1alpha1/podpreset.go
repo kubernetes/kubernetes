@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type PodPresetLister interface {
 	// List lists all PodPresets in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.PodPreset, err error)
+	// ListWithOptions lists all PodPresets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.PodPreset, err error)
 	// PodPresets returns an object that can list and get PodPresets.
 	PodPresets(namespace string) PodPresetNamespaceLister
 	PodPresetListerExpansion
@@ -52,6 +56,15 @@ func (s *podPresetLister) List(selector labels.Selector) (ret []*v1alpha1.PodPre
 	return ret, err
 }
 
+// ListWithOptions lists all PodPresets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *podPresetLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.PodPreset, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.PodPreset))
+	})
+	return ret, err
+}
+
 // PodPresets returns an object that can list and get PodPresets.
 func (s *podPresetLister) PodPresets(namespace string) PodPresetNamespaceLister {
 	return podPresetNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *podPresetLister) PodPresets(namespace string) PodPresetNamespaceLister 
 type PodPresetNamespaceLister interface {
 	// List lists all PodPresets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1alpha1.PodPreset, err error)
+	// ListWithOptions lists all PodPresets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.PodPreset, err error)
 	// Get retrieves the PodPreset from the indexer for a given namespace and name.
 	Get(name string) (*v1alpha1.PodPreset, error)
 	PodPresetNamespaceListerExpansion
@@ -76,6 +93,15 @@ type podPresetNamespaceLister struct {
 // List lists all PodPresets in the indexer for a given namespace.
 func (s podPresetNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.PodPreset, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.PodPreset))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PodPresets that matches the options
+// in the indexer for a given namespace.
+func (s podPresetNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.PodPreset, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.PodPreset))
 	})
 	return ret, err

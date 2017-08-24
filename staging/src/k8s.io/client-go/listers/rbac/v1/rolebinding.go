@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type RoleBindingLister interface {
 	// List lists all RoleBindings in the indexer.
 	List(selector labels.Selector) (ret []*v1.RoleBinding, err error)
+	// ListWithOptions lists all RoleBindings in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.RoleBinding, err error)
 	// RoleBindings returns an object that can list and get RoleBindings.
 	RoleBindings(namespace string) RoleBindingNamespaceLister
 	RoleBindingListerExpansion
@@ -52,6 +56,15 @@ func (s *roleBindingLister) List(selector labels.Selector) (ret []*v1.RoleBindin
 	return ret, err
 }
 
+// ListWithOptions lists all RoleBindings in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *roleBindingLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.RoleBinding, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.RoleBinding))
+	})
+	return ret, err
+}
+
 // RoleBindings returns an object that can list and get RoleBindings.
 func (s *roleBindingLister) RoleBindings(namespace string) RoleBindingNamespaceLister {
 	return roleBindingNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *roleBindingLister) RoleBindings(namespace string) RoleBindingNamespaceL
 type RoleBindingNamespaceLister interface {
 	// List lists all RoleBindings in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.RoleBinding, err error)
+	// ListWithOptions lists all RoleBindings that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.RoleBinding, err error)
 	// Get retrieves the RoleBinding from the indexer for a given namespace and name.
 	Get(name string) (*v1.RoleBinding, error)
 	RoleBindingNamespaceListerExpansion
@@ -76,6 +93,15 @@ type roleBindingNamespaceLister struct {
 // List lists all RoleBindings in the indexer for a given namespace.
 func (s roleBindingNamespaceLister) List(selector labels.Selector) (ret []*v1.RoleBinding, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.RoleBinding))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all RoleBindings that matches the options
+// in the indexer for a given namespace.
+func (s roleBindingNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.RoleBinding, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.RoleBinding))
 	})
 	return ret, err

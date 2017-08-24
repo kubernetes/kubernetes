@@ -21,6 +21,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type ScaleLister interface {
 	// List lists all Scales in the indexer.
 	List(selector labels.Selector) (ret []*v1beta1.Scale, err error)
+	// ListWithOptions lists all Scales in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.Scale, err error)
 	// Scales returns an object that can list and get Scales.
 	Scales(namespace string) ScaleNamespaceLister
 	ScaleListerExpansion
@@ -52,6 +56,15 @@ func (s *scaleLister) List(selector labels.Selector) (ret []*v1beta1.Scale, err 
 	return ret, err
 }
 
+// ListWithOptions lists all Scales in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *scaleLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.Scale, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Scale))
+	})
+	return ret, err
+}
+
 // Scales returns an object that can list and get Scales.
 func (s *scaleLister) Scales(namespace string) ScaleNamespaceLister {
 	return scaleNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *scaleLister) Scales(namespace string) ScaleNamespaceLister {
 type ScaleNamespaceLister interface {
 	// List lists all Scales in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1beta1.Scale, err error)
+	// ListWithOptions lists all Scales that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.Scale, err error)
 	// Get retrieves the Scale from the indexer for a given namespace and name.
 	Get(name string) (*v1beta1.Scale, error)
 	ScaleNamespaceListerExpansion
@@ -76,6 +93,15 @@ type scaleNamespaceLister struct {
 // List lists all Scales in the indexer for a given namespace.
 func (s scaleNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.Scale, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Scale))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Scales that matches the options
+// in the indexer for a given namespace.
+func (s scaleNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.Scale, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta1.Scale))
 	})
 	return ret, err

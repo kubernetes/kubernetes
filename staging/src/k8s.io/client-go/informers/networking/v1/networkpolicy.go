@@ -60,8 +60,27 @@ func NewNetworkPolicyInformer(client kubernetes.Interface, namespace string, res
 	)
 }
 
-func defaultNetworkPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNetworkPolicyInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewNetworkPolicyInformerWithOptions constructs a new informer for NetworkPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.NetworkingV1().NetworkPolicies(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.NetworkingV1().NetworkPolicies(namespace).Watch(options)
+			},
+		},
+		options,
+		&networking_v1.NetworkPolicy{},
+		indexers,
+	)
+}
+
+func defaultNetworkPolicyInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewNetworkPolicyInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {

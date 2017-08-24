@@ -31,9 +31,9 @@ import (
 )
 
 type sharedInformerFactory struct {
-	client        internalclientset.Interface
-	lock          sync.Mutex
-	defaultResync time.Duration
+	client  internalclientset.Interface
+	lock    sync.Mutex
+	options cache.SharedInformerOptions
 
 	informers map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
@@ -45,7 +45,18 @@ type sharedInformerFactory struct {
 func NewSharedInformerFactory(client internalclientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
 		client:           client,
-		defaultResync:    defaultResync,
+		options:          cache.SharedInformerOptions{ResyncPeriod: defaultResync},
+		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
+		startedInformers: make(map[reflect.Type]bool),
+	}
+}
+
+// NewSharedInformerFactoryWithOptions constructs a new instance of sharedInformerFactory.
+// Callers can specify resync period and if to include uninitialized objects via options.
+func NewSharedInformerFactoryWithOptions(client internalclientset.Interface, options cache.SharedInformerOptions) SharedInformerFactory {
+	return &sharedInformerFactory{
+		client:           client,
+		options:          options,
 		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
 		startedInformers: make(map[reflect.Type]bool),
 	}
@@ -97,7 +108,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	if exists {
 		return informer
 	}
-	informer = newFunc(f.client, f.defaultResync)
+	informer = newFunc(f.client, f.options)
 	f.informers[informerType] = informer
 
 	return informer

@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type ResourceQuotaLister interface {
 	// List lists all ResourceQuotas in the indexer.
 	List(selector labels.Selector) (ret []*api.ResourceQuota, err error)
+	// ListWithOptions lists all ResourceQuotas in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ResourceQuota, err error)
 	// ResourceQuotas returns an object that can list and get ResourceQuotas.
 	ResourceQuotas(namespace string) ResourceQuotaNamespaceLister
 	ResourceQuotaListerExpansion
@@ -52,6 +56,15 @@ func (s *resourceQuotaLister) List(selector labels.Selector) (ret []*api.Resourc
 	return ret, err
 }
 
+// ListWithOptions lists all ResourceQuotas in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *resourceQuotaLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ResourceQuota, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.ResourceQuota))
+	})
+	return ret, err
+}
+
 // ResourceQuotas returns an object that can list and get ResourceQuotas.
 func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaNamespaceLister {
 	return resourceQuotaNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaName
 type ResourceQuotaNamespaceLister interface {
 	// List lists all ResourceQuotas in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.ResourceQuota, err error)
+	// ListWithOptions lists all ResourceQuotas that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ResourceQuota, err error)
 	// Get retrieves the ResourceQuota from the indexer for a given namespace and name.
 	Get(name string) (*api.ResourceQuota, error)
 	ResourceQuotaNamespaceListerExpansion
@@ -76,6 +93,15 @@ type resourceQuotaNamespaceLister struct {
 // List lists all ResourceQuotas in the indexer for a given namespace.
 func (s resourceQuotaNamespaceLister) List(selector labels.Selector) (ret []*api.ResourceQuota, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ResourceQuota))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ResourceQuotas that matches the options
+// in the indexer for a given namespace.
+func (s resourceQuotaNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ResourceQuota, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.ResourceQuota))
 	})
 	return ret, err

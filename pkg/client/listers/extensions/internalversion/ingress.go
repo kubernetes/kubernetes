@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,6 +30,9 @@ import (
 type IngressLister interface {
 	// List lists all Ingresses in the indexer.
 	List(selector labels.Selector) (ret []*extensions.Ingress, err error)
+	// ListWithOptions lists all Ingresses in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*extensions.Ingress, err error)
 	// Ingresses returns an object that can list and get Ingresses.
 	Ingresses(namespace string) IngressNamespaceLister
 	IngressListerExpansion
@@ -52,6 +56,15 @@ func (s *ingressLister) List(selector labels.Selector) (ret []*extensions.Ingres
 	return ret, err
 }
 
+// ListWithOptions lists all Ingresses in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *ingressLister) ListWithOptions(options metav1.ListOptions) (ret []*extensions.Ingress, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*extensions.Ingress))
+	})
+	return ret, err
+}
+
 // Ingresses returns an object that can list and get Ingresses.
 func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
 	return ingressNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
 type IngressNamespaceLister interface {
 	// List lists all Ingresses in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*extensions.Ingress, err error)
+	// ListWithOptions lists all Ingresses that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*extensions.Ingress, err error)
 	// Get retrieves the Ingress from the indexer for a given namespace and name.
 	Get(name string) (*extensions.Ingress, error)
 	IngressNamespaceListerExpansion
@@ -76,6 +93,15 @@ type ingressNamespaceLister struct {
 // List lists all Ingresses in the indexer for a given namespace.
 func (s ingressNamespaceLister) List(selector labels.Selector) (ret []*extensions.Ingress, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*extensions.Ingress))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Ingresses that matches the options
+// in the indexer for a given namespace.
+func (s ingressNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*extensions.Ingress, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*extensions.Ingress))
 	})
 	return ret, err

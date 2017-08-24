@@ -21,6 +21,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type StorageClassLister interface {
 	// List lists all StorageClasses in the indexer.
 	List(selector labels.Selector) (ret []*v1beta1.StorageClass, err error)
+	// ListWithOptions lists all StorageClasses in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.StorageClass, err error)
 	// Get retrieves the StorageClass from the index for a given name.
 	Get(name string) (*v1beta1.StorageClass, error)
 	StorageClassListerExpansion
@@ -48,6 +52,15 @@ func NewStorageClassLister(indexer cache.Indexer) StorageClassLister {
 // List lists all StorageClasses in the indexer.
 func (s *storageClassLister) List(selector labels.Selector) (ret []*v1beta1.StorageClass, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.StorageClass))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all StorageClasses in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *storageClassLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.StorageClass, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta1.StorageClass))
 	})
 	return ret, err

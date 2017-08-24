@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
@@ -29,6 +30,9 @@ import (
 type EvictionLister interface {
 	// List lists all Evictions in the indexer.
 	List(selector labels.Selector) (ret []*policy.Eviction, err error)
+	// ListWithOptions lists all Evictions in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*policy.Eviction, err error)
 	// Evictions returns an object that can list and get Evictions.
 	Evictions(namespace string) EvictionNamespaceLister
 	EvictionListerExpansion
@@ -52,6 +56,15 @@ func (s *evictionLister) List(selector labels.Selector) (ret []*policy.Eviction,
 	return ret, err
 }
 
+// ListWithOptions lists all Evictions in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *evictionLister) ListWithOptions(options metav1.ListOptions) (ret []*policy.Eviction, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*policy.Eviction))
+	})
+	return ret, err
+}
+
 // Evictions returns an object that can list and get Evictions.
 func (s *evictionLister) Evictions(namespace string) EvictionNamespaceLister {
 	return evictionNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *evictionLister) Evictions(namespace string) EvictionNamespaceLister {
 type EvictionNamespaceLister interface {
 	// List lists all Evictions in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*policy.Eviction, err error)
+	// ListWithOptions lists all Evictions that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*policy.Eviction, err error)
 	// Get retrieves the Eviction from the indexer for a given namespace and name.
 	Get(name string) (*policy.Eviction, error)
 	EvictionNamespaceListerExpansion
@@ -76,6 +93,15 @@ type evictionNamespaceLister struct {
 // List lists all Evictions in the indexer for a given namespace.
 func (s evictionNamespaceLister) List(selector labels.Selector) (ret []*policy.Eviction, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*policy.Eviction))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Evictions that matches the options
+// in the indexer for a given namespace.
+func (s evictionNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*policy.Eviction, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*policy.Eviction))
 	})
 	return ret, err

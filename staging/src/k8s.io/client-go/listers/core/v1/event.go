@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type EventLister interface {
 	// List lists all Events in the indexer.
 	List(selector labels.Selector) (ret []*v1.Event, err error)
+	// ListWithOptions lists all Events in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Event, err error)
 	// Events returns an object that can list and get Events.
 	Events(namespace string) EventNamespaceLister
 	EventListerExpansion
@@ -52,6 +56,15 @@ func (s *eventLister) List(selector labels.Selector) (ret []*v1.Event, err error
 	return ret, err
 }
 
+// ListWithOptions lists all Events in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *eventLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Event, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.Event))
+	})
+	return ret, err
+}
+
 // Events returns an object that can list and get Events.
 func (s *eventLister) Events(namespace string) EventNamespaceLister {
 	return eventNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *eventLister) Events(namespace string) EventNamespaceLister {
 type EventNamespaceLister interface {
 	// List lists all Events in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.Event, err error)
+	// ListWithOptions lists all Events that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Event, err error)
 	// Get retrieves the Event from the indexer for a given namespace and name.
 	Get(name string) (*v1.Event, error)
 	EventNamespaceListerExpansion
@@ -76,6 +93,15 @@ type eventNamespaceLister struct {
 // List lists all Events in the indexer for a given namespace.
 func (s eventNamespaceLister) List(selector labels.Selector) (ret []*v1.Event, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Event))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Events that matches the options
+// in the indexer for a given namespace.
+func (s eventNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Event, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.Event))
 	})
 	return ret, err

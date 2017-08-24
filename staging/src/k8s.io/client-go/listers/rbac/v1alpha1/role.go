@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type RoleLister interface {
 	// List lists all Roles in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.Role, err error)
+	// ListWithOptions lists all Roles in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Role, err error)
 	// Roles returns an object that can list and get Roles.
 	Roles(namespace string) RoleNamespaceLister
 	RoleListerExpansion
@@ -52,6 +56,15 @@ func (s *roleLister) List(selector labels.Selector) (ret []*v1alpha1.Role, err e
 	return ret, err
 }
 
+// ListWithOptions lists all Roles in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *roleLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Role, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.Role))
+	})
+	return ret, err
+}
+
 // Roles returns an object that can list and get Roles.
 func (s *roleLister) Roles(namespace string) RoleNamespaceLister {
 	return roleNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *roleLister) Roles(namespace string) RoleNamespaceLister {
 type RoleNamespaceLister interface {
 	// List lists all Roles in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1alpha1.Role, err error)
+	// ListWithOptions lists all Roles that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Role, err error)
 	// Get retrieves the Role from the indexer for a given namespace and name.
 	Get(name string) (*v1alpha1.Role, error)
 	RoleNamespaceListerExpansion
@@ -76,6 +93,15 @@ type roleNamespaceLister struct {
 // List lists all Roles in the indexer for a given namespace.
 func (s roleNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.Role, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.Role))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Roles that matches the options
+// in the indexer for a given namespace.
+func (s roleNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.Role, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.Role))
 	})
 	return ret, err

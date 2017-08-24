@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type PodSecurityPolicyLister interface {
 	// List lists all PodSecurityPolicies in the indexer.
 	List(selector labels.Selector) (ret []*extensions.PodSecurityPolicy, err error)
+	// ListWithOptions lists all PodSecurityPolicies in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*extensions.PodSecurityPolicy, err error)
 	// Get retrieves the PodSecurityPolicy from the index for a given name.
 	Get(name string) (*extensions.PodSecurityPolicy, error)
 	PodSecurityPolicyListerExpansion
@@ -48,6 +52,15 @@ func NewPodSecurityPolicyLister(indexer cache.Indexer) PodSecurityPolicyLister {
 // List lists all PodSecurityPolicies in the indexer.
 func (s *podSecurityPolicyLister) List(selector labels.Selector) (ret []*extensions.PodSecurityPolicy, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*extensions.PodSecurityPolicy))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PodSecurityPolicies in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *podSecurityPolicyLister) ListWithOptions(options metav1.ListOptions) (ret []*extensions.PodSecurityPolicy, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*extensions.PodSecurityPolicy))
 	})
 	return ret, err

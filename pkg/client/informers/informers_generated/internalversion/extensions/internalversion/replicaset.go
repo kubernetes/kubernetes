@@ -60,8 +60,27 @@ func NewReplicaSetInformer(client internalclientset.Interface, namespace string,
 	)
 }
 
-func defaultReplicaSetInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewReplicaSetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewReplicaSetInformerWithOptions constructs a new informer for ReplicaSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewReplicaSetInformerWithOptions(client internalclientset.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Extensions().ReplicaSets(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Extensions().ReplicaSets(namespace).Watch(options)
+			},
+		},
+		options,
+		&extensions.ReplicaSet{},
+		indexers,
+	)
+}
+
+func defaultReplicaSetInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewReplicaSetInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {

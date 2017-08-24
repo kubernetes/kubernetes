@@ -60,8 +60,27 @@ func NewStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Dura
 	)
 }
 
-func defaultStorageClassInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewStorageClassInformerWithOptions constructs a new informer for StorageClass type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewStorageClassInformerWithOptions(client kubernetes.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.StorageV1().StorageClasses().List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.StorageV1().StorageClasses().Watch(options)
+			},
+		},
+		options,
+		&storage_v1.StorageClass{},
+		indexers,
+	)
+}
+
+func defaultStorageClassInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewStorageClassInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {

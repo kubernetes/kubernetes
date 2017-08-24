@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type PodTemplateLister interface {
 	// List lists all PodTemplates in the indexer.
 	List(selector labels.Selector) (ret []*v1.PodTemplate, err error)
+	// ListWithOptions lists all PodTemplates in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.PodTemplate, err error)
 	// PodTemplates returns an object that can list and get PodTemplates.
 	PodTemplates(namespace string) PodTemplateNamespaceLister
 	PodTemplateListerExpansion
@@ -52,6 +56,15 @@ func (s *podTemplateLister) List(selector labels.Selector) (ret []*v1.PodTemplat
 	return ret, err
 }
 
+// ListWithOptions lists all PodTemplates in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *podTemplateLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.PodTemplate, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.PodTemplate))
+	})
+	return ret, err
+}
+
 // PodTemplates returns an object that can list and get PodTemplates.
 func (s *podTemplateLister) PodTemplates(namespace string) PodTemplateNamespaceLister {
 	return podTemplateNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *podTemplateLister) PodTemplates(namespace string) PodTemplateNamespaceL
 type PodTemplateNamespaceLister interface {
 	// List lists all PodTemplates in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.PodTemplate, err error)
+	// ListWithOptions lists all PodTemplates that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.PodTemplate, err error)
 	// Get retrieves the PodTemplate from the indexer for a given namespace and name.
 	Get(name string) (*v1.PodTemplate, error)
 	PodTemplateNamespaceListerExpansion
@@ -76,6 +93,15 @@ type podTemplateNamespaceLister struct {
 // List lists all PodTemplates in the indexer for a given namespace.
 func (s podTemplateNamespaceLister) List(selector labels.Selector) (ret []*v1.PodTemplate, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.PodTemplate))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PodTemplates that matches the options
+// in the indexer for a given namespace.
+func (s podTemplateNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.PodTemplate, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.PodTemplate))
 	})
 	return ret, err
