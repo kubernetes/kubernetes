@@ -102,7 +102,7 @@ type OperationGenerator interface {
 		string,
 		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (func() error, error)
 
-	GenerateExpandVolumeFunc(*expandcache.PvcWithResizeRequest, expandcache.VolumeResizeMap) (func() error, error)
+	GenerateExpandVolumeFunc(*expandcache.PvcWithResizeRequest, expandcache.VolumeResizeMap) (func() error, string, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
@@ -731,22 +731,19 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 
 func (og *operationGenerator) GenerateExpandVolumeFunc(
 	pvcWithResizeRequest *expandcache.PvcWithResizeRequest,
-	resizeMap expandcache.VolumeResizeMap) (func() error, error) {
+	resizeMap expandcache.VolumeResizeMap) (func() error, string, error) {
 
 	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(pvcWithResizeRequest.VolumeSpec)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
-	}
-
-	expanderPlugin, err := volumePlugin.NewExpander(pvcWithResizeRequest.VolumeSpec)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error creating expander plugin for volume %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+		return nil, "", fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
 
 	expandFunc := func() error {
-		expandErr := expanderPlugin.ExpandVolumeDevice(pvcWithResizeRequest.ExpectedSize, pvcWithResizeRequest.CurrentSize)
+		newSize, expandErr := volumePlugin.ExpandVolumeDevice(
+			pvcWithResizeRequest.VolumeSpec,
+			pvcWithResizeRequest.ExpectedSize,
+			pvcWithResizeRequest.CurrentSize)
 
 		if expandErr != nil {
 			glog.Errorf("Error expanding volume through cloudprovider for volume %q : %v", pvcWithResizeRequest.QualifiedName(), expandErr)
@@ -756,9 +753,9 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		}
 
 		// CloudProvider resize succeded - lets mark api objects as resized
-		if expanderPlugin.RequiresFSResize() {
+		if volumePlugin.RequiresFSResize() {
 			glog.V(4).Infof("Controller resizing done for PVC %s, requesting file system resize", pvcWithResizeRequest.QualifiedName())
-			err := resizeMap.MarkForFileSystemResize(pvcWithResizeRequest)
+			err := resizeMap.MarkForFileSystemResize(pvcWithResizeRequest, newSize)
 
 			if err != nil {
 				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, err.Error())
@@ -767,7 +764,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			}
 		} else {
 			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
-			err := resizeMap.MarkAsResized(pvcWithResizeRequest)
+			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
 
 			if err != nil {
 				glog.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
@@ -778,7 +775,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		return nil
 
 	}
-	return expandFunc, nil
+	return expandFunc, volumePlugin.GetPluginName(), nil
 }
 
 func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {

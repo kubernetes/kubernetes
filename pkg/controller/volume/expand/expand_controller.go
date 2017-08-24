@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package expand implements interfaces that attempt to resize a pvc
+// by adding pvc to a volume resize map from which PVCs are picked and
+// resized
 package expand
 
 import (
@@ -43,7 +46,10 @@ import (
 )
 
 const (
-	syncLoopPeriod time.Duration = 100 * time.Millisecond
+	// How often resizing loop runs
+	syncLoopPeriod time.Duration = 30 * time.Second
+	// How often pvc populator runs
+	populatorLoopPeriod time.Duration = 2 * time.Minute
 )
 
 // ExpandController expands the pvs
@@ -82,6 +88,9 @@ type expandController struct {
 
 	// Operation executor
 	opExecutor operationexecutor.OperationExecutor
+
+	// populator for periodically polling all PVCs
+	pvcPopulator PVCPopulator
 }
 
 func NewExpandController(
@@ -100,7 +109,7 @@ func NewExpandController(
 		pvSynced:   pvInformer.Informer().HasSynced,
 	}
 
-	if err := expc.volumePluginMgr.InitPlugins(plugins, expc); err != nil {
+	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
@@ -119,10 +128,11 @@ func NewExpandController(
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		UpdateFunc: expc.pvcUpdate,
+		DeleteFunc: expc.deletePVC,
 	})
 
-	expc.syncResize = NewSyncVolumeResize(syncLoopPeriod, expc.opExecutor, expc.resizeMap)
-
+	expc.syncResize = NewSyncVolumeResize(syncLoopPeriod, expc.opExecutor, expc.resizeMap, kubeClient)
+	expc.pvcPopulator = NewPVCPopulator(populatorLoopPeriod, expc.resizeMap, expc.pvcLister, expc.pvLister, kubeClient)
 	return expc, nil
 }
 
@@ -136,9 +146,20 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 	}
 
 	// Run volume sync work goroutine
-	expc.syncResize.Run(stopCh)
-
+	go expc.syncResize.Run(stopCh)
+	// Start the pvc populator loop
+	go expc.pvcPopulator.Run(stopCh)
 	<-stopCh
+}
+
+func (expc *expandController) deletePVC(obj interface{}) {
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+
+	if pvc == nil || !ok {
+		return
+	}
+
+	expc.resizeMap.DeletePVC(pvc)
 }
 
 func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
@@ -153,24 +174,20 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	if newPvc == nil || !ok {
 		return
 	}
-	volumeSpec, err := CreateVolumeSpec(newPvc, expc.pvcLister, expc.pvLister)
+	pv, err := getPersistentVolume(newPvc, expc.pvLister)
 	if err != nil {
-		glog.Errorf("Error creating volume spec during update event : %v", err)
+		glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPvc.UID, err)
 		return
 	}
-	expc.resizeMap.AddPvcUpdate(newPvc, oldPvc, volumeSpec)
+	expc.resizeMap.AddPVCUpdate(newPvc, oldPvc, pv)
 }
 
-func CreateVolumeSpec(
-	pvc *v1.PersistentVolumeClaim,
-	pvcLister corelisters.PersistentVolumeClaimLister,
-	pvLister corelisters.PersistentVolumeLister) (*volume.Spec, error) {
-
+func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.PersistentVolumeLister) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
 	pv, err := pvLister.Get(volumeName)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find PV %q in PV informer cache : %v", volumeName, err)
+		return nil, fmt.Errorf("failed to find PV %q in PV informer cache with error : %v", volumeName, err)
 	}
 
 	clonedPvObject, err := scheme.Scheme.DeepCopy(pv)
@@ -182,7 +199,7 @@ func CreateVolumeSpec(
 	if !ok {
 		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", volumeName, pv)
 	}
-	return volume.NewSpecFromPersistentVolume(clonedPV, false), nil
+	return clonedPV, nil
 }
 
 // Implementing VolumeHost interface
@@ -214,8 +231,12 @@ func (expc *expandController) GetCloudProvider() cloudprovider.Interface {
 	return expc.cloud
 }
 
-func (expc *expandController) GetMounter() mount.Interface {
+func (expc *expandController) GetMounter(pluginName string) mount.Interface {
 	return nil
+}
+
+func (expc *expandController) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
 }
 
 func (expc *expandController) GetWriter() io.Writer {
@@ -227,7 +248,7 @@ func (expc *expandController) GetHostName() string {
 }
 
 func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by expand controller's VolumeHost implementation")
+	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -247,5 +268,5 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 }
 
 func (expc *expandController) GetNodeLabels() (map[string]string, error) {
-	return nil, fmt.Errorf("GetNodeLabels() unsupported in expandController")
+	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }

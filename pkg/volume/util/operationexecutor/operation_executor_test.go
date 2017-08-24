@@ -284,11 +284,11 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(v
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvcWithResizeRequest *expandcache.PvcWithResizeRequest,
-	resizeMap expandcache.VolumeResizeMap) (func() error, error) {
+	resizeMap expandcache.VolumeResizeMap) (func() error, string, error) {
 	return func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil
-	}, nil
+	}, "", nil
 }
 
 func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(

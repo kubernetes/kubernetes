@@ -723,13 +723,14 @@ func (oe *operationExecutor) UnmountDevice(
 }
 
 func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PvcWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
-	expandFunc, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
+	expandFunc, pluginName, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
 
 	if err != nil {
 		return err
 	}
 	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePvcKey())
-	return oe.pendingOperations.Run(uniqueVolumeKey, "", expandFunc)
+	opCompleteFunc := util.OperationCompleteHook(pluginName, "expand_volume")
+	return oe.pendingOperations.Run(uniqueVolumeKey, "", expandFunc, opCompleteFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
