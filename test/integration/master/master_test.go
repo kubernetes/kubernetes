@@ -542,6 +542,31 @@ func TestMasterService(t *testing.T) {
 	}
 }
 
+func TestClusterInfoConfigMap(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer closeFn()
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}})
+
+	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+		info, err := client.Core().ConfigMaps(metav1.NamespaceDefault).Get("cluster-info", metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return false, nil
+		}
+
+		if _, ok := info.Data["cluster-id"]; !ok {
+			t.Errorf("unexpected error: %v", err)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestServiceAlloc(t *testing.T) {
 	cfg := framework.NewIntegrationTestMasterConfig()
 	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
