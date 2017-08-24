@@ -17,11 +17,11 @@ cni-tar:
   archive:
     - extracted
     - user: root
-    - name: /home/kubernetes
+    - name: /home/kubernetes/bin
     - makedirs: True
-    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz
+    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz
     - tar_options: v
-    - source_hash: md5=afbb526e7d976f98353ac96f73043031
+    - source_hash: md5=9534876FAE7DBE813CDAB404DC1F9219
     - archive_format: tar
     - if_missing: /home/kubernetes/bin
 
