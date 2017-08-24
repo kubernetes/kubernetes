@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
@@ -305,6 +306,10 @@ func (f *FakeFactory) JSONEncoder() runtime.Encoder {
 }
 
 func (f *FakeFactory) RESTClient() (*restclient.RESTClient, error) {
+	return nil, nil
+}
+
+func (f *FakeFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return nil, nil
 }
 
@@ -581,6 +586,33 @@ func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
 
 func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
 	return testapi.Default.Codec()
+}
+
+func (f *fakeAPIFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
+	fakeClient := f.tf.Client.(*fake.RESTClient)
+	clientset := kubernetes.NewForConfigOrDie(f.tf.ClientConfig)
+
+	clientset.CoreV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AutoscalingV2alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.BatchV2alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.ExtensionsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.RbacV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.RbacV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.StorageV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.StorageV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AppsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AppsV1beta2().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+
+	return clientset, f.tf.Err
 }
 
 func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
