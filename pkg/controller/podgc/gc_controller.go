@@ -93,9 +93,9 @@ func (gcc *PodGCController) gc() {
 	}
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(pods)
+		gcc.gcOrphaned(pods)
+		gcc.gcUnscheduledTerminating(pods)
 	}
-	gcc.gcOrphaned(pods)
-	gcc.gcUnscheduledTerminating(pods)
 }
 
 func isPodTerminated(pod *v1.Pod) bool {
