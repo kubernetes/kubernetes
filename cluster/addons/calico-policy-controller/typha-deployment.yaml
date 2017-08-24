@@ -8,7 +8,6 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: calico-typha
 spec:
-  replicas: __CALICO_TYPHA_REPLICAS__
   revisionHistoryLimit: 2
   template:
     metadata:
@@ -21,8 +20,9 @@ spec:
       - key: CriticalAddonsOnly
         operator: Exists
       hostNetwork: true
+      serviceAccountName: calico
       containers:
-      - image: calico/typha:v0.2.2
+      - image: calico/typha:v0.4.1
         name: calico-typha
         ports:
         - containerPort: 5473
@@ -45,13 +45,23 @@ spec:
             value: "kubernetes"
           - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
             value: "1"
+          - name: TYPHA_HEALTHENABLED
+            value: "true"
         volumeMounts:
         - mountPath: /etc/calico
           name: etc-calico
           readOnly: true
-        resources:
-          requests:
-            cpu: __CALICO_TYPHA_CPU__
+        livenessProbe:
+          httpGet:
+            path: /liveness
+            port: 9098
+          periodSeconds: 30
+          initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 9098
+          periodSeconds: 10
       volumes:
       - name: etc-calico
         hostPath:
