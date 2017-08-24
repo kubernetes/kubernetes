@@ -752,7 +752,7 @@ EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     cat >>$file <<EOF
-VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume})
+VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec})
 EOF
   fi
 
