@@ -2683,7 +2683,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 
 	containerLimitCase := api.ResourceRequirements{
 		Limits: api.ResourceList{
-			api.ResourceStorageOverlay: *resource.NewMilliQuantity(
+			api.ResourceEphemeralStorage: *resource.NewMilliQuantity(
 				int64(40000),
 				resource.BinarySI),
 		},
