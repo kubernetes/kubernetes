@@ -32,11 +32,13 @@ func startJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
 		return false, nil
 	}
-	go job.NewJobController(
+
+	controller := job.NewJobController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -47,8 +49,10 @@ func startCronJobController(ctx ControllerContext) (bool, error) {
 	// TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
 	cronjobConfig := ctx.ClientBuilder.ConfigOrDie("cronjob-controller")
 	cronjobConfig.ContentConfig.GroupVersion = &schema.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
-	go cronjob.NewCronJobController(
+
+	controller := cronjob.NewCronJobController(
 		clientset.NewForConfigOrDie(cronjobConfig),
-	).Run(ctx.Stop)
+	)
+	go controller.Run(ctx.Stop)
 	return true, nil
 }
