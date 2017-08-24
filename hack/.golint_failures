@@ -1,6 +1,7 @@
 cluster/images/etcd-version-monitor
 cmd/cloud-controller-manager/app
 cmd/cloud-controller-manager/app/options
+cmd/genslateyaml
 cmd/genutils
 cmd/gke-certificates-controller/app
 cmd/hyperkube
@@ -28,6 +29,7 @@ cmd/kubectl/app
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
+cmd/mungedocs
 examples/guestbook-go
 federation/apis/core
 federation/apis/core/v1
