@@ -11,7 +11,20 @@ go_library(
     srcs = [
         "doc.go",
         "host_path.go",
-    ],
+        "nsenter_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "host_path_unix.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "host_path_unix.go",
+            "nsenter.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "host_path_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
@@ -20,7 +33,12 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(

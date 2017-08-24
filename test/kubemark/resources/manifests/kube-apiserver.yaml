@@ -56,6 +56,7 @@ spec:
   - name: logfile
     hostPath:
       path: /var/log/kube-apiserver.log
+      type: FileOrCreate
   - name: etcssl
     hostPath:
       path: /etc/ssl
