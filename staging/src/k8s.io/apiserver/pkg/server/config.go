@@ -437,6 +437,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		LoopbackClientConfig:   c.LoopbackClientConfig,
 		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
 		admissionControl:       c.AdmissionControl,
+		authorizer:             c.Authorizer,
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
 		AuditBackend:           c.AuditBackend,

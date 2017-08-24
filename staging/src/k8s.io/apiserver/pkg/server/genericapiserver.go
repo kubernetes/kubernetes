@@ -148,6 +148,9 @@ type GenericAPIServer struct {
 
 	// delegationTarget is the next delegate in the chain or nil
 	delegationTarget DelegationTarget
+
+	// delegationTarget is the next delegate in the chain or nil
+	authorizer authorizer.Authorizer
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
