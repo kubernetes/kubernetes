@@ -120,8 +120,8 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
-	// Grow PVC will grow size available to PVC
-	GrowPvc(*expandcache.PvcWithResizeRequest, expandcache.VolumeResizeMap) error
+	// Expand Volume will grow size available to PVC
+	ExpandVolume(*expandcache.PvcWithResizeRequest, expandcache.VolumeResizeMap) error
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -722,7 +722,7 @@ func (oe *operationExecutor) UnmountDevice(
 		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc, opCompleteFunc)
 }
 
-func (oe *operationExecutor) GrowPvc(pvcWithResizeRequest *expandcache.PvcWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
+func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PvcWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
 	expandFunc, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
 
 	if err != nil {
