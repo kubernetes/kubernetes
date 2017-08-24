@@ -249,6 +249,7 @@ spec:
     name: ca-certs
   - hostPath:
       path: /etc/kubernetes/controller-manager.conf
+      type: FileOrCreate
     name: kubeconfig
   - hostPath:
       path: /etc/pki
@@ -324,6 +325,7 @@ spec:
         name: ca-certs
       - hostPath:
           path: /etc/kubernetes/controller-manager.conf
+          type: FileOrCreate
         name: kubeconfig
       - hostPath:
           path: /etc/pki
@@ -374,6 +376,7 @@ spec:
   volumes:
   - hostPath:
       path: /etc/kubernetes/scheduler.conf
+      type: FileOrCreate
     name: kubeconfig
 status: {}
 `
@@ -425,6 +428,7 @@ spec:
       volumes:
       - hostPath:
           path: /etc/kubernetes/scheduler.conf
+          type: FileOrCreate
         name: kubeconfig
   updateStrategy: {}
 status:
