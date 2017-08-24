@@ -40,7 +40,7 @@ func (gce *GCECloud) CreateUrlMap(urlMap *compute.UrlMap) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // UpdateUrlMap applies the given UrlMap as an update
@@ -50,7 +50,7 @@ func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteUrlMap deletes a url map by name.
@@ -63,7 +63,7 @@ func (gce *GCECloud) DeleteUrlMap(name string) error {
 		}
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListUrlMaps lists all UrlMaps in the project.

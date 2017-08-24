@@ -41,7 +41,7 @@ func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) erro
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteGlobalBackendService deletes the given BackendService by name.
@@ -55,7 +55,7 @@ func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // CreateGlobalBackendService creates the given BackendService.
@@ -66,7 +66,7 @@ func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) erro
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // ListGlobalBackendServices lists all backend services in the project.
@@ -102,7 +102,7 @@ func (gce *GCECloud) UpdateRegionBackendService(bg *compute.BackendService, regi
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // DeleteRegionBackendService deletes the given BackendService by name.
@@ -116,7 +116,7 @@ func (gce *GCECloud) DeleteRegionBackendService(name, region string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // CreateRegionBackendService creates the given BackendService.
@@ -127,7 +127,7 @@ func (gce *GCECloud) CreateRegionBackendService(bg *compute.BackendService, regi
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // ListRegionBackendServices lists all backend services in the project.

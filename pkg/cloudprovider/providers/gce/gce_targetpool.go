@@ -37,7 +37,7 @@ func (gce *GCECloud) CreateTargetPool(tp *compute.TargetPool, region string) err
 		return mc.Observe(err)
 	}
 
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // DeleteTargetPool deletes TargetPool by name.
@@ -47,7 +47,7 @@ func (gce *GCECloud) DeleteTargetPool(name, region string) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // AddInstancesToTargetPool adds instances by link to the TargetPool
@@ -58,7 +58,7 @@ func (gce *GCECloud) AddInstancesToTargetPool(name, region string, instanceRefs 
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // RemoveInstancesToTargetPool removes instances by link to the TargetPool
@@ -69,5 +69,5 @@ func (gce *GCECloud) RemoveInstancesFromTargetPool(name, region string, instance
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }

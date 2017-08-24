@@ -39,7 +39,7 @@ func (gce *GCECloud) CreateFirewall(f *compute.Firewall) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteFirewall deletes the given firewall rule.
@@ -49,7 +49,7 @@ func (gce *GCECloud) DeleteFirewall(name string) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // UpdateFirewall applies the given firewall as an update to an existing service.
@@ -60,5 +60,5 @@ func (gce *GCECloud) UpdateFirewall(f *compute.Firewall) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }

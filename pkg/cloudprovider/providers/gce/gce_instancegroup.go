@@ -31,7 +31,7 @@ func (gce *GCECloud) CreateInstanceGroup(ig *compute.InstanceGroup, zone string)
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(op, zone, mc)
+	return gce.waitForZoneOp(op, gce.projectID, zone, mc)
 }
 
 // DeleteInstanceGroup deletes an instance group.
@@ -43,7 +43,7 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(op, zone, mc)
+	return gce.waitForZoneOp(op, gce.projectID, zone, mc)
 }
 
 // ListInstanceGroups lists all InstanceGroups in the project and
@@ -83,7 +83,7 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, insta
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(op, zone, mc)
+	return gce.waitForZoneOp(op, gce.projectID, zone, mc)
 }
 
 // RemoveInstancesFromInstanceGroup removes the given instances from
@@ -103,7 +103,7 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, 
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(op, zone, mc)
+	return gce.waitForZoneOp(op, gce.projectID, zone, mc)
 }
 
 // SetNamedPortsOfInstanceGroup sets the list of named ports on a given instance group
@@ -116,7 +116,7 @@ func (gce *GCECloud) SetNamedPortsOfInstanceGroup(igName, zone string, namedPort
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(op, zone, mc)
+	return gce.waitForZoneOp(op, gce.projectID, zone, mc)
 }
 
 // GetInstanceGroup returns an instance group by name.

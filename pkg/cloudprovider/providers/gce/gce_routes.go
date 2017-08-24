@@ -96,7 +96,7 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 			return mc.Observe(err)
 		}
 	}
-	return gce.waitForGlobalOp(insertOp, mc)
+	return gce.waitForGlobalOp(insertOp, gce.projectID, mc)
 }
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
@@ -105,7 +105,7 @@ func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route)
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(deleteOp, mc)
+	return gce.waitForGlobalOp(deleteOp, gce.projectID, mc)
 }
 
 func truncateClusterName(clusterName string) string {

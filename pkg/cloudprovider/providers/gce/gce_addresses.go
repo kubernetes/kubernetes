@@ -42,7 +42,7 @@ func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // DeleteGlobalAddress deletes a global address by name.
@@ -52,7 +52,7 @@ func (gce *GCECloud) DeleteGlobalAddress(name string) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(op, mc)
+	return gce.waitForGlobalOp(op, gce.projectID, mc)
 }
 
 // GetGlobalAddress returns the global address by name.
@@ -69,7 +69,7 @@ func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) 
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // ReserveAlphaRegionAddress creates an Alpha, regional address.
@@ -79,7 +79,7 @@ func (gce *GCECloud) ReserveAlphaRegionAddress(addr *computealpha.Address, regio
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // DeleteRegionAddress deletes a region address by name.
@@ -89,7 +89,7 @@ func (gce *GCECloud) DeleteRegionAddress(name, region string) error {
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForRegionOp(op, region, mc)
+	return gce.waitForRegionOp(op, gce.projectID, region, mc)
 }
 
 // GetRegionAddress returns the region address by name
