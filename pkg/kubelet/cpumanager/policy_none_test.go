@@ -19,7 +19,7 @@ package cpumanager
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 func TestNonePolicyName(t *testing.T) {

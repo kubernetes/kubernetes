@@ -21,8 +21,8 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 type cpuAccumulator struct {
@@ -60,7 +60,7 @@ func (a *cpuAccumulator) isCoreFree(coreID int) bool {
 // Returns free socket IDs as a slice sorted by:
 // - socket ID, ascending.
 func (a *cpuAccumulator) freeSockets() []int {
-	return a.details.Sockets().Filter(a.isSocketFree).AsSlice()
+	return a.details.Sockets().Filter(a.isSocketFree).ToSlice()
 }
 
 // Returns core IDs as a slice sorted by:
@@ -68,7 +68,7 @@ func (a *cpuAccumulator) freeSockets() []int {
 // - socket ID, ascending
 // - core ID, ascending
 func (a *cpuAccumulator) freeCores() []int {
-	socketIDs := a.details.Sockets().AsSlice()
+	socketIDs := a.details.Sockets().ToSlice()
 	sort.Slice(socketIDs,
 		func(i, j int) bool {
 			iCores := a.details.CoresInSocket(socketIDs[i]).Filter(a.isCoreFree)
@@ -78,7 +78,7 @@ func (a *cpuAccumulator) freeCores() []int {
 
 	coreIDs := []int{}
 	for _, s := range socketIDs {
-		coreIDs = append(coreIDs, a.details.CoresInSocket(s).Filter(a.isCoreFree).AsSlice()...)
+		coreIDs = append(coreIDs, a.details.CoresInSocket(s).Filter(a.isCoreFree).ToSlice()...)
 	}
 	return coreIDs
 }
@@ -91,7 +91,7 @@ func (a *cpuAccumulator) freeCores() []int {
 // - core ID.
 func (a *cpuAccumulator) freeCPUs() []int {
 	result := []int{}
-	cores := a.details.Cores().AsSlice()
+	cores := a.details.Cores().ToSlice()
 
 	sort.Slice(
 		cores,
@@ -99,8 +99,8 @@ func (a *cpuAccumulator) freeCPUs() []int {
 			iCore := cores[i]
 			jCore := cores[j]
 
-			iCPUs := a.topo.CPUDetails.CPUsInCore(iCore).AsSlice()
-			jCPUs := a.topo.CPUDetails.CPUsInCore(jCore).AsSlice()
+			iCPUs := a.topo.CPUDetails.CPUsInCore(iCore).ToSlice()
+			jCPUs := a.topo.CPUDetails.CPUsInCore(jCore).ToSlice()
 
 			iSocket := a.topo.CPUDetails[iCPUs[0]].SocketID
 			jSocket := a.topo.CPUDetails[jCPUs[0]].SocketID
@@ -128,7 +128,7 @@ func (a *cpuAccumulator) freeCPUs() []int {
 
 	// For each core, append sorted CPU IDs to result.
 	for _, core := range cores {
-		result = append(result, a.details.CPUsInCore(core).AsSlice()...)
+		result = append(result, a.details.CPUsInCore(core).ToSlice()...)
 	}
 	return result
 }
@@ -151,7 +151,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return nil, fmt.Errorf("not enough cpus available to satisfy request")
+		return cpuset.NewCPUSet(), fmt.Errorf("not enough cpus available to satisfy request")
 	}
 
 	// Algorithm: topology-aware best-fit
@@ -192,5 +192,5 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 		}
 	}
 
-	return nil, fmt.Errorf("failed to allocate cpus")
+	return cpuset.NewCPUSet(), fmt.Errorf("failed to allocate cpus")
 }

@@ -20,9 +20,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 // PolicyStatic name of static policy
@@ -51,14 +51,14 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
-	fullCpuset := cpuset.NewCPUSet()
-	for cpuid := 0; cpuid < p.topology.NumCPUs; cpuid++ {
-		fullCpuset.Add(cpuid)
-	}
-	// takeByTopology will filter out fullCpuset returning low-number cores
-	// i.e. NumReservedCores=2, then reserved={0,5} (HT enabled Case)
-	reserved, _ := takeByTopology(p.topology, fullCpuset, p.topology.NumReservedCores)
-	s.SetDefaultCPUSet(fullCpuset.Difference(reserved))
+	allCPUs := p.topology.CPUDetails.CPUs()
+	// takeByTopology allocates CPUs associated with low-numbered cores from
+	// allCPUs.
+	//
+	// For example: Given a system with 8 CPUs available and HT enabled,
+	// if NumReservedCores=2, then reserved={0,4}
+	reserved, _ := takeByTopology(p.topology, allCPUs, p.topology.NumReservedCores)
+	s.SetDefaultCPUSet(allCPUs.Difference(reserved))
 }
 
 func (p *staticPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -89,7 +89,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 	glog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
 	result, err := takeByTopology(p.topology, s.GetDefaultCPUSet(), numCPUs)
 	if err != nil {
-		return nil, err
+		return cpuset.NewCPUSet(), err
 	}
 	// Remove allocated CPUs from the shared CPUSet.
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))

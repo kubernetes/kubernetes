@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // CPUDetails is a map from CPU ID to Core ID and Socket ID.
@@ -77,66 +77,66 @@ func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 // Sockets returns all of the socket IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Sockets() cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for _, info := range d {
-		result.Add(info.SocketID)
+		b.Add(info.SocketID)
 	}
-	return result
+	return b.Result()
 }
 
 // CPUsInSocket returns all of the logical CPU IDs associated with the
 // given socket ID in this CPUDetails.
 func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for cpu, info := range d {
 		if info.SocketID == id {
-			result.Add(cpu)
+			b.Add(cpu)
 		}
 	}
-	return result
+	return b.Result()
 }
 
 // Cores returns all of the core IDs associated with the CPUs in this
 // CPUDetails.
 func (d CPUDetails) Cores() cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for _, info := range d {
-		result.Add(info.CoreID)
+		b.Add(info.CoreID)
 	}
-	return result
+	return b.Result()
 }
 
 // CoresInSocket returns all of the core IDs associated with the given
 // socket ID in this CPUDetails.
 func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for _, info := range d {
 		if info.SocketID == id {
-			result.Add(info.CoreID)
+			b.Add(info.CoreID)
 		}
 	}
-	return result
+	return b.Result()
 }
 
 // CPUs returns all of the logical CPU IDs in this CPUDetails.
 func (d CPUDetails) CPUs() cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for cpuID := range d {
-		result.Add(cpuID)
+		b.Add(cpuID)
 	}
-	return result
+	return b.Result()
 }
 
 // CPUsInCore returns all of the logical CPU IDs associated with the
 // given core ID in this CPUDetails.
 func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
-	result := cpuset.NewCPUSet()
+	b := cpuset.NewBuilder()
 	for cpu, info := range d {
 		if info.CoreID == id {
-			result.Add(cpu)
+			b.Add(cpu)
 		}
 	}
-	return result
+	return b.Result()
 }
 
 // Discover returns CPUTopology based on cadvisor node info

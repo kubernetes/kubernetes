@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 type staticPolicyTest struct {
@@ -58,9 +58,8 @@ func TestStaticPolicyStart(t *testing.T) {
 
 	policy.Start(st)
 	for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
-		if _, found := st.defaultCPUSet[cpuid]; !found {
-			t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet",
-				cpuid)
+		if !st.defaultCPUSet.Contains(cpuid) {
+			t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
 		}
 	}
 }
@@ -165,7 +164,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 			pod:             makePod("1000m", "2000m"),
 			expErr:          nil,
 			expCPUAlloc:     false,
-			expCSet:         nil,
+			expCSet:         cpuset.NewCPUSet(),
 		},
 		{
 			description:     "GuPodNonIntegerCore, SingleSocketHT, NoAlloc",
@@ -176,7 +175,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 			pod:             makePod("977m", "977m"),
 			expErr:          nil,
 			expCPUAlloc:     false,
-			expCSet:         nil,
+			expCSet:         cpuset.NewCPUSet(),
 		},
 		{
 			description: "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
@@ -189,7 +188,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 			pod:             makePod("2000m", "2000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
-			expCSet:         nil,
+			expCSet:         cpuset.NewCPUSet(),
 		},
 		{
 			description: "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
@@ -202,7 +201,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 			pod:             makePod("10000m", "10000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
-			expCSet:         nil,
+			expCSet:         cpuset.NewCPUSet(),
 		},
 	}
 
@@ -233,16 +232,8 @@ func TestStaticPolicyRegister(t *testing.T) {
 					testCase.description, testCase.expCSet, cset)
 			}
 
-			result := false
-			for cpu := range cset {
-				if _, found := st.defaultCPUSet[cpu]; found {
-					result = true
-					break
-				}
-			}
-
-			if result {
-				t.Errorf("StaticPolicy Register() error (%v). expected cpuset %v to not be in the shared cpuset %v",
+			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
+				t.Errorf("StaticPolicy Register() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
 					testCase.description, cset, st.defaultCPUSet)
 			}
 		}

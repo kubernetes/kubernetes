@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cpuset"
 )
 
 func TestCPUAccumulatorFreeSockets(t *testing.T) {
@@ -305,7 +305,7 @@ func TestTakeByTopology(t *testing.T) {
 			cpuset.NewCPUSet(0, 2, 4, 6),
 			5,
 			"not enough cpus available to satisfy request",
-			nil,
+			cpuset.NewCPUSet(),
 		},
 		{
 			"take zero cpus from single socket with HT",

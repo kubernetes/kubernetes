@@ -254,7 +254,6 @@ filegroup(
         "//pkg/kubelet/configmap:all-srcs",
         "//pkg/kubelet/container:all-srcs",
         "//pkg/kubelet/cpumanager:all-srcs",
-        "//pkg/kubelet/cpuset:all-srcs",
         "//pkg/kubelet/custommetrics:all-srcs",
         "//pkg/kubelet/dockershim:all-srcs",
         "//pkg/kubelet/envvars:all-srcs",
