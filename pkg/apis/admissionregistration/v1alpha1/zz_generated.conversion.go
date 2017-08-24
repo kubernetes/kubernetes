@@ -170,7 +170,6 @@ func Convert_admissionregistration_ExternalAdmissionHookConfigurationList_To_v1a
 func autoConvert_v1alpha1_Initializer_To_admissionregistration_Initializer(in *v1alpha1.Initializer, out *admissionregistration.Initializer, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Rules = *(*[]admissionregistration.Rule)(unsafe.Pointer(&in.Rules))
-	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	return nil
 }
 
@@ -182,7 +181,6 @@ func Convert_v1alpha1_Initializer_To_admissionregistration_Initializer(in *v1alp
 func autoConvert_admissionregistration_Initializer_To_v1alpha1_Initializer(in *admissionregistration.Initializer, out *v1alpha1.Initializer, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Rules = *(*[]v1alpha1.Rule)(unsafe.Pointer(&in.Rules))
-	out.FailurePolicy = (*v1alpha1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	return nil
 }
 
