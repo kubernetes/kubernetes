@@ -222,6 +222,9 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 			return err
 		}
 		_, _, err = t.storage.Delete(ctx, accessor.GetName(), nil)
+		if err != nil {
+			return err
+		}
 	default:
 		err = fmt.Errorf("unexpected action: %v", action)
 	}
