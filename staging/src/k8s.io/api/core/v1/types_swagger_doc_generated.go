@@ -165,6 +165,15 @@ func (CinderVolumeSource) SwaggerDoc() map[string]string {
 	return map_CinderVolumeSource
 }
 
+var map_ClientIPConfig = map[string]string{
+	"":               "ClientIPConfig represents the configurations of Client IP based session affinity.",
+	"timeoutSeconds": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be >0 && <=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours).",
+}
+
+func (ClientIPConfig) SwaggerDoc() map[string]string {
+	return map_ClientIPConfig
+}
+
 var map_ComponentCondition = map[string]string{
 	"":        "Information about the condition of a component.",
 	"type":    "Type of condition for a component. Valid value: \"Healthy\"",
@@ -1903,6 +1912,7 @@ var map_ServiceSpec = map[string]string{
 	"externalTrafficPolicy":    "externalTrafficPolicy denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints. \"Local\" preserves the client source IP and avoids a second hop for LoadBalancer and Nodeport type services, but risks potentially imbalanced traffic spreading. \"Cluster\" obscures the client source IP and may cause a second hop to another node, but should have good overall load-spreading.",
 	"healthCheckNodePort":      "healthCheckNodePort specifies the healthcheck nodePort for the service. If not specified, HealthCheckNodePort is created by the service api backend with the allocated nodePort. Will use user-specified nodePort value if specified by the client. Only effects when Type is set to LoadBalancer and ExternalTrafficPolicy is set to Local.",
 	"publishNotReadyAddresses": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field.",
+	"sessionAffinityConfig":    "sessionAffinityConfig contains the configurations of session affinity.",
 }
 
 func (ServiceSpec) SwaggerDoc() map[string]string {
@@ -1916,6 +1926,15 @@ var map_ServiceStatus = map[string]string{
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
 	return map_ServiceStatus
+}
+
+var map_SessionAffinityConfig = map[string]string{
+	"":         "SessionAffinityConfig represents the configurations of session affinity.",
+	"clientIP": "clientIP contains the configurations of Client IP based session affinity.",
+}
+
+func (SessionAffinityConfig) SwaggerDoc() map[string]string {
+	return map_SessionAffinityConfig
 }
 
 var map_StorageOSPersistentVolumeSource = map[string]string{
