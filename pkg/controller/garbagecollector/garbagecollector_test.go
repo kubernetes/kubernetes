@@ -358,9 +358,12 @@ func TestProcessEvent(t *testing.T) {
 		},
 	}
 
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		dependencyGraphBuilder := &GraphBuilder{
-			graphChanges: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			informersStarted: alwaysStarted,
+			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
 				uidToNodeLock: sync.RWMutex{},
 				uidToNode:     make(map[types.UID]*node),

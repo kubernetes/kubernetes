@@ -335,6 +335,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
+		ctx.InformersStarted,
 	)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)
