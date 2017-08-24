@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,207 +25,143 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
 	"k8s.io/kubernetes/pkg/util/strings"
-	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+// VolumeResizeMap defines an interface that serves as a cache for holding pending resizing requests
 type VolumeResizeMap interface {
-	AddPvcUpdate(newPvc *v1.PersistentVolumeClaim, oldPvc *v1.PersistentVolumeClaim, spec *volume.Spec)
-	GetPvcsWithResizeRequest() []*PvcWithResizeRequest
-	GetPvcsWithUpdateNeeded() []*PvcWithResizeRequest
-	// Mark this volume as resize
-	MarkAsResized(*PvcWithResizeRequest) error
-	MarkForFileSystemResize(*PvcWithResizeRequest) error
-	MarkResizeFailed(*PvcWithResizeRequest, string) error
+	// AddPVCUpdate adds pvc for resizing
+	AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume)
+	// DeletePVC deletes pvc that is scheduled for resizing
+	DeletePVC(pvc *v1.PersistentVolumeClaim)
+	// GetPVCsWithResizeRequest returns all pending pvc resize requests
+	GetPVCsWithResizeRequest() []*PVCWithResizeRequest
+	// MarkAsResized marks a pvc as fully resized
+	MarkAsResized(*PVCWithResizeRequest, resource.Quantity) error
+	// UpdatePVSize updates just pv size after cloudprovider resizing is successful
+	UpdatePVSize(*PVCWithResizeRequest, resource.Quantity) error
 }
 
 type volumeResizeMap struct {
-	pvcrs      map[types.UniquePvcName]*PvcWithResizeRequest
+	// map of unique pvc name and resize requests that are pending or inflight
+	pvcrs map[types.UniquePVCName]*PVCWithResizeRequest
+	// kube client for making API calls
 	kubeClient clientset.Interface
+	// for guarding access to pvcrs map
 	sync.RWMutex
 }
 
-type PvcWithResizeRequest struct {
-	PVC          *v1.PersistentVolumeClaim
-	VolumeSpec   *volume.Spec
-	CurrentSize  resource.Quantity
+// PVCWithResizeRequest struct defines data structure that stores state needed for
+// performing file system resize
+type PVCWithResizeRequest struct {
+	// PVC that needs to be resized
+	PVC *v1.PersistentVolumeClaim
+	// persistentvolume
+	PersistentVolume *v1.PersistentVolume
+	// Current volume size
+	CurrentSize resource.Quantity
+	// Expended volume size
 	ExpectedSize resource.Quantity
-	ResizeDone   bool
-	UpdateNeeded *updateNeeded
-	FailedReason *string
 }
 
-type updateNeeded string
-
-const (
-	Resized      updateNeeded = "resized"
-	ResizeFailed updateNeeded = "resizeFailed"
-	FsResize     updateNeeded = "fsResize"
-)
-
-func (pvcr *PvcWithResizeRequest) UniquePvcKey() types.UniquePvcName {
-	return types.UniquePvcName(pvcr.PVC.UID)
+// UniquePVCKey returns unique key of the PVC based on its UID
+func (pvcr *PVCWithResizeRequest) UniquePVCKey() types.UniquePVCName {
+	return types.UniquePVCName(pvcr.PVC.UID)
 }
 
-func (pvcr *PvcWithResizeRequest) QualifiedName() string {
+// QualifiedName returns namespace and name combination of the PVC
+func (pvcr *PVCWithResizeRequest) QualifiedName() string {
 	return strings.JoinQualifiedName(pvcr.PVC.Namespace, pvcr.PVC.Name)
 }
 
+// NewVolumeResizeMap returns new VolumeResizeMap which acts as a cache
+// for holding pending resize requests.
 func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 	resizeMap := &volumeResizeMap{}
-	resizeMap.pvcrs = make(map[types.UniquePvcName]*PvcWithResizeRequest)
+	resizeMap.pvcrs = make(map[types.UniquePVCName]*PVCWithResizeRequest)
 	resizeMap.kubeClient = kubeClient
 	return resizeMap
 }
 
-func (resizeMap *volumeResizeMap) AddPvcUpdate(newPvc *v1.PersistentVolumeClaim, oldPvc *v1.PersistentVolumeClaim, spec *volume.Spec) {
+// AddPVCUpdate adds pvc for resizing
+func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	if pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
+		glog.Errorf("Persistent Volume is not mapped to PVC being updated : %s", util.ClaimToClaimKey(pvc))
+		return
+	}
+
+	if pvc.Status.Phase != v1.ClaimBound {
+		return
+	}
+
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
 
-	newSize := newPvc.Spec.Resources.Requests[v1.ResourceStorage]
-	oldSize := oldPvc.Spec.Resources.Requests[v1.ResourceStorage]
-	glog.Infof(" Checking size of stuff new %v vs old %v", newSize, oldSize)
+	pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+	pvcStatusSize := pvc.Status.Capacity[v1.ResourceStorage]
 
-	if newSize.Cmp(oldSize) > 0 {
-		pvcRequest := &PvcWithResizeRequest{
-			PVC:          newPvc,
-			CurrentSize:  newPvc.Status.Capacity[v1.ResourceStorage],
-			ExpectedSize: newSize,
-			VolumeSpec:   spec,
-			ResizeDone:   false,
-		}
-		resizeMap.pvcrs[types.UniquePvcName(newPvc.UID)] = pvcRequest
+	if pvcStatusSize.Cmp(pvcSize) >= 0 {
+		return
 	}
+
+	glog.V(4).Infof("Adding pvc %s with Size %s/%s for resizing", util.ClaimToClaimKey(pvc), pvcSize.String(), pvcStatusSize.String())
+
+	pvcRequest := &PVCWithResizeRequest{
+		PVC:              pvc,
+		CurrentSize:      pvcStatusSize,
+		ExpectedSize:     pvcSize,
+		PersistentVolume: pv,
+	}
+	resizeMap.pvcrs[types.UniquePVCName(pvc.UID)] = pvcRequest
 }
 
-// Return Pvcrs that require resize
-func (resizeMap *volumeResizeMap) GetPvcsWithResizeRequest() []*PvcWithResizeRequest {
+// GetPVCsWithResizeRequest returns all pending pvc resize requests
+func (resizeMap *volumeResizeMap) GetPVCsWithResizeRequest() []*PVCWithResizeRequest {
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
 
-	pvcrs := []*PvcWithResizeRequest{}
+	pvcrs := []*PVCWithResizeRequest{}
 	for _, pvcr := range resizeMap.pvcrs {
-		if !pvcr.ResizeDone {
-			pvcrs = append(pvcrs, pvcr)
-		}
+		pvcrs = append(pvcrs, pvcr)
 	}
+	// Empty out pvcrs map, we will add back failed resize requests later
+	resizeMap.pvcrs = map[types.UniquePVCName]*PVCWithResizeRequest{}
 	return pvcrs
 }
 
-// Return Pvcrs that require update of their API objects
-func (resizeMap *volumeResizeMap) GetPvcsWithUpdateNeeded() []*PvcWithResizeRequest {
+// DeletePVC removes given pvc object from list of pvcs that needs resizing.
+// deleting a pvc in this map doesn't affect operations that are already inflight.
+func (resizeMap *volumeResizeMap) DeletePVC(pvc *v1.PersistentVolumeClaim) {
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
-
-	pvcrs := []*PvcWithResizeRequest{}
-	for _, pvcr := range resizeMap.pvcrs {
-		// TODO: when to delete pvcr from resizeMap
-		if pvcr.ResizeDone && pvcr.UpdateNeeded != nil {
-			pvcrs = append(pvcrs, pvcr)
-		}
-	}
-	return pvcrs
+	pvcUniqueName := types.UniquePVCName(pvc.UID)
+	glog.V(5).Infof("Removing PVC %v from resize map", pvcUniqueName)
+	delete(resizeMap.pvcrs, pvcUniqueName)
 }
 
-func (resizeMap *volumeResizeMap) MarkAsResized(pvcr *PvcWithResizeRequest) error {
+// MarkAsResized marks a pvc as fully resized
+func (resizeMap *volumeResizeMap) MarkAsResized(pvcr *PVCWithResizeRequest, newSize resource.Quantity) error {
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
 
-	pvcUniqueName := pvcr.UniquePvcKey()
+	emptyCondition := []v1.PersistentVolumeClaimCondition{}
 
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.ResizeDone = true
-		update := Resized
-		pvcr.UpdateNeeded = &update
-	}
-
-	// This needs to be done atomically somehow so as these operations succeed or fail together. :(
-	// If any part of this update fails, sync should GetPvcsWithUpdateNeeded and update each
-
-	err := resizeMap.updatePvSize(pvcr, pvcr.ExpectedSize)
+	err := resizeMap.updatePVCCapacityAndConditions(pvcr, newSize, emptyCondition)
 	if err != nil {
 		glog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcr.QualifiedName(), err)
 		return err
 	}
-
-	readyCondition := v1.PvcCondition{
-		Type:   v1.PvcReady,
-		Status: v1.ConditionTrue,
-	}
-
-	err = resizeMap.updatePvcCapacityAndConditions(pvcr, pvcr.ExpectedSize, readyCondition)
-	if err != nil {
-		glog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcr.QualifiedName(), err)
-		return err
-	}
-
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.UpdateNeeded = nil
-	}
 	return nil
 }
 
-func (resizeMap *volumeResizeMap) MarkResizeFailed(pvcr *PvcWithResizeRequest, reason string) error {
+// UpdatePVSize updates just pv size after cloudprovider resizing is successful
+func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSize resource.Quantity) error {
 	resizeMap.Lock()
 	defer resizeMap.Unlock()
 
-	pvcUniqueName := pvcr.UniquePvcKey()
-
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.ResizeDone = true
-		update := ResizeFailed
-		pvcr.UpdateNeeded = &update
-		pvcr.FailedReason = &reason
-	}
-
-	// This needs to be done atomically somehow so as these operations succeed or fail together. :(
-	// If any part of this update fails, sync should GetPvcsWithUpdateNeeded and update each
-
-	failedCondition := v1.PvcCondition{
-		Type:   v1.PvcResizeFailed,
-		Status: v1.ConditionTrue,
-		Reason: reason,
-	}
-
-	err := resizeMap.updatePvcCondition(pvcr, failedCondition)
-	if err != nil {
-		glog.V(4).Infof("Error updating pvc condition for volume %q with : %v", pvcr.QualifiedName(), err)
-		return err
-	}
-
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.UpdateNeeded = nil
-	}
-	return nil
-}
-
-func (resizeMap *volumeResizeMap) MarkForFileSystemResize(pvcr *PvcWithResizeRequest) error {
-	resizeMap.Lock()
-	defer resizeMap.Unlock()
-
-	pvcUniqueName := pvcr.UniquePvcKey()
-
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.ResizeDone = true
-		update := FsResize
-		pvcr.UpdateNeeded = &update
-	}
-
-	err := resizeMap.updatePvSize(pvcr, pvcr.ExpectedSize)
-	if err != nil {
-		glog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcr.QualifiedName(), err)
-		return err
-	}
-
-	if pvcr, ok := resizeMap.pvcrs[pvcUniqueName]; ok {
-		pvcr.UpdateNeeded = nil
-	}
-	return nil
-}
-
-func (resizeMap *volumeResizeMap) updatePvSize(pvcr *PvcWithResizeRequest, newSize resource.Quantity) error {
-	oldPv := pvcr.VolumeSpec.PersistentVolume
+	oldPv := pvcr.PersistentVolume
 	clone, err := scheme.Scheme.DeepCopy(oldPv)
 
 	if err != nil {
@@ -241,81 +177,25 @@ func (resizeMap *volumeResizeMap) updatePvSize(pvcr *PvcWithResizeRequest, newSi
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Update(pvClone)
 
 	if updateErr != nil {
-		glog.V(4).Infof("Erro updating pv %q with error : %v", pvClone.Name, updateErr)
+		glog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)
 		return updateErr
 	}
 	return nil
 }
 
-func (resizeMap *volumeResizeMap) updatePvcCapacity(pvcr *PvcWithResizeRequest, newSize resource.Quantity) error {
-	claimClone, err := clonePVC(pvcr.PVC)
+func (resizeMap *volumeResizeMap) updatePVCCapacityAndConditions(pvcr *PVCWithResizeRequest, newSize resource.Quantity, pvcConditions []v1.PersistentVolumeClaimCondition) error {
+
+	claimClone, err := util.ClonePVC(pvcr.PVC)
 	if err != nil {
 		return err
 	}
 
 	claimClone.Status.Capacity[v1.ResourceStorage] = newSize
-	_, updateErr := resizeMap.kubeClient.Core().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
-	if updateErr != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: failed: %v", pvcr.QualifiedName(), updateErr)
-		return updateErr
-	}
-	return nil
-}
-
-func (resizeMap *volumeResizeMap) updatePvcCondition(pvcr *PvcWithResizeRequest, pvcCondition v1.PvcCondition) error {
-	glog.V(4).Infof("Updating PVC %s with condition % and status %s", pvcr.QualifiedName(), pvcCondition.Type, pvcCondition.Status)
-
-	newConditions := []v1.PvcCondition{pvcCondition}
-
-	claimClone, err := clonePVC(pvcr.PVC)
-	if err != nil {
-		return err
-	}
-
-	claimClone.Status.Conditions = newConditions
+	claimClone.Status.Conditions = pvcConditions
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if updateErr != nil {
 		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: failed: %v", pvcr.QualifiedName(), updateErr)
 		return updateErr
 	}
 	return nil
-}
-
-func (resizeMap *volumeResizeMap) updatePvcCapacityAndConditions(pvcr *PvcWithResizeRequest, newSize resource.Quantity, pvcCondition v1.PvcCondition) error {
-	glog.V(4).Infof("Updating PVC %s with condition % and status %s", pvcr.QualifiedName(), pvcCondition.Type, pvcCondition.Status)
-
-	newConditions := []v1.PvcCondition{pvcCondition}
-	claimClone, err := clonePVC(pvcr.PVC)
-	if err != nil {
-		return err
-	}
-
-	claimClone.Status.Capacity[v1.ResourceStorage] = newSize
-	claimClone.Status.Conditions = newConditions
-	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
-	if updateErr != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: failed: %v", pvcr.QualifiedName(), updateErr)
-		return updateErr
-	}
-	return nil
-}
-
-func clonePVC(oldPvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	clone, err := scheme.Scheme.DeepCopy(oldPvc)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim %s : %v", claimToClaimKey(oldPvc), err)
-	}
-
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
-	return claimClone, nil
-
-}
-
-func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
-	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
