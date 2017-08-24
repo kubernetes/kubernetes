@@ -15890,7 +15890,7 @@ func (x *AllowedHostPath) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2[0] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("path"))
+					r.EncodeString(codecSelferC_UTF81234, string("pathPrefix"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym5 := z.EncBinary()
 					_ = yym5
@@ -15961,7 +15961,7 @@ func (x *AllowedHostPath) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue1234)
 		switch yys3 {
-		case "path":
+		case "pathPrefix":
 			if r.TryDecodeAsNil() {
 				x.PathPrefix = ""
 			} else {

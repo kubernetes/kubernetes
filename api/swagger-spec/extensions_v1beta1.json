@@ -9476,7 +9476,7 @@
       "items": {
        "$ref": "v1beta1.AllowedHostPath"
       },
-      "description": "AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used."
+      "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used."
      }
     }
    },
@@ -9597,11 +9597,11 @@
    },
    "v1beta1.AllowedHostPath": {
     "id": "v1beta1.AllowedHostPath",
-    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "description": "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
     "properties": {
-     "path": {
+     "pathPrefix": {
       "type": "string",
-      "description": "PathPrefix is the path prefix that the host volume must match. PathPrefix does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
+      "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
      }
     }
    },

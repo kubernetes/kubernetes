@@ -37,8 +37,8 @@ func (APIVersion) SwaggerDoc() map[string]string {
 }
 
 var map_AllowedHostPath = map[string]string{
-	"":     "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
-	"path": "PathPrefix is the path prefix that the host volume must match. PathPrefix does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
+	"":           "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+	"pathPrefix": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
 }
 
 func (AllowedHostPath) SwaggerDoc() map[string]string {
@@ -447,7 +447,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"readOnlyRootFilesystem":          "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
 	"defaultAllowPrivilegeEscalation": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than it's parent process.",
 	"allowPrivilegeEscalation":        "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation.",
-	"allowedHostPaths":                "AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.",
+	"allowedHostPaths":                "is a white list of allowed host paths. Empty indicates that all host paths may be used.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
