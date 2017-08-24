@@ -72,6 +72,14 @@ message APIResource {
   // namespaced indicates if a resource is namespaced or not.
   optional bool namespaced = 2;
 
+  // group is the preferred group of the resource.  Empty implies the group of the containing resource list.
+  // For subresources, this may have a different value, for example: Scale".
+  optional string group = 8;
+
+  // version is the preferred version of the resource.  Empty implies the version of the containing resource list
+  // For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)".
+  optional string version = 9;
+
   // kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
   optional string kind = 3;
 
