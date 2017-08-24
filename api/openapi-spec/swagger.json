@@ -62829,6 +62829,25 @@
      }
     }
    },
+   "io.k8s.api.extensions.v1beta1.IPBlock": {
+    "description": "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+    "required": [
+     "cidr"
+    ],
+    "properties": {
+     "cidr": {
+      "description": "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\"",
+      "type": "string"
+     },
+     "except": {
+      "description": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "io.k8s.api.extensions.v1beta1.Ingress": {
     "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
     "properties": {
@@ -63055,6 +63074,10 @@
    },
    "io.k8s.api.extensions.v1beta1.NetworkPolicyPeer": {
     "properties": {
+     "ipBlock": {
+      "description": "IPBlock defines policy on a particular IPBlock",
+      "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.IPBlock"
+     },
      "namespaceSelector": {
       "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
@@ -63556,6 +63579,25 @@
      }
     }
    },
+   "io.k8s.api.networking.v1.IPBlock": {
+    "description": "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+    "required": [
+     "cidr"
+    ],
+    "properties": {
+     "cidr": {
+      "description": "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\"",
+      "type": "string"
+     },
+     "except": {
+      "description": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "io.k8s.api.networking.v1.NetworkPolicy": {
     "description": "NetworkPolicy describes what network traffic is allowed for a set of Pods",
     "properties": {
@@ -63640,6 +63682,10 @@
    "io.k8s.api.networking.v1.NetworkPolicyPeer": {
     "description": "NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields must be specified.",
     "properties": {
+     "ipBlock": {
+      "description": "IPBlock defines policy on a particular IPBlock",
+      "$ref": "#/definitions/io.k8s.api.networking.v1.IPBlock"
+     },
      "namespaceSelector": {
       "description": "Selects Namespaces using cluster scoped-labels. This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"

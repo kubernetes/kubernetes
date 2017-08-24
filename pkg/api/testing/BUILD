@@ -24,6 +24,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/fuzzer:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//pkg/apis/networking/fuzzer:go_default_library",
         "//pkg/apis/policy/fuzzer:go_default_library",
         "//pkg/apis/rbac/fuzzer:go_default_library",
         "//pkg/apis/storage/fuzzer:go_default_library",

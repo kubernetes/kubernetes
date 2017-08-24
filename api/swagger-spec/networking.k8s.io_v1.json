@@ -1307,6 +1307,30 @@
      "namespaceSelector": {
       "$ref": "v1.LabelSelector",
       "description": "Selects Namespaces using cluster scoped-labels. This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces."
+     },
+     "ipBlock": {
+      "$ref": "v1.IPBlock",
+      "description": "IPBlock defines policy on a particular IPBlock"
+     }
+    }
+   },
+   "v1.IPBlock": {
+    "id": "v1.IPBlock",
+    "description": "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+    "required": [
+     "cidr"
+    ],
+    "properties": {
+     "cidr": {
+      "type": "string",
+      "description": "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\""
+     },
+     "except": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range"
      }
     }
    },
