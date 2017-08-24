@@ -162,14 +162,15 @@ func (m *manager) Start() {
 
 func (m *manager) RegisterContainer(p *v1.Pod, c *v1.Container, containerID string) error {
 	m.Lock()
-	defer m.Unlock()
-
 	err := m.policy.RegisterContainer(m.state, p, c, containerID)
 	if err != nil {
 		glog.Errorf("[cpumanager] RegisterContainer error: %v", err)
+		m.Unlock()
 		return err
 	}
 	cpuset := m.state.GetCPUSetOrDefault(containerID)
+	m.Unlock()
+
 	err = m.containerRuntime.UpdateContainerResources(
 		containerID,
 		&runtimeapi.LinuxContainerResources{
