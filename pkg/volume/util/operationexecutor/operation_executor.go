@@ -121,7 +121,7 @@ type OperationExecutor interface {
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 	// Expand Volume will grow size available to PVC
-	ExpandVolume(*expandcache.PvcWithResizeRequest, expandcache.VolumeResizeMap) error
+	ExpandVolume(*expandcache.PVCWithResizeRequest, expandcache.VolumeResizeMap) error
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -722,14 +722,15 @@ func (oe *operationExecutor) UnmountDevice(
 		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc, opCompleteFunc)
 }
 
-func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PvcWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
-	expandFunc, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
+func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PVCWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
+	expandFunc, pluginName, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
 
 	if err != nil {
 		return err
 	}
-	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePvcKey())
-	return oe.pendingOperations.Run(uniqueVolumeKey, "", expandFunc)
+	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
+	opCompleteFunc := util.OperationCompleteHook(pluginName, "expand_volume")
+	return oe.pendingOperations.Run(uniqueVolumeKey, "", expandFunc, opCompleteFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
