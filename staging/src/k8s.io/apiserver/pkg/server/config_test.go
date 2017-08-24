@@ -105,6 +105,7 @@ func TestNewWithDelegate(t *testing.T) {
   "paths": [
     "/apis",
     "/bar",
+    "/bulk/watch",
     "/foo",
     "/healthz",
     "/healthz/delegate-health",
