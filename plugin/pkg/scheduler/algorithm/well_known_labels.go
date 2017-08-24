@@ -20,7 +20,7 @@ const (
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeNotReady would be automatically added by node controller
 	// when node is not ready, and removed when node becomes ready.
-	TaintNodeNotReady = "node.alpha.kubernetes.io/notReady"
+	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeUnreachable would be automatically added by node controller
