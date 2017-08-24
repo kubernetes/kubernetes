@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -31,9 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 type kletGetter interface {
@@ -62,10 +61,6 @@ type Manager interface {
 	UnregisterContainer(containerID string) error
 
 	State() state.Reader
-
-	IsUnderCPUPressure() bool
-
-	lifecycle.PodAdmitHandler
 }
 
 type manager struct {
@@ -85,13 +80,6 @@ type manager struct {
 	// and the containerID of their containers
 	podStatusProvider status.PodStatusProvider
 
-	// getPodsFunc gets list of active pods to consider for eviction when
-	// under pressure.
-	getPodsFunc eviction.ActivePodsFunc
-
-	// killPodFunc kills a pod selected for eviction when under pressure.
-	killPodFunc eviction.KillPodFunc
-
 	// recorder records eviction events.
 	recorder record.EventRecorder
 }
@@ -108,31 +96,42 @@ func NewManager(
 	getPodsFunc eviction.ActivePodsFunc,
 	killPodFunc eviction.KillPodFunc,
 	recorder record.EventRecorder,
-) (Manager, lifecycle.PodAdmitHandler, error) {
+) (Manager, error) {
 	var policy Policy
 
 	switch policyName(cpuPolicyName) {
+
 	case PolicyNone:
 		policy = NewNonePolicy()
+
 	case PolicyStatic:
 		machineInfo, err := kletGetter.GetCachedMachineInfo()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		topo, err := topology.Discover(machineInfo)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
 
-		resources := capacityProvider.GetNodeAllocatableReservation()
-		cpuResource, ok := resources[v1.ResourceCPU]
-		if ok {
-			reservedCores := int(cpuResource.Value())
-			glog.Infof("[cpumanager] reserving %v cores due to kube/system reserved", reservedCores)
-			topo.NumReservedCores = reservedCores
+		reservedResources := capacityProvider.GetNodeAllocatableReservation()
+		reservedCPUResource, ok := reservedResources[v1.ResourceCPU]
+		if !ok {
+			// The static policy cannot initialize without this information. Panic!
+			panic("[cpumanager] unable to determine reserved CPU resources for static policy")
 		}
-		policy = NewStaticPolicy(topo)
+		if reservedCPUResource.IsZero() {
+			// The static policy requires this to be nonzero. Panic!
+			panic("[cpumanager] the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero")
+		}
+
+		// Take the ceiling of the reservation, since fractional CPUs cannot be
+		// exclusively allocated.
+		floatValue := float64(reservedCPUResource.MilliValue()) / 1000
+		numReservedCPUs := int(math.Ceil(floatValue))
+		policy = NewStaticPolicy(topo, numReservedCPUs)
+
 	default:
 		glog.Warningf("[cpumanager] Unknown policy (\"%s\"), falling back to \"%s\" policy (\"%s\")", cpuPolicyName, PolicyNone)
 		policy = NewNonePolicy()
@@ -144,11 +143,9 @@ func NewManager(
 		containerRuntime:  cr,
 		kletGetter:        kletGetter,
 		podStatusProvider: statusProvider,
-		getPodsFunc:       getPodsFunc,
-		killPodFunc:       killPodFunc,
 		recorder:          recorder,
 	}
-	return manager, manager, nil
+	return manager, nil
 }
 
 func (m *manager) Start() {
@@ -213,14 +210,6 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
-	if m.IsUnderCPUPressure() {
-		// Make sure all no-CPU pods are evicted.
-		// This really should only do something on the first reconcilation
-		// pass after transitioning to UnderPressure conditions, if all
-		// no-CPU pods are evicted successfully.
-		m.evictNoCPUPods()
-	}
-
 	for _, pod := range m.kletGetter.GetPods() {
 		for _, container := range pod.Spec.Containers {
 			status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
@@ -269,94 +258,4 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
-}
-
-func (m *manager) IsUnderCPUPressure() bool {
-	return m.state.GetPressure()
-}
-
-// Admit rejects a pod if its not safe to admit for node stability.
-// Required for lifecycle.PodAdmitHandler interface
-func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	if !m.state.GetPressure() {
-		return lifecycle.PodAdmitResult{Admit: true}
-	}
-
-	admit := true
-	containers := attrs.Pod.Spec.Containers
-	for _, c := range containers {
-		cpu := c.Resources.Requests.Cpu()
-		if cpu == nil || cpu.Value() == 0 {
-			admit = false
-			break
-		}
-	}
-	if admit {
-		return lifecycle.PodAdmitResult{Admit: true}
-	}
-
-	// reject pods with no CPU requests when under CPU pressure
-	glog.Warningf("Failed to admit pod without CPU resource request %s - node is experiencing CPU pressure", attrs.Pod)
-	return lifecycle.PodAdmitResult{
-		Admit:   false,
-		Reason:  "InsufficientCPU",
-		Message: "Node is experiencing CPU Pressure",
-	}
-}
-
-const (
-	reason  = "Evicted"
-	message = "The node no longer has CPUs available to run the pod"
-)
-
-func isNoCPUPod(pod *v1.Pod) bool {
-	for _, container := range pod.Spec.Containers {
-		if isNoCPUContainer(&container) {
-			return true
-		}
-	}
-	return false
-}
-
-func isNoCPUContainer(container *v1.Container) bool {
-	cpu, ok := container.Resources.Requests[v1.ResourceCPU]
-	if !ok || cpu.IsZero() {
-		return true
-	}
-	return false
-}
-
-func getNoCPUPods(pods []*v1.Pod) []*v1.Pod {
-	var noCPUPods []*v1.Pod
-	for _, pod := range pods {
-		if isNoCPUPod(pod) {
-			noCPUPods = append(noCPUPods, pod)
-		}
-	}
-	return noCPUPods
-}
-
-func (m *manager) evictNoCPUPods() {
-	noCPUPods := getNoCPUPods(m.getPodsFunc())
-	if len(noCPUPods) == 0 {
-		return
-	}
-
-	glog.Infof("[cpumanager] attempting to evict pods with no CPU request because CPU pressure is indicated: %v", noCPUPods)
-	for _, pod := range noCPUPods {
-		status := v1.PodStatus{
-			Phase:   v1.PodFailed,
-			Message: message,
-			Reason:  reason,
-		}
-		// record that we are evicting the pod
-		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
-		// this is a blocking call and should only return when the pod and its containers are killed.
-		err := m.killPodFunc(pod, status, nil)
-		if err != nil {
-			glog.Warningf("[cpumanager]: pod %s failed to evict %v", format.Pod(pod), err)
-		} else {
-			glog.Infof("[cpumanager]: pod %s evicted successfully", format.Pod(pod))
-		}
-	}
 }

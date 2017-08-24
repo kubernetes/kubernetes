@@ -625,7 +625,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, err
 		}
 
-		cpuManager, cpuManagerAdmitHandler, err := cpumanager.NewManager(
+		cpuManager, err := cpumanager.NewManager(
 			kubeCfg.CPUManagerPolicy,
 			runtimeService,
 			klet,
@@ -639,7 +639,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, err
 		}
 		klet.cpuManager = cpuManager
-		klet.admitHandlers.AddPodAdmitHandler(cpuManagerAdmitHandler)
 
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),

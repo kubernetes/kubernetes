@@ -31,12 +31,11 @@ type CPUDetails map[int]CPUInfo
 // Core - physical CPU, cadvisor - Core
 // Socket - socket, cadvisor - Node
 type CPUTopology struct {
-	NumCPUs          int
-	NumCores         int
-	HyperThreading   bool
-	NumSockets       int
-	CPUDetails       CPUDetails
-	NumReservedCores int
+	NumCPUs        int
+	NumCores       int
+	HyperThreading bool
+	NumSockets     int
+	CPUDetails     CPUDetails
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with

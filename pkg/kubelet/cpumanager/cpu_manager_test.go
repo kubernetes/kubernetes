@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cpumanager/state"
@@ -36,7 +35,6 @@ import (
 type mockState struct {
 	assignments   map[string]cpuset.CPUSet
 	defaultCPUSet cpuset.CPUSet
-	pressure      bool
 }
 
 func (s *mockState) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
@@ -55,10 +53,6 @@ func (s *mockState) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
 	return s.GetDefaultCPUSet()
 }
 
-func (s *mockState) GetPressure() bool {
-	return s.pressure
-}
-
 func (s *mockState) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	s.assignments[containerID] = cset
 }
@@ -71,13 +65,8 @@ func (s *mockState) Delete(containerID string) {
 	delete(s.assignments, containerID)
 }
 
-func (s *mockState) SetPressure(value bool) {
-	s.pressure = value
-}
-
 type mockPolicy struct {
-	err           error
-	underPressure bool
+	err error
 }
 
 func (p *mockPolicy) Name() string {
@@ -479,100 +468,5 @@ func TestReconcileState(t *testing.T) {
 				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
 			}
 		}
-	}
-}
-
-func TestEvictNoCPUPods(t *testing.T) {
-	bestEffortPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{},
-					},
-				},
-			},
-		},
-	}
-	burstablePodNoCPU := &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-		},
-	}
-	burstablePodWithCPU := &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-		},
-	}
-	burstablePodWithBoth := &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-					},
-				},
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-		},
-	}
-	guaranteedPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-						Limits: v1.ResourceList{
-							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
-							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	allPods := []*v1.Pod{bestEffortPod, burstablePodNoCPU, burstablePodWithCPU, burstablePodWithBoth, guaranteedPod}
-	expectedEvictedPods := []*v1.Pod{bestEffortPod, burstablePodNoCPU, burstablePodWithBoth}
-	podProvider := &mockPodProvider{pods: allPods}
-	podKiller := &mockPodKiller{}
-	recorder := &record.FakeRecorder{}
-	mgr := &manager{
-		getPodsFunc: podProvider.getPods,
-		killPodFunc: podKiller.killPodNow,
-		recorder:    recorder,
-	}
-	mgr.evictNoCPUPods()
-	if !reflect.DeepEqual(podKiller.killedPods, expectedEvictedPods) {
-		t.Errorf("killed pods did not match expected result - killed: %v, expected: %v", podKiller.killedPods, expectedEvictedPods)
 	}
 }

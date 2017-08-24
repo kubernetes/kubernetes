@@ -17,6 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
@@ -31,7 +33,10 @@ const PolicyStatic policyName = "static"
 var _ Policy = &staticPolicy{}
 
 type staticPolicy struct {
+	// cpu socket topology
 	topology *topology.CPUTopology
+	// set of CPUs that is not available for exclusive assignment
+	reserved cpuset.CPUSet
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -40,9 +45,24 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a cpuset manager policy that does not change
 // CPU assignments for exclusively pinned guaranteed containers after
 // the main container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy {
+	allCPUs := topology.CPUDetails.CPUs()
+	// takeByTopology allocates CPUs associated with low-numbered cores from
+	// allCPUs.
+	//
+	// For example: Given a system with 8 CPUs available and HT enabled,
+	// if numReservedCPUs=2, then reserved={0,4}
+	reserved, _ := takeByTopology(topology, allCPUs, numReservedCPUs)
+
+	if reserved.Size() != numReservedCPUs {
+		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))
+	}
+
+	glog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
+
 	return &staticPolicy{
 		topology: topology,
+		reserved: reserved,
 	}
 }
 
@@ -51,14 +71,14 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
+	// Configure the shared pool to include all detected CPU IDs.
 	allCPUs := p.topology.CPUDetails.CPUs()
-	// takeByTopology allocates CPUs associated with low-numbered cores from
-	// allCPUs.
-	//
-	// For example: Given a system with 8 CPUs available and HT enabled,
-	// if NumReservedCores=2, then reserved={0,4}
-	reserved, _ := takeByTopology(p.topology, allCPUs, p.topology.NumReservedCores)
-	s.SetDefaultCPUSet(allCPUs.Difference(reserved))
+	s.SetDefaultCPUSet(allCPUs)
+}
+
+// assignableCPUs returns the set of unassigned CPUs minus the reserved set.
+func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
+	return s.GetDefaultCPUSet().Difference(p.reserved)
 }
 
 func (p *staticPolicy) RegisterContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -87,14 +107,12 @@ func (p *staticPolicy) UnregisterContainer(s state.State, containerID string) er
 
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, error) {
 	glog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
-	result, err := takeByTopology(p.topology, s.GetDefaultCPUSet(), numCPUs)
+	result, err := takeByTopology(p.topology, p.assignableCPUs(s), numCPUs)
 	if err != nil {
 		return cpuset.NewCPUSet(), err
 	}
 	// Remove allocated CPUs from the shared CPUSet.
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
-	// Set CPU pressure condition.
-	s.SetPressure(s.GetDefaultCPUSet().IsEmpty())
 
 	glog.Infof("[cpumanager] allocateCPUs: returning \"%v\"", result)
 	return result, nil
@@ -103,8 +121,6 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 func (p *staticPolicy) releaseCPUs(s state.State, release cpuset.CPUSet) {
 	// Mutate the shared pool, adding supplied cpus.
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(release))
-	// Set CPU pressure condition.
-	s.SetPressure(s.GetDefaultCPUSet().IsEmpty())
 }
 
 func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {

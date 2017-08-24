@@ -50,10 +50,6 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
-func (m *fakeManager) IsUnderCPUPressure() bool {
-	return false
-}
-
 // Required for lifecycle.PodAdmitHandler interface
 func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{Admit: true}

@@ -29,6 +29,7 @@ import (
 type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
+	numReservedCPUs int
 	containerID     string
 	stAssignments   map[string]cpuset.CPUSet
 	stDefaultCPUSet cpuset.CPUSet
@@ -39,7 +40,7 @@ type staticPolicyTest struct {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy := NewStaticPolicy(topoSingleSocketHT)
+	policy := NewStaticPolicy(topoSingleSocketHT, 1)
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -49,7 +50,7 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
-	policy := NewStaticPolicy(topoSingleSocketHT).(*staticPolicy)
+	policy := NewStaticPolicy(topoSingleSocketHT, 1).(*staticPolicy)
 
 	st := &mockState{
 		assignments:   map[string]cpuset.CPUSet{},
@@ -67,89 +68,108 @@ func TestStaticPolicyStart(t *testing.T) {
 func TestStaticPolicyRegister(t *testing.T) {
 	testCases := []staticPolicyTest{
 		{
-			description:     "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
 			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
 			containerID:     "fakeID2",
 			stAssignments:   map[string]cpuset.CPUSet{},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("8000m", "8000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID2",
+			stAssignments:   map[string]cpuset.CPUSet{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("1000m", "1000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(4), // expect sibling of partial core
 		},
 		{
-			description: "GuPodMultipleCores, SingleSocketHT, ExpectAllocOneCore",
-			topo:        topoSingleSocketHT,
-			containerID: "fakeID3",
+			description:     "GuPodMultipleCores, SingleSocketHT, ExpectAllocOneCore",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID3",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(2, 3, 6, 7),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 4, 5),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 4, 5),
 			pod:             makePod("2000m", "2000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(1, 5),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocket",
-			topo:        topoDualSocketHT,
-			containerID: "fakeID3",
+			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocket",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID3",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(2),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("6000m", "6000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(1, 3, 5, 7, 9, 11),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketHT, ExpectAllocThreeCores",
-			topo:        topoDualSocketHT,
-			containerID: "fakeID3",
+			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocThreeCores",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID3",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(1, 5),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 2, 3, 4, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("6000m", "6000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(2, 3, 4, 8, 9, 10),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketNoHT, ExpectAllocOneSocket",
-			topo:        topoDualSocketNoHT,
-			containerID: "fakeID1",
+			description:     "GuPodMultipleCores, DualSocketNoHT, ExpectAllocOneSocket",
+			topo:            topoDualSocketNoHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID1",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 4, 5, 6, 7),
 			pod:             makePod("4000m", "4000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(4, 5, 6, 7),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketNoHT, ExpectAllocFourCores",
-			topo:        topoDualSocketNoHT,
-			containerID: "fakeID1",
+			description:     "GuPodMultipleCores, DualSocketNoHT, ExpectAllocFourCores",
+			topo:            topoDualSocketNoHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID1",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(4, 5),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 3, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 6, 7),
 			pod:             makePod("4000m", "4000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.NewCPUSet(1, 3, 6, 7),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocketOneCore",
-			topo:        topoDualSocketHT,
-			containerID: "fakeID3",
+			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocketOneCore",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID3",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(2),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("8000m", "8000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -158,9 +178,10 @@ func TestStaticPolicyRegister(t *testing.T) {
 		{
 			description:     "NonGuPod, SingleSocketHT, NoAlloc",
 			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
 			containerID:     "fakeID1",
 			stAssignments:   map[string]cpuset.CPUSet{},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("1000m", "2000m"),
 			expErr:          nil,
 			expCPUAlloc:     false,
@@ -169,35 +190,38 @@ func TestStaticPolicyRegister(t *testing.T) {
 		{
 			description:     "GuPodNonIntegerCore, SingleSocketHT, NoAlloc",
 			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
 			containerID:     "fakeID4",
 			stAssignments:   map[string]cpuset.CPUSet{},
-			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("977m", "977m"),
 			expErr:          nil,
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
 		},
 		{
-			description: "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
-			topo:        topoSingleSocketHT,
-			containerID: "fakeID5",
+			description:     "GuPodMultipleCores, SingleSocketHT, NoAllocExpectError",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID5",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(1, 2, 3, 4, 5, 6),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(7),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 7),
 			pod:             makePod("2000m", "2000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
 		},
 		{
-			description: "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
-			topo:        topoDualSocketHT,
-			containerID: "fakeID5",
+			description:     "GuPodMultipleCores, DualSocketHT, NoAllocExpectError",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID5",
 			stAssignments: map[string]cpuset.CPUSet{
 				"fakeID100": cpuset.NewCPUSet(1, 2, 3),
 			},
-			stDefaultCPUSet: cpuset.NewCPUSet(4, 5, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("10000m", "10000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
@@ -206,7 +230,7 @@ func TestStaticPolicyRegister(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy := NewStaticPolicy(testCase.topo)
+		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -244,10 +268,6 @@ func TestStaticPolicyRegister(t *testing.T) {
 				t.Errorf("StaticPolicy Register() error (%v). Did not expect container id %v to be present in assignments %v",
 					testCase.description, testCase.containerID, st.assignments)
 			}
-		}
-
-		if st.defaultCPUSet.IsEmpty() && !st.GetPressure() {
-			t.Error("StaticPolicy CPU pressure error: Default CPU set is empty but policy reporting no CPU pressure")
 		}
 	}
 }
@@ -299,7 +319,7 @@ func TestStaticPolicyUnregister(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy := NewStaticPolicy(testCase.topo)
+		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
