@@ -203,7 +203,7 @@ type AttachableVolumePlugin interface {
 // expanded
 type ExpandableVolumePlugin interface {
 	VolumePlugin
-	NewExpander() (Expander, error)
+	NewExpander(spec *Spec) (Expander, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
