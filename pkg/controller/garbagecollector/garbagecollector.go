@@ -86,6 +86,7 @@ func NewGarbageCollector(
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informers.SharedInformerFactory,
+	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
@@ -100,6 +101,7 @@ func NewGarbageCollector(
 	}
 	gb := &GraphBuilder{
 		metaOnlyClientPool:                  metaOnlyClientPool,
+		informersStarted:                    informersStarted,
 		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
 		restMapper:                          mapper,
 		graphChanges:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),

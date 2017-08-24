@@ -242,6 +242,8 @@ func setup(t *testing.T, workerCount int) *testContext {
 	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
 		metaOnlyClientPool,
 		clientPool,
@@ -249,6 +251,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
 		sharedInformers,
+		alwaysStarted,
 	)
 	if err != nil {
 		t.Fatalf("failed to create garbage collector: %v", err)
