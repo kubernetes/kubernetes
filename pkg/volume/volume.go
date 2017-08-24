@@ -195,7 +195,7 @@ type BulkVolumeVerifier interface {
 
 type Expander interface {
 	// ExpandVolume expands the volume device via cloudprovider api call
-	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) error
+	ExpandVolumeDevice(newSize resource.Quantity, oldSize resource.Quantity) error
 	// Check if volume type also requires File system resize
 	RequiresFSResize() bool
 }
