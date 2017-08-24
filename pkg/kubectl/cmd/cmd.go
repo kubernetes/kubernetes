@@ -380,6 +380,13 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
 
+	// deprecated commands
+	cmds.AddCommand(deprecatedAlias("run-container", NewCmdRun(f, in, out, err)))
+	cmds.AddCommand(deprecatedAlias("rollingupdate", NewCmdRollingUpdate(f, out)))
+	cmds.AddCommand(deprecatedAlias("clusterinfo", NewCmdClusterInfo(f, out)))
+	cmds.AddCommand(deprecatedAlias("update", NewCmdReplace(f, out)))
+	cmds.AddCommand(deprecatedAlias("apiversions", NewCmdApiVersions(f, out)))
+
 	return cmds
 }
 
