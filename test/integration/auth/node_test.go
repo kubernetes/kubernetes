@@ -136,7 +136,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			AccessModes:            []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
 			Capacity:               api.ResourceList{api.ResourceStorage: resource.MustParse("1")},
 			ClaimRef:               &api.ObjectReference{Namespace: "ns", Name: "mypvc"},
-			PersistentVolumeSource: api.PersistentVolumeSource{AzureFile: &api.AzureFileVolumeSource{ShareName: "default", SecretName: "mypvsecret"}},
+			PersistentVolumeSource: api.PersistentVolumeSource{AzureFile: &api.AzureFilePersistentVolumeSource{ShareName: "default", SecretName: "mypvsecret"}},
 		},
 	}); err != nil {
 		t.Fatal(err)

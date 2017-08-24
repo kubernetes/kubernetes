@@ -125,6 +125,25 @@ message AzureDiskVolumeSource {
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+message AzureFilePersistentVolumeSource {
+  // the name of secret that contains Azure Storage Account Name and Key
+  optional string secretName = 1;
+
+  // Share Name
+  optional string shareName = 2;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 3;
+
+  // the namespace of the secret that contains Azure Storage Account Name and Key
+  // default is the same as the Pod
+  // +optional
+  optional string secretNamespace = 4;
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
   optional string secretName = 1;
@@ -2222,7 +2241,7 @@ message PersistentVolumeSource {
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   // +optional
-  optional AzureFileVolumeSource azureFile = 13;
+  optional AzureFilePersistentVolumeSource azureFile = 13;
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   // +optional

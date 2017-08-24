@@ -37,8 +37,14 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 	source := &pv.Spec.PersistentVolumeSource
 	switch {
 	case source.AzureFile != nil:
-		if len(source.AzureFile.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.AzureFile.SecretName) {
-			return false
+		if source.AzureFile.SecretNamespace != nil && len(*source.AzureFile.SecretNamespace) > 0 {
+			if len(source.AzureFile.SecretName) > 0 && !visitor(*source.AzureFile.SecretNamespace, source.AzureFile.SecretName) {
+				return false
+			}
+		} else {
+			if len(source.AzureFile.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.AzureFile.SecretName) {
+				return false
+			}
 		}
 		return true
 	case source.CephFS != nil:

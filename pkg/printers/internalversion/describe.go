@@ -993,6 +993,19 @@ func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWr
 		azureFile.SecretName, azureFile.ShareName, azureFile.ReadOnly)
 }
 
+func printAzureFilePersistentVolumeSource(azureFile *api.AzureFilePersistentVolumeSource, w PrefixWriter) {
+	ns := ""
+	if azureFile.SecretNamespace != nil {
+		ns = *azureFile.SecretNamespace
+	}
+	w.Write(LEVEL_2, "Type:\tAzureFile (an Azure File Service mount on the host and bind mount to the pod)\n"+
+		"    SecretName:\t%v\n"+
+		"    SecretNamespace:\t%v\n"+
+		"    ShareName:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		azureFile.SecretName, ns, azureFile.ShareName, azureFile.ReadOnly)
+}
+
 func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tFlexVolume (a generic volume resource that is provisioned/attached using an exec based plugin)\n"+
 		"    Driver:\t%v\n"+
@@ -1088,7 +1101,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.FC != nil:
 			printFCVolumeSource(pv.Spec.FC, w)
 		case pv.Spec.AzureFile != nil:
-			printAzureFileVolumeSource(pv.Spec.AzureFile, w)
+			printAzureFilePersistentVolumeSource(pv.Spec.AzureFile, w)
 		case pv.Spec.FlexVolume != nil:
 			printFlexVolumeSource(pv.Spec.FlexVolume, w)
 		case pv.Spec.Flocker != nil:
