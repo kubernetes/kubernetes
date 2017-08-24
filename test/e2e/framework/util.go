@@ -4445,20 +4445,8 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	return
 }
 
-// CheckConnectivityToHost launches a pod to test connectivity to the specified
-// host. An error will be returned if the host is not reachable from the pod.
-//
-// An empty nodeName will use the schedule to choose where the pod is executed.
-func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
+func checkConnectivityWithCommand(f *Framework, nodeName, podName string, command []string) error {
 	contName := fmt.Sprintf("%s-container", podName)
-
-	command := []string{
-		"ping",
-		"-c", "3", // send 3 pings
-		"-W", "2", // wait at most 2 seconds for a reply
-		"-w", strconv.Itoa(timeout),
-		host,
-	}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -4491,7 +4479,34 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 			Logf("pod %s/%s logs:\n%s", f.Namespace.Name, pod.Name, logs)
 		}
 	}
+	return err
+}
 
+// CheckConnectivityToHost launches a pod to test connectivity to the specified
+// host. An error will be returned if the host is not reachable from the pod.
+//
+// An empty nodeName will use the scheduler to choose where the pod is executed.
+func CheckConnectivityToHost(f *Framework, nodeName, host string, timeout int) error {
+
+	podName := "ping-test"
+	cmdPing := []string{
+		"ping",
+		"-c", "3", // send 3 pings
+		"-W", "2", // wait at most 2 seconds for a reply
+		"-w", strconv.Itoa(timeout),
+		host,
+	}
+	err := checkConnectivityWithCommand(f, nodeName, podName, cmdPing)
+	if err != nil {
+		url := fmt.Sprintf("http://%s", host)
+		podName = "wget-test"
+		cmdWget := []string{
+			"wget",
+			url,
+		}
+		Logf("Failed to %v, then retry to %v", cmdPing, cmdWget)
+		err = checkConnectivityWithCommand(f, nodeName, podName, cmdWget)
+	}
 	return err
 }
 
