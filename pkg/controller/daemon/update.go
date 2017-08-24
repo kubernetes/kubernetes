@@ -408,7 +408,8 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet,
 		}
 		available := false
 		for _, pod := range daemonPods {
-			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			//for the purposes of update we ensure that the Pod is both available and not terminating
+			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) && pod.DeletionTimestamp == nil {
 				available = true
 				break
 			}
