@@ -101,15 +101,15 @@ func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
 
-func NewDynamicResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+func NewDynamicResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientSet, internalClientset)
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, internalClientset)
 }
 
 // TODO this still defaults to replication controller
-func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
-		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientSet, internalClientset)
+		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientset, internalClientset)
 }
 
 /*
@@ -120,15 +120,15 @@ memLimit argument is in megabytes, memLimit is a maximum amount of memory that c
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
 func newResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientSet clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 
-	runServiceAndWorkloadForResourceConsumer(clientSet, internalClientset, nsName, name, kind, replicas, cpuLimit, memLimit)
+	runServiceAndWorkloadForResourceConsumer(clientset, internalClientset, nsName, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
 		name:                     name,
 		controllerName:           name + "-ctrl",
 		kind:                     kind,
 		nsName:                   nsName,
-		clientSet:                clientSet,
+		clientSet:                clientset,
 		internalClientset:        internalClientset,
 		cpu:                      make(chan int),
 		mem:                      make(chan int),
@@ -235,13 +235,12 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 }
 
 func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
-	framework.ExpectNoError(err)
-
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
@@ -250,7 +249,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
 		framework.Logf("ConsumeCPU URL: %v", *req.URL())
-		_, err := req.DoRaw()
+		_, err = req.DoRaw()
 		if err != nil {
 			framework.Logf("ConsumeCPU failure: %v", err)
 			return false, nil
@@ -263,13 +262,12 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 
 // sendConsumeMemRequest sends POST request for memory consumption
 func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
-	framework.ExpectNoError(err)
-
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
@@ -278,7 +276,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
 		framework.Logf("ConsumeMem URL: %v", *req.URL())
-		_, err := req.DoRaw()
+		_, err = req.DoRaw()
 		if err != nil {
 			framework.Logf("ConsumeMem failure: %v", err)
 			return false, nil
@@ -291,13 +289,12 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 
 // sendConsumeCustomMetric sends POST request for custom metric consumption
 func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
-	proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
-	framework.ExpectNoError(err)
-
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	err = wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
 			Name(rc.controllerName).
@@ -307,7 +304,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
 		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
-		_, err := req.DoRaw()
+		_, err = req.DoRaw()
 		if err != nil {
 			framework.Logf("ConsumeCustomMetric failure: %v", err)
 			return false, nil
