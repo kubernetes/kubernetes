@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -165,6 +166,10 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 
 func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	return f.discoveryFactory.DiscoveryClient()
+}
+
+func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
+	return f.clientCache.KubernetesClientSetForVersion(nil)
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {

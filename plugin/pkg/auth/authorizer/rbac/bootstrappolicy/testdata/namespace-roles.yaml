@@ -1,6 +1,6 @@
 apiVersion: v1
 items:
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -35,7 +35,7 @@ items:
     - create
     - patch
     - update
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -54,7 +54,7 @@ items:
     - configmaps
     verbs:
     - get
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -80,7 +80,7 @@ items:
     verbs:
     - get
     - update
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -106,7 +106,7 @@ items:
     verbs:
     - get
     - update
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -125,7 +125,7 @@ items:
     - get
     - list
     - watch
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:
@@ -145,7 +145,7 @@ items:
     - get
     - list
     - watch
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: Role
   metadata:
     annotations:

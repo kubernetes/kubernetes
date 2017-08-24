@@ -43,17 +43,15 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&glusterfsPlugin{host: nil, exe: exec.New(), gidTable: make(map[string]*MinMaxAllocator)}}
+	return []volume.VolumePlugin{&glusterfsPlugin{host: nil, gidTable: make(map[string]*MinMaxAllocator)}}
 }
 
 type glusterfsPlugin struct {
 	host         volume.VolumeHost
-	exe          exec.Interface
 	gidTable     map[string]*MinMaxAllocator
 	gidTableLock sync.Mutex
 }
@@ -152,7 +150,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 		return nil, err
 	}
 	glog.V(1).Infof("glusterfs: endpoints %v", ep)
-	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(plugin.GetPluginName()), exec.New())
+	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool) {
@@ -164,7 +162,7 @@ func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*v1.Gl
 	return spec.PersistentVolume.Spec.Glusterfs, spec.ReadOnly
 }
 
-func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endpoints, pod *v1.Pod, mounter mount.Interface, exe exec.Interface) (volume.Mounter, error) {
+func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endpoints, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
@@ -176,7 +174,6 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 		hosts:        ep,
 		path:         source.Path,
 		readOnly:     readOnly,
-		exe:          exe,
 		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
@@ -192,11 +189,6 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 		pod:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}}, nil
-}
-
-func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }
 
 func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -226,7 +218,6 @@ type glusterfsMounter struct {
 	hosts        *v1.Endpoints
 	path         string
 	readOnly     bool
-	exe          exec.Interface
 	mountOptions []string
 }
 
@@ -244,10 +235,10 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (b *glusterfsMounter) CanMount() error {
-	exe := exec.New()
+	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Command("/bin/ls", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
+		if _, err := exe.Run("/bin/ls", gciLinuxGlusterMountBinaryPath); err != nil {
 			return fmt.Errorf("Required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
@@ -261,7 +252,7 @@ func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
 
 func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	glog.V(4).Infof("glusterfs: mount set up: %s %v %v", dir, !notMnt, err)
+	glog.V(4).Infof("glusterfs: mount setup: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -309,7 +300,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 	if err := os.MkdirAll(p, 0750); err != nil {
-		return fmt.Errorf("glusterfs: mkdir failed: %v", err)
+		return fmt.Errorf("glusterfs: Error creating directory %v: %v", p, err)
 	}
 
 	// adding log-level ERROR to remove noise
@@ -681,7 +672,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
 	}
-	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", p.options)
+	glog.V(4).Infof("glusterfs: Provision VolumeOptions %v", p.options)
 	scName := v1helper.GetPersistentVolumeClaimClass(p.options.PVC)
 	cfg, err := parseClassParameters(p.options.Parameters, p.plugin.host.GetKubeClient())
 	if err != nil {
@@ -711,7 +702,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 
 		glog.Errorf("glusterfs: create volume err: %v.", err)
-		return nil, fmt.Errorf("glusterfs: create volume err: %v", err)
+		return nil, fmt.Errorf("glusterfs: create volume error: %v", err)
 	}
 	pv := new(v1.PersistentVolume)
 	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs

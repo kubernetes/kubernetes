@@ -75,32 +75,8 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, nodeName stri
 	// If we get here:
 	// - there is no need to restart to update the current config
 	// - there was no error trying to sync configuration
-	// - if, previously, there was an error trying to sync configuration, we need to update to the correct condition
-	errfmt := `sync succeeded but unable to clear "failed to sync" message from ConfigOK, error: %v`
-
-	currentUID := ""
-	if currentSource, err := cc.checkpointStore.Current(); err != nil {
-		utillog.Errorf(errfmt, err)
-		return
-	} else if currentSource != nil {
-		currentUID = currentSource.UID()
-	}
-
-	lkgUID := ""
-	if lkgSource, err := cc.checkpointStore.LastKnownGood(); err != nil {
-		utillog.Errorf(errfmt, err)
-		return
-	} else if lkgSource != nil {
-		lkgUID = lkgSource.UID()
-	}
-
-	currentBadReason := ""
-	if entry, err := cc.badConfigTracker.Entry(currentUID); err != nil {
-		utillog.Errorf(errfmt, err)
-	} else if entry != nil {
-		currentBadReason = entry.Reason
-	}
-	cc.configOK.ClearFailedSyncCondition(currentUID, lkgUID, currentBadReason, cc.initConfig != nil)
+	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the condition
+	cc.configOK.ClearFailedSyncCondition()
 }
 
 // doSyncConfigSource checkpoints and sets the store's current config to the new config or resets config,

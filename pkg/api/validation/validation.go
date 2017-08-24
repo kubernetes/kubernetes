@@ -458,7 +458,7 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path, volName
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("glusterfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGlusterfs(source.Glusterfs, fldPath.Child("glusterfs"))...)
+			allErrs = append(allErrs, validateGlusterfsVolumeSource(source.Glusterfs, fldPath.Child("glusterfs"))...)
 		}
 	}
 	if source.Flocker != nil {
@@ -623,6 +623,7 @@ func validateHostPathVolumeSource(hostPath *api.HostPathVolumeSource, fldPath *f
 	}
 
 	allErrs = append(allErrs, validatePathNoBacksteps(hostPath.Path, fldPath.Child("path"))...)
+	allErrs = append(allErrs, validateHostPathType(hostPath.Type, fldPath.Child("type"))...)
 	return allErrs
 }
 
@@ -815,7 +816,7 @@ func validateQuobyteVolumeSource(quobyte *api.QuobyteVolumeSource, fldPath *fiel
 	return allErrs
 }
 
-func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(glusterfs.EndpointsName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("endpoints"), ""))
@@ -971,6 +972,26 @@ func validateProjectedVolumeSource(projection *api.ProjectedVolumeSource, fldPat
 	}
 
 	allErrs = append(allErrs, validateProjectionSources(projection, projectionMode, fldPath)...)
+	return allErrs
+}
+
+var supportedHostPathTypes = sets.NewString(
+	string(api.HostPathUnset),
+	string(api.HostPathDirectoryOrCreate),
+	string(api.HostPathDirectory),
+	string(api.HostPathFileOrCreate),
+	string(api.HostPathFile),
+	string(api.HostPathSocket),
+	string(api.HostPathCharDev),
+	string(api.HostPathBlockDev))
+
+func validateHostPathType(hostPathType *api.HostPathType, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if !supportedHostPathTypes.Has(string(*hostPathType)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, hostPathType, supportedHostPathTypes.List()))
+	}
+
 	return allErrs
 }
 
@@ -1273,7 +1294,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("glusterfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
+			allErrs = append(allErrs, validateGlusterfsVolumeSource(pv.Spec.Glusterfs, specPath.Child("glusterfs"))...)
 		}
 	}
 	if pv.Spec.Flocker != nil {
@@ -2103,16 +2124,6 @@ func validateHostNetwork(hostNetwork bool, containers []api.Container, fldPath *
 	return allErrors
 }
 
-func validateHostNetworkNoHostAliases(hostNetwork bool, hostAliases []api.HostAlias, fldPath *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	if hostNetwork {
-		if len(hostAliases) > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath, "may not be set when `hostNetwork` is true"))
-		}
-	}
-	return allErrors
-}
-
 // validateImagePullSecrets checks to make sure the pull secrets are well
 // formed.  Right now, we only expect name to be set (it's the only field).  If
 // this ever changes and someone decides to set those fields, we'd like to
@@ -2649,7 +2660,6 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 
 	if securityContext != nil {
 		allErrs = append(allErrs, validateHostNetwork(securityContext.HostNetwork, spec.Containers, specPath.Child("containers"))...)
-		allErrs = append(allErrs, validateHostNetworkNoHostAliases(securityContext.HostNetwork, spec.HostAliases, specPath)...)
 		if securityContext.FSGroup != nil {
 			for _, msg := range validation.IsValidGroupID(*securityContext.FSGroup) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("fsGroup"), *(securityContext.FSGroup), msg))

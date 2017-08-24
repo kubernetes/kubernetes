@@ -221,7 +221,7 @@ func TestPluginBackCompat(t *testing.T) {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	volPath := mounter.GetPath()
@@ -248,6 +248,9 @@ func TestMetrics(t *testing.T) {
 	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(spec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	// Need to create the subdirectory

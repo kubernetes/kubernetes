@@ -94,7 +94,7 @@ func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 
 func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 	return s.
-		WithAnyonymous().
+		WithAnonymous().
 		WithBootstrapToken().
 		WithClientCert().
 		WithKeystone().
@@ -106,7 +106,7 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithWebHook()
 }
 
-func (s *BuiltInAuthenticationOptions) WithAnyonymous() *BuiltInAuthenticationOptions {
+func (s *BuiltInAuthenticationOptions) WithAnonymous() *BuiltInAuthenticationOptions {
 	s.Anonymous = &AnonymousAuthenticationOptions{Allow: true}
 	return s
 }

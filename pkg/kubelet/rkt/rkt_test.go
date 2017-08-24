@@ -1073,8 +1073,8 @@ func TestSetApp(t *testing.T) {
 				Command:    []string{"/bin/bar", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50M")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m"), v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{
@@ -1137,8 +1137,8 @@ func TestSetApp(t *testing.T) {
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m")},
-					Requests: v1.ResourceList{"memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{

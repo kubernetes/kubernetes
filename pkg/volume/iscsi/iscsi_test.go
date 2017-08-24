@@ -283,6 +283,9 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")

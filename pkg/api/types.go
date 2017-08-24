@@ -597,10 +597,36 @@ const (
 	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
+type HostPathType string
+
+const (
+	// For backwards compatible, leave it empty if unset
+	HostPathUnset HostPathType = ""
+	// If nothing exists at the given path, an empty directory will be created there
+	// as needed with file mode 0755, having the same group and ownership with Kubelet.
+	HostPathDirectoryOrCreate HostPathType = "DirectoryOrCreate"
+	// A directory must exist at the given path
+	HostPathDirectory HostPathType = "Directory"
+	// If nothing exists at the given path, an empty file will be created there
+	// as needed with file mode 0644, having the same group and ownership with Kubelet.
+	HostPathFileOrCreate HostPathType = "FileOrCreate"
+	// A file must exist at the given path
+	HostPathFile HostPathType = "File"
+	// A UNIX socket must exist at the given path
+	HostPathSocket HostPathType = "Socket"
+	// A character device must exist at the given path
+	HostPathCharDev HostPathType = "CharDevice"
+	// A block device must exist at the given path
+	HostPathBlockDev HostPathType = "BlockDevice"
+)
+
 // Represents a host path mapped into a pod.
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
+	// If the path is a symlink, it will follow the link to the real path.
 	Path string
+	// Defaults to ""
+	Type *HostPathType
 }
 
 // Represents an empty directory for a pod.
@@ -3173,9 +3199,11 @@ const (
 	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// The resource name for ResourceStorageScratch is alpha and it can change across releases.
 	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
+	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
+	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
 	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
 	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
-	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
 const (
@@ -3725,10 +3753,14 @@ const (
 	ResourceRequestsMemory ResourceName = "requests.memory"
 	// Storage request, in bytes
 	ResourceRequestsStorage ResourceName = "requests.storage"
+	// Local ephemeral storage request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsEphemeralStorage ResourceName = "requests.ephemeral-storage"
 	// CPU limit, in cores. (500m = .5 cores)
 	ResourceLimitsCPU ResourceName = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsMemory ResourceName = "limits.memory"
+	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

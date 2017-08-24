@@ -18,16 +18,12 @@ package gce
 
 import (
 	"net/http"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newUrlMapMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"urlmap_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("urlmap", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetUrlMap returns the UrlMap by name.

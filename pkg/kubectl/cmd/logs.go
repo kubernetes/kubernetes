@@ -165,7 +165,8 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 	if limit := cmdutil.GetFlagInt64(cmd, "limit-bytes"); limit != 0 {
 		logOptions.LimitBytes = &limit
 	}
-	if tail := cmdutil.GetFlagInt64(cmd, "tail"); tail != -1 {
+	tail := cmdutil.GetFlagInt64(cmd, "tail")
+	if tail != -1 {
 		logOptions.TailLines = &tail
 	}
 	if sinceSeconds := cmdutil.GetFlagDuration(cmd, "since"); sinceSeconds != 0 {
@@ -185,7 +186,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Comm
 		if logOptions.Follow {
 			return cmdutil.UsageErrorf(cmd, "only one of follow (-f) or selector (-l) is allowed")
 		}
-		if logOptions.TailLines == nil {
+		if logOptions.TailLines == nil && tail != -1 {
 			logOptions.TailLines = &selectorTail
 		}
 	}

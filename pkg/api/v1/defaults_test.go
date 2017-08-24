@@ -1277,3 +1277,25 @@ func TestSetDefaultSchedulerName(t *testing.T) {
 		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
 	}
 }
+
+func TestSetDefaultHostPathVolumeSource(t *testing.T) {
+	s := v1.PodSpec{}
+	s.Volumes = []v1.Volume{
+		{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "foo"},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*v1.Pod)
+	defaultType := pod2.Spec.Volumes[0].VolumeSource.HostPath.Type
+	expectedType := v1.HostPathUnset
+
+	if defaultType == nil || *defaultType != expectedType {
+		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
+	}
+}

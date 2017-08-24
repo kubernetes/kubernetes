@@ -32,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 )
 
-type CustomResourceDefinitionStorageStrategy struct {
+type customResourceDefinitionStorageStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 
@@ -40,8 +40,8 @@ type CustomResourceDefinitionStorageStrategy struct {
 	validator       customResourceValidator
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind) CustomResourceDefinitionStorageStrategy {
-	return CustomResourceDefinitionStorageStrategy{
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind) customResourceDefinitionStorageStrategy {
+	return customResourceDefinitionStorageStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
 		namespaceScoped: namespaceScoped,
@@ -52,36 +52,36 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 	}
 }
 
-func (a CustomResourceDefinitionStorageStrategy) NamespaceScoped() bool {
+func (a customResourceDefinitionStorageStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
 }
 
-func (CustomResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 }
 
-func (CustomResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 }
 
-func (a CustomResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (a customResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	return a.validator.Validate(ctx, obj)
 }
 
-func (CustomResourceDefinitionStorageStrategy) AllowCreateOnUpdate() bool {
+func (customResourceDefinitionStorageStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (CustomResourceDefinitionStorageStrategy) AllowUnconditionalUpdate() bool {
+func (customResourceDefinitionStorageStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func (CustomResourceDefinitionStorageStrategy) Canonicalize(obj runtime.Object) {
+func (customResourceDefinitionStorageStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (a CustomResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (a customResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return a.validator.ValidateUpdate(ctx, obj, old)
 }
 
-func (a CustomResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func (a customResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, nil, false, err
@@ -102,7 +102,7 @@ func objectMetaFieldsSet(objectMeta metav1.Object, namespaceScoped bool) fields.
 	}
 }
 
-func (a CustomResourceDefinitionStorageStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func (a customResourceDefinitionStorageStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,

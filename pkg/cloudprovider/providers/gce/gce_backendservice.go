@@ -18,16 +18,12 @@ package gce
 
 import (
 	"net/http"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newBackendServiceMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"backendservice_" + request, region, unusedMetricLabel},
-	}
+	return newGenericMetricContext("backendservice", request, region, unusedMetricLabel, computeV1Version)
 }
 
 // GetGlobalBackendService retrieves a backend by name.

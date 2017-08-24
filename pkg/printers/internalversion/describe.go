@@ -846,7 +846,8 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		"    DiscoveryCHAPAuth:\t%v\n"+
 		"    SessionCHAPAuth:\t%v\n"+
 		"    SecretRef:\t%v\n",
-		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef)
+		"    InitiatorName:\t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, iscsi.InitiatorName)
 }
 
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
@@ -2173,10 +2174,15 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 		}
 	}
 
-	return describeServiceAccount(serviceAccount, tokens, missingSecrets)
+	var events *api.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.Core().Events(namespace).Search(api.Scheme, serviceAccount)
+	}
+
+	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
 }
 
-func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, missingSecrets sets.String) (string, error) {
+func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Secret, missingSecrets sets.String, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -2226,6 +2232,10 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 				}
 			}
 			w.WriteLine()
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
 		}
 
 		return nil

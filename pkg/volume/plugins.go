@@ -66,6 +66,8 @@ type VolumeOptions struct {
 	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
+	// This flag helps identify whether kubelet is running in a container
+	Containerized bool
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a

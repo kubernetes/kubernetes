@@ -223,7 +223,14 @@ func (s *ServiceController) init() error {
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry in that Duration.
 func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) (error, time.Duration) {
-
+	if cachedService.state != nil {
+		if cachedService.state.UID != service.UID {
+			err, retry := s.processLoadBalancerDelete(cachedService, key)
+			if err != nil {
+				return err, retry
+			}
+		}
+	}
 	// cache the service, we need the info for service deletion
 	cachedService.state = service
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
@@ -764,6 +771,10 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 	if !ok {
 		return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key), doNotRetry
 	}
+	return s.processLoadBalancerDelete(cachedService, key)
+}
+
+func (s *ServiceController) processLoadBalancerDelete(cachedService *cachedService, key string) (error, time.Duration) {
 	service := cachedService.state
 	// delete load balancer info only if the service type is LoadBalancer
 	if !wantsLoadBalancer(service) {

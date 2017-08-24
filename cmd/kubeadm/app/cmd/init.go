@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -33,8 +34,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/features"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
@@ -89,10 +90,17 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var skipTokenPrint bool
 	var dryRun bool
+	var featureFlagsString string
+
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
+			var err error
+			if cfg.FeatureFlags, err = features.NewFeatureGate(&features.InitFeatureGates, featureFlagsString); err != nil {
+				kubeadmutil.CheckErr(err)
+			}
+
 			api.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			api.Scheme.Convert(cfg, internalcfg, nil)
@@ -110,14 +118,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		},
 	}
 
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg)
+	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureFlagsString)
 	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun)
 
 	return cmd
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureFlagsString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
@@ -162,6 +170,8 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		&cfg.TokenTTL, "token-ttl", cfg.TokenTTL,
 		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.",
 	)
+	flagSet.StringVar(featureFlagsString, "feature-gates", *featureFlagsString, "A set of key=value pairs that describe feature gates for various features. "+
+		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset

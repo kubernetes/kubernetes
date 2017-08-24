@@ -28,17 +28,15 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&fcPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&fcPlugin{nil}}
 }
 
 type fcPlugin struct {
 	host volume.VolumeHost
-	exe  exec.Interface
 }
 
 var _ volume.VolumePlugin = &fcPlugin{}
@@ -158,11 +156,6 @@ func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 		},
 		mounter: mounter,
 	}, nil
-}
-
-func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }
 
 func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {

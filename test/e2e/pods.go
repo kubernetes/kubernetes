@@ -215,12 +215,12 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 							Image: "gcr.io/google_containers/nginx-slim:0.7",
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
-									"cpu":    resource.MustParse("100m"),
-									"memory": resource.MustParse("100Mi"),
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 								Requests: v1.ResourceList{
-									"cpu":    resource.MustParse("100m"),
-									"memory": resource.MustParse("100Mi"),
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 							},
 						},

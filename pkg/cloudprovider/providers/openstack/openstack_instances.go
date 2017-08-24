@@ -126,6 +126,9 @@ func (os *OpenStack) InstanceID() (string, error) {
 func (i *Instances) InstanceID(name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
+		if err == ErrNotFound {
+			return "", cloudprovider.InstanceNotFound
+		}
 		return "", err
 	}
 	// In the future it is possible to also return an endpoint as:
