@@ -61,7 +61,7 @@ var (
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
-func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdConvert(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &ConvertOptions{}
 
 	cmd := &cobra.Command{
@@ -70,7 +70,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    convert_long,
 		Example: convert_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.Complete(f, out, cmd)
+			err := options.Complete(f, out, errOut, cmd)
 			cmdutil.CheckErr(err)
 			err = options.RunConvert()
 			cmdutil.CheckErr(err)
@@ -97,6 +97,7 @@ type ConvertOptions struct {
 
 	encoder runtime.Encoder
 	out     io.Writer
+	errOut  io.Writer
 	printer printers.ResourcePrinter
 
 	outputVersion schema.GroupVersion
@@ -118,7 +119,7 @@ func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 }
 
 // Complete collects information required to run Convert command from command line.
-func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) (err error) {
+func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command) (err error) {
 	o.outputVersion, err = outputVersion(cmd, &scheme.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
@@ -150,6 +151,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 
 	// build the printer
 	o.out = out
+	o.errOut = errOut
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
 	templateFile := cmdutil.GetFlagString(cmd, "template")
 	if len(outputFormat) == 0 {
@@ -194,6 +196,14 @@ func (o *ConvertOptions) RunConvert() error {
 		if err != nil {
 			return err
 		}
+		for _, item := range items {
+			actualVersion := item.GetObjectKind().GroupVersionKind()
+			if actualVersion.Group != o.outputVersion.Group ||
+				actualVersion.Version != o.outputVersion.Version {
+				fmt.Fprintf(o.errOut, "target version is not specified or not supported, convert to latest version instead\n")
+				break
+			}
+		}
 		filteredObj, err := objectListToVersionedObject(items, o.outputVersion)
 		if err != nil {
 			return err
@@ -201,6 +211,11 @@ func (o *ConvertOptions) RunConvert() error {
 		return o.printer.PrintObj(filteredObj, o.out)
 	}
 
+	actualVersion := objects.GetObjectKind().GroupVersionKind()
+	if actualVersion.Group != o.outputVersion.Group ||
+		actualVersion.Version != o.outputVersion.Version {
+		fmt.Fprintf(o.errOut, "target version is not specified or not supported, convert to latest version instead\n")
+	}
 	return o.printer.PrintObj(objects, o.out)
 }
 

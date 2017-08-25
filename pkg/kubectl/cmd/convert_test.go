@@ -107,9 +107,10 @@ func TestConvertObject(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
 
 	for _, tc := range testcases {
-		cmd := NewCmdConvert(f, buf)
+		cmd := NewCmdConvert(f, buf, errBuf)
 		cmd.Flags().Set("filename", tc.file)
 		cmd.Flags().Set("output-version", tc.outputVersion)
 		cmd.Flags().Set("local", "true")
