@@ -31,6 +31,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/policy/poddisruptionbudget:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
