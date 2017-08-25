@@ -757,7 +757,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			sst.RestoreHttpProbe(ss)
 			sst.Scale(ss, 0)
-			sst.WaitForStatusReadyReplicas(ss, 0)
+			sst.WaitForStatusReplicas(ss, 0)
 		})
 
 		It("Should recreate evicted statefulset", func() {
