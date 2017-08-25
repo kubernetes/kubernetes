@@ -66,10 +66,10 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+
 	// Reasons for deployment conditions
-	//
 	// Progressing:
-	//
+
 	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
 	// of the rollout process.
 	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
@@ -92,9 +92,9 @@ const (
 	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
 	// deployments that paused amidst a rollout and are bounded by a deadline.
 	ResumedDeployReason = "DeploymentResumed"
-	//
+
 	// Available:
-	//
+
 	// MinimumReplicasAvailable is added in a deployment when it has its minimum replicas required available.
 	MinimumReplicasAvailable = "MinimumReplicasAvailable"
 	// MinimumReplicasUnavailable is added in a deployment when it doesn't have the minimum required replicas
@@ -125,8 +125,8 @@ func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensi
 	return nil
 }
 
-// TODO: remove the duplicate
 // GetDeploymentConditionInternal returns the condition with the provided type.
+// TODO: remove the duplicate
 func GetDeploymentConditionInternal(status internalextensions.DeploymentStatus, condType internalextensions.DeploymentConditionType) *internalextensions.DeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
@@ -556,6 +556,7 @@ func podListFromClient(c clientset.Interface) podListFunc {
 	}
 }
 
+// RsListFunc lists RS filtered by the given name and options
 // TODO: switch this to full namespacers
 type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
@@ -948,9 +949,9 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment,
 	})
 }
 
-// TODO: remove the duplicate
-// WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
+// WaitForObservedDeploymentInternal polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
 // Returns error if polling timesout.
+// TODO: remove the duplicate
 func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
@@ -991,6 +992,7 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	return int32(surge), int32(unavailable), nil
 }
 
+// DeploymentDeepCopy performs a deep copy of the given deployment.
 func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	objCopy, err := scheme.Scheme.DeepCopy(deployment)
 	if err != nil {
