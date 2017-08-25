@@ -47,6 +47,8 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 var (
@@ -2171,4 +2173,58 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func TestPredicates(t *testing.T) {
+	type args struct {
+		pod  *v1.Pod
+		node *v1.Node
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantRes []algorithm.PredicateFailureReason
+		wantErr bool
+	}{
+		{
+			name: "retrun OutOfDiskErr if outOfDisk",
+			args: args{
+				pod: newPod("pod1-", "node-0", nil, nil),
+				node: &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-0",
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
+						},
+						Allocatable: v1.ResourceList{
+							v1.ResourcePods: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+			want:    false,
+			wantRes: []algorithm.PredicateFailureReason{predicates.ErrNodeOutOfDisk},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeInfo := schedulercache.NewNodeInfo(tt.args.pod)
+			nodeInfo.SetNode(tt.args.node)
+
+			got, res, err := Predicates(tt.args.pod, nodeInfo)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("%s (error): error = %v, wantErr %v", tt.name, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("%s (fit): got = %v, want %v", tt.name, got, tt.want)
+			}
+			if !reflect.DeepEqual(res, tt.wantRes) {
+				t.Errorf("%s (reasons): got = %v, want %v", tt.name, res, tt.wantRes)
+			}
+		})
+	}
 }
