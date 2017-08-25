@@ -241,6 +241,48 @@ func Revision(obj runtime.Object) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
+// HistoryRevisions returns the history revision numbers of the input object.
+func HistoryRevisions(obj runtime.Object) ([]int64, error) {
+	revisions := []int64{}
+	acc, err := meta.Accessor(obj)
+	if err != nil {
+		return revisions, err
+	}
+	v, ok := acc.GetAnnotations()[RevisionHistoryAnnotation]
+	if !ok {
+		return revisions, nil
+	}
+	for _, revision := range strings.Split(v, ",") {
+		revisionToInt, err := strconv.ParseInt(revision, 10, 64)
+		if err != nil {
+			return revisions, err
+		}
+		revisions = append(revisions, revisionToInt)
+	}
+	return revisions, nil
+}
+
+// HasRevision determine if the input object has certain revision in its current or history revisions
+func HasRevision(obj runtime.Object, revision int64) (bool, error) {
+	currentRevision, err := Revision(obj)
+	if err != nil {
+		return false, err
+	}
+	if currentRevision == revision {
+		return true, nil
+	}
+	historyRevisions, err := HistoryRevisions(obj)
+	if err != nil {
+		return false, err
+	}
+	for _, historyRevision := range historyRevisions {
+		if historyRevision == revision {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // SetNewReplicaSetAnnotations sets new replica set's annotations appropriately by updating its revision and
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
 func SetNewReplicaSetAnnotations(deployment *extensions.Deployment, newRS *extensions.ReplicaSet, newRevision string, exists bool) bool {

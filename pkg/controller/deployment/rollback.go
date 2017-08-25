@@ -46,13 +46,13 @@ func (dc *DeploymentController) rollback(d *extensions.Deployment, rsList []*ext
 		}
 	}
 	for _, rs := range allRSs {
-		v, err := deploymentutil.Revision(rs)
+		hasRevision, err := deploymentutil.HasRevision(rs, *toRevision)
 		if err != nil {
 			glog.V(4).Infof("Unable to extract revision from deployment's replica set %q: %v", rs.Name, err)
 			continue
 		}
-		if v == *toRevision {
-			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
+		if hasRevision {
+			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, *toRevision)
 			// rollback by copying podTemplate.Spec from the replica set
 			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the the spec matches current deployment's podTemplate.Spec
