@@ -62,13 +62,19 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 func validPod(name string, numContainers int, resources api.ResourceRequirements) *api.Pod {
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
-		Spec:       api.PodSpec{},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
 	for i := 0; i < numContainers; i++ {
 		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
-			Image:     "foo:V" + strconv.Itoa(i),
-			Resources: resources,
+			Name:                     "ctr-" + strconv.Itoa(i),
+			Image:                    "foo:V" + strconv.Itoa(i),
+			Resources:                resources,
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
 		})
 	}
 	return pod

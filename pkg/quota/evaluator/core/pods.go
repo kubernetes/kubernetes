@@ -94,18 +94,12 @@ func (p *podEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 		return fmt.Errorf("Unexpected input object %v", item)
 	}
 
-	// Pod level resources are often set during admission control
-	// As a consequence, we want to verify that resources are valid prior
-	// to ever charging quota prematurely in case they are not.
-	allErrs := field.ErrorList{}
-	fldPath := field.NewPath("spec").Child("containers")
-	for i, ctr := range pod.Spec.Containers {
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
-	}
-	fldPath = field.NewPath("spec").Child("initContainers")
-	for i, ctr := range pod.Spec.InitContainers {
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
-	}
+	// A pod that fails validation can exhaust all end-user quota
+	// for compute resources.  Pending the ability to do object
+	// validation before quota charges, we validate a pod spec during
+	// this phase.  Do not validate object meta as it is not fully
+	// populated yet.
+	allErrs := validation.ValidatePodSpec(&pod.Spec, field.NewPath("spec"))
 	if len(allErrs) > 0 {
 		return allErrs.ToAggregate()
 	}
