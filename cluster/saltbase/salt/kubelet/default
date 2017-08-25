@@ -164,10 +164,21 @@
   {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 {% endif -%}
 
-{% set node_labels = "" %}
-{% if pillar['node_labels'] is defined -%}
-  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
-{% endif -%}
+{% set node_labels = pillar['node_labels'] %}
+{% if grains['roles'][0] != 'kubernetes-master' -%}
+  # Set specific labels for node.
+  {%- if pillar.get('kube_proxy_daemonset', '').lower() == 'true' -%}
+    # Set kube-proxy daemonset label if enabled.
+    {%- if node_labels != "" %}
+      {% set node_labels = node_labels + ",beta.kubernetes.io/kube-proxy-ds-ready=true" %}
+    {% else %}
+      {% set node_labels = "beta.kubernetes.io/kube-proxy-ds-ready=true" %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+{% if node_labels != "" %}
+  {% set node_labels="--node-labels=" + node_labels %}
+{% endif %}
 
 {% set node_taints = "" %}
 {% if pillar['node_taints'] is defined -%}
