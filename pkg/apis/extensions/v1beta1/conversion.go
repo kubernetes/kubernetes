@@ -45,6 +45,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
+		Convert_extensions_SurgingRollingUpdateDaemonSet_To_v1beta1_SurgingRollingUpdateDaemonSet,
+		Convert_v1beta1_SurgingRollingUpdateDaemonSet_To_extensions_SurgingRollingUpdateDaemonSet,
 		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
 		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
 		Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy,
@@ -233,6 +235,23 @@ func Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet
 
 func Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *extensionsv1beta1.RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_SurgingRollingUpdateDaemonSet_To_v1beta1_SurgingRollingUpdateDaemonSet(in *extensions.SurgingRollingUpdateDaemonSet, out *extensionsv1beta1.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	if out.MaxSurge == nil {
+		out.MaxSurge = &intstr.IntOrString{}
+	}
+	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1beta1_SurgingRollingUpdateDaemonSet_To_extensions_SurgingRollingUpdateDaemonSet(in *extensionsv1beta1.SurgingRollingUpdateDaemonSet, out *extensions.SurgingRollingUpdateDaemonSet, s conversion.Scope) error {
+	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
 		return err
 	}
 	return nil

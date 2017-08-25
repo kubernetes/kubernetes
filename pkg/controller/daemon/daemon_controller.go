@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -57,8 +59,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -825,6 +825,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 		daemonPods, exists := nodeToDaemonPods[node.Name]
 		dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
 		dsc.removeSuspendedDaemonPods(node.Name, dsKey)
+		daemonPods = dsc.pruneSurgingDaemonPods(ds, daemonPods, hash)
 
 		switch {
 		case wantToRun && !shouldSchedule:
@@ -879,7 +880,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
-// returns slice with erros if any
+// returns slice with errors if any
 func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
@@ -1111,6 +1112,8 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 		case extensions.OnDeleteDaemonSetStrategyType:
 		case extensions.RollingUpdateDaemonSetStrategyType:
 			err = dsc.rollingUpdate(ds, hash)
+		case extensions.SurgingRollingUpdateDaemonSetStrategyType:
+			err = dsc.surgingRollingUpdate(ds, hash)
 		}
 		if err != nil {
 			return err

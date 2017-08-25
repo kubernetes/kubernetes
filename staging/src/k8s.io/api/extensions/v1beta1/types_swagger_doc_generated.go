@@ -108,8 +108,9 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetUpdateStrategy = map[string]string{
-	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
-	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
+	"type":                 "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
+	"rollingUpdate":        "Rolling update config params. Present only if type = \"RollingUpdate\".",
+	"surgingRollingUpdate": "Surging rolling update config params. Present only if type = \"SurgingRollingUpdate\".",
 }
 
 func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
@@ -588,6 +589,15 @@ var map_SupplementalGroupsStrategyOptions = map[string]string{
 
 func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 	return map_SupplementalGroupsStrategyOptions
+}
+
+var map_SurgingRollingUpdateDaemonSet = map[string]string{
+	"":         "Spec to control the desired behavior of a daemon set surging rolling update.",
+	"maxSurge": "The maximum number of DaemonSet pods that can be scheduled above the desired number of pods during the update. Value can be an absolute number (ex: 5) or a percentage of the total number of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are available it then stops the existing pods before proceeding onto other DaemonSet pods, thus ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all times during the update.",
+}
+
+func (SurgingRollingUpdateDaemonSet) SwaggerDoc() map[string]string {
+	return map_SurgingRollingUpdateDaemonSet
 }
 
 var map_ThirdPartyResource = map[string]string{

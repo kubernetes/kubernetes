@@ -57,6 +57,17 @@ func SetDefaults_DaemonSet(obj *extensionsv1beta1.DaemonSet) {
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 	}
+	if updateStrategy.Type == extensionsv1beta1.SurgingRollingUpdateDaemonSetStrategyType {
+		if updateStrategy.SurgingRollingUpdate == nil {
+			rollingUpdate := extensionsv1beta1.SurgingRollingUpdateDaemonSet{}
+			updateStrategy.SurgingRollingUpdate = &rollingUpdate
+		}
+		if updateStrategy.SurgingRollingUpdate.MaxSurge == nil {
+			// Set default MaxSurge as 1 by default.
+			maxSurge := intstr.FromInt(1)
+			updateStrategy.SurgingRollingUpdate.MaxSurge = &maxSurge
+		}
+	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10

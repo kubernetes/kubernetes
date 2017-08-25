@@ -197,6 +197,14 @@ message DaemonSetUpdateStrategy {
   // See https://github.com/kubernetes/kubernetes/issues/35345
   // +optional
   optional RollingUpdateDaemonSet rollingUpdate = 2;
+
+  // Surging rolling update config params. Present only if type = "SurgingRollingUpdate".
+  // ---
+  // TODO: Update this to follow our convention for oneOf, whatever we decide it
+  // to be. Same as Deployment `strategy.rollingUpdate`.
+  // See https://github.com/kubernetes/kubernetes/issues/35345
+  // +optional
+  optional SurgingRollingUpdateDaemonSet surgingRollingUpdate = 3;
 }
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
@@ -983,6 +991,22 @@ message SupplementalGroupsStrategyOptions {
   // supplemental group then supply a single range with the same start and end.
   // +optional
   repeated IDRange ranges = 2;
+}
+
+// Spec to control the desired behavior of a daemon set surging rolling update.
+message SurgingRollingUpdateDaemonSet {
+  // The maximum number of DaemonSet pods that can be scheduled above the desired number of pods
+  // during the update. Value can be an absolute number (ex: 5) or a percentage of the total number
+  // of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from
+  // the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is
+  // set to 30%, at most 30% of the total number of nodes that should be running the daemon pod
+  // (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update
+  // starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are
+  // available it then stops the existing pods before proceeding onto other DaemonSet pods, thus
+  // ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all
+  // times during the update.
+  // +optional
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource

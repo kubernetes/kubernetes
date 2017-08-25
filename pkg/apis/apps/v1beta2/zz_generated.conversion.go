@@ -324,6 +324,7 @@ func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateSt
 	} else {
 		out.RollingUpdate = nil
 	}
+	// WARNING: in.SurgingRollingUpdate requires manual conversion: does not exist in peer-type
 	return nil
 }
 

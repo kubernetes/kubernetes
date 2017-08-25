@@ -1808,6 +1808,40 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1beta1_surgingrollingupdatedaemonset">v1beta1.SurgingRollingUpdateDaemonSet</h3>
+<div class="paragraph">
+<p>Spec to control the desired behavior of a daemon set surging rolling update.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">maxSurge</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The maximum number of DaemonSet pods that can be scheduled above the desired number of pods during the update. Value can be an absolute number (ex: 5) or a percentage of the total number of DaemonSet pods at the start of the update (ex: 10%). The absolute number is calculated from the percentage by rounding up. This cannot be 0. The default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have 2 pods running at any given time. The update starts by starting replacements for at most 30% of those DaemonSet pods. Once the new pods are available it then stops the existing pods before proceeding onto other DaemonSet pods, thus ensuring that at most 130% of the desired final number of DaemonSet  pods are running at all times during the update.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_execaction">v1.ExecAction</h3>
 <div class="paragraph">
 <p>ExecAction describes a "run in container" action.</p>
@@ -3161,6 +3195,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">Rolling update config params. Present only if type = "RollingUpdate".</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_rollingupdatedaemonset">v1beta1.RollingUpdateDaemonSet</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">surgingRollingUpdate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Surging rolling update config params. Present only if type = "SurgingRollingUpdate".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_surgingrollingupdatedaemonset">v1beta1.SurgingRollingUpdateDaemonSet</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
