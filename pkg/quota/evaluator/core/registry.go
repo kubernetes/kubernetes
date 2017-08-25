@@ -18,6 +18,7 @@ package core
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/quota"
@@ -27,7 +28,7 @@ import (
 // NewRegistry returns a registry that knows how to deal with core kubernetes resources
 // If an informer factory is provided, evaluators will use them.
 func NewRegistry(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Registry {
-	pod := NewPodEvaluator(kubeClient, f)
+	pod := NewPodEvaluator(kubeClient, f, clock.RealClock{})
 	service := NewServiceEvaluator(kubeClient, f)
 	replicationController := NewReplicationControllerEvaluator(kubeClient, f)
 	resourceQuota := NewResourceQuotaEvaluator(kubeClient, f)
