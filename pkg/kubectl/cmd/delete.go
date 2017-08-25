@@ -140,7 +140,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	usage := "containing the resource to delete."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
-	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
+	cmd.Flags().BoolVar(&options.DeleteAll, "all", options.DeleteAll, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
@@ -187,6 +187,9 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 }
 
 func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
+	if o.DeleteAll && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if o.DeleteAll {
 		f := cmd.Flags().Lookup("ignore-not-found")
 		// The flag should never be missing
