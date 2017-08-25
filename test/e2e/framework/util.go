@@ -75,7 +75,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
@@ -2487,10 +2486,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 				Logf("================================")
 			}
 		}
-		if len(notSchedulable) > TestContext.AllowedNotReadyNodes {
-			return false, nil
-		}
-		return allowedNotReadyReasons(notSchedulable), nil
+		return len(notSchedulable) <= TestContext.AllowedNotReadyNodes, nil
 	})
 }
 
@@ -3597,23 +3593,6 @@ func WaitForNodeToBe(c clientset.Interface, name string, conditionType v1.NodeCo
 	return false
 }
 
-// Checks whether not-ready nodes can be ignored while checking if all nodes are
-// ready (we allow e.g. for incorrect provisioning of some small percentage of nodes
-// while validating cluster, and those nodes may never become healthy).
-// Currently we allow only for:
-// - not present CNI plugins on node
-// TODO: we should extend it for other reasons.
-func allowedNotReadyReasons(nodes []*v1.Node) bool {
-	for _, node := range nodes {
-		index, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
-		if index == -1 ||
-			!strings.Contains(condition.Message, "could not locate kubenet required CNI plugins") {
-			return false
-		}
-	}
-	return true
-}
-
 // Checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
@@ -3643,19 +3622,14 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// of nodes (which we allow in cluster validation). Some nodes that are not
 		// provisioned correctly at startup will never become ready (e.g. when something
 		// won't install correctly), so we can't expect them to be ready at any point.
-		//
-		// However, we only allow non-ready nodes with some specific reasons.
-		if len(notReady) > TestContext.AllowedNotReadyNodes {
-			return false, nil
-		}
-		return allowedNotReadyReasons(notReady), nil
+		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
 		return err
 	}
 
-	if len(notReady) > TestContext.AllowedNotReadyNodes || !allowedNotReadyReasons(notReady) {
+	if len(notReady) > TestContext.AllowedNotReadyNodes {
 		msg := ""
 		for _, node := range notReady {
 			msg = fmt.Sprintf("%s, %s", msg, node.Name)
