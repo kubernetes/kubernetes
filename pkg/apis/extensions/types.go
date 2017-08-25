@@ -168,6 +168,7 @@ type ThirdPartyResourceData struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 type Deployment struct {
 	metav1.TypeMeta
 	// +optional
@@ -182,6 +183,7 @@ type Deployment struct {
 	Status DeploymentStatus
 }
 
+// DEPRECATED.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
@@ -260,6 +262,7 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
+// DEPRECATED.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
@@ -284,6 +287,7 @@ const (
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
+// DEPRECATED.
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
@@ -313,6 +317,7 @@ type RollingUpdateDeployment struct {
 	MaxSurge intstr.IntOrString
 }
 
+// DEPRECATED.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
 	// +optional
@@ -365,6 +370,7 @@ const (
 	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
 )
 
+// DEPRECATED.
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
@@ -383,6 +389,7 @@ type DeploymentCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 type DeploymentList struct {
 	metav1.TypeMeta
 	// +optional
@@ -392,6 +399,7 @@ type DeploymentList struct {
 	Items []Deployment
 }
 
+// DEPRECATED.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
 	// Default is OnDelete.
@@ -417,6 +425,7 @@ const (
 	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
 )
 
+// DEPRECATED.
 // Spec to control the desired behavior of daemon set rolling update.
 type RollingUpdateDaemonSet struct {
 	// The maximum number of DaemonSet pods that can be unavailable during the
@@ -437,6 +446,7 @@ type RollingUpdateDaemonSet struct {
 	MaxUnavailable intstr.IntOrString
 }
 
+// DEPRECATED.
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
 	// A label query over pods that are managed by the daemon set.
@@ -477,6 +487,7 @@ type DaemonSetSpec struct {
 	RevisionHistoryLimit *int32
 }
 
+// DEPRECATED.
 // DaemonSetStatus represents the current status of a daemon set.
 type DaemonSetStatus struct {
 	// The number of nodes that are running at least 1
@@ -525,6 +536,7 @@ type DaemonSetStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	metav1.TypeMeta
@@ -557,6 +569,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
 	metav1.TypeMeta
@@ -753,6 +766,7 @@ type IngressBackend struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // ReplicaSet represents the configuration of a replica set.
 type ReplicaSet struct {
 	metav1.TypeMeta
@@ -771,6 +785,7 @@ type ReplicaSet struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
 	metav1.TypeMeta
@@ -780,6 +795,7 @@ type ReplicaSetList struct {
 	Items []ReplicaSet
 }
 
+// DEPRECATED.
 // ReplicaSetSpec is the specification of a ReplicaSet.
 // As the internal representation of a ReplicaSet, it must have
 // a Template set.
@@ -806,6 +822,7 @@ type ReplicaSetSpec struct {
 	Template api.PodTemplateSpec
 }
 
+// DEPRECATED.
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
 	// Replicas is the number of actual replicas.
@@ -842,6 +859,7 @@ const (
 	ReplicaSetReplicaFailure ReplicaSetConditionType = "ReplicaFailure"
 )
 
+// DEPRECATED.
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetCondition struct {
 	// Type of replica set condition.
