@@ -68,10 +68,20 @@ func NewBackupStreamReader(r io.Reader) *BackupStreamReader {
 	return &BackupStreamReader{r, 0}
 }
 
-// Next returns the next backup stream and prepares for calls to Write(). It skips the remainder of the current stream if
+// Next returns the next backup stream and prepares for calls to Read(). It skips the remainder of the current stream if
 // it was not completely read.
 func (r *BackupStreamReader) Next() (*BackupHeader, error) {
 	if r.bytesLeft > 0 {
+		if s, ok := r.r.(io.Seeker); ok {
+			// Make sure Seek on io.SeekCurrent sometimes succeeds
+			// before trying the actual seek.
+			if _, err := s.Seek(0, io.SeekCurrent); err == nil {
+				if _, err = s.Seek(r.bytesLeft, io.SeekCurrent); err != nil {
+					return nil, err
+				}
+				r.bytesLeft = 0
+			}
+		}
 		if _, err := io.Copy(ioutil.Discard, r); err != nil {
 			return nil, err
 		}
@@ -220,7 +230,7 @@ type BackupFileWriter struct {
 	ctx             uintptr
 }
 
-// NewBackupFileWrtier returns a new BackupFileWriter from a file handle. If includeSecurity is true,
+// NewBackupFileWriter returns a new BackupFileWriter from a file handle. If includeSecurity is true,
 // Write() will attempt to restore the security descriptor from the stream.
 func NewBackupFileWriter(f *os.File, includeSecurity bool) *BackupFileWriter {
 	w := &BackupFileWriter{f, includeSecurity, 0}
