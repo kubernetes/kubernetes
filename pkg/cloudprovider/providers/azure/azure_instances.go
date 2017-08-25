@@ -88,7 +88,7 @@ func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
-// If false is returned with no error, the instance will be immediately deleted.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	return false, errors.New("unimplemented")
 }
