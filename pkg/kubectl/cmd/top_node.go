@@ -112,7 +112,6 @@ func NewCmdTopNode(f cmdutil.Factory, options *TopNodeOptions, out io.Writer) *c
 }
 
 func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
-	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
