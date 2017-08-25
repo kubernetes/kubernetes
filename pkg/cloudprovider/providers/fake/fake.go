@@ -239,6 +239,7 @@ func (f *FakeCloud) InstanceTypeByProviderID(providerID string) (string, error) 
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted.
 func (f *FakeCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	f.addCall("instance-exists-by-provider-id")
 	return f.ExistsByProviderID, f.ErrByProviderID

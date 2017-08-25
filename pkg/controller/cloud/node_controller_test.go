@@ -130,23 +130,23 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			instances, _ := fc.Instances()
 			exists, err := ensureNodeExistsByProviderIDOrName(instances, tc.node)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 
 			if !reflect.DeepEqual(fc.Calls, tc.expectedCalls) {
-				t.Fatalf("expected cloud provider methods `%v` to be called but `%v` was called ", tc.expectedCalls, fc.Calls)
+				t.Errorf("expected cloud provider methods `%v` to be called but `%v` was called ", tc.expectedCalls, fc.Calls)
 			}
 
 			if tc.existsByProviderID && tc.existsByProviderID != exists {
-				t.Fatalf("expected exist by provider id to be `%t` but got `%t`", tc.existsByProviderID, exists)
+				t.Errorf("expected exist by provider id to be `%t` but got `%t`", tc.existsByProviderID, exists)
 			}
 
 			if tc.existsByNodeName && tc.existsByNodeName != exists {
-				t.Fatalf("expected exist by node name to be `%t` but got `%t`", tc.existsByNodeName, exists)
+				t.Errorf("expected exist by node name to be `%t` but got `%t`", tc.existsByNodeName, exists)
 			}
 
 			if !tc.existsByNodeName && !tc.existsByProviderID && exists {
-				t.Fatal("node is not supposed to exist")
+				t.Error("node is not supposed to exist")
 			}
 
 		})
