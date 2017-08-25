@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
@@ -51,11 +52,11 @@ type ReplenishmentControllerOptions struct {
 }
 
 // PodReplenishmentUpdateFunc will replenish if the old pod was quota tracked but the new is not
-func PodReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) func(oldObj, newObj interface{}) {
+func PodReplenishmentUpdateFunc(options *ReplenishmentControllerOptions, clock clock.Clock) func(oldObj, newObj interface{}) {
 	return func(oldObj, newObj interface{}) {
 		oldPod := oldObj.(*v1.Pod)
 		newPod := newObj.(*v1.Pod)
-		if core.QuotaV1Pod(oldPod) && !core.QuotaV1Pod(newPod) {
+		if core.QuotaV1Pod(oldPod, clock) && !core.QuotaV1Pod(newPod, clock) {
 			options.ReplenishmentFunc(options.GroupKind, newPod.Namespace, oldPod)
 		}
 	}
@@ -115,9 +116,10 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 		if err != nil {
 			return nil, err
 		}
+		clock := clock.RealClock{}
 		informer.Informer().AddEventHandlerWithResyncPeriod(
 			cache.ResourceEventHandlerFuncs{
-				UpdateFunc: PodReplenishmentUpdateFunc(options),
+				UpdateFunc: PodReplenishmentUpdateFunc(options, clock),
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
 			},
 			options.ResyncPeriod(),
