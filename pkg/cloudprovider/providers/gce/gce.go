@@ -103,6 +103,7 @@ type GCECloud struct {
 	managedZones             []string // List of zones we are spanning (for multi-AZ clusters, primarily when running on master)
 	networkURL               string
 	subnetworkURL            string
+	secondaryRangeName       string
 	networkProjectID         string
 	onXPN                    bool
 	nodeTags                 []string    // List of tags to use on firewall rules for load balancers
@@ -143,21 +144,30 @@ type GCEServiceManager struct {
 	gce *GCECloud
 }
 
+// ConfigFile is the struct used to parse the /etc/gce.conf configuration file.
 type ConfigFile struct {
 	Global struct {
-		TokenURL           string   `gcfg:"token-url"`
-		TokenBody          string   `gcfg:"token-body"`
-		ProjectID          string   `gcfg:"project-id"`
-		NetworkName        string   `gcfg:"network-name"`
-		SubnetworkName     string   `gcfg:"subnetwork-name"`
+		TokenURL       string `gcfg:"token-url"`
+		TokenBody      string `gcfg:"token-body"`
+		ProjectID      string `gcfg:"project-id"`
+		NetworkName    string `gcfg:"network-name"`
+		SubnetworkName string `gcfg:"subnetwork-name"`
+		// SecondaryRangeName is the name of the secondary range to allocate IP
+		// aliases. The secondary range must be present on the subnetwork the
+		// cluster is attached to.
+		SecondaryRangeName string   `gcfg:"secondary-range-name"`
 		NodeTags           []string `gcfg:"node-tags"`
 		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 		Multizone          bool     `gcfg:"multizone"`
-		// Specifying ApiEndpoint will override the default GCE compute API endpoint.
+		// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
+		// then the default endpoint is used.
 		ApiEndpoint string `gcfg:"api-endpoint"`
-		LocalZone   string `gcfg:"local-zone"`
-		// Possible values: List of api names separated by comma. Default to none.
-		// For example: MyFeatureFlag
+		// LocalZone specifies the GCE zone that gce cloud client instance is
+		// located in (i.e. where the controller will be running). If this is
+		// blank, then the local zone will be discovered via the metadata server.
+		LocalZone string `gcfg:"local-zone"`
+		// AlphaFeatures is a list of API flags to be enabled. Defaults to none.
+		// Example API name format: "MyFeatureFlag"
 		AlphaFeatures []string `gcfg:"alpha-features"`
 	}
 }
@@ -171,6 +181,7 @@ type CloudConfig struct {
 	ManagedZones       []string
 	NetworkURL         string
 	SubnetworkURL      string
+	SecondaryRangeName string
 	NodeTags           []string
 	NodeInstancePrefix string
 	TokenSource        oauth2.TokenSource
@@ -313,6 +324,11 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 			cloudConfig.SubnetworkURL = gceSubnetworkURL(cloudConfig.ApiEndpoint, cloudConfig.ProjectID, cloudConfig.Region, configFile.Global.SubnetworkName)
 		}
 	}
+
+	if configFile != nil {
+		cloudConfig.SecondaryRangeName = configFile.Global.SecondaryRangeName
+	}
+
 	return cloudConfig, err
 }
 
@@ -409,6 +425,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		managedZones:             config.ManagedZones,
 		networkURL:               config.NetworkURL,
 		subnetworkURL:            config.SubnetworkURL,
+		secondaryRangeName:       config.SecondaryRangeName,
 		nodeTags:                 config.NodeTags,
 		nodeInstancePrefix:       config.NodeInstancePrefix,
 		useMetadataServer:        config.UseMetadataServer,

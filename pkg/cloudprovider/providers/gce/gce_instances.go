@@ -18,6 +18,7 @@ package gce
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
@@ -313,6 +315,43 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 		}
 	}
 	return
+}
+
+// AddAliasToInstance adds an alias to the given instance from the named
+// secondary range.
+func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) error {
+
+	v1instance, err := gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	if err != nil {
+		return err
+	}
+	instance, err := gce.serviceAlpha.Instances.Get(gce.projectID, v1instance.Zone, v1instance.Name).Do()
+	if err != nil {
+		return err
+	}
+
+	switch len(instance.NetworkInterfaces) {
+	case 0:
+		return fmt.Errorf("Instance %q has no network interfaces", nodeName)
+	case 1:
+	default:
+		glog.Warningf("Instance %q has more than one network interface, using only the first (%v)",
+			nodeName, instance.NetworkInterfaces)
+	}
+
+	iface := instance.NetworkInterfaces[0]
+	iface.AliasIpRanges = append(iface.AliasIpRanges, &computealpha.AliasIpRange{
+		IpCidrRange:         alias.String(),
+		SubnetworkRangeName: gce.secondaryRangeName,
+	})
+
+	mc := newInstancesMetricContext("addalias", v1instance.Zone)
+	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
+		gce.projectID, instance.Zone, instance.Name, iface.Name, iface).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+	return gce.waitForZoneOp(op, v1instance.Zone, mc)
 }
 
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
