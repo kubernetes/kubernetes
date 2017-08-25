@@ -331,7 +331,7 @@ kube::util::group-version-to-pkg-path() {
     return
   fi
 
-  # "v1" is the API GroupVersion 
+  # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
     echo "vendor/k8s.io/api/core/v1"
     return
@@ -435,6 +435,23 @@ kube::util::git_upstream_remote_name() {
   git remote -v | grep fetch |\
     grep -E 'github.com[/:]kubernetes/kubernetes|k8s.io/kubernetes' |\
     head -n 1 | awk '{print $1}'
+}
+
+# Ensures the current directory is a git tree for doing things like restoring or
+# validating godeps
+kube::util::create-fake-git-tree() {
+  local -r target_dir=${1:-$(pwd)}
+
+  pushd "${target_dir}" >/dev/null
+    git init >/dev/null
+    git config --local user.email "nobody@k8s.io"
+    git config --local user.name "$0"
+    git add . >/dev/null
+    git commit -q -m "Snapshot" >/dev/null
+    if (( ${KUBE_VERBOSE:-5} >= 6 )); then
+      kube::log::status "${target_dir} is now a git tree."
+    fi
+  popd >/dev/null
 }
 
 # Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
