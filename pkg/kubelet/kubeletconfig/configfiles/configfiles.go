@@ -27,6 +27,8 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 )
 
+const kubeletFile = "kubelet"
+
 // Loader loads configuration from a storage layer
 type Loader interface {
 	// Load loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be loaded
@@ -43,8 +45,8 @@ type fsLoader struct {
 	configDir string
 }
 
-// NewFSLoader returns a Loader that loads a KubeletConfiguration from the files in `configDir`
-func NewFSLoader(fs utilfs.Filesystem, configDir string) (Loader, error) {
+// NewFsLoader returns a Loader that loads a KubeletConfiguration from the files in `configDir`
+func NewFsLoader(fs utilfs.Filesystem, configDir string) (Loader, error) {
 	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
 	if err != nil {
 		return nil, err
@@ -58,10 +60,8 @@ func NewFSLoader(fs utilfs.Filesystem, configDir string) (Loader, error) {
 }
 
 func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
-	errfmt := fmt.Sprintf("failed to load Kubelet config files from %q, error: ", loader.configDir) + "%v"
-
 	// require the config be in a file called "kubelet"
-	path := filepath.Join(loader.configDir, "kubelet")
+	path := filepath.Join(loader.configDir, kubeletFile)
 	data, err := loader.fs.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read init config file %q, error: %v", path, err)
@@ -69,7 +69,7 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 
 	// no configuration is an error, some parameters are required
 	if len(data) == 0 {
-		return nil, fmt.Errorf(errfmt, fmt.Errorf("config file was empty, but some parameters are required"))
+		return nil, fmt.Errorf("init config file %q was empty, but some parameters are required", path)
 	}
 
 	return utilcodec.DecodeKubeletConfiguration(loader.kubeletCodecs, data)
