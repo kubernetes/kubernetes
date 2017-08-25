@@ -77,6 +77,7 @@ type Scale struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
@@ -113,6 +114,7 @@ const (
 	ParallelPodManagement = "Parallel"
 )
 
+// DEPRECATED.
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
@@ -142,6 +144,7 @@ const (
 	OnDeleteStatefulSetStrategyType = "OnDelete"
 )
 
+// DEPRECATED.
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
 	// Partition indicates the ordinal at which the StatefulSet should be
@@ -149,6 +152,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
 }
 
+// DEPRECATED.
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// replicas is the desired number of replicas of the given Template.
@@ -211,6 +215,7 @@ type StatefulSetSpec struct {
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,8,opt,name=revisionHistoryLimit"`
 }
 
+// DEPRECATED.
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
 	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
@@ -249,6 +254,7 @@ type StatefulSetStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -260,6 +266,7 @@ type StatefulSetList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
@@ -276,6 +283,7 @@ type Deployment struct {
 	Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// DEPRECATED.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
@@ -355,6 +363,7 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
+// DEPRECATED.
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
@@ -380,6 +389,7 @@ const (
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
+// DEPRECATED.
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
@@ -410,6 +420,7 @@ type RollingUpdateDeployment struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
+// DEPRECATED.
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
@@ -465,6 +476,7 @@ const (
 	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
 )
 
+// DEPRECATED.
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
 	// Type of deployment condition.
@@ -483,6 +495,7 @@ type DeploymentCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -497,6 +510,7 @@ type DeploymentList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
 // their internal state.
@@ -522,6 +536,7 @@ type ControllerRevision struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED.
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.
 type ControllerRevisionList struct {
 	metav1.TypeMeta `json:",inline"`
