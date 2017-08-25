@@ -202,6 +202,7 @@ pkg/controller/volume/attachdetach/util
 pkg/conversion
 pkg/conversion/queryparams
 pkg/credentialprovider/aws
+pkg/credentialprovider/azure
 pkg/fieldpath
 pkg/fields
 pkg/hyperkube
