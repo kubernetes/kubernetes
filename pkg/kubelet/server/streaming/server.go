@@ -141,6 +141,11 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 	handler := restful.NewContainer()
 	handler.Add(ws)
 	s.handler = handler
+	s.server = &http.Server{
+		Addr:      s.config.Addr,
+		Handler:   s.handler,
+		TLSConfig: s.config.TLSConfig,
+	}
 
 	return s, nil
 }
@@ -150,6 +155,7 @@ type server struct {
 	runtime *criAdapter
 	handler http.Handler
 	cache   *requestCache
+	server  *http.Server
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
@@ -197,21 +203,15 @@ func (s *server) Start(stayUp bool) error {
 		return errors.New("stayUp=false is not yet implemented")
 	}
 
-	server := &http.Server{
-		Addr:      s.config.Addr,
-		Handler:   s.handler,
-		TLSConfig: s.config.TLSConfig,
-	}
 	if s.config.TLSConfig != nil {
-		return server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
+		return s.server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
 	} else {
-		return server.ListenAndServe()
+		return s.server.ListenAndServe()
 	}
 }
 
 func (s *server) Stop() error {
-	// TODO(tallclair): Implement this.
-	return errors.New("not yet implemented")
+	return s.server.Close()
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
