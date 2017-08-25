@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -53,6 +54,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api"
@@ -264,30 +266,64 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("couldn't parse kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
 	}
 
+	// Get directories to write files to; can be faked if we're dry-running
+	realCertsDir := i.cfg.CertificatesDir
+	certsDirToWriteTo, kubeConfigDir, manifestDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
+	if err != nil {
+		return err
+	}
+	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
+	i.cfg.CertificatesDir = certsDirToWriteTo
+
+	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
+
 	// PHASE 1: Generate certificates
 	if err := certsphase.CreatePKIAssets(i.cfg); err != nil {
 		return err
 	}
 
 	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-	if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeadmconstants.KubernetesDir, i.cfg); err != nil {
+	if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
 		return err
 	}
 
+	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
+	// This is needed for writing the right kind of manifests
+	i.cfg.CertificatesDir = realCertsDir
+
 	// PHASE 3: Bootstrap the control plane
-	manifestPath := kubeadmconstants.GetStaticPodDirectory()
-	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestPath, i.cfg); err != nil {
+	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
 		return err
 	}
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(i.cfg.Etcd.Endpoints) == 0 {
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestPath, i.cfg); err != nil {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
 			return err
 		}
 	}
 
-	client, err := createClientsetAndOptionallyWaitForReady(i.cfg, i.dryRun)
+	// Revert the earlier CertificatesDir assignment to the directory that can be written to
+	i.cfg.CertificatesDir = certsDirToWriteTo
+
+	// If we're dry-running, print the generated manifests
+	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
+		return err
+	}
+
+	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
+	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
+		return err
+	}
+
+	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
+	waiter := getWaiter(i.dryRun, client)
+
+	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] This process often takes about a minute to perform or longer if the control plane images have to be pulled...")
+	// TODO: Adjust this timeout or start polling the kubelet API
+	// TODO: Make this timeout more realistic when we do create some more complex logic about the interaction with the kubelet
+	if err := waiter.WaitForAPI(); err != nil {
 		return err
 	}
 
@@ -316,7 +352,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
+	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
 		return err
 	}
 	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
@@ -347,9 +383,15 @@ func (i *Init) Run(out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane...")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(i.cfg, client); err != nil {
+		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
 			return err
 		}
+	}
+
+	// Exit earlier if we're dryrunning
+	if i.dryRun {
+		fmt.Println("[dryrun] Finished dry-running successfully; above are the resources that would be created.")
+		return nil
 	}
 
 	// Load the CA certificate from so we can pin its public key
@@ -362,8 +404,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	ctx := map[string]string{
-		"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
-		"KubeConfigName": kubeadmconstants.AdminKubeConfigFileName,
+		"KubeConfigPath": adminKubeConfigPath,
 		"Token":          i.cfg.Token,
 		"CAPubKeyPin":    pubkeypin.Hash(caCert),
 		"MasterHostPort": masterHostPort,
@@ -375,24 +416,59 @@ func (i *Init) Run(out io.Writer) error {
 	return initDoneTempl.Execute(out, ctx)
 }
 
-func createClientsetAndOptionallyWaitForReady(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.Interface, error) {
+// createClient creates a clientset.Interface object
+func createClient(cfg *kubeadmapi.MasterConfiguration, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
 		// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
 		dryRunGetter := apiclient.NewInitDryRunGetter(cfg.NodeName, cfg.Networking.ServiceSubnet)
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 
-	// If we're acting for real,we should create a connection to the API server and wait for it to come up
-	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
-	if err != nil {
-		return nil, err
+	// If we're acting for real, we should create a connection to the API server and wait for it to come up
+	return kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
+}
+
+// getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
+// This behaves differently when dry-running vs the normal flow
+func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, error) {
+	if dryRun {
+		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
+		if err != nil {
+			return "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+		}
+		// Use the same temp dir for all
+		return dryRunDir, dryRunDir, dryRunDir, nil
 	}
 
-	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
-	// TODO: Adjust this timeout or start polling the kubelet API
-	// TODO: Make this timeout more realistic when we do create some more complex logic about the interaction with the kubelet
-	if err := apiclient.WaitForAPI(client, 30*time.Minute); err != nil {
-		return nil, err
+	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), nil
+}
+
+// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
+func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
+	if !dryRun {
+		return nil
 	}
-	return client, nil
+
+	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to %q\n", manifestDir)
+	fmt.Println("[dryrun] Won't print certificates or kubeconfig files due to the sensitive nature of them")
+	fmt.Printf("[dryrun] Please go and examine the %q directory for details about what would be written\n", manifestDir)
+
+	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
+	files := []dryrunutil.FileToPrint{}
+	for _, component := range kubeadmconstants.MasterComponents {
+		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
+		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
+		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
+	}
+
+	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
+}
+
+// getWaiter gets the right waiter implementation
+func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
+	if dryRun {
+		return dryrunutil.NewWaiter()
+	}
+	// TODO: Adjust this timeout slightly?
+	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
 }
