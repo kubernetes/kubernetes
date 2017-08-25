@@ -48,13 +48,38 @@ func TestSemantic(t *testing.T) {
 	}
 }
 
+func TestIsStandardContainerResourceName(t *testing.T) {
+	testCases := []struct {
+		input  string
+		output bool
+	}{
+		{"cpu", true},
+		{"kubernetes.io/cpu", false},
+		{"memory", true},
+		{"kubernetes.io/memory", false},
+		{"storage.kubernetes.io/overlay", true},
+		{"storage.kubernetes.io/scratch", true},
+		{"alpha.kubernetes.io/nvidia-gpu", true},
+		{"foo", false},
+		{"example.com/foo", false},
+		{"kubernetes.io/foo", false},
+	}
+	for _, tc := range testCases {
+		if IsStandardContainerResourceName(tc.input) != tc.output {
+			t.Errorf("case[%s], expected: %t, got: %t", tc.input, tc.output, !tc.output)
+		}
+	}
+}
+
 func TestIsStandardResource(t *testing.T) {
 	testCases := []struct {
 		input  string
 		output bool
 	}{
 		{"cpu", true},
+		{"kubernetes.io/cpu", false},
 		{"memory", true},
+		{"kubernetes.io/memory", false},
 		{"disk", false},
 		{"blah", false},
 		{"x.y.z", false},

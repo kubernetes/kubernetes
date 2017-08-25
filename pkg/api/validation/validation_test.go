@@ -8518,43 +8518,39 @@ func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
 		input   string
 		success bool
-		expect  string
 	}{
-		{"memory", true, ""},
-		{"cpu", true, ""},
-		{"storage", true, ""},
-		{"requests.cpu", true, ""},
-		{"requests.memory", true, ""},
-		{"requests.storage", true, ""},
-		{"limits.cpu", true, ""},
-		{"limits.memory", true, ""},
-		{"network", false, ""},
-		{"disk", false, ""},
-		{"", false, ""},
-		{".", false, ""},
-		{"..", false, ""},
-		{"my.favorite.app.co/12345", true, ""},
-		{"my.favorite.app.co/_12345", false, ""},
-		{"my.favorite.app.co/12345_", false, ""},
-		{"kubernetes.io/..", false, ""},
-		{"kubernetes.io/" + strings.Repeat("a", 63), true, ""},
-		{"kubernetes.io/" + strings.Repeat("a", 64), false, ""},
-		{"kubernetes.io//", false, ""},
-		{"kubernetes.io", false, ""},
-		{"kubernetes.io/will/not/work/", false, ""},
+		{"memory", true},
+		{"cpu", true},
+		{"storage.kubernetes.io/scratch", true},
+		{"storage.kubernetes.io/overlay", true},
+		{"storage", true},
+		{"requests.cpu", true},
+		{"requests.memory", true},
+		{"limits.cpu", true},
+		{"limits.memory", true},
+		{"alpha.kubernetes.io/nvidia-gpu", true},
+		{"network", false},
+		{"disk", false},
+		{"", false},
+		{".", false},
+		{"..", false},
+		{"example.com/foo", true},
+		{"my.favorite.app.co/12345", true},
+		{"my.favorite.app.co/_12345", false},
+		{"my.favorite.app.co/12345_", false},
+		{"kubernetes.io/..", false},
+		{"kubernetes.io/" + strings.Repeat("a", 63), true},
+		{"kubernetes.io/" + strings.Repeat("a", 64), false},
+		{"kubernetes.io//", false},
+		{"kubernetes.io", false},
+		{"kubernetes.io/will/not/work/", false},
 	}
-	for k, item := range table {
+	for _, item := range table {
 		err := validateResourceName(item.input, field.NewPath("field"))
 		if len(err) != 0 && item.success {
 			t.Errorf("expected no failure for input %q", item.input)
 		} else if len(err) == 0 && !item.success {
 			t.Errorf("expected failure for input %q", item.input)
-			for i := range err {
-				detail := err[i].Detail
-				if detail != "" && !strings.Contains(detail, item.expect) {
-					t.Errorf("%d: expected error detail either empty or %s, got %s", k, item.expect, detail)
-				}
-			}
 		}
 	}
 }

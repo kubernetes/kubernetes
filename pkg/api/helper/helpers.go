@@ -107,10 +107,13 @@ func IsResourceQuotaScopeValidForResource(scope api.ResourceQuotaScope, resource
 var standardContainerResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceStorageOverlay),
+	string(api.ResourceStorageScratch),
+	string(api.ResourceNvidiaGPU),
 )
 
-// IsStandardContainerResourceName returns true if the container can make a resource request
-// for the specified resource
+// IsStandardContainerResourceName returns true if a container can make a
+// resource request for the specified resource.
 func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
@@ -199,12 +202,14 @@ var standardResources = sets.NewString(
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
 	string(api.ResourcePods),
-	string(api.ResourceQuotas),
 	string(api.ResourceServices),
 	string(api.ResourceReplicationControllers),
+	string(api.ResourceQuotas),
 	string(api.ResourceSecrets),
 	string(api.ResourceConfigMaps),
 	string(api.ResourcePersistentVolumeClaims),
+	string(api.ResourceServicesNodePorts),
+	string(api.ResourceServicesLoadBalancers),
 	string(api.ResourceStorage),
 	string(api.ResourceRequestsStorage),
 )

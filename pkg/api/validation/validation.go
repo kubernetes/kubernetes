@@ -3442,8 +3442,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource type or fully qualified"))
 		}
 	}
-
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate container resource name
@@ -3451,12 +3450,15 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
-	if len(strings.Split(value, "/")) == 1 {
-		if !helper.IsStandardContainerResourceName(value) {
-			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
-		}
+	// Container resources must be one of:
+	// - A known resource in the `*kubernetes.io/` namespace.
+	// - An extended resource (not in the `*kubernetes.io/` namespace.
+	// - An opaque integer resource [DEPRECATED] (TODO: Remove following deprecation)
+	if !helper.IsStandardContainerResourceName(value) &&
+		!helper.IsExtendedResourceName(api.ResourceName(value)) {
+		return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers or fully qualified"))
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate resource names that can go in a resource quota
@@ -3468,7 +3470,7 @@ func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate limit range types
