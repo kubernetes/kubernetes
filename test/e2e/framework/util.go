@@ -3290,6 +3290,24 @@ func RunHostCmdOrDie(ns, name, cmd string) string {
 	return stdout
 }
 
+// RunHostCmdWithRetries calls RunHostCmd until it succeeds or a built-in timeout expires.
+// This can be used with idempotent commands to deflake transient connection issues.
+func RunHostCmdWithRetries(ns, name, cmd string, interval time.Duration, maxTries int) (string, error) {
+	tries := 0
+	for {
+		out, err := RunHostCmd(ns, name, cmd)
+		if err == nil {
+			return out, nil
+		}
+		tries++
+		if tries >= maxTries {
+			return out, fmt.Errorf("RunHostCmd still failed after %d tries: %v", tries, err)
+		}
+		Logf("Waiting %v to retry failed RunHostCmd (attempt %d): %v", interval, tries, err)
+		time.Sleep(interval)
+	}
+}
+
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
 func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
