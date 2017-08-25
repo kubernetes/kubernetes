@@ -20,15 +20,15 @@ import (
 	"fmt"
 	"testing"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Apps.GroupVersion().String()},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    label,
 			Namespace: metav1.NamespaceDefault,
@@ -49,8 +49,8 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 func TestIsPodUpdated(t *testing.T) {
 	templateGeneration := int64(12345)
 	hash := "55555"
-	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
-	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
+	labels := map[string]string{apps.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), apps.DefaultDaemonSetUniqueLabelKey: hash}
+	labelsNoHash := map[string]string{apps.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
 	tests := []struct {
 		test               string
 		templateGeneration int64
@@ -149,11 +149,11 @@ func TestCreatePodTemplate(t *testing.T) {
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
 		newPodTemplate := CreatePodTemplate(podTemplateSpec, test.templateGeneration, test.hash)
-		val, exists := newPodTemplate.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
+		val, exists := newPodTemplate.ObjectMeta.Labels[apps.DaemonSetTemplateGenerationKey]
 		if !exists || val != fmt.Sprint(test.templateGeneration) {
 			t.Errorf("Expected podTemplateSpec to have generation label value: %d, got: %s", test.templateGeneration, val)
 		}
-		val, exists = newPodTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		val, exists = newPodTemplate.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		if test.expectUniqueLabel && (!exists || val != test.hash) {
 			t.Errorf("Expected podTemplateSpec to have hash label value: %s, got: %s", test.hash, val)
 		}

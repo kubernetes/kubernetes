@@ -33,6 +33,7 @@ import (
 
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
+// TODO: switch to apps/v1beta2 DaemonSet
 type DaemonSetUpgradeTest struct {
 	daemonSet *extensions.DaemonSet
 }

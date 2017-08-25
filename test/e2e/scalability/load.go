@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -239,7 +240,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.ExpectNoError(framework.DeleteResourceAndPods(
 						f.ClientSet,
 						f.InternalClientset,
-						extensions.Kind("DaemonSet"),
+						apps.Kind("DaemonSet"),
 						config.Namespace,
 						config.Name,
 					))

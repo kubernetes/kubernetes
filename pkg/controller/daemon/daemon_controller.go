@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,16 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	appsinformers "k8s.io/client-go/informers/apps/v1beta2"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	clientgoapps "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1beta2"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -78,7 +76,7 @@ const (
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = extensions.SchemeGroupVersion.WithKind("DaemonSet")
+var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
@@ -95,12 +93,12 @@ type DaemonSetsController struct {
 	// To allow injection of syncDaemonSet for testing.
 	syncHandler func(dsKey string) error
 	// used for unit testing
-	enqueueDaemonSet            func(ds *extensions.DaemonSet)
-	enqueueDaemonSetRateLimited func(ds *extensions.DaemonSet)
+	enqueueDaemonSet            func(ds *apps.DaemonSet)
+	enqueueDaemonSetRateLimited func(ds *apps.DaemonSet)
 	// A TTLCache of pod creates/deletes each ds expects to see
 	expectations controller.ControllerExpectationsInterface
 	// dsLister can list/get daemonsets from the shared informer's store
-	dsLister extensionslisters.DaemonSetLister
+	dsLister appslisters.DaemonSetLister
 	// dsStoreSynced returns true if the daemonset store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	dsStoreSynced cache.InformerSynced
@@ -129,7 +127,7 @@ type DaemonSetsController struct {
 	suspendedDaemonPods      map[string]sets.String
 }
 
-func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) *DaemonSetsController {
+func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) *DaemonSetsController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -156,13 +154,13 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			ds := obj.(*extensions.DaemonSet)
+			ds := obj.(*apps.DaemonSet)
 			glog.V(4).Infof("Adding daemon set %s", ds.Name)
 			dsc.enqueueDaemonSet(ds)
 		},
 		UpdateFunc: func(old, cur interface{}) {
-			oldDS := old.(*extensions.DaemonSet)
-			curDS := cur.(*extensions.DaemonSet)
+			oldDS := old.(*apps.DaemonSet)
+			curDS := cur.(*apps.DaemonSet)
 			glog.V(4).Infof("Updating daemon set %s", oldDS.Name)
 			dsc.enqueueDaemonSet(curDS)
 		},
@@ -204,14 +202,14 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 }
 
 func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
-	ds, ok := obj.(*extensions.DaemonSet)
+	ds, ok := obj.(*apps.DaemonSet)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
 			return
 		}
-		ds, ok = tombstone.Obj.(*extensions.DaemonSet)
+		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
 			return
@@ -265,7 +263,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 	return true
 }
 
-func (dsc *DaemonSetsController) enqueue(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -276,7 +274,7 @@ func (dsc *DaemonSetsController) enqueue(ds *extensions.DaemonSet) {
 	dsc.queue.Add(key)
 }
 
-func (dsc *DaemonSetsController) enqueueRateLimited(ds *extensions.DaemonSet) {
+func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
@@ -298,7 +296,7 @@ func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after ti
 }
 
 // getPodDaemonSets returns a list of DaemonSets that potentially match the pod.
-func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.DaemonSet {
+func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*apps.DaemonSet {
 	sets, err := dsc.dsLister.GetPodDaemonSets(pod)
 	if err != nil {
 		return nil
@@ -313,7 +311,7 @@ func (dsc *DaemonSetsController) getPodDaemonSets(pod *v1.Pod) []*extensions.Dae
 
 // getDaemonSetsForHistory returns a list of DaemonSets that potentially
 // match a ControllerRevision.
-func (dsc *DaemonSetsController) getDaemonSetsForHistory(history *apps.ControllerRevision) []*extensions.DaemonSet {
+func (dsc *DaemonSetsController) getDaemonSetsForHistory(history *apps.ControllerRevision) []*apps.DaemonSet {
 	daemonSets, err := dsc.dsLister.GetHistoryDaemonSets(history)
 	if err != nil || len(daemonSets) == 0 {
 		return nil
@@ -729,7 +727,7 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.Pod, error) {
+func (dsc *DaemonSetsController) getDaemonPods(ds *apps.DaemonSet) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -744,7 +742,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		fresh, err := dsc.kubeClient.AppsV1beta2().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -762,7 +760,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) (map[string][]*v1.Pod, error) {
+func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *apps.DaemonSet) (map[string][]*v1.Pod, error) {
 	claimedPods, err := dsc.getDaemonPods(ds)
 	if err != nil {
 		return nil, err
@@ -783,7 +781,7 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.DaemonSet {
+func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.DaemonSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -801,7 +799,7 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 	return ds
 }
 
-func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) error {
+func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
 	// Find out which nodes are running the daemon pods controlled by ds.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -880,7 +878,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
-func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
@@ -905,7 +903,11 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
 	createWait.Add(createDiff)
-	template := util.CreatePodTemplate(ds.Spec.Template, ds.Spec.TemplateGeneration, hash)
+	templateGeneration, err := GetTemplateGeneration(ds)
+	if err != nil {
+		return err
+	}
+	template := util.CreatePodTemplate(ds.Spec.Template, templateGeneration, hash)
 	for i := 0; i < createDiff; i++ {
 		go func(ix int) {
 			defer createWait.Done()
@@ -955,7 +957,19 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 	return utilerrors.NewAggregate(errors)
 }
 
-func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds *extensions.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
+func GetTemplateGeneration(ds *apps.DaemonSet) (int64, error) {
+	templateGeneration := int64(0)
+	if templateGenerationStr, _ := ds.Annotations[apps.DeprecatedTemplateGeneration]; len(templateGenerationStr) > 0 {
+		var err error
+		templateGeneration, err = strconv.ParseInt(templateGenerationStr, 10, 64)
+		if err != nil {
+			return int64(0), fmt.Errorf("failed to parse DaemonSet templateGeneration %s: %v", templateGenerationStr, err)
+		}
+	}
+	return templateGeneration, nil
+}
+
+func storeDaemonSetStatus(dsClient clientgoapps.DaemonSetInterface, ds *apps.DaemonSet, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable int) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
@@ -972,7 +986,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		return err
 	}
 
-	toUpdate := clone.(*extensions.DaemonSet)
+	toUpdate := clone.(*apps.DaemonSet)
 
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {
@@ -999,7 +1013,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 	return updateErr
 }
 
-func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet, hash string) error {
+func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, hash string) error {
 	glog.V(4).Infof("Updating daemon set status")
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
 	if err != nil {
@@ -1034,7 +1048,11 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet,
 						numberAvailable++
 					}
 				}
-				if util.IsPodUpdated(ds.Spec.TemplateGeneration, pod, hash) {
+				templateGeneration, err := GetTemplateGeneration(ds)
+				if err != nil {
+					return err
+				}
+				if util.IsPodUpdated(templateGeneration, pod, hash) {
 					updatedNumberScheduled++
 				}
 			}
@@ -1046,7 +1064,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *extensions.DaemonSet,
 	}
 	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = storeDaemonSetStatus(dsc.kubeClient.Extensions().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
+	err = storeDaemonSetStatus(dsc.kubeClient.AppsV1beta2().DaemonSets(ds.Namespace), ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable)
 	if err != nil {
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}
@@ -1093,7 +1111,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	if err != nil {
 		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
 	}
-	hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
 	if ds.DeletionTimestamp != nil || !dsc.expectations.SatisfiedExpectations(dsKey) {
 		// Only update status.
@@ -1108,8 +1126,8 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	// Process rolling updates if we're ready.
 	if dsc.expectations.SatisfiedExpectations(dsKey) {
 		switch ds.Spec.UpdateStrategy.Type {
-		case extensions.OnDeleteDaemonSetStrategyType:
-		case extensions.RollingUpdateDaemonSetStrategyType:
+		case apps.OnDeleteDaemonSetStrategyType:
+		case apps.RollingUpdateDaemonSetStrategyType:
 			err = dsc.rollingUpdate(ds, hash)
 		}
 		if err != nil {
@@ -1125,7 +1143,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds, hash)
 }
 
-func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *extensions.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
+func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
@@ -1210,7 +1228,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 // * shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
-func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *extensions.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
 	newPod := NewPod(ds, node.Name)
 
 	// Because these bools require an && of all their required conditions, we start
@@ -1299,7 +1317,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	return
 }
 
-func NewPod(ds *extensions.DaemonSet, nodeName string) *v1.Pod {
+func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = nodeName
@@ -1360,7 +1378,7 @@ func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*extensions.DaemonSet
+type byCreationTimestamp []*apps.DaemonSet
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

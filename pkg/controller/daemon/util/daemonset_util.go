@@ -19,8 +19,8 @@ package util
 import (
 	"fmt"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -85,12 +85,12 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 	templateGenerationStr := fmt.Sprint(generation)
 	newTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
 		template.ObjectMeta.Labels,
-		extensions.DaemonSetTemplateGenerationKey,
+		apps.DaemonSetTemplateGenerationKey,
 		templateGenerationStr,
 	)
 	// TODO: do we need to validate if the DaemonSet is RollingUpdate or not?
 	if len(hash) > 0 {
-		newTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = hash
+		newTemplate.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey] = hash
 	}
 	return newTemplate
 }
@@ -98,8 +98,8 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 // IsPodUpdate checks if pod contains label value that either matches templateGeneration or hash
 func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod, hash string) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
-	templateMatches := pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
-	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
+	templateMatches := pod.Labels[apps.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
+	hashMatches := len(hash) > 0 && pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
 }
 

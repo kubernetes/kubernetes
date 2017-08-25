@@ -127,7 +127,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
-        "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
