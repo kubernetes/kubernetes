@@ -1201,7 +1201,7 @@ function prepare-mounter-rootfs {
   mount --make-rshared "${CONTAINERIZED_MOUNTER_ROOTFS}/var/lib/kubelet"
   mount --bind -o ro /proc "${CONTAINERIZED_MOUNTER_ROOTFS}/proc"
   mount --bind -o ro /dev "${CONTAINERIZED_MOUNTER_ROOTFS}/dev"
-  mount --bind -o ro /etc/resolv.conf "${CONTAINERIZED_MOUNTER_ROOTFS}/etc/resolv.conf"
+  cp /etc/resolv.conf "${CONTAINERIZED_MOUNTER_ROOTFS}/etc/"
 }
 
 # A helper function for removing salt configuration and comments from a file.
