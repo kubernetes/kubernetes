@@ -59,7 +59,8 @@ const (
 
 	optionKeyServiceAccountName = "kubernetes.io/serviceAccount.name"
 
-	attachCapability = "attach"
+	attachCapability         = "attach"
+	selinuxRelabelCapability = "selinuxRelabel"
 )
 
 const (
@@ -80,6 +81,11 @@ type DriverCall struct {
 	Timeout time.Duration
 	plugin  *flexVolumePlugin
 	args    []string
+}
+
+type driverCapabilities struct {
+	attach         bool
+	selinuxRelabel bool
 }
 
 func (plugin *flexVolumePlugin) NewDriverCall(command string) *DriverCall {
@@ -234,4 +240,24 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 	}
 
 	return &status, nil
+}
+
+// getDriverCapabilities returns the reported capabilities as returned by driver's init() function
+func (ds *DriverStatus) getDriverCapabilities() *driverCapabilities {
+	driverCaps := &driverCapabilities{
+		attach:         true,
+		selinuxRelabel: true,
+	}
+
+	// Check if driver supports SELinux Relabeling of mounted volume
+	if dcap, ok := ds.Capabilities[selinuxRelabelCapability]; ok {
+		driverCaps.selinuxRelabel = dcap
+	}
+
+	// Check whether the plugin is attachable.
+	if dcap, ok := ds.Capabilities[attachCapability]; ok {
+		driverCaps.attach = dcap
+	}
+
+	return driverCaps
 }
