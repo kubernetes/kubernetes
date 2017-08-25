@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/api/core/v1"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsfuzzer "k8s.io/kubernetes/pkg/apis/extensions/fuzzer"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	networkingfuzzer "k8s.io/kubernetes/pkg/apis/networking/fuzzer"
 	policyfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
 	rbacfuzzer "k8s.io/kubernetes/pkg/apis/rbac/fuzzer"
 	storagefuzzer "k8s.io/kubernetes/pkg/apis/storage/fuzzer"
@@ -102,4 +103,5 @@ var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	certificatesfuzzer.Funcs,
 	admissionregistrationfuzzer.Funcs,
 	storagefuzzer.Funcs,
+	networkingfuzzer.Funcs,
 )

@@ -92,6 +92,20 @@ type NetworkPolicyPort struct {
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
+// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
+// matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
+// not be included within this rule.
+type IPBlock struct {
+	// CIDR is a string representing the IP Block
+	// Valid examples are "192.168.1.1/24"
+	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
+	// Except is a slice of CIDRs that should not be included within an IP Block
+	// Valid examples are "192.168.1.1/24"
+	// Except values will be rejected if they are outside the CIDR range
+	// +optional
+	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
+}
+
 // NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields
 // must be specified.
 type NetworkPolicyPeer struct {
@@ -106,6 +120,10 @@ type NetworkPolicyPeer struct {
 	// selector semantics. If present but empty, this selector selects all namespaces.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`
+
+	// IPBlock defines policy on a particular IPBlock
+	// +optional
+	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
