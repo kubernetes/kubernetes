@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "doc.go",
         "gce.go",
+        "gce_address_manager.go",
         "gce_addresses.go",
         "gce_addresses_fakes.go",
         "gce_alpha.go",
@@ -83,6 +84,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "gce_address_manager_test.go",
         "gce_annotations_test.go",
         "gce_disks_test.go",
         "gce_healthchecks_test.go",
@@ -95,6 +97,7 @@ go_test(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
