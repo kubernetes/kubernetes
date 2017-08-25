@@ -19,7 +19,7 @@ package selfhosting
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -184,8 +184,8 @@ func uploadTLSSecrets(client clientset.Interface, certDir string) error {
 	for _, tlsKeyPair := range getTLSKeyPairs() {
 		secret, err := createTLSSecretFromFiles(
 			tlsKeyPair.name,
-			path.Join(certDir, tlsKeyPair.cert),
-			path.Join(certDir, tlsKeyPair.key),
+			filepath.Join(certDir, tlsKeyPair.cert),
+			filepath.Join(certDir, tlsKeyPair.key),
 		)
 		if err != nil {
 			return err
@@ -200,13 +200,13 @@ func uploadTLSSecrets(client clientset.Interface, certDir string) error {
 	return nil
 }
 
-func uploadKubeConfigSecrets(client clientset.Interface) error {
+func uploadKubeConfigSecrets(client clientset.Interface, kubeConfigDir string) error {
 	files := []string{
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 	}
 	for _, file := range files {
-		kubeConfigPath := path.Join(kubeadmconstants.KubernetesDir, file)
+		kubeConfigPath := filepath.Join(kubeConfigDir, file)
 		secret, err := createOpaqueSecretFromFile(file, kubeConfigPath)
 		if err != nil {
 			return err
@@ -257,7 +257,7 @@ func createOpaqueSecretFromFile(secretName, file string) (*v1.Secret, error) {
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			path.Base(file): fileBytes,
+			filepath.Base(file): fileBytes,
 		},
 	}, nil
 }

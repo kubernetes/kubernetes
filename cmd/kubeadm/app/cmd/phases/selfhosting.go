@@ -17,16 +17,20 @@ limitations under the License.
 package phases
 
 import (
+	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
@@ -78,7 +82,8 @@ func getSelfhostingSubCommand() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			// Converts the Static Pod-hosted control plane into a self-hosted one
-			err = selfhosting.CreateSelfHostedControlPlane(internalcfg, client)
+			waiter := apiclient.NewKubeWaiter(client, 2*time.Minute, os.Stdout)
+			err = selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter)
 			kubeadmutil.CheckErr(err)
 		},
 	}
