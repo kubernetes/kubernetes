@@ -154,32 +154,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	// Add field label conversions for kinds having selectable nothing but v1.ObjectMeta fields.
-	for _, k := range []string{
-		"Endpoints",
-		"ResourceQuota",
-		"PersistentVolumeClaim",
-		"Service",
-		"ServiceAccount",
-		"ConfigMap",
-	} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("v1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.namespace",
-					"metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
@@ -233,19 +207,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
 		})
-	if err != nil {
-		return err
-	}
-	err = scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
 	if err != nil {
 		return err
 	}
