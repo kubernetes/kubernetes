@@ -315,10 +315,8 @@ func PrioritizeNodes(
 		errs = append(errs, err)
 	}
 
-	results := make([]schedulerapi.HostPriorityList, 0, len(priorityConfigs))
-	for range priorityConfigs {
-		results = append(results, nil)
-	}
+	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
+
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Function != nil {
 			// DEPRECATED
