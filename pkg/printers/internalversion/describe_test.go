@@ -118,6 +118,31 @@ func TestDescribePodTolerations(t *testing.T) {
 	}
 }
 
+func TestDescribeSecret(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Data: map[string][]byte{
+			"username": []byte("YWRtaW4="),
+			"password": []byte("MWYyZDFlMmU2N2Rm"),
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := SecretDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "username") || !strings.Contains(out, "8 bytes") || !strings.Contains(out, "password") || !strings.Contains(out, "16 bytes") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if strings.Contains(out, "YWRtaW4=") || strings.Contains(out, "MWYyZDFlMmU2N2Rm") {
+		t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
+	}
+}
+
 func TestDescribeNamespace(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
