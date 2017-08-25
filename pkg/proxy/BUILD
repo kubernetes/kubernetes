@@ -31,6 +31,7 @@ filegroup(
         "//pkg/proxy/ipvs:all-srcs",
         "//pkg/proxy/userspace:all-srcs",
         "//pkg/proxy/util:all-srcs",
+        "//pkg/proxy/winkernel:all-srcs",
         "//pkg/proxy/winuserspace:all-srcs",
     ],
     tags = ["automanaged"],
