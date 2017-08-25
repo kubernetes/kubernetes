@@ -505,7 +505,7 @@ kube::util::ensure_godep_version() {
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
     git checkout -q "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
@@ -539,7 +539,7 @@ kube::util::go_install_from_commit() {
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
-  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}" 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
   (
     cd "${KUBE_TEMP}/go/src/${pkg}"
     git checkout -q "${commit}"
