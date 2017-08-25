@@ -2833,6 +2833,31 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
 
+  ### Set env of a deployment
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/configmap.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/secret.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
+  kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
+  # Set env of deployments for all container
+  kubectl set env deployment nginx-deployment env=prod "${kube_flags[@]}"
+  # Set env of deployments for specific container
+  kubectl set env deployment nginx-deployment env=prod -c=nginx "${kube_flags[@]}"
+  # Set env of deployments by configmap
+  kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]}"
+  # Set env of deployments by secret
+  kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]}"
+  # Remove specific env of deployment
+  kubectl set env deployment nginx-deployment env-
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete configmap test-set-env-config "${kube_flags[@]}"
+  kubectl delete secret test-set-env-secret "${kube_flags[@]}"
+
   set +o nounset
   set +o errexit
 }
