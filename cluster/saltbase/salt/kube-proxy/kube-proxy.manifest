@@ -102,6 +102,7 @@ spec:
     name: etc-ssl-certs
   - hostPath:
       path: /var/lib/kube-proxy/kubeconfig
+      type: FileOrCreate
     name: kubeconfig
   - hostPath:
       path: /var/log
@@ -111,4 +112,5 @@ spec:
     name: run
   - hostPath:
       path: /run/xtables.lock
+      type: FileOrCreate
     name: iptableslock

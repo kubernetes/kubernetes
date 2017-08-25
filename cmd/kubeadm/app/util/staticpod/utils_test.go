@@ -123,10 +123,12 @@ func TestComponentPod(t *testing.T) {
 }
 
 func TestNewVolume(t *testing.T) {
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	var tests = []struct {
 		name     string
 		path     string
 		expected v1.Volume
+		pathType *v1.HostPathType
 	}{
 		{
 			name: "foo",
@@ -134,14 +136,18 @@ func TestNewVolume(t *testing.T) {
 			expected: v1.Volume{
 				Name: "foo",
 				VolumeSource: v1.VolumeSource{
-					HostPath: &v1.HostPathVolumeSource{Path: "/etc/foo"},
+					HostPath: &v1.HostPathVolumeSource{
+						Path: "/etc/foo",
+						Type: &hostPathDirectoryOrCreate,
+					},
 				},
 			},
+			pathType: &hostPathDirectoryOrCreate,
 		},
 	}
 
 	for _, rt := range tests {
-		actual := NewVolume(rt.name, rt.path)
+		actual := NewVolume(rt.name, rt.path, rt.pathType)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf(
 				"failed newVolume:\n\texpected: %v\n\t  actual: %v",
