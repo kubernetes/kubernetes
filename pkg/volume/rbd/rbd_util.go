@@ -312,12 +312,14 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 		if !found {
 			return errors.New("Could not map image: Timeout after 10s")
 		}
+		glog.V(3).Infof("rbd: successfully map image %s/%s to %s", b.Pool, b.Image, devicePath)
 	}
 
 	// mount it
 	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
+	glog.V(3).Infof("rbd: successfully mount image %s/%s at %s", b.Pool, b.Image, globalPDPath)
 	return err
 }
 
@@ -329,6 +331,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	if err = c.mounter.Unmount(mntPath); err != nil {
 		return fmt.Errorf("rbd detach disk: failed to umount: %s\nError: %v", mntPath, err)
 	}
+	glog.V(3).Infof("rbd: successfully umount mountpoint %s", mntPath)
 	// if device is no longer used, see if can unmap
 	if cnt <= 1 {
 		// rbd unmap
@@ -343,7 +346,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 			util.defencing(c)
 		}
 
-		glog.Infof("rbd: successfully unmap device %s", device)
+		glog.V(3).Infof("rbd: successfully unmap device %s", device)
 	}
 	return nil
 }
