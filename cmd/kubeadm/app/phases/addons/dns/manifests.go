@@ -17,8 +17,8 @@ limitations under the License.
 package dns
 
 const (
-	// v170AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
-	v170AndAboveKubeDNSDeployment = `
+	// v180AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
+	v180AndAboveKubeDNSDeployment = `
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -156,8 +156,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{ .DNSDomain }},5,A
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{ .DNSDomain }},5,A
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{ .DNSDomain }},5,{{ .DNSProbeType }}
         ports:
         - containerPort: 10054
           name: metrics
