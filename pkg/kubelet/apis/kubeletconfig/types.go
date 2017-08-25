@@ -210,6 +210,8 @@ type KubeletConfiguration struct {
 	CgroupRoot string
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string
+	// CPUManagerPolicy is the name of the policy to use.
+	CPUManagerPolicy string
 	// remoteRuntimeEndpoint is the endpoint of remote runtime service
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service

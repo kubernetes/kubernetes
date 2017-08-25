@@ -22,6 +22,26 @@ go_library(
     ],
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "cpu_manager_test.go",
+        "policy_none_test.go",
+    ],
+    library = ":go_default_library",
+    deps = [
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/cm/cpumanager/state:go_default_library",
+        "//pkg/kubelet/cm/cpuset:go_default_library",
+        "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+    ],
+)
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
