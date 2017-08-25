@@ -4530,7 +4530,7 @@
   "models": {
    "v1beta1.DaemonSetList": {
     "id": "v1beta1.DaemonSetList",
-    "description": "DaemonSetList is a collection of daemon sets.",
+    "description": "DEPRECATED. DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -4572,7 +4572,7 @@
    },
    "v1beta1.DaemonSet": {
     "id": "v1beta1.DaemonSet",
-    "description": "DaemonSet represents the configuration of a daemon set.",
+    "description": "DEPRECATED. DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "kind": {
       "type": "string",
@@ -4836,7 +4836,7 @@
    },
    "v1beta1.DaemonSetSpec": {
     "id": "v1beta1.DaemonSetSpec",
-    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "description": "DEPRECATED. DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
@@ -6892,6 +6892,7 @@
    },
    "v1beta1.DaemonSetUpdateStrategy": {
     "id": "v1beta1.DaemonSetUpdateStrategy",
+    "description": "DEPRECATED.",
     "properties": {
      "type": {
       "type": "string",
@@ -6905,7 +6906,7 @@
    },
    "v1beta1.RollingUpdateDaemonSet": {
     "id": "v1beta1.RollingUpdateDaemonSet",
-    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -6915,7 +6916,7 @@
    },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
-    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "description": "DEPRECATED. DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -7041,7 +7042,7 @@
    },
    "v1beta1.DeploymentList": {
     "id": "v1beta1.DeploymentList",
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "DEPRECATED. DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -7069,7 +7070,7 @@
    },
    "v1beta1.Deployment": {
     "id": "v1beta1.Deployment",
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7095,7 +7096,7 @@
    },
    "v1beta1.DeploymentSpec": {
     "id": "v1beta1.DeploymentSpec",
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -7144,7 +7145,7 @@
    },
    "v1beta1.DeploymentStrategy": {
     "id": "v1beta1.DeploymentStrategy",
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "type": {
       "type": "string",
@@ -7158,7 +7159,7 @@
    },
    "v1beta1.RollingUpdateDeployment": {
     "id": "v1beta1.RollingUpdateDeployment",
-    "description": "Spec to control the desired behavior of rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -7183,7 +7184,7 @@
    },
    "v1beta1.DeploymentStatus": {
     "id": "v1beta1.DeploymentStatus",
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "observedGeneration": {
       "type": "integer",
@@ -7231,7 +7232,7 @@
    },
    "v1beta1.DeploymentCondition": {
     "id": "v1beta1.DeploymentCondition",
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -7550,7 +7551,7 @@
    },
    "v1beta1.ReplicaSetList": {
     "id": "v1beta1.ReplicaSetList",
-    "description": "ReplicaSetList is a collection of ReplicaSets.",
+    "description": "DEPRECATED. ReplicaSetList is a collection of ReplicaSets.",
     "required": [
      "items"
     ],
@@ -7578,7 +7579,7 @@
    },
    "v1beta1.ReplicaSet": {
     "id": "v1beta1.ReplicaSet",
-    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7604,7 +7605,7 @@
    },
    "v1beta1.ReplicaSetSpec": {
     "id": "v1beta1.ReplicaSetSpec",
-    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSetSpec is the specification of a ReplicaSet.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -7628,7 +7629,7 @@
    },
    "v1beta1.ReplicaSetStatus": {
     "id": "v1beta1.ReplicaSetStatus",
-    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
     ],
@@ -7669,7 +7670,7 @@
    },
    "v1beta1.ReplicaSetCondition": {
     "id": "v1beta1.ReplicaSetCondition",
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "DEPRECATED. ReplicaSetCondition describes the state of a replica set at a certain point.",
     "required": [
      "type",
      "status"

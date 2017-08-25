@@ -3339,7 +3339,7 @@
   "models": {
    "v1beta1.ControllerRevisionList": {
     "id": "v1beta1.ControllerRevisionList",
-    "description": "ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
+    "description": "DEPRECATED. ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
     "required": [
      "items"
     ],
@@ -3381,7 +3381,7 @@
    },
    "v1beta1.ControllerRevision": {
     "id": "v1beta1.ControllerRevision",
-    "description": "ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
+    "description": "DEPRECATED. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
     "required": [
      "revision"
     ],
@@ -3718,7 +3718,7 @@
    },
    "v1beta1.DeploymentList": {
     "id": "v1beta1.DeploymentList",
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "DEPRECATED. DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -3746,7 +3746,7 @@
    },
    "v1beta1.Deployment": {
     "id": "v1beta1.Deployment",
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "kind": {
       "type": "string",
@@ -3772,7 +3772,7 @@
    },
    "v1beta1.DeploymentSpec": {
     "id": "v1beta1.DeploymentSpec",
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -5841,7 +5841,7 @@
    },
    "v1beta1.DeploymentStrategy": {
     "id": "v1beta1.DeploymentStrategy",
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "type": {
       "type": "string",
@@ -5855,7 +5855,7 @@
    },
    "v1beta1.RollingUpdateDeployment": {
     "id": "v1beta1.RollingUpdateDeployment",
-    "description": "Spec to control the desired behavior of rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxUnavailable": {
       "type": "string",
@@ -5880,7 +5880,7 @@
    },
    "v1beta1.DeploymentStatus": {
     "id": "v1beta1.DeploymentStatus",
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "observedGeneration": {
       "type": "integer",
@@ -5928,7 +5928,7 @@
    },
    "v1beta1.DeploymentCondition": {
     "id": "v1beta1.DeploymentCondition",
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -6051,7 +6051,7 @@
    },
    "v1beta1.StatefulSetList": {
     "id": "v1beta1.StatefulSetList",
-    "description": "StatefulSetList is a collection of StatefulSets.",
+    "description": "DEPRECATED. StatefulSetList is a collection of StatefulSets.",
     "required": [
      "items"
     ],
@@ -6077,7 +6077,7 @@
    },
    "v1beta1.StatefulSet": {
     "id": "v1beta1.StatefulSet",
-    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "description": "DEPRECATED. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
     "properties": {
      "kind": {
       "type": "string",
@@ -6102,7 +6102,7 @@
    },
    "v1beta1.StatefulSetSpec": {
     "id": "v1beta1.StatefulSetSpec",
-    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "description": "DEPRECATED. A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
      "template",
      "serviceName"
@@ -6229,7 +6229,7 @@
    },
    "v1beta1.StatefulSetUpdateStrategy": {
     "id": "v1beta1.StatefulSetUpdateStrategy",
-    "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+    "description": "DEPRECATED. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
     "properties": {
      "type": {
       "type": "string",
@@ -6243,7 +6243,7 @@
    },
    "v1beta1.RollingUpdateStatefulSetStrategy": {
     "id": "v1beta1.RollingUpdateStatefulSetStrategy",
-    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+    "description": "DEPRECATED. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
       "type": "integer",
@@ -6254,7 +6254,7 @@
    },
    "v1beta1.StatefulSetStatus": {
     "id": "v1beta1.StatefulSetStatus",
-    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "description": "DEPRECATED. StatefulSetStatus represents the current state of a StatefulSet.",
     "required": [
      "replicas"
     ],

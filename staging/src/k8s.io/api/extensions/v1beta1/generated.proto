@@ -64,6 +64,7 @@ message CustomMetricTargetList {
   repeated CustomMetricTarget items = 1;
 }
 
+// DEPRECATED.
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
   // Standard object's metadata.
@@ -85,6 +86,7 @@ message DaemonSet {
   optional DaemonSetStatus status = 3;
 }
 
+// DEPRECATED.
 // DaemonSetList is a collection of daemon sets.
 message DaemonSetList {
   // Standard list metadata.
@@ -96,6 +98,7 @@ message DaemonSetList {
   repeated DaemonSet items = 2;
 }
 
+// DEPRECATED.
 // DaemonSetSpec is the specification of a daemon set.
 message DaemonSetSpec {
   // A label query over pods that are managed by the daemon set.
@@ -136,6 +139,7 @@ message DaemonSetSpec {
   optional int32 revisionHistoryLimit = 6;
 }
 
+// DEPRECATED.
 // DaemonSetStatus represents the current status of a daemon set.
 message DaemonSetStatus {
   // The number of nodes that are running at least 1
@@ -184,6 +188,7 @@ message DaemonSetStatus {
   optional int32 collisionCount = 9;
 }
 
+// DEPRECATED.
 message DaemonSetUpdateStrategy {
   // Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
   // Default is OnDelete.
@@ -199,6 +204,7 @@ message DaemonSetUpdateStrategy {
   optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
+// DEPRECATED.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
@@ -214,6 +220,7 @@ message Deployment {
   optional DeploymentStatus status = 3;
 }
 
+// DEPRECATED.
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
@@ -235,6 +242,7 @@ message DeploymentCondition {
   optional string message = 5;
 }
 
+// DEPRECATED.
 // DeploymentList is a list of Deployments.
 message DeploymentList {
   // Standard list metadata.
@@ -259,6 +267,7 @@ message DeploymentRollback {
   optional RollbackConfig rollbackTo = 3;
 }
 
+// DEPRECATED.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
@@ -309,6 +318,7 @@ message DeploymentSpec {
   optional int32 progressDeadlineSeconds = 9;
 }
 
+// DEPRECATED.
 // DeploymentStatus is the most recently observed status of the Deployment.
 message DeploymentStatus {
   // The generation observed by the deployment controller.
@@ -347,6 +357,7 @@ message DeploymentStatus {
   optional int32 collisionCount = 8;
 }
 
+// DEPRECATED.
 // DeploymentStrategy describes how to replace existing pods with new ones.
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
@@ -737,6 +748,7 @@ message PodSecurityPolicySpec {
   optional bool allowPrivilegeEscalation = 16;
 }
 
+// DEPRECATED.
 // ReplicaSet represents the configuration of a ReplicaSet.
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
@@ -759,6 +771,7 @@ message ReplicaSet {
   optional ReplicaSetStatus status = 3;
 }
 
+// DEPRECATED.
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
@@ -780,6 +793,7 @@ message ReplicaSetCondition {
   optional string message = 5;
 }
 
+// DEPRECATED.
 // ReplicaSetList is a collection of ReplicaSets.
 message ReplicaSetList {
   // Standard list metadata.
@@ -792,6 +806,7 @@ message ReplicaSetList {
   repeated ReplicaSet items = 2;
 }
 
+// DEPRECATED.
 // ReplicaSetSpec is the specification of a ReplicaSet.
 message ReplicaSetSpec {
   // Replicas is the number of desired replicas.
@@ -821,6 +836,7 @@ message ReplicaSetSpec {
   optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
 }
 
+// DEPRECATED.
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
   // Replicas is the most recently oberved number of replicas.
@@ -861,6 +877,7 @@ message RollbackConfig {
   optional int64 revision = 1;
 }
 
+// DEPRECATED.
 // Spec to control the desired behavior of daemon set rolling update.
 message RollingUpdateDaemonSet {
   // The maximum number of DaemonSet pods that can be unavailable during the
@@ -881,6 +898,7 @@ message RollingUpdateDaemonSet {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 }
 
+// DEPRECATED.
 // Spec to control the desired behavior of rolling update.
 message RollingUpdateDeployment {
   // The maximum number of pods that can be unavailable during the update.

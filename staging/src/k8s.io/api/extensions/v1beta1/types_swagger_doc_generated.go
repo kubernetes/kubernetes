@@ -56,7 +56,7 @@ func (CustomMetricTarget) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSet = map[string]string{
-	"":         "DaemonSet represents the configuration of a daemon set.",
+	"":         "DEPRECATED. DaemonSet represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 	"status":   "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
@@ -67,7 +67,7 @@ func (DaemonSet) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetList = map[string]string{
-	"":         "DaemonSetList is a collection of daemon sets.",
+	"":         "DEPRECATED. DaemonSetList is a collection of daemon sets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"items":    "A list of daemon sets.",
 }
@@ -77,7 +77,7 @@ func (DaemonSetList) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetSpec = map[string]string{
-	"":                     "DaemonSetSpec is the specification of a daemon set.",
+	"":                     "DEPRECATED. DaemonSetSpec is the specification of a daemon set.",
 	"selector":             "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 	"template":             "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 	"updateStrategy":       "An update strategy to replace existing DaemonSet pods with new pods.",
@@ -91,7 +91,7 @@ func (DaemonSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetStatus = map[string]string{
-	"": "DaemonSetStatus represents the current status of a daemon set.",
+	"": "DEPRECATED. DaemonSetStatus represents the current status of a daemon set.",
 	"currentNumberScheduled": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"numberMisscheduled":     "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"desiredNumberScheduled": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
@@ -108,6 +108,7 @@ func (DaemonSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetUpdateStrategy = map[string]string{
+	"":              "DEPRECATED.",
 	"type":          "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is OnDelete.",
 	"rollingUpdate": "Rolling update config params. Present only if type = \"RollingUpdate\".",
 }
@@ -117,7 +118,7 @@ func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"":         "Deployment enables declarative updates for Pods and ReplicaSets.",
+	"":         "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
 	"metadata": "Standard object metadata.",
 	"spec":     "Specification of the desired behavior of the Deployment.",
 	"status":   "Most recently observed status of the Deployment.",
@@ -128,7 +129,7 @@ func (Deployment) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentCondition = map[string]string{
-	"":                   "DeploymentCondition describes the state of a deployment at a certain point.",
+	"":                   "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
 	"type":               "Type of deployment condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastUpdateTime":     "The last time this condition was updated.",
@@ -142,7 +143,7 @@ func (DeploymentCondition) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentList = map[string]string{
-	"":         "DeploymentList is a list of Deployments.",
+	"":         "DEPRECATED. DeploymentList is a list of Deployments.",
 	"metadata": "Standard list metadata.",
 	"items":    "Items is the list of Deployments.",
 }
@@ -163,7 +164,7 @@ func (DeploymentRollback) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentSpec = map[string]string{
-	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+	"":                        "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 	"selector":                "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
 	"template":                "Template describes the pods that will be created.",
@@ -180,7 +181,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStatus = map[string]string{
-	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"":                    "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
@@ -196,7 +197,7 @@ func (DeploymentStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStrategy = map[string]string{
-	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
+	"":              "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
 	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
 }
@@ -434,7 +435,7 @@ func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSet = map[string]string{
-	"":         "ReplicaSet represents the configuration of a ReplicaSet.",
+	"":         "DEPRECATED. ReplicaSet represents the configuration of a ReplicaSet.",
 	"metadata": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 	"status":   "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
@@ -445,7 +446,7 @@ func (ReplicaSet) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetCondition = map[string]string{
-	"":                   "ReplicaSetCondition describes the state of a replica set at a certain point.",
+	"":                   "DEPRECATED. ReplicaSetCondition describes the state of a replica set at a certain point.",
 	"type":               "Type of replica set condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
@@ -458,7 +459,7 @@ func (ReplicaSetCondition) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetList = map[string]string{
-	"":         "ReplicaSetList is a collection of ReplicaSets.",
+	"":         "DEPRECATED. ReplicaSetList is a collection of ReplicaSets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller",
 }
@@ -468,7 +469,7 @@ func (ReplicaSetList) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetSpec = map[string]string{
-	"":                "ReplicaSetSpec is the specification of a ReplicaSet.",
+	"":                "DEPRECATED. ReplicaSetSpec is the specification of a ReplicaSet.",
 	"replicas":        "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"minReadySeconds": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"selector":        "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
@@ -480,7 +481,7 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetStatus = map[string]string{
-	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
+	"":                     "DEPRECATED. ReplicaSetStatus represents the current status of a ReplicaSet.",
 	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
 	"readyReplicas":        "The number of ready replicas for this replica set.",
@@ -511,7 +512,7 @@ func (RollbackConfig) SwaggerDoc() map[string]string {
 }
 
 var map_RollingUpdateDaemonSet = map[string]string{
-	"":               "Spec to control the desired behavior of daemon set rolling update.",
+	"":               "DEPRECATED. Spec to control the desired behavior of daemon set rolling update.",
 	"maxUnavailable": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
 }
 
@@ -520,7 +521,7 @@ func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
 }
 
 var map_RollingUpdateDeployment = map[string]string{
-	"":               "Spec to control the desired behavior of rolling update.",
+	"":               "DEPRECATED. Spec to control the desired behavior of rolling update.",
 	"maxUnavailable": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. By default, a fixed value of 1 is used. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
 	"maxSurge":       "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
 }
