@@ -237,7 +237,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 			if currentReadyCondition.Status != v1.ConditionTrue {
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				exists, err := ensureNodeExistsByProviderIDOrName(instances, node)
+				exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
 				if err != nil {
 					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
 					continue
@@ -382,8 +382,8 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 	return newTaints
 }
 
-// ensureNodeExistsByProviderIDOrName first checks if the instance exists by the provider id and then by node name
-func ensureNodeExistsByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+// ensureNodeExistsByProviderIDOrExternalID first checks if the instance exists by the provider id and then by calling external id with node name
+func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
 	exists, err := instances.InstanceExistsByProviderID(node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err

@@ -128,7 +128,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderIDOrName(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, tc.node)
 			if err != nil {
 				t.Error(err)
 			}
