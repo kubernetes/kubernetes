@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -9,9 +11,6 @@ go_library(
     srcs = [
         "editoptions.go",
         "editor.go",
-    ],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
     deps = [
         "//pkg/api:go_default_library",
@@ -52,7 +51,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )

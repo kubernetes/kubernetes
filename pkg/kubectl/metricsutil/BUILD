@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -8,9 +10,6 @@ go_library(
     srcs = [
         "metrics_client.go",
         "metrics_printer.go",
-    ],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_metricsutil_CONSUMERS",
     ],
     deps = [
         "//pkg/api:go_default_library",
@@ -35,7 +34,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_metricsutil_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )

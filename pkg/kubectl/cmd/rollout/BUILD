@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,9 +14,6 @@ go_library(
         "rollout_resume.go",
         "rollout_status.go",
         "rollout_undo.go",
-    ],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",
     ],
     deps = [
         "//pkg/kubectl:go_default_library",
@@ -44,7 +43,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )

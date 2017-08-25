@@ -1,3 +1,5 @@
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
+
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -6,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["jsonmerge.go"],
-    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -25,7 +26,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_jsonmerge_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )

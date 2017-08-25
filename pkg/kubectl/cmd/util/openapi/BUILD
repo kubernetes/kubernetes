@@ -1,4 +1,4 @@
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//pkg/kubectl/visibility:kubectl_allowed_deps"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
@@ -56,7 +56,6 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
-    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -67,6 +66,7 @@ filegroup(
         "//pkg/kubectl/cmd/util/openapi/validation:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
