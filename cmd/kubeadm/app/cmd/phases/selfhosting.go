@@ -29,6 +29,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 )
 
 // NewCmdSelfhosting returns the self-hosting Cobra command
@@ -37,7 +38,7 @@ func NewCmdSelfhosting() *cobra.Command {
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted"},
 		Short:   "Make a kubeadm cluster self-hosted.",
-		RunE:    subCmdRunE("selfhosting"),
+		RunE:    cmdutil.SubCmdRunE("selfhosting"),
 	}
 
 	cmd.AddCommand(getSelfhostingSubCommand())

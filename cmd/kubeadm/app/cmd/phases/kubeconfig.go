@@ -24,6 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
@@ -34,7 +35,7 @@ func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kubeconfig",
 		Short: "Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file.",
-		RunE:  subCmdRunE("kubeconfig"),
+		RunE:  cmdutil.SubCmdRunE("kubeconfig"),
 	}
 
 	cmd.AddCommand(getKubeConfigSubCommands(out, kubeadmconstants.KubernetesDir)...)

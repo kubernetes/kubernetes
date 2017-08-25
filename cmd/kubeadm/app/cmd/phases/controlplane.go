@@ -21,6 +21,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,7 +32,7 @@ func NewCmdControlplane() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "controlplane",
 		Short: "Generate all static pod manifest files necessary to establish the control plane.",
-		RunE:  subCmdRunE("controlplane"),
+		RunE:  cmdutil.SubCmdRunE("controlplane"),
 	}
 
 	manifestPath := kubeadmconstants.GetStaticPodDirectory()

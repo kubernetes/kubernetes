@@ -21,6 +21,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,7 +32,7 @@ func NewCmdEtcd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "etcd",
 		Short: "Generate static pod manifest file for etcd.",
-		RunE:  subCmdRunE("etcd"),
+		RunE:  cmdutil.SubCmdRunE("etcd"),
 	}
 
 	manifestPath := kubeadmconstants.GetStaticPodDirectory()
