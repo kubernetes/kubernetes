@@ -625,14 +625,19 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 			dirty = true
 		}
 
-		volumeCap, ok := volume.Spec.Capacity[v1.ResourceStorage]
-		if !ok {
-			return nil, fmt.Errorf("PersistentVolume %q is without a storage capacity", volume.Name)
-		}
-		claimCap, ok := claim.Status.Capacity[v1.ResourceStorage]
-		if !ok || volumeCap.Cmp(claimCap) != 0 {
-			claimClone.Status.Capacity = volume.Spec.Capacity
-			dirty = true
+		// Update Capacity if the claim is becoming Bound, not if it was already.
+		// A discrepancy can be intentional to mean that the PVC filesystem size
+		// doesn't match the PV block device size, so don't clobber it
+		if claim.Status.Phase != phase {
+			volumeCap, ok := volume.Spec.Capacity[v1.ResourceStorage]
+			if !ok {
+				return nil, fmt.Errorf("PersistentVolume %q is without a storage capacity", volume.Name)
+			}
+			claimCap, ok := claim.Status.Capacity[v1.ResourceStorage]
+			if !ok || volumeCap.Cmp(claimCap) != 0 {
+				claimClone.Status.Capacity = volume.Spec.Capacity
+				dirty = true
+			}
 		}
 	}
 
