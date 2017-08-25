@@ -49,7 +49,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-const ProviderName = "openstack"
+const (
+	ProviderName     = "openstack"
+	AvailabilityZone = "availability_zone"
+)
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -534,6 +537,7 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 
 	return os, true
 }
+
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	md, err := getMetadata()
 	if err != nil {
@@ -553,14 +557,54 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	compute, err := os.NewComputeV2()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	srv, err := servers.Get(compute, instanceID).Extract()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	zone := cloudprovider.Zone{
+		FailureDomain: srv.Metadata[AvailabilityZone],
+		Region:        os.region,
+	}
+	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+
+	return zone, nil
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	compute, err := os.NewComputeV2()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	srv, err := getServerByName(compute, nodeName)
+	if err != nil {
+		if err == ErrNotFound {
+			return cloudprovider.Zone{}, cloudprovider.InstanceNotFound
+		}
+		return cloudprovider.Zone{}, err
+	}
+
+	zone := cloudprovider.Zone{
+		FailureDomain: srv.Metadata[AvailabilityZone],
+		Region:        os.region,
+	}
+	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+
+	return zone, nil
 }
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
