@@ -431,8 +431,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		It("should support exec through kubectl proxy", func() {
-			Skip("kubernetes/kubernetes#50466: This feature doesn't work for anything but client certs authentication.")
-
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
