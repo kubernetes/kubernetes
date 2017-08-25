@@ -32,10 +32,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	"k8s.io/kubernetes/pkg/features"
-	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
-	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
+	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
@@ -75,17 +72,12 @@ func main() {
 	if err := options.ValidateKubeletFlags(kubeletFlags); err != nil {
 		die(err)
 	}
-	// if dynamic kubelet config is enabled, bootstrap the kubelet config controller
-	var kubeletConfig *kubeletconfiginternal.KubeletConfiguration
-	var kubeletConfigController *kubeletconfig.Controller
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		var err error
-		kubeletConfig, kubeletConfigController, err = app.BootstrapKubeletConfigController(kubeletFlags, defaultConfig)
-		if err != nil {
-			die(err)
-		}
-	} else if kubeletConfig == nil {
-		kubeletConfig = defaultConfig
+	// bootstrap the kubelet config controller, app.BootstrapKubeletConfigController will check
+	// feature gates and only turn on relevant parts of the controller
+	kubeletConfig, kubeletConfigController, err := app.BootstrapKubeletConfigController(
+		defaultConfig, kubeletFlags.InitConfigDir, kubeletFlags.DynamicConfigDir)
+	if err != nil {
+		die(err)
 	}
 
 	// construct a KubeletServer from kubeletFlags and kubeletConfig

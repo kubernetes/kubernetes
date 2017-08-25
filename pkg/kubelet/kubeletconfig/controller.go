@@ -78,9 +78,9 @@ type Controller struct {
 // If the `initConfigDir` is an empty string, skips trying to load the init config.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(initConfigDir string,
-	dynamicConfigDir string,
-	defaultConfig *kubeletconfig.KubeletConfiguration) (*Controller, error) {
+func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
+	initConfigDir string,
+	dynamicConfigDir string) (*Controller, error) {
 	var err error
 
 	fs := utilfs.DefaultFs{}

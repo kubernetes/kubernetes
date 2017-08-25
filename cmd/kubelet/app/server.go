@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/flag"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -766,29 +767,29 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(
-	flags *options.KubeletFlags,
-	defaultConfig *kubeletconfiginternal.KubeletConfiguration) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
+func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.KubeletConfiguration,
+	initConfigDirFlag flag.StringFlag,
+	dynamicConfigDirFlag flag.StringFlag) (*kubeletconfiginternal.KubeletConfiguration, *kubeletconfig.Controller, error) {
 	var err error
 	// Alpha Dynamic Configuration Implementation; this section only loads config from disk, it does not contact the API server
 	// compute absolute paths based on current working dir
 	initConfigDir := ""
-	if flags.InitConfigDir.Provided() {
-		initConfigDir, err = filepath.Abs(flags.InitConfigDir.Value())
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) && initConfigDirFlag.Provided() {
+		initConfigDir, err = filepath.Abs(initConfigDirFlag.Value())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get absolute path for --init-config-dir")
 		}
 	}
 	dynamicConfigDir := ""
-	if flags.DynamicConfigDir.Provided() {
-		dynamicConfigDir, err = filepath.Abs(flags.DynamicConfigDir.Value())
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && dynamicConfigDirFlag.Provided() {
+		dynamicConfigDir, err = filepath.Abs(dynamicConfigDirFlag.Value())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get absolute path for --dynamic-config-dir")
 		}
 	}
 
 	// get the latest KubeletConfiguration checkpoint from disk, or load the init or default config if no valid checkpoints exist
-	kubeletConfigController, err := kubeletconfig.NewController(initConfigDir, dynamicConfigDir, defaultConfig)
+	kubeletConfigController, err := kubeletconfig.NewController(defaultConfig, initConfigDir, dynamicConfigDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to construct controller, error: %v", err)
 	}
