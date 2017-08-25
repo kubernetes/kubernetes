@@ -69,6 +69,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "kubemark")
 
+		// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
+		_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
+		if err != nil {
+			framework.Skipf("test expects Cluster Autoscaler to be enabled")
+		}
+
 		c = f.ClientSet
 		if originalSizes == nil {
 			originalSizes = make(map[string]int)
