@@ -42,8 +42,8 @@ type flexVolumePlugin struct {
 	runner     exec.Interface
 
 	sync.Mutex
-	capabilities        *driverCapabilities
 	unsupportedCommands []string
+	capabilities        DriverCapabilities
 }
 
 type flexVolumeAttachablePlugin struct {
@@ -65,19 +65,16 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 		unsupportedCommands: []string{},
 	}
 
-	// Retrieve driver reported capabilities
+	// Initialize the plugin and probe the capabilities
 	call := flexPlugin.NewDriverCall(initCmd)
 	ds, err := call.Run()
 	if err != nil {
 		return nil, err
 	}
+	flexPlugin.capabilities = *ds.Capabilities
 
-	driverCaps := ds.getDriverCapabilities()
-	flexPlugin.capabilities = driverCaps
-
-	// Check whether the plugin is attachable.
-	if driverCaps.attach {
-		// Plugin supports attach/detach by default, so return flexVolumeAttachablePlugin
+	if flexPlugin.capabilities.Attach {
+		// Plugin supports attach/detach, so return flexVolumeAttachablePlugin
 		return &flexVolumeAttachablePlugin{flexVolumePlugin: flexPlugin}, nil
 	} else {
 		return flexPlugin, nil
