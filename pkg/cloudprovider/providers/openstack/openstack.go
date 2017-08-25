@@ -549,6 +549,20 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	return zone, nil
 }
 
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+}
+
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	glog.V(4).Info("openstack.Routes() called")
 

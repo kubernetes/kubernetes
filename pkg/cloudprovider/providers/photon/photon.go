@@ -521,6 +521,20 @@ func (pc *PCCloud) GetZone() (cloudprovider.Zone, error) {
 	return pc.Zone, nil
 }
 
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (pc *PCCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (pc *PCCloud) GetZoneByNodeName(nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+}
+
 // Routes returns a false since the interface is not supported for photon controller.
 func (pc *PCCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false

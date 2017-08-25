@@ -554,6 +554,20 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{Region: os.region}, nil
 }
 
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *Rackspace) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *Rackspace) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+}
+
 // Create a volume of given size (in GiB)
 func (rs *Rackspace) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
 	return "", "", errors.New("unimplemented")

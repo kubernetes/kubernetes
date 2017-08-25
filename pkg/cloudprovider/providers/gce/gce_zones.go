@@ -17,12 +17,14 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"strings"
 )
 
 func newZonesMetricContext(request, region string) *metricContext {
@@ -35,6 +37,20 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: gce.localZone,
 		Region:        gce.region,
 	}, nil
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (gce *GCECloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (gce *GCECloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
 }
 
 // ListZonesInRegion returns all zones in a GCP region
