@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
@@ -27,7 +28,7 @@ func NewCmdPreFlight() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "preflight",
 		Short: "Run pre-flight checks",
-		RunE:  subCmdRunE("preflight"),
+		RunE:  cmdutil.SubCmdRunE("preflight"),
 	}
 
 	cmd.AddCommand(NewCmdPreFlightMaster())

@@ -23,6 +23,7 @@ import (
 
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -37,7 +38,7 @@ func NewCmdSelfhosting() *cobra.Command {
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted"},
 		Short:   "Make a kubeadm cluster self-hosted.",
-		RunE:    subCmdRunE("selfhosting"),
+		RunE:    cmdutil.SubCmdRunE("selfhosting"),
 	}
 
 	cmd.AddCommand(getSelfhostingSubCommand())

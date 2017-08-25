@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	clientset "k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -36,7 +37,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 		Use:     "bootstrap-token",
 		Short:   "Manage kubeadm-specific Bootstrap Token functions.",
 		Aliases: []string{"bootstraptoken"},
-		RunE:    subCmdRunE("bootstrap-token"),
+		RunE:    cmdutil.SubCmdRunE("bootstrap-token"),
 	}
 
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
@@ -55,7 +56,7 @@ func NewSubCmdClusterInfo(kubeConfigFile *string) *cobra.Command {
 		Short:   "Uploads and exposes the cluster-info ConfigMap publicly from the given cluster-info file",
 		Aliases: []string{"clusterinfo"},
 		Run: func(cmd *cobra.Command, args []string) {
-			err := validateExactArgNumber(args, []string{"clusterinfo-file"})
+			err := cmdutil.ValidateExactArgNumber(args, []string{"clusterinfo-file"})
 			kubeadmutil.CheckErr(err)
 
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
@@ -81,7 +82,7 @@ func NewSubCmdNodeBootstrapToken(kubeConfigFile *string) *cobra.Command {
 		Use:     "node",
 		Short:   "Manages Node Bootstrap Tokens",
 		Aliases: []string{"clusterinfo"},
-		RunE:    subCmdRunE("node"),
+		RunE:    cmdutil.SubCmdRunE("node"),
 	}
 
 	cmd.AddCommand(NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile))

@@ -52,10 +52,10 @@ func TestValidateExactArgNumber(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := validateExactArgNumber(rt.args, rt.supportedArgs)
+		actual := ValidateExactArgNumber(rt.args, rt.supportedArgs)
 		if (actual != nil) != rt.expectedErr {
 			t.Errorf(
-				"failed validateExactArgNumber:\n\texpected error: %t\n\t  actual error: %t",
+				"failed ValidateExactArgNumber:\n\texpected error: %t\n\t  actual error: %t",
 				rt.expectedErr,
 				(actual != nil),
 			)

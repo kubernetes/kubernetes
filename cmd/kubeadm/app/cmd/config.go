@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -52,7 +53,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: subCmdRunE("config"),
+		RunE: cmdutil.SubCmdRunE("config"),
 	}
 
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
@@ -67,7 +68,7 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
 		Short: "Upload configuration about the current state so 'kubeadm upgrade' later can know how to configure the upgraded cluster",
-		RunE:  subCmdRunE("upload"),
+		RunE:  cmdutil.SubCmdRunE("upload"),
 	}
 
 	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
