@@ -1066,6 +1066,14 @@ func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.P
 	return allErrs
 }
 
+func validateCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cephfs.Monitors) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+	}
+	return allErrs
+}
+
 func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
@@ -1350,7 +1358,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("cephFS"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCephFSVolumeSource(pv.Spec.CephFS, specPath.Child("cephfs"))...)
+			allErrs = append(allErrs, validateCephFSPersistentVolumeSource(pv.Spec.CephFS, specPath.Child("cephfs"))...)
 		}
 	}
 	if pv.Spec.ISCSI != nil {

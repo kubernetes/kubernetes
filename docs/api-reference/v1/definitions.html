@@ -2380,6 +2380,47 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="_v1_secretreference">v1.SecretReference</h3>
+<div class="paragraph">
+<p>SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name is unique within a namespace to reference a secret resource.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">namespace</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Namespace defines the space within which the secret name must be unique.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_objectmeta">v1.ObjectMeta</h3>
 <div class="paragraph">
 <p>ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.</p>
@@ -4843,6 +4884,75 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_cephfspersistentvolumesource">v1.CephFSPersistentVolumeSource</h3>
+<div class="paragraph">
+<p>Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Monitors is a collection of Ceph monitors More info: <a href="https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Used as the mounted root, rather than the full Ceph tree, default is /</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: User is the rados user name, default is admin More info: <a href="https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretFile</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: <a href="https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: <a href="https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_secretreference">v1.SecretReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: <a href="https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 </tbody>
 </table>
@@ -7419,7 +7529,7 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">cephfs</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">CephFS represents a Ceph FS mount on the host that shares a pod&#8217;s lifetime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_cephfsvolumesource">v1.CephFSVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_cephfspersistentvolumesource">v1.CephFSPersistentVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
