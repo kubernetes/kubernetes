@@ -284,7 +284,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 			return err
 		}
 		// If the error is type NoRBACAPIError, We continue to create the rest of
-		// the resources, without the SA and roles (in the abscense of RBAC support).
+		// the resources, without the SA and roles (in the absence of RBAC support).
 		rbacAvailable = false
 	}
 
