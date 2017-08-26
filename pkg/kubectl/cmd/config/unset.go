@@ -39,7 +39,7 @@ var (
 	unsetLong = templates.LongDesc(`
 	Unsets an individual value in a kubeconfig file
 
-	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
+	PROPERTY-NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
 
 	unsetExample = templates.Examples(`
 		# Unset the current-context.
@@ -53,7 +53,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "unset PROPERTY_NAME",
+		Use: "unset PROPERTY-NAME",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Unsets an individual value in a kubeconfig file"),
 		Long:    unsetLong,

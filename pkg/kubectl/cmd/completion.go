@@ -48,7 +48,7 @@ var (
 		Output shell completion code for the specified shell (bash or zsh).
 		The shell code must be evaluated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
-		the .bash_profile.
+		the ` + "`.bash_profile.`" + `
 
 		Detailed instructions on how to do this are available here:
 		https://kubernetes.io/docs/tasks/tools/install-kubectl/#enabling-shell-autocompletion

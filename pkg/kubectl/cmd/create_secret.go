@@ -133,7 +133,7 @@ var (
 		Dockercfg secrets are used to authenticate against Docker registries.
 
 		When using the Docker command line to push images, you can authenticate to a given registry by running:
-			'$ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
+			'$ docker login DOCKER-REGISTRY-SERVER --username=DOCKER-USER --password=DOCKER-PASSWORD --email=DOCKER-EMAIL'.
 
     	That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
 		authenticate to the registry. The email address is optional.
@@ -144,7 +144,7 @@ var (
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
 		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
-		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`))
+		  kubectl create secret docker-registry my-secret --docker-server=DOCKER-REGISTRY-SERVER --docker-username=DOCKER-USER --docker-password=DOCKER-PASSWORD --docker-email=DOCKER-EMAIL`))
 )
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
