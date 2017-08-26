@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/spf13/afero"
+	"path/filepath"
 )
 
 // fakeFs is implemented in terms of afero
@@ -62,18 +63,33 @@ func (fs *fakeFs) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	return fs.a.Fs.Chtimes(name, atime, mtime)
 }
 
-// ReadFile via afero.Fs.ReadFile
+// ReadFile via afero.ReadFile
 func (fs *fakeFs) ReadFile(filename string) ([]byte, error) {
 	return fs.a.ReadFile(filename)
 }
 
-// TempFile via afero.Fs.TempFile
+// TempFile via afero.TempFile
 func (fs *fakeFs) TempFile(dir, prefix string) (File, error) {
 	file, err := fs.a.TempFile(dir, prefix)
 	if err != nil {
 		return nil, err
 	}
 	return &fakeFile{file}, nil
+}
+
+// ReadDir via afero.ReadDir
+func (fs *fakeFs) ReadDir(dirname string) ([]os.FileInfo, error) {
+	return fs.a.ReadDir(dirname)
+}
+
+// Walk via afero.Walk
+func (fs *fakeFs) Walk(root string, walkFn filepath.WalkFunc) error {
+	return fs.a.Walk(root, walkFn)
+}
+
+// RemoveAll via afero.RemoveAll
+func (fs *fakeFs) RemoveAll(path string) error {
+	return fs.a.RemoveAll(path)
 }
 
 // fakeFile implements File; for use with fakeFs

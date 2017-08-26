@@ -19,11 +19,14 @@ package filesystem
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 )
 
 // DefaultFs implements Filesystem using same-named functions from "os" and "io/ioutil"
 type DefaultFs struct{}
+
+var _ Filesystem = DefaultFs{}
 
 // Stat via os.Stat
 func (DefaultFs) Stat(name string) (os.FileInfo, error) {
@@ -54,18 +57,33 @@ func (DefaultFs) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	return os.Chtimes(name, atime, mtime)
 }
 
-// ReadFile via os.ReadFile
+// RemoveAll via os.RemoveAll
+func (DefaultFs) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
+
+// ReadFile via ioutil.ReadFile
 func (DefaultFs) ReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }
 
-// TempFile via os.TempFile
+// TempFile via ioutil.TempFile
 func (DefaultFs) TempFile(dir, prefix string) (File, error) {
 	file, err := ioutil.TempFile(dir, prefix)
 	if err != nil {
 		return nil, err
 	}
 	return &defaultFile{file}, nil
+}
+
+// ReadDir via ioutil.ReadDir
+func (DefaultFs) ReadDir(dirname string) ([]os.FileInfo, error) {
+	return ioutil.ReadDir(dirname)
+}
+
+// Walk via filepath.Walk
+func (DefaultFs) Walk(root string, walkFn filepath.WalkFunc) error {
+	return filepath.Walk(root, walkFn)
 }
 
 // defaultFile implements File using same-named functions from "os"
