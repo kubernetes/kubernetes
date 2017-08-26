@@ -1,7 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
+load(
+    "@io_bazel_rules_docker//docker/contrib:push-all.bzl",
+    docker_pushall = "docker_push",
+)
 load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+
+config_setting(
+    name = "actual_release",
+    values = {
+        "define": "RELEASE_FLAVOR=actual",
+    },
+)
 
 filegroup(
     name = "package-srcs",
@@ -25,23 +36,23 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image:image",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image:image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image:image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image:image",
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": "@debian-iptables-amd64//image:image.tar",
+        "base": "@debian-iptables-amd64//image:image",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
@@ -158,4 +169,32 @@ filegroup(
         "//test/e2e/testing-manifests:all-srcs",
         "//test/kubemark:all-srcs",
     ],
+)
+
+# These bundles group images at no build time cost unless a .tar is built from
+# the bundle. We use these bundles to push all images from the pushall rule.
+docker_bundle(
+    name = "all_images",
+    images = {
+        "gcr.io/google_containers/%s:{STABLE_DOCKER_TAG}" % (binary): binary + "-internal"
+        for binary in DOCKERIZED_BINARIES.keys()
+    },
+    stamp = True,
+)
+
+docker_bundle(
+    name = "all_dev_images",
+    images = {
+        "gcr.io/kubernetes-ci-images/bazel/%s:{STABLE_DOCKER_TAG}" % (binary): binary + "-internal"
+        for binary in DOCKERIZED_BINARIES.keys()
+    },
+    stamp = True,
+)
+
+docker_pushall(
+    name = "push_all_images",
+    bundle = select({
+        ":actual_release": "all_images",
+        "//conditions:default": "all_dev_images",
+    }),
 )
