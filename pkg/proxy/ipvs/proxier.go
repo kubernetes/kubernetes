@@ -909,7 +909,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	// activeIPVSServices represents IPVS service successfully created in this round of sync
 	activeIPVSServices := map[string]bool{}
 	// currentIPVSServices represent IPVS services listed from the system
-	currentIPVSServices := make(map[string]*utilipvs.FrontendService)
+	currentIPVSServices := make(map[string]*utilipvs.VirtualServer)
 
 	// Build IPVS rules for each service.
 	for svcName, svcInfo := range proxier.serviceMap {
@@ -919,7 +919,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 		svcNameString := svcName.String()
 
 		// Capture the clusterIP.
-		serv := &utilipvs.FrontendService{
+		serv := &utilipvs.VirtualServer{
 			Address:   svcInfo.clusterIP,
 			Port:      uint16(svcInfo.port),
 			Protocol:  string(svcInfo.protocol),
@@ -1000,7 +1000,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 				}
 			} // We're holding the port, so it's OK to install IPVS rules.
 
-			serv := &utilipvs.FrontendService{
+			serv := &utilipvs.VirtualServer{
 				Address:   net.ParseIP(externalIP),
 				Port:      uint16(svcInfo.port),
 				Protocol:  string(svcInfo.protocol),
@@ -1061,7 +1061,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 					writeLine(natRules, append(args, "-j", string(KubeMarkDropChain))...)
 				}
 
-				serv := &utilipvs.FrontendService{
+				serv := &utilipvs.VirtualServer{
 					Address:   net.ParseIP(ingress.IP),
 					Port:      uint16(svcInfo.port),
 					Protocol:  string(svcInfo.protocol),
@@ -1111,7 +1111,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 				glog.Errorf("Failed to get node IP, err: %v", err)
 			} else {
 				for _, nodeIP := range nodeIPs {
-					serv := &utilipvs.FrontendService{
+					serv := &utilipvs.VirtualServer{
 						Address:   nodeIP,
 						Port:      uint16(svcInfo.nodePort),
 						Protocol:  string(svcInfo.protocol),
@@ -1161,7 +1161,7 @@ func (proxier *Proxier) syncProxyRules(reason syncReason) {
 	proxier.portsMap = replacementPortsMap
 
 	// Clean up legacy IPVS services
-	appliedSvcs, err := proxier.ipvs.GetServices()
+	appliedSvcs, err := proxier.ipvs.GetVirtualServers()
 	if err == nil {
 		for _, appliedSvc := range appliedSvcs {
 			currentIPVSServices[appliedSvc.String()] = appliedSvc
@@ -1211,13 +1211,13 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 	}
 }
 
-func (proxier *Proxier) syncService(svcName string, ipvsSvc *utilipvs.FrontendService, bindAddr bool) error {
-	appliedSvc, _ := proxier.ipvs.GetService(ipvsSvc)
-	if appliedSvc == nil || !appliedSvc.Equal(ipvsSvc) {
-		if appliedSvc == nil {
+func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, bindAddr bool) error {
+	appliedVirtualServer, _ := proxier.ipvs.GetVirtualServer(vs)
+	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
+		if appliedVirtualServer == nil {
 			// IPVS service is not found, create a new service
-			glog.V(3).Infof("Adding new service %q %s:%d/%s", svcName, ipvsSvc.Address, ipvsSvc.Port, ipvsSvc.Protocol)
-			if err := proxier.ipvs.AddService(ipvsSvc); err != nil {
+			glog.V(3).Infof("Adding new service %q %s:%d/%s", svcName, appliedVirtualServer.Address, appliedVirtualServer.Port, appliedVirtualServer.Protocol)
+			if err := proxier.ipvs.AddVirtualServer(vs); err != nil {
 				glog.Errorf("Failed to add IPVS service %q: %v", svcName, err)
 				return err
 			}
@@ -1225,7 +1225,7 @@ func (proxier *Proxier) syncService(svcName string, ipvsSvc *utilipvs.FrontendSe
 			// IPVS service was changed, update the existing one
 			// During updates, service VIP will not go down
 			glog.V(3).Infof("IPVS service %s was changed", svcName)
-			if err := proxier.ipvs.UpdateService(appliedSvc); err != nil {
+			if err := proxier.ipvs.UpdateVirtualServer(appliedVirtualServer); err != nil {
 				glog.Errorf("Failed to update IPVS service, err:%v", err)
 				return err
 			}
@@ -1235,7 +1235,7 @@ func (proxier *Proxier) syncService(svcName string, ipvsSvc *utilipvs.FrontendSe
 	// bind service address to dummy interface even if service not changed,
 	// in case that service IP was removed by other processes
 	if bindAddr {
-		_, err := proxier.ipvs.EnsureServiceAddressBind(ipvsSvc, DefaultDummyDevice)
+		_, err := proxier.ipvs.EnsureVirtualServerAddressBind(vs, DefaultDummyDevice)
 		if err != nil {
 			glog.Errorf("Failed to bind service address to dummy device %q: %v", svcName, err)
 			return err
@@ -1244,9 +1244,9 @@ func (proxier *Proxier) syncService(svcName string, ipvsSvc *utilipvs.FrontendSe
 	return nil
 }
 
-func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNodeLocalEndpoints bool, ipvsSvc *utilipvs.FrontendService) error {
-	svc, err := proxier.ipvs.GetService(ipvsSvc)
-	if err != nil || svc == nil {
+func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNodeLocalEndpoints bool, vs *utilipvs.VirtualServer) error {
+	appliedVirtualServer, err := proxier.ipvs.GetVirtualServer(vs)
+	if err != nil || appliedVirtualServer == nil {
 		glog.Errorf("Failed to get IPVS service, error: %v", err)
 		return err
 	}
@@ -1256,7 +1256,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	// newEndpoints represents Endpoints watched from API Server.
 	newEndpoints := sets.NewString()
 
-	curDests, err := proxier.ipvs.GetDestinations(svc)
+	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
 		glog.Errorf("Failed to list IPVS destinations, error: %v", err)
 		return err
@@ -1285,12 +1285,12 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				continue
 			}
 
-			newDest := &utilipvs.FrontendDestination{
+			newDest := &utilipvs.RealServer{
 				Address: net.ParseIP(ip),
 				Port:    uint16(portNum),
 				Weight:  1,
 			}
-			err = proxier.ipvs.AddDestination(svc, newDest)
+			err = proxier.ipvs.AddRealServer(appliedVirtualServer, newDest)
 			if err != nil {
 				glog.Errorf("Failed to add destination: %v, error: %v", newDest, err)
 				continue
@@ -1309,11 +1309,11 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 				continue
 			}
 
-			delDest := &utilipvs.FrontendDestination{
+			delDest := &utilipvs.RealServer{
 				Address: net.ParseIP(ip),
 				Port:    uint16(portNum),
 			}
-			err = proxier.ipvs.DeleteDestination(svc, delDest)
+			err = proxier.ipvs.DeleteRealServer(appliedVirtualServer, delDest)
 			if err != nil {
 				glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
 				continue
@@ -1323,15 +1323,15 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	return nil
 }
 
-func (proxier *Proxier) cleanLegacyService(atciveServices map[string]bool, currentServices map[string]*utilipvs.FrontendService) {
+func (proxier *Proxier) cleanLegacyService(atciveServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {
 	for cS := range currentServices {
 		if !atciveServices[cS] {
 			svc := currentServices[cS]
-			err := proxier.ipvs.DeleteService(svc)
+			err := proxier.ipvs.DeleteVirtualServer(svc)
 			if err != nil {
 				glog.Errorf("Failed to delete service, error: %v", err)
 			}
-			err = proxier.ipvs.UnbindServiceAddress(svc, DefaultDummyDevice)
+			err = proxier.ipvs.UnbindVirtualServerAddress(svc, DefaultDummyDevice)
 			if err != nil {
 				glog.Errorf("Failed to unbind service from dummy interface, error: %v", err)
 			}

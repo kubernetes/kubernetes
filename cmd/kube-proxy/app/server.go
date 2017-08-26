@@ -809,6 +809,9 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, kcompat i
 	if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
 		if proxyMode == proxyModeIPVS {
 			return tryIPVSProxy(iptver, kcompat)
+		} else {
+			glog.Warningf("Can't use ipvs proxier, trying iptables proxier")
+			return tryIPTablesProxy(iptver, kcompat)
 		}
 	}
 	glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
@@ -830,7 +833,7 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelComp
 	// TODO: Check ipvs version
 
 	// Try to fallback to iptables before falling back to userspace
-	glog.V(1).Infof("Can't use ipvs proxy, trying iptables proxier")
+	glog.V(1).Infof("Can't use ipvs proxier, trying iptables proxier")
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
