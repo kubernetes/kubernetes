@@ -19,7 +19,7 @@ package openstack
 import (
 	"errors"
 	"fmt"
-	"net/url"
+	"regexp"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
@@ -180,14 +180,16 @@ func srvInstanceType(srv *servers.Server) (string, error) {
 	return "", fmt.Errorf("flavor name/id not found")
 }
 
+// instanceIDFromProviderID splits a provider's id and return instanceID.
+// A providerID is build out of '${ProviderName}:///${instance-id}'which contains ':///'.
+// See cloudprovider.GetInstanceProviderID and Instances.InstanceID.
 func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
-	parsedID, err := url.Parse(providerID)
-	if err != nil {
-		return "", err
-	}
-	if parsedID.Scheme != ProviderName {
-		return "", fmt.Errorf("unrecognized provider %q", parsedID.Scheme)
-	}
+	// If Instances.InstanceID or cloudprovider.GetInstanceProviderID is changed, the regexp should be changed too.
+	var providerIdRegexp = regexp.MustCompile(`^` + ProviderName + `:///([^/]+)$`)
 
-	return parsedID.Host, nil
+	matches := providerIdRegexp.FindStringSubmatch(providerID)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
+	}
+	return matches[1], nil
 }

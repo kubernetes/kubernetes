@@ -454,11 +454,11 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 // versioned representation to an unversioned one.
 func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
 	if s.fieldLabelConversionFuncs[version] == nil {
-		return "", "", fmt.Errorf("No field label conversion function found for version: %s", version)
+		return DefaultMetaV1FieldSelectorConversion(label, value)
 	}
 	conversionFunc, ok := s.fieldLabelConversionFuncs[version][kind]
 	if !ok {
-		return "", "", fmt.Errorf("No field label conversion function found for version %s and kind %s", version, kind)
+		return DefaultMetaV1FieldSelectorConversion(label, value)
 	}
 	return conversionFunc(label, value)
 }

@@ -25,7 +25,7 @@
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
-    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% endif -%}
 
   {% if grains.cloud in ['openstack'] -%}
@@ -119,7 +119,7 @@
 {% if grains.webhook_authentication_config is defined -%}
   {% set webhook_authentication_config = " --authentication-token-webhook-config-file=" + grains.webhook_authentication_config -%}
   {% set webhook_authn_config_mount = "{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"" + grains.webhook_authentication_config + "\", \"readOnly\": false}," -%}
-  {% set webhook_authn_config_volume = "{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authentication_config + "\"}}," -%}
+  {% set webhook_authn_config_volume = "{\"name\": \"webhookauthnconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authentication_config + "\", \"type\": \"FileOrCreate\"}}," -%}
 {% endif -%}
 
 {% set webhook_authorization_config = "" -%}
@@ -128,7 +128,7 @@
 {% if grains.webhook_authorization_config is defined -%}
   {% set webhook_authorization_config = " --authorization-webhook-config-file=" + grains.webhook_authorization_config -%}
   {% set webhook_config_mount = "{\"name\": \"webhookconfigmount\",\"mountPath\": \"" + grains.webhook_authorization_config + "\", \"readOnly\": false}," -%}
-  {% set webhook_config_volume = "{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authorization_config + "\"}}," -%}
+  {% set webhook_config_volume = "{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"" + grains.webhook_authorization_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% set authz_mode = authz_mode + ",Webhook" -%}
 {% endif -%}
 
@@ -140,9 +140,9 @@
 {% if grains.image_review_config is defined -%}
   {% set image_review_config = " --admission-control-config-file=" + grains.image_review_config -%}
   {% set admission_controller_config_mount = "{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"" + grains.image_review_config + "\", \"readOnly\": false}," -%}
-  {% set admission_controller_config_volume = "{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"" + grains.image_review_config + "\"}}," -%}
+  {% set admission_controller_config_volume = "{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"" + grains.image_review_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% set image_policy_webhook_config_mount = "{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false}," -%}
-  {% set image_policy_webhook_config_volume = "{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\"}}," -%}
+  {% set image_policy_webhook_config_volume = "{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\", \"type\": \"FileOrCreate\"}}," -%}
 {% endif -%}
 
 {% set admission_control = "" -%}
@@ -185,14 +185,14 @@
 {% elif pillar['enable_apiserver_advanced_audit'] is defined and pillar['enable_apiserver_advanced_audit'] in ['true']  -%}
   {% set audit_log = "--audit-policy-file=/etc/audit_policy.config" -%}
   {% set audit_policy_config_mount = "{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"/etc/audit_policy.config\", \"readOnly\": true}," -%}
-  {% set audit_policy_config_volume = "{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_policy.config\"}}," -%}
+  {% set audit_policy_config_volume = "{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_policy.config\", \"type\": \"FileOrCreate\"}}," -%}
   {% if pillar['advanced_audit_backend'] is defined and 'log' in pillar['advanced_audit_backend'] -%}
     {% set audit_log = audit_log + " --audit-log-path=/var/log/kube-apiserver-audit.log --audit-log-maxage=0 --audit-log-maxbackup=0 --audit-log-maxsize=2000000000" -%}
   {% endif %}
   {% if pillar['advanced_audit_backend'] is defined and 'webhook' in pillar['advanced_audit_backend'] -%}
     {% set audit_log = audit_log + " --audit-webhook-mode=batch" -%}
     {% set audit_webhook_config_mount = "{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"/etc/audit_webhook.config\", \"readOnly\": true}," -%}
-    {% set audit_webhook_config_volume = "{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_webhook.config\"}}," -%}
+    {% set audit_webhook_config_volume = "{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/audit_webhook.config\", \"type\": \"FileOrCreate\"}}," -%}
   {% endif %}
 {% endif -%}
 
@@ -308,11 +308,13 @@
   },
   { "name": "logfile",
     "hostPath": {
-        "path": "/var/log/kube-apiserver.log"}
+        "path": "/var/log/kube-apiserver.log",
+        "type": "FileOrCreate"}
   },
   { "name": "auditlogfile",
     "hostPath": {
-        "path": "/var/log/kube-apiserver-audit.log"}
+        "path": "/var/log/kube-apiserver-audit.log",
+        "type": "FileOrCreate"}
   },
   { "name": "etcssl",
     "hostPath": {

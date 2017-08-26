@@ -207,6 +207,8 @@ var standardResources = sets.NewString(
 	string(api.ResourcePersistentVolumeClaims),
 	string(api.ResourceStorage),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceServicesNodePorts),
+	string(api.ResourceServicesLoadBalancers),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system

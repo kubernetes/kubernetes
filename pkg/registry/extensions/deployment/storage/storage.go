@@ -146,6 +146,7 @@ func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object,
 		return nil, err
 	}
 	return &metav1.Status{
+		Status:  metav1.StatusSuccess,
 		Message: fmt.Sprintf("rollback request for deployment %q succeeded", rollback.Name),
 		Code:    http.StatusOK,
 	}, nil

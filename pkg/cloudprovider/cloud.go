@@ -184,5 +184,18 @@ type Zone struct {
 // Zones is an abstract, pluggable interface for zone enumeration.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+	// In most cases, this method is called from the kubelet querying a local metadata service to aquire its zone.
+	// For the case of external cloud providers, use GetZoneByProviderID or GetZoneByNodeName since GetZone
+	// can no longer be called from the kubelets.
 	GetZone() (Zone, error)
+
+	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByProviderID(providerID string) (Zone, error)
+
+	// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByNodeName(nodeName types.NodeName) (Zone, error)
 }

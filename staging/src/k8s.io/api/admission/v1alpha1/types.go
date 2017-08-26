@@ -20,7 +20,6 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/admission"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -48,7 +47,7 @@ type AdmissionReviewSpec struct {
 	// +optional
 	OldObject runtime.RawExtension `json:"oldObject,omitempty" protobuf:"bytes,3,opt,name=oldObject"`
 	// Operation is the operation being performed
-	Operation admission.Operation `json:"operation,omitempty" protobuf:"bytes,4,opt,name=operation"`
+	Operation Operation `json:"operation,omitempty" protobuf:"bytes,4,opt,name=operation"`
 	// Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and
 	// rely on the server to generate the name.  If that is the case, this method will return the empty string.
 	// +optional
@@ -78,3 +77,14 @@ type AdmissionReviewStatus struct {
 	// +optional
 	Result *metav1.Status `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
+
+// Operation is the type of resource operation being checked for admission control
+type Operation string
+
+// Operation constants
+const (
+	Create  Operation = "CREATE"
+	Update  Operation = "UPDATE"
+	Delete  Operation = "DELETE"
+	Connect Operation = "CONNECT"
+)

@@ -256,11 +256,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	collisionCount int32,
 	pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
 	// get the current and update revisions of the set.
-	currentSet, err := applyRevision(set, currentRevision)
+	currentSet, err := ApplyRevision(set, currentRevision)
 	if err != nil {
 		return nil, err
 	}
-	updateSet, err := applyRevision(set, updateRevision)
+	updateSet, err := ApplyRevision(set, updateRevision)
 	if err != nil {
 		return nil, err
 	}

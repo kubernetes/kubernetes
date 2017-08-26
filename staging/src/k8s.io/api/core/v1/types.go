@@ -409,7 +409,7 @@ type PersistentVolumeSource struct {
 	Cinder *CinderVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
-	CephFS *CephFSVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,9,opt,name=cephfs"`
+	CephFS *CephFSPersistentVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,9,opt,name=cephfs"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource `json:"fc,omitempty" protobuf:"bytes,10,opt,name=fc"`
@@ -423,7 +423,7 @@ type PersistentVolumeSource struct {
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty" protobuf:"bytes,12,opt,name=flexVolume"`
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
-	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
+	AzureFile *AzureFilePersistentVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
@@ -848,6 +848,45 @@ type CephFSVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
+type SecretReference struct {
+	// Name is unique within a namespace to reference a secret resource.
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// Namespace defines the space within which the secret name must be unique.
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+}
+
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
+type CephFSPersistentVolumeSource struct {
+	// Required: Monitors is a collection of Ceph monitors
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	// +optional
+	Path string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	// Optional: User is the rados user name, default is admin
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	// +optional
+	User string `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
+	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	// +optional
+	SecretFile string `json:"secretFile,omitempty" protobuf:"bytes,4,opt,name=secretFile"`
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+}
+
 // Represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
@@ -1167,6 +1206,22 @@ type AzureFileVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+type AzureFilePersistentVolumeSource struct {
+	// the name of secret that contains Azure Storage Account Name and Key
+	SecretName string `json:"secretName" protobuf:"bytes,1,opt,name=secretName"`
+	// Share Name
+	ShareName string `json:"shareName" protobuf:"bytes,2,opt,name=shareName"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// the namespace of the secret that contains Azure Storage Account Name and Key
+	// default is the same as the Pod
+	// +optional
+	SecretNamespace *string `json:"secretNamespace" protobuf:"bytes,4,opt,name=secretNamespace"`
 }
 
 // Represents a vSphere volume resource.

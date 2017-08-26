@@ -120,12 +120,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
 
-	// TODO: remove post-1.6
-	fs.String("long-running-request-regexp", "", ""+
-		"A regular expression matching long running requests which should "+
-		"be excluded from maximum inflight request handling.")
-	fs.MarkDeprecated("long-running-request-regexp", "regular expression matching of long-running requests is no longer supported")
-
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")

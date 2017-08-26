@@ -54,7 +54,10 @@ const (
 // 8. In order to avoid race conditions, we have to make sure that static pod is deleted correctly before we continue
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, waiter apiclient.Waiter) error {
+
+	// Adjust the timeout slightly to something self-hosting specific
+	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's podspec is stored
 	mutators := getDefaultMutators()
@@ -66,7 +69,7 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		if err := uploadTLSSecrets(client, cfg.CertificatesDir); err != nil {
 			return err
 		}
-		if err := uploadKubeConfigSecrets(client); err != nil {
+		if err := uploadKubeConfigSecrets(client, kubeConfigDir); err != nil {
 			return err
 		}
 		// Add the store-certs-in-secrets-specific mutators here so that the self-hosted component starts using them
@@ -77,7 +80,7 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 
 	for _, componentName := range kubeadmconstants.MasterComponents {
 		start := time.Now()
-		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, kubeadmconstants.GetStaticPodDirectory())
+		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, manifestsDir)
 
 		// Since we want this function to be idempotent; just continue and try the next component if this file doesn't exist
 		if _, err := os.Stat(manifestPath); err != nil {
@@ -102,7 +105,7 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		}
 
 		// Wait for the self-hosted component to come up
-		if err := apiclient.WaitForPodsWithLabel(client, selfHostingWaitTimeout, os.Stdout, buildSelfHostedWorkloadLabelQuery(componentName)); err != nil {
+		if err := waiter.WaitForPodsWithLabel(buildSelfHostedWorkloadLabelQuery(componentName)); err != nil {
 			return err
 		}
 
@@ -115,12 +118,12 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		// remove the Static Pod (or the mirror Pod respectively). This implicitely also tests that the API server endpoint is healthy,
 		// because this blocks until the API server returns a 404 Not Found when getting the Static Pod
 		staticPodName := fmt.Sprintf("%s-%s", componentName, cfg.NodeName)
-		if err := apiclient.WaitForStaticPodToDisappear(client, selfHostingWaitTimeout, staticPodName); err != nil {
+		if err := waiter.WaitForPodToDisappear(staticPodName); err != nil {
 			return err
 		}
 
 		// Just as an extra safety check; make sure the API server is returning ok at the /healthz endpoint (although we know it could return a GET answer for a Pod above)
-		if err := apiclient.WaitForAPI(client, selfHostingWaitTimeout); err != nil {
+		if err := waiter.WaitForAPI(); err != nil {
 			return err
 		}
 

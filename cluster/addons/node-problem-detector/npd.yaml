@@ -76,6 +76,7 @@ spec:
       - name: localtime
         hostPath:
           path: /etc/localtime
+          type: "FileOrCreate"
       serviceAccountName: node-problem-detector
       tolerations:
       - operator: "Exists"

@@ -954,6 +954,17 @@ func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
 		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
 }
 
+func printCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tCephFS (a CephFS mount on the host that shares a pod's lifetime)\n"+
+		"    Monitors:\t%v\n"+
+		"    Path:\t%v\n"+
+		"    User:\t%v\n"+
+		"    SecretFile:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
+}
+
 func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tStorageOS (a StorageOS Persistent Disk resource)\n"+
 		"    VolumeName:\t%v\n"+
@@ -991,6 +1002,19 @@ func printAzureFileVolumeSource(azureFile *api.AzureFileVolumeSource, w PrefixWr
 		"    ShareName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		azureFile.SecretName, azureFile.ShareName, azureFile.ReadOnly)
+}
+
+func printAzureFilePersistentVolumeSource(azureFile *api.AzureFilePersistentVolumeSource, w PrefixWriter) {
+	ns := ""
+	if azureFile.SecretNamespace != nil {
+		ns = *azureFile.SecretNamespace
+	}
+	w.Write(LEVEL_2, "Type:\tAzureFile (an Azure File Service mount on the host and bind mount to the pod)\n"+
+		"    SecretName:\t%v\n"+
+		"    SecretNamespace:\t%v\n"+
+		"    ShareName:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		azureFile.SecretName, ns, azureFile.ShareName, azureFile.ReadOnly)
 }
 
 func printFlexVolumeSource(flex *api.FlexVolumeSource, w PrefixWriter) {
@@ -1082,13 +1106,13 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.Local != nil:
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
-			printCephFSVolumeSource(pv.Spec.CephFS, w)
+			printCephFSPersistentVolumeSource(pv.Spec.CephFS, w)
 		case pv.Spec.StorageOS != nil:
 			printStorageOSPersistentVolumeSource(pv.Spec.StorageOS, w)
 		case pv.Spec.FC != nil:
 			printFCVolumeSource(pv.Spec.FC, w)
 		case pv.Spec.AzureFile != nil:
-			printAzureFileVolumeSource(pv.Spec.AzureFile, w)
+			printAzureFilePersistentVolumeSource(pv.Spec.AzureFile, w)
 		case pv.Spec.FlexVolume != nil:
 			printFlexVolumeSource(pv.Spec.FlexVolume, w)
 		case pv.Spec.Flocker != nil:

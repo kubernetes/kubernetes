@@ -22,6 +22,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -34,7 +35,7 @@ func NewCmdCerts() *cobra.Command {
 		Use:     "certs",
 		Aliases: []string{"certificates"},
 		Short:   "Generate certificates for a Kubernetes cluster.",
-		RunE:    subCmdRunE("certs"),
+		RunE:    cmdutil.SubCmdRunE("certs"),
 	}
 
 	cmd.AddCommand(getCertsSubCommands()...)

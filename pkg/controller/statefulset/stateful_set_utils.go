@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -266,6 +267,15 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 	return pod
 }
 
+// Match check if the given StatefulSet's template matches the template stored in the given history.
+func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error) {
+	patch, err := getPatch(ss)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
@@ -319,9 +329,9 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 	return cr, nil
 }
 
-// applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
+// ApplyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
-func applyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*apps.StatefulSet, error) {
+func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*apps.StatefulSet, error) {
 	obj, err := scheme.Scheme.DeepCopy(set)
 	if err != nil {
 		return nil, err

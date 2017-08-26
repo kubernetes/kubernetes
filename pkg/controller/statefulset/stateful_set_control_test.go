@@ -1281,7 +1281,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		history.SortControllerRevisions(revisions)
-		set, err = applyRevision(set, revisions[0])
+		set, err = ApplyRevision(set, revisions[0])
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}

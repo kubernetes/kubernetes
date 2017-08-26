@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -52,7 +53,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: subCmdRunE("config"),
+		RunE: cmdutil.SubCmdRunE("config"),
 	}
 
 	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
@@ -67,7 +68,7 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
 		Short: "Upload configuration about the current state so 'kubeadm upgrade' later can know how to configure the upgraded cluster",
-		RunE:  subCmdRunE("upload"),
+		RunE:  cmdutil.SubCmdRunE("upload"),
 	}
 
 	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
@@ -138,6 +139,8 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			Using from-flags, you can upload configuration to the ConfigMap in the cluster using the same flags you'd give to kubeadm init.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set some flag; you need to run this command with the
 			same flags before upgrading to v1.8 using 'kubeadm upgrade'.
+
+			The configuration is located in the %q namespace in the %q ConfigMap
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error

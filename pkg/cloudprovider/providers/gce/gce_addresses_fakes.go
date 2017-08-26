@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -32,7 +33,7 @@ type FakeCloudAddressService struct {
 	reservedAddrs map[string]bool
 	// addrsByRegionAndName
 	// Outer key is for region string; inner key is for address name.
-	addrsByRegionAndName map[string]map[string]*compute.Address
+	addrsByRegionAndName map[string]map[string]*computealpha.Address
 }
 
 // FakeCloudAddressService Implements CloudAddressService
@@ -41,23 +42,23 @@ var _ CloudAddressService = &FakeCloudAddressService{}
 func NewFakeCloudAddressService() *FakeCloudAddressService {
 	return &FakeCloudAddressService{
 		reservedAddrs:        make(map[string]bool),
-		addrsByRegionAndName: make(map[string]map[string]*compute.Address),
+		addrsByRegionAndName: make(map[string]map[string]*computealpha.Address),
 	}
 }
 
-// SetRegionalAddresses populates the addresses of the region with the name to
-// IP map.
-func (cas *FakeCloudAddressService) SetRegionalAddresses(region string, ipList map[string]string) {
+// SetRegionalAddresses sets the addresses of ther region. This is used for
+// setting the test environment.
+func (cas *FakeCloudAddressService) SetRegionalAddresses(region string, addrs []*computealpha.Address) {
 	// Reset addresses in the region.
-	cas.addrsByRegionAndName[region] = make(map[string]*compute.Address)
+	cas.addrsByRegionAndName[region] = make(map[string]*computealpha.Address)
 
-	for name, ip := range ipList {
-		cas.reservedAddrs[ip] = true
-		cas.addrsByRegionAndName[region][name] = &compute.Address{Name: name, Address: ip}
+	for _, addr := range addrs {
+		cas.reservedAddrs[addr.Address] = true
+		cas.addrsByRegionAndName[region][addr.Name] = addr
 	}
 }
 
-func (cas *FakeCloudAddressService) ReserveRegionAddress(addr *compute.Address, region string) error {
+func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
 	if addr.Address == "" {
 		addr.Address = fmt.Sprintf("1.2.3.%d", cas.count)
 		cas.count++
@@ -68,7 +69,7 @@ func (cas *FakeCloudAddressService) ReserveRegionAddress(addr *compute.Address, 
 	}
 
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
-		cas.addrsByRegionAndName[region] = make(map[string]*compute.Address)
+		cas.addrsByRegionAndName[region] = make(map[string]*computealpha.Address)
 	}
 
 	if _, exists := cas.addrsByRegionAndName[region][addr.Name]; exists {
@@ -80,7 +81,12 @@ func (cas *FakeCloudAddressService) ReserveRegionAddress(addr *compute.Address, 
 	return nil
 }
 
-func (cas *FakeCloudAddressService) GetRegionAddress(name, region string) (*compute.Address, error) {
+func (cas *FakeCloudAddressService) ReserveRegionAddress(addr *compute.Address, region string) error {
+	alphaAddr := convertToAlphaAddress(addr)
+	return cas.ReserveAlphaRegionAddress(alphaAddr, region)
+}
+
+func (cas *FakeCloudAddressService) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
 		return nil, makeGoogleAPINotFoundError("")
 	}
@@ -92,6 +98,14 @@ func (cas *FakeCloudAddressService) GetRegionAddress(name, region string) (*comp
 	}
 }
 
+func (cas *FakeCloudAddressService) GetRegionAddress(name, region string) (*compute.Address, error) {
+	addr, err := cas.GetAlphaRegionAddress(name, region)
+	if addr != nil {
+		return convertToV1Address(addr), err
+	}
+	return nil, err
+}
+
 func (cas *FakeCloudAddressService) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
 		return nil, makeGoogleAPINotFoundError("")
@@ -99,16 +113,32 @@ func (cas *FakeCloudAddressService) GetRegionAddressByIP(region, ipAddress strin
 
 	for _, addr := range cas.addrsByRegionAndName[region] {
 		if addr.Address == ipAddress {
-			return addr, nil
+			return convertToV1Address(addr), nil
 		}
 	}
 	return nil, makeGoogleAPINotFoundError("")
 }
 
-func (cas *FakeCloudAddressService) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
-	return nil, fmt.Errorf("not implemented")
+func convertToV1Address(object gceObject) *compute.Address {
+	enc, err := object.MarshalJSON()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to encode to json: %v", err))
+	}
+	var addr compute.Address
+	if err := json.Unmarshal(enc, &addr); err != nil {
+		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to v1 address: %v", object, err))
+	}
+	return &addr
 }
 
-func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
-	return fmt.Errorf("not implemented")
+func convertToAlphaAddress(object gceObject) *computealpha.Address {
+	enc, err := object.MarshalJSON()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to encode to json: %v", err))
+	}
+	var addr computealpha.Address
+	if err := json.Unmarshal(enc, &addr); err != nil {
+		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to alpha address: %v", object, err))
+	}
+	return &addr
 }

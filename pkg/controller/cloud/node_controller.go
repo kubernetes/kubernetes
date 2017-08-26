@@ -321,7 +321,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		}
 
 		if zones, ok := cnc.cloud.Zones(); ok {
-			zone, err := zones.GetZone()
+			zone, err := getZoneByProviderIDOrName(zones, curNode)
 			if err != nil {
 				return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
@@ -429,4 +429,19 @@ func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *
 		}
 	}
 	return instanceType, err
+}
+
+// getZoneByProviderIDorName will attempt to get the zone of node using its providerID
+// then it's name. If both attempts fail, an error is returned
+func getZoneByProviderIDOrName(zones cloudprovider.Zones, node *v1.Node) (cloudprovider.Zone, error) {
+	zone, err := zones.GetZoneByProviderID(node.Spec.ProviderID)
+	if err != nil {
+		providerIDErr := err
+		zone, err = zones.GetZoneByNodeName(types.NodeName(node.Name))
+		if err != nil {
+			return cloudprovider.Zone{}, fmt.Errorf("Zone: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+		}
+	}
+
+	return zone, nil
 }

@@ -1066,6 +1066,14 @@ func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.P
 	return allErrs
 }
 
+func validateCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(cephfs.Monitors) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+	}
+	return allErrs
+}
+
 func validateFlexVolumeSource(fv *api.FlexVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(fv.Driver) == 0 {
@@ -1094,6 +1102,22 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	}
 	if azure.ShareName == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("shareName"), ""))
+	}
+	return allErrs
+}
+
+func validateAzureFilePV(azure *api.AzureFilePersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if azure.SecretName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
+	}
+	if azure.ShareName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("shareName"), ""))
+	}
+	if azure.SecretNamespace != nil {
+		if len(*azure.SecretNamespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("secretNamespace"), ""))
+		}
 	}
 	return allErrs
 }
@@ -1334,7 +1358,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("cephFS"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateCephFSVolumeSource(pv.Spec.CephFS, specPath.Child("cephfs"))...)
+			allErrs = append(allErrs, validateCephFSPersistentVolumeSource(pv.Spec.CephFS, specPath.Child("cephfs"))...)
 		}
 	}
 	if pv.Spec.ISCSI != nil {
@@ -1375,7 +1399,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateAzureFile(pv.Spec.AzureFile, specPath.Child("azureFile"))...)
+			allErrs = append(allErrs, validateAzureFilePV(pv.Spec.AzureFile, specPath.Child("azureFile"))...)
 		}
 	}
 
@@ -3419,7 +3443,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 		}
 	}
 
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate container resource name
@@ -3432,7 +3456,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate resource names that can go in a resource quota
@@ -3444,7 +3468,7 @@ func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // Validate limit range types

@@ -107,7 +107,6 @@ pkg/apis/authorization/v1
 pkg/apis/authorization/v1beta1
 pkg/apis/authorization/validation
 pkg/apis/autoscaling
-pkg/apis/autoscaling/v2alpha1
 pkg/apis/autoscaling/validation
 pkg/apis/batch
 pkg/apis/batch/validation

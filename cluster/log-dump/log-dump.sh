@@ -125,12 +125,15 @@ function copy-logs-from-node() {
 # Save logs for node $1 into directory $2. Pass in any non-common files in $3.
 # Pass in any non-common systemd services in $4.
 # $3 and $4 should be a space-separated list of files.
+# Set $5 to true to indicate it is on master. Default to false.
 # This function shouldn't ever trigger errexit
 function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
     local opt_systemd_services="${4:-""}"
+    local on_master="${5:-"false"}"
+
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
@@ -151,8 +154,13 @@ function save-logs() {
     local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
-        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
-        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
+        if [[ "${on_master}" == "true" ]]; then
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
+        else
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
+        fi
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
 
         for svc in "${services[@]}"; do
@@ -193,7 +201,7 @@ function dump_masters() {
   for master_name in "${master_names[@]}"; do
     master_dir="${report_dir}/${master_name}"
     mkdir -p "${master_dir}"
-    save-logs "${master_name}" "${master_dir}" "${master_logfiles}" &
+    save-logs "${master_name}" "${master_dir}" "${master_logfiles}" "" "true" &
 
     # We don't want to run more than ${max_scp_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might

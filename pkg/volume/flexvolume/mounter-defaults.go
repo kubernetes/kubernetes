@@ -47,7 +47,7 @@ func (f *mounterDefaults) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:        f.readOnly,
 		Managed:         !f.readOnly,
-		SupportsSELinux: f.flexVolume.plugin.capabilities.selinuxRelabel,
+		SupportsSELinux: f.flexVolume.plugin.capabilities.SELinuxRelabel,
 	}
 }
 

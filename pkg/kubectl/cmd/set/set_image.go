@@ -229,7 +229,10 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		// patch the change
@@ -252,7 +255,10 @@ func (o *ImageOptions) Run() error {
 		info.Refresh(obj, true)
 
 		if len(o.Output) > 0 {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "image updated")
 	}

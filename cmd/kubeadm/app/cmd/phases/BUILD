@@ -25,6 +25,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
+        "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
@@ -38,6 +39,7 @@ go_library(
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/api:go_default_library",
@@ -54,7 +56,6 @@ go_test(
         "controlplane_test.go",
         "etcd_test.go",
         "kubeconfig_test.go",
-        "phase_test.go",
     ],
     library = ":go_default_library",
     deps = [

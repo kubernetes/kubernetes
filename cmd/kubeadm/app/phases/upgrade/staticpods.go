@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package upgrade
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
+// PerformStaticPodControlPlaneUpgrade upgrades a static pod-hosted control plane
+func PerformStaticPodControlPlaneUpgrade(_ clientset.Interface, _ *kubeadmapi.MasterConfiguration, _ *version.Version) error {
+	// No-op for now; doesn't do anything yet
+	return nil
 }

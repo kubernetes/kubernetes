@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	computealpha "google.golang.org/api/compute/v0.alpha"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -51,13 +53,13 @@ func TestVerifyRequestedIP(t *testing.T) {
 	for desc, tc := range map[string]struct {
 		requestedIP     string
 		fwdRuleIP       string
-		ipList          map[string]string
+		addrList        []*computealpha.Address
 		expectErr       bool
 		expectUserOwned bool
 	}{
 		"requested IP exists": {
 			requestedIP:     "1.1.1.1",
-			ipList:          map[string]string{"foo": "1.1.1.1"},
+			addrList:        []*computealpha.Address{{Name: "foo", Address: "1.1.1.1"}},
 			expectErr:       false,
 			expectUserOwned: true,
 		},
@@ -76,7 +78,7 @@ func TestVerifyRequestedIP(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			s.SetRegionalAddresses(region, tc.ipList)
+			s.SetRegionalAddresses(region, tc.addrList)
 			isUserOwnedIP, err := verifyUserRequestedIP(s, region, tc.requestedIP, tc.fwdRuleIP, lbRef)
 			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
 			assert.Equal(t, tc.expectUserOwned, isUserOwnedIP, desc)

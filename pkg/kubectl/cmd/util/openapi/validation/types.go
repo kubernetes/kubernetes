@@ -127,6 +127,11 @@ func (item *mapItem) VisitKind(schema *openapi.Kind) {
 	}
 }
 
+func (item *mapItem) VisitReference(schema openapi.Reference) {
+	// passthrough
+	schema.SubSchema().Accept(item)
+}
+
 // arrayItem represents a yaml array.
 type arrayItem struct {
 	baseItem
@@ -163,6 +168,11 @@ func (item *arrayItem) VisitMap(schema *openapi.Map) {
 
 func (item *arrayItem) VisitKind(schema *openapi.Kind) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
+}
+
+func (item *arrayItem) VisitReference(schema openapi.Reference) {
+	// passthrough
+	schema.SubSchema().Accept(item)
 }
 
 // primitiveItem represents a yaml value.
@@ -214,6 +224,11 @@ func (item *primitiveItem) VisitMap(schema *openapi.Map) {
 
 func (item *primitiveItem) VisitKind(schema *openapi.Kind) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "map", Actual: item.Kind})
+}
+
+func (item *primitiveItem) VisitReference(schema openapi.Reference) {
+	// passthrough
+	schema.SubSchema().Accept(item)
 }
 
 // itemFactory creates the relevant item type/visitor based on the current yaml type.

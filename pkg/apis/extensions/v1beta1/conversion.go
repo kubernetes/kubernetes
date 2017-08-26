@@ -60,27 +60,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec,
 		Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec,
 		Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
+		Convert_v1beta1_IPBlock_To_networking_IPBlock,
+		Convert_networking_IPBlock_To_v1beta1_IPBlock,
 	)
 	if err != nil {
 		return err
-	}
-
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.name", "metadata.namespace":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -364,6 +348,14 @@ func Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *exten
 	} else {
 		out.NamespaceSelector = nil
 	}
+	if in.IPBlock != nil {
+		out.IPBlock = new(networking.IPBlock)
+		if err := s.Convert(in.IPBlock, out.IPBlock, 0); err != nil {
+			return err
+		}
+	} else {
+		out.IPBlock = nil
+	}
 	return nil
 }
 
@@ -384,6 +376,30 @@ func Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *netwo
 	} else {
 		out.NamespaceSelector = nil
 	}
+	if in.IPBlock != nil {
+		out.IPBlock = new(extensionsv1beta1.IPBlock)
+		if err := s.Convert(in.IPBlock, out.IPBlock, 0); err != nil {
+			return err
+		}
+	} else {
+		out.IPBlock = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_IPBlock_To_networking_IPBlock(in *extensionsv1beta1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
+	out.CIDR = in.CIDR
+
+	out.Except = make([]string, len(in.Except))
+	copy(out.Except, in.Except)
+	return nil
+}
+
+func Convert_networking_IPBlock_To_v1beta1_IPBlock(in *networking.IPBlock, out *extensionsv1beta1.IPBlock, s conversion.Scope) error {
+	out.CIDR = in.CIDR
+
+	out.Except = make([]string, len(in.Except))
+	copy(out.Except, in.Except)
 	return nil
 }
 

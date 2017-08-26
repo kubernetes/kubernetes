@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
@@ -25,6 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -75,6 +75,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
+	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 
 	// Wrap not yet fully supported commands in an alpha subcommand
 	experimentalCmd := &cobra.Command{
@@ -85,19 +86,4 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(experimentalCmd)
 
 	return cmds
-}
-
-// subCmdRunE returns a function that handles a case where a subcommand must be specified
-// Without this callback, if a user runs just the command without a subcommand,
-// or with an invalid subcommand, cobra will print usage information, but still exit cleanly.
-// We want to return an error code in these cases so that the
-// user knows that their command was invalid.
-func subCmdRunE(name string) func(*cobra.Command, []string) error {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return fmt.Errorf("missing subcommand; %q is not meant to be run on its own", name)
-		}
-
-		return fmt.Errorf("invalid subcommand: %q", args[0])
-	}
 }

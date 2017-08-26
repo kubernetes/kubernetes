@@ -360,7 +360,7 @@ type PersistentVolumeSource struct {
 	Cinder *CinderVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
-	CephFS *CephFSVolumeSource
+	CephFS *CephFSPersistentVolumeSource
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource
@@ -369,7 +369,7 @@ type PersistentVolumeSource struct {
 	Flocker *FlockerVolumeSource
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
-	AzureFile *AzureFileVolumeSource
+	AzureFile *AzureFilePersistentVolumeSource
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
@@ -1019,6 +1019,40 @@ type CephFSVolumeSource struct {
 	ReadOnly bool
 }
 
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
+type SecretReference struct {
+	// Name is unique within a namespace to reference a secret resource.
+	// +optional
+	Name string
+	// Namespace defines the space within which the secret name must be unique.
+	// +optional
+	Namespace string
+}
+
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
+type CephFSPersistentVolumeSource struct {
+	// Required: Monitors is a collection of Ceph monitors
+	Monitors []string
+	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+	// +optional
+	Path string
+	// Optional: User is the rados user name, default is admin
+	// +optional
+	User string
+	// Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+	// +optional
+	SecretFile string
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// +optional
+	SecretRef *SecretReference
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
 // Represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
@@ -1085,6 +1119,22 @@ type AzureFileVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+type AzureFilePersistentVolumeSource struct {
+	// the name of secret that contains Azure Storage Account Name and Key
+	SecretName string
+	// Share Name
+	ShareName string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+	// the namespace of the secret that contains Azure Storage Account Name and Key
+	// default is the same as the Pod
+	// +optional
+	SecretNamespace *string
 }
 
 // Represents a vSphere volume resource.

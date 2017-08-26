@@ -135,3 +135,94 @@ func TestConstructVolumeSpec(t *testing.T) {
 		t.Errorf("Get wrong cephfs spec name, got: %s", cephfsSpec.Name())
 	}
 }
+
+type testcase struct {
+	name      string
+	defaultNs string
+	spec      *volume.Spec
+	// Expected return of the test
+	expectedName  string
+	expectedNs    string
+	expectedError error
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name: "name",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						CephFS: &v1.CephFSVolumeSource{
+							Monitors: []string{"a", "b"},
+							User:     "user",
+							SecretRef: &v1.LocalObjectReference{
+								Name: "name",
+							},
+							SecretFile: "/etc/ceph/user.secret",
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getSecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
+}

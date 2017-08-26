@@ -42,6 +42,7 @@ go_test(
         "attacher_test.go",
         "common_test.go",
         "detacher_test.go",
+        "driver-call_test.go",
         "flexvolume_test.go",
         "mounter_test.go",
         "plugin_test.go",

@@ -53,7 +53,7 @@ func TestCanSupport(t *testing.T) {
 	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{AzureFile: &v1.AzureFileVolumeSource{}}}}) {
 		t.Errorf("Expected true")
 	}
-	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AzureFile: &v1.AzureFileVolumeSource{}}}}}) {
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{AzureFile: &v1.AzureFilePersistentVolumeSource{}}}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -204,7 +204,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				AzureFile: &v1.AzureFileVolumeSource{},
+				AzureFile: &v1.AzureFilePersistentVolumeSource{},
 			},
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
@@ -286,4 +286,84 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	if _, ok := unmounter.(volume.Mounter); ok {
 		t.Errorf("Volume Unmounter can be type-assert to Mounter")
 	}
+}
+
+type testcase struct {
+	name      string
+	defaultNs string
+	spec      *volume.Spec
+	// Expected return of the test
+	expectedName  string
+	expectedNs    string
+	expectedError error
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	secretNs := "ns"
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							AzureFile: &v1.AzureFilePersistentVolumeSource{
+								ShareName:       "share",
+								SecretName:      "name",
+								SecretNamespace: &secretNs,
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							AzureFile: &v1.AzureFilePersistentVolumeSource{
+								ShareName:  "share",
+								SecretName: "name",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						AzureFile: &v1.AzureFileVolumeSource{
+							ShareName:  "share",
+							SecretName: "name",
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getSecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
 }

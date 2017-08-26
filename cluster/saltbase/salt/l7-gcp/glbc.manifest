@@ -48,7 +48,9 @@ spec:
   volumes:
   - hostPath:
       path: /etc/gce.conf
+      type: FileOrCreate
     name: cloudconfig
   - hostPath:
       path: /var/log/glbc.log
+      type: FileOrCreate
     name: logfile

@@ -252,6 +252,22 @@ func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	return f.Zone, f.Err
 }
 
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (f *FakeCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	f.addCall("get-zone-by-provider-id")
+	return f.Zone, f.Err
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (f *FakeCloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	f.addCall("get-zone-by-node-name")
+	return f.Zone, f.Err
+}
+
 func (f *FakeCloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
