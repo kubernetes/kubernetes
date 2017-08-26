@@ -631,11 +631,7 @@ func Convert_v1_CephFSPersistentVolumeSource_To_api_CephFSPersistentVolumeSource
 }
 
 func autoConvert_api_CephFSPersistentVolumeSource_To_v1_CephFSPersistentVolumeSource(in *api.CephFSPersistentVolumeSource, out *v1.CephFSPersistentVolumeSource, s conversion.Scope) error {
-	if in.Monitors == nil {
-		out.Monitors = make([]string, 0)
-	} else {
-		out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
-	}
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
 	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
@@ -665,11 +661,7 @@ func Convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource(in *v1.CephFSVolume
 }
 
 func autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSVolumeSource, out *v1.CephFSVolumeSource, s conversion.Scope) error {
-	if in.Monitors == nil {
-		out.Monitors = make([]string, 0)
-	} else {
-		out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
-	}
+	out.Monitors = *(*[]string)(unsafe.Pointer(&in.Monitors))
 	out.Path = in.Path
 	out.User = in.User
 	out.SecretFile = in.SecretFile
@@ -788,11 +780,7 @@ func Convert_v1_ComponentStatusList_To_api_ComponentStatusList(in *v1.ComponentS
 
 func autoConvert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.ComponentStatusList, out *v1.ComponentStatusList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.ComponentStatus, 0)
-	} else {
-		out.Items = *(*[]v1.ComponentStatus)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.ComponentStatus)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -890,11 +878,7 @@ func Convert_v1_ConfigMapList_To_api_ConfigMapList(in *v1.ConfigMapList, out *ap
 
 func autoConvert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *v1.ConfigMapList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.ConfigMap, 0)
-	} else {
-		out.Items = *(*[]v1.ConfigMap)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.ConfigMap)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -1051,11 +1035,7 @@ func Convert_v1_ContainerImage_To_api_ContainerImage(in *v1.ContainerImage, out 
 }
 
 func autoConvert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage, out *v1.ContainerImage, s conversion.Scope) error {
-	if in.Names == nil {
-		out.Names = make([]string, 0)
-	} else {
-		out.Names = *(*[]string)(unsafe.Pointer(&in.Names))
-	}
+	out.Names = *(*[]string)(unsafe.Pointer(&in.Names))
 	out.SizeBytes = in.SizeBytes
 	return nil
 }
@@ -1456,11 +1436,7 @@ func Convert_v1_Endpoints_To_api_Endpoints(in *v1.Endpoints, out *api.Endpoints,
 
 func autoConvert_api_Endpoints_To_v1_Endpoints(in *api.Endpoints, out *v1.Endpoints, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if in.Subsets == nil {
-		out.Subsets = make([]v1.EndpointSubset, 0)
-	} else {
-		out.Subsets = *(*[]v1.EndpointSubset)(unsafe.Pointer(&in.Subsets))
-	}
+	out.Subsets = *(*[]v1.EndpointSubset)(unsafe.Pointer(&in.Subsets))
 	return nil
 }
 
@@ -1482,11 +1458,7 @@ func Convert_v1_EndpointsList_To_api_EndpointsList(in *v1.EndpointsList, out *ap
 
 func autoConvert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *v1.EndpointsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.Endpoints, 0)
-	} else {
-		out.Items = *(*[]v1.Endpoints)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.Endpoints)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -1626,11 +1598,7 @@ func Convert_v1_EventList_To_api_EventList(in *v1.EventList, out *api.EventList,
 
 func autoConvert_api_EventList_To_v1_EventList(in *api.EventList, out *v1.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.Event, 0)
-	} else {
-		out.Items = *(*[]v1.Event)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.Event)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -2106,11 +2074,7 @@ func Convert_v1_LimitRangeList_To_api_LimitRangeList(in *v1.LimitRangeList, out 
 
 func autoConvert_api_LimitRangeList_To_v1_LimitRangeList(in *api.LimitRangeList, out *v1.LimitRangeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.LimitRange, 0)
-	} else {
-		out.Items = *(*[]v1.LimitRange)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.LimitRange)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -2130,11 +2094,7 @@ func Convert_v1_LimitRangeSpec_To_api_LimitRangeSpec(in *v1.LimitRangeSpec, out 
 }
 
 func autoConvert_api_LimitRangeSpec_To_v1_LimitRangeSpec(in *api.LimitRangeSpec, out *v1.LimitRangeSpec, s conversion.Scope) error {
-	if in.Limits == nil {
-		out.Limits = make([]v1.LimitRangeItem, 0)
-	} else {
-		out.Limits = *(*[]v1.LimitRangeItem)(unsafe.Pointer(&in.Limits))
-	}
+	out.Limits = *(*[]v1.LimitRangeItem)(unsafe.Pointer(&in.Limits))
 	return nil
 }
 
@@ -2175,7 +2135,7 @@ func autoConvert_api_List_To_v1_List(in *api.List, out *v1.List, s conversion.Sc
 			}
 		}
 	} else {
-		out.Items = make([]runtime.RawExtension, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -2374,11 +2334,7 @@ func Convert_v1_NamespaceList_To_api_NamespaceList(in *v1.NamespaceList, out *ap
 
 func autoConvert_api_NamespaceList_To_v1_NamespaceList(in *api.NamespaceList, out *v1.NamespaceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.Namespace, 0)
-	} else {
-		out.Items = *(*[]v1.Namespace)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.Namespace)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -2590,11 +2546,7 @@ func Convert_v1_NodeList_To_api_NodeList(in *v1.NodeList, out *api.NodeList, s c
 
 func autoConvert_api_NodeList_To_v1_NodeList(in *api.NodeList, out *v1.NodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.Node, 0)
-	} else {
-		out.Items = *(*[]v1.Node)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.Node)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -2654,11 +2606,7 @@ func Convert_v1_NodeSelector_To_api_NodeSelector(in *v1.NodeSelector, out *api.N
 }
 
 func autoConvert_api_NodeSelector_To_v1_NodeSelector(in *api.NodeSelector, out *v1.NodeSelector, s conversion.Scope) error {
-	if in.NodeSelectorTerms == nil {
-		out.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 0)
-	} else {
-		out.NodeSelectorTerms = *(*[]v1.NodeSelectorTerm)(unsafe.Pointer(&in.NodeSelectorTerms))
-	}
+	out.NodeSelectorTerms = *(*[]v1.NodeSelectorTerm)(unsafe.Pointer(&in.NodeSelectorTerms))
 	return nil
 }
 
@@ -2702,11 +2650,7 @@ func Convert_v1_NodeSelectorTerm_To_api_NodeSelectorTerm(in *v1.NodeSelectorTerm
 }
 
 func autoConvert_api_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *api.NodeSelectorTerm, out *v1.NodeSelectorTerm, s conversion.Scope) error {
-	if in.MatchExpressions == nil {
-		out.MatchExpressions = make([]v1.NodeSelectorRequirement, 0)
-	} else {
-		out.MatchExpressions = *(*[]v1.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchExpressions))
-	}
+	out.MatchExpressions = *(*[]v1.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchExpressions))
 	return nil
 }
 
@@ -3010,11 +2954,7 @@ func Convert_v1_PersistentVolumeClaimList_To_api_PersistentVolumeClaimList(in *v
 
 func autoConvert_api_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *api.PersistentVolumeClaimList, out *v1.PersistentVolumeClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.PersistentVolumeClaim, 0)
-	} else {
-		out.Items = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -3133,7 +3073,7 @@ func autoConvert_api_PersistentVolumeList_To_v1_PersistentVolumeList(in *api.Per
 			}
 		}
 	} else {
-		out.Items = make([]v1.PersistentVolume, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -3452,11 +3392,7 @@ func autoConvert_api_PodExecOptions_To_v1_PodExecOptions(in *api.PodExecOptions,
 	out.Stderr = in.Stderr
 	out.TTY = in.TTY
 	out.Container = in.Container
-	if in.Command == nil {
-		out.Command = make([]string, 0)
-	} else {
-		out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
-	}
+	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
 	return nil
 }
 
@@ -3497,7 +3433,7 @@ func autoConvert_api_PodList_To_v1_PodList(in *api.PodList, out *v1.PodList, s c
 			}
 		}
 	} else {
-		out.Items = make([]v1.Pod, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -3721,7 +3657,7 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s c
 			}
 		}
 	} else {
-		out.Containers = make([]v1.Container, 0)
+		out.Containers = nil
 	}
 	out.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
@@ -3864,7 +3800,7 @@ func autoConvert_api_PodTemplateList_To_v1_PodTemplateList(in *api.PodTemplateLi
 			}
 		}
 	} else {
-		out.Items = make([]v1.PodTemplate, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -4036,11 +3972,7 @@ func Convert_v1_ProjectedVolumeSource_To_api_ProjectedVolumeSource(in *v1.Projec
 }
 
 func autoConvert_api_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *api.ProjectedVolumeSource, out *v1.ProjectedVolumeSource, s conversion.Scope) error {
-	if in.Sources == nil {
-		out.Sources = make([]v1.VolumeProjection, 0)
-	} else {
-		out.Sources = *(*[]v1.VolumeProjection)(unsafe.Pointer(&in.Sources))
-	}
+	out.Sources = *(*[]v1.VolumeProjection)(unsafe.Pointer(&in.Sources))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	return nil
 }
@@ -4096,11 +4028,7 @@ func Convert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *v1.RBDVolumeSource, o
 }
 
 func autoConvert_api_RBDVolumeSource_To_v1_RBDVolumeSource(in *api.RBDVolumeSource, out *v1.RBDVolumeSource, s conversion.Scope) error {
-	if in.CephMonitors == nil {
-		out.CephMonitors = make([]string, 0)
-	} else {
-		out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
-	}
+	out.CephMonitors = *(*[]string)(unsafe.Pointer(&in.CephMonitors))
 	out.RBDImage = in.RBDImage
 	out.FSType = in.FSType
 	out.RBDPool = in.RBDPool
@@ -4131,11 +4059,7 @@ func Convert_v1_RangeAllocation_To_api_RangeAllocation(in *v1.RangeAllocation, o
 func autoConvert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocation, out *v1.RangeAllocation, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Range = in.Range
-	if in.Data == nil {
-		out.Data = make([]byte, 0)
-	} else {
-		out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
-	}
+	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
 	return nil
 }
 
@@ -4236,7 +4160,7 @@ func autoConvert_api_ReplicationControllerList_To_v1_ReplicationControllerList(i
 			}
 		}
 	} else {
-		out.Items = make([]v1.ReplicationController, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -4381,11 +4305,7 @@ func Convert_v1_ResourceQuotaList_To_api_ResourceQuotaList(in *v1.ResourceQuotaL
 
 func autoConvert_api_ResourceQuotaList_To_v1_ResourceQuotaList(in *api.ResourceQuotaList, out *v1.ResourceQuotaList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.ResourceQuota, 0)
-	} else {
-		out.Items = *(*[]v1.ResourceQuota)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.ResourceQuota)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -4630,7 +4550,7 @@ func autoConvert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *v1.Sec
 			}
 		}
 	} else {
-		out.Items = make([]v1.Secret, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -4838,11 +4758,7 @@ func Convert_v1_ServiceAccountList_To_api_ServiceAccountList(in *v1.ServiceAccou
 
 func autoConvert_api_ServiceAccountList_To_v1_ServiceAccountList(in *api.ServiceAccountList, out *v1.ServiceAccountList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.ServiceAccount, 0)
-	} else {
-		out.Items = *(*[]v1.ServiceAccount)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.ServiceAccount)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -4883,7 +4799,7 @@ func autoConvert_api_ServiceList_To_v1_ServiceList(in *api.ServiceList, out *v1.
 			}
 		}
 	} else {
-		out.Items = make([]v1.Service, 0)
+		out.Items = nil
 	}
 	return nil
 }

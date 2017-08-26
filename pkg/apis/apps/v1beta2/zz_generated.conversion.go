@@ -162,7 +162,7 @@ func autoConvert_apps_ControllerRevisionList_To_v1beta2_ControllerRevisionList(i
 			}
 		}
 	} else {
-		out.Items = make([]v1beta2.ControllerRevision, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func autoConvert_extensions_DaemonSetList_To_v1beta2_DaemonSetList(in *extension
 			}
 		}
 	} else {
-		out.Items = make([]v1beta2.DaemonSet, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -411,7 +411,7 @@ func autoConvert_extensions_DeploymentList_To_v1beta2_DeploymentList(in *extensi
 			}
 		}
 	} else {
-		out.Items = make([]v1beta2.Deployment, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -612,7 +612,7 @@ func autoConvert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList(in *extensi
 			}
 		}
 	} else {
-		out.Items = make([]v1beta2.ReplicaSet, 0)
+		out.Items = nil
 	}
 	return nil
 }
@@ -851,7 +851,7 @@ func autoConvert_apps_StatefulSetList_To_v1beta2_StatefulSetList(in *apps.Statef
 			}
 		}
 	} else {
-		out.Items = make([]v1beta2.StatefulSet, 0)
+		out.Items = nil
 	}
 	return nil
 }

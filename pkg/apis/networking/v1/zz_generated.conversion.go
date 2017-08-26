@@ -140,11 +140,7 @@ func Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1.Network
 
 func autoConvert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1.NetworkPolicy, 0)
-	} else {
-		out.Items = *(*[]v1.NetworkPolicy)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1.NetworkPolicy)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

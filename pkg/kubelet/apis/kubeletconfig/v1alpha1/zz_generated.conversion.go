@@ -332,21 +332,9 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivileged, &out.AllowPrivileged, s); err != nil {
 		return err
 	}
-	if in.HostNetworkSources == nil {
-		out.HostNetworkSources = make([]string, 0)
-	} else {
-		out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
-	}
-	if in.HostPIDSources == nil {
-		out.HostPIDSources = make([]string, 0)
-	} else {
-		out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
-	}
-	if in.HostIPCSources == nil {
-		out.HostIPCSources = make([]string, 0)
-	} else {
-		out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
-	}
+	out.HostNetworkSources = *(*[]string)(unsafe.Pointer(&in.HostNetworkSources))
+	out.HostPIDSources = *(*[]string)(unsafe.Pointer(&in.HostPIDSources))
+	out.HostIPCSources = *(*[]string)(unsafe.Pointer(&in.HostIPCSources))
 	if err := v1.Convert_int32_To_Pointer_int32(&in.RegistryPullQPS, &out.RegistryPullQPS, s); err != nil {
 		return err
 	}
@@ -379,11 +367,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	}
 	out.ClusterDomain = in.ClusterDomain
 	out.MasterServiceNamespace = in.MasterServiceNamespace
-	if in.ClusterDNS == nil {
-		out.ClusterDNS = make([]string, 0)
-	} else {
-		out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
-	}
+	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
@@ -426,11 +410,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_bool_To_Pointer_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
 	}
-	if in.RegisterWithTaints == nil {
-		out.RegisterWithTaints = make([]core_v1.Taint, 0)
-	} else {
-		out.RegisterWithTaints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
-	}
+	out.RegisterWithTaints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
 	out.ContentType = in.ContentType
 	if err := v1.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err
@@ -477,11 +457,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
-	if in.EnforceNodeAllocatable == nil {
-		out.EnforceNodeAllocatable = make([]string, 0)
-	} else {
-		out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
-	}
+	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ExperimentalNodeAllocatableIgnoreEvictionThreshold = in.ExperimentalNodeAllocatableIgnoreEvictionThreshold
 	return nil
 }
