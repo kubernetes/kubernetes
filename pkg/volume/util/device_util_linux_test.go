@@ -119,7 +119,13 @@ func TestFindDeviceForPath(t *testing.T) {
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}
+	if err != nil {
+		t.Fatalf("error finding device for path /dev/sde:%v", err)
+	}
 	disk, err = findDeviceForPath("/returns/a/dev", io)
+	if err != nil {
+		t.Fatalf("error finding device for path /returns/a/dev:%v", err)
+	}
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}
