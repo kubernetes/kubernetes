@@ -38,13 +38,13 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 	page := 0
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
 		mc := newRoutesMetricContext("list_page")
-		listCall := gce.service.Routes.List(gce.NetworkProjectID())
+		listCall := gce.service.Routes.List(gce.projectID)
 
 		prefix := truncateClusterName(clusterName)
 		// Filter for routes starting with clustername AND belonging to the
 		// relevant gcp network AND having description = "k8s-node-route".
 		filter := "(name eq " + prefix + "-.*) "
-		filter = filter + "(network eq " + gce.NetworkURL() + ") "
+		filter = filter + "(network eq " + gce.networkURL + ") "
 		filter = filter + "(description eq " + k8sNodeRouteTag + ")"
 		listCall = listCall.Filter(filter)
 		if pageToken != "" {
@@ -80,11 +80,11 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	}
 
 	mc := newRoutesMetricContext("create")
-	insertOp, err := gce.service.Routes.Insert(gce.NetworkProjectID(), &compute.Route{
+	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
 		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),
-		Network:         gce.NetworkURL(),
+		Network:         gce.networkURL,
 		Priority:        1000,
 		Description:     k8sNodeRouteTag,
 	}).Do()
@@ -96,16 +96,16 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 			return mc.Observe(err)
 		}
 	}
-	return gce.waitForGlobalOpInProject(insertOp, gce.NetworkProjectID(), mc)
+	return gce.waitForGlobalOp(insertOp, mc)
 }
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("delete")
-	deleteOp, err := gce.service.Routes.Delete(gce.NetworkProjectID(), route.Name).Do()
+	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOpInProject(deleteOp, gce.NetworkProjectID(), mc)
+	return gce.waitForGlobalOp(deleteOp, mc)
 }
 
 func truncateClusterName(clusterName string) string {
