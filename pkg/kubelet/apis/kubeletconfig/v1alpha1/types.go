@@ -78,7 +78,7 @@ type KubeletConfiguration struct {
 	Port int32 `json:"port"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
-	ReadOnlyPort int32 `json:"readOnlyPort"`
+	ReadOnlyPort *int32 `json:"readOnlyPort"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -135,10 +135,10 @@ type KubeletConfiguration struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount *int32 `json:"maxContainerCount"`
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort *int32 `json:"cAdvisorPort"`
-	// healthzPort is the port of the localhost healthz endpoint
-	HealthzPort int32 `json:"healthzPort"`
+	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
+	HealthzPort *int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve
 	// on.
 	HealthzBindAddress string `json:"healthzBindAddress"`

@@ -60,6 +60,8 @@ func TestLogDryRunAction(t *testing.T) {
 				},
 			}),
 			expectedBytes: []byte(`[dryrun] Would perform action CREATE on resource "services" in API group "core/v1"
+	apiVersion: v1
+	kind: Service
 	metadata:
 	  creationTimestamp: null
 	  name: foo

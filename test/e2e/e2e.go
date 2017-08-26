@@ -84,8 +84,8 @@ func setupProviderConfig() error {
 			Region:             region,
 			Zone:               zone,
 			ManagedZones:       managedZones,
-			NetworkURL:         "",
-			SubnetworkURL:      "",
+			NetworkName:        "", // TODO: Change this to use framework.TestContext.CloudConfig.Network?
+			SubnetworkName:     "",
 			NodeTags:           nil,
 			NodeInstancePrefix: "",
 			TokenSource:        nil,

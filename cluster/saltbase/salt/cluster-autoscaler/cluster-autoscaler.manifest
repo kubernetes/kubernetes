@@ -5,7 +5,7 @@
 {% if grains.cloud == 'gce' and grains.cloud_config is defined -%}
   {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
   {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
-  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+  {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
 {% endif -%}
 {% set params = pillar['autoscaler_mig_config'] + " " + cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
 
@@ -95,7 +95,8 @@
             {
                 "name": "logfile",
                 "hostPath": {
-                    "path": "/var/log/cluster-autoscaler.log"
+                    "path": "/var/log/cluster-autoscaler.log",
+                    "type": "FileOrCreate"
                 }
             }
         ],

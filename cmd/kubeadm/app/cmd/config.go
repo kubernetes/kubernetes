@@ -139,6 +139,8 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			Using from-flags, you can upload configuration to the ConfigMap in the cluster using the same flags you'd give to kubeadm init.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set some flag; you need to run this command with the
 			same flags before upgrading to v1.8 using 'kubeadm upgrade'.
+
+			The configuration is located in the %q namespace in the %q ConfigMap
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error

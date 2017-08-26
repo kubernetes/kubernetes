@@ -729,7 +729,7 @@ func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress st
 		return false, false, nil
 	}
 
-	fw, err := gce.service.Firewalls.Get(gce.projectID, makeFirewallName(name)).Do()
+	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), makeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil
@@ -776,7 +776,7 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(serviceName, ipAddress, regio
 	ports := []v1.ServicePort{{Protocol: "tcp", Port: hcPort}}
 
 	fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)
-	fw, err := gce.service.Firewalls.Get(gce.projectID, fwName).Do()
+	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), fwName).Do()
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusNotFound) {
 			return fmt.Errorf("error getting firewall for health checks: %v", err)

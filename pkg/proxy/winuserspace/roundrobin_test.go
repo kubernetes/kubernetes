@@ -357,7 +357,7 @@ func TestStickyLoadBalanceWorksWithNewServiceCalledFirst(t *testing.T) {
 	}
 
 	// Call NewService() before OnEndpointsUpdate()
-	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpoints := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Subsets: []api.EndpointSubset{
@@ -421,7 +421,7 @@ func TestStickyLoadBalanceWorksWithNewServiceCalledSecond(t *testing.T) {
 		},
 	}
 	loadBalancer.OnEndpointsAdd(endpoints)
-	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 
 	client1 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0}
 	client2 := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2), Port: 0}
@@ -473,7 +473,7 @@ func TestStickyLoadBalanaceWorksWithMultipleEndpointsRemoveOne(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpointsv1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Subsets: []api.EndpointSubset{
@@ -546,7 +546,7 @@ func TestStickyLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 
-	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpointsv1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Subsets: []api.EndpointSubset{
@@ -605,7 +605,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
-	loadBalancer.NewService(fooService, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(fooService, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpoints1 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: fooService.Name, Namespace: fooService.Namespace},
 		Subsets: []api.EndpointSubset{
@@ -616,7 +616,7 @@ func TestStickyLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 		},
 	}
 	barService := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "bar"}, Port: ""}
-	loadBalancer.NewService(barService, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(barService, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpoints2 := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: barService.Name, Namespace: barService.Namespace},
 		Subsets: []api.EndpointSubset{
@@ -674,7 +674,7 @@ func TestStickyLoadBalanceWorksWithEndpointFails(t *testing.T) {
 	}
 
 	// Call NewService() before OnEndpointsUpdate()
-	loadBalancer.NewService(service, api.ServiceAffinityClientIP, 0)
+	loadBalancer.NewService(service, api.ServiceAffinityClientIP, int(api.DefaultClientIPServiceAffinitySeconds))
 	endpoints := &api.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Name: service.Name, Namespace: service.Namespace},
 		Subsets: []api.EndpointSubset{

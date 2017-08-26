@@ -140,9 +140,9 @@ type KubeletConfiguration struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort int32
-	// healthzPort is the port of the localhost healthz endpoint
+	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
 	HealthzPort int32
 	// healthzBindAddress is the IP address for the healthz server to serve
 	// on.
