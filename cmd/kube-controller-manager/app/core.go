@@ -67,7 +67,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
-		return false, nil
+		return true, err
 	}
 	go serviceController.Run(ctx.Stop, int(ctx.Options.ConcurrentServiceSyncs))
 	return true, nil
