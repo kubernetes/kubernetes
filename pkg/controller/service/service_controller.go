@@ -112,6 +112,7 @@ func New(
 	clusterName string,
 ) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(glog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 	broadcaster.StartLogging(glog.Infof)
