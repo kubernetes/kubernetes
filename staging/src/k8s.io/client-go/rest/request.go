@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -744,8 +745,29 @@ func (r *Request) DoRaw() ([]byte, error) {
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
 	var body []byte
 	if resp.Body != nil {
-		if data, err := ioutil.ReadAll(resp.Body); err == nil {
+		data, err := ioutil.ReadAll(resp.Body)
+		switch err.(type) {
+		case nil:
 			body = data
+		case http2.StreamError:
+			// This is trying to catch the scenario that the server may close the connection when sending the
+			// response body. This can be caused by server timeout due to a slow network connection.
+			// TODO: Add test for this. Steps may be:
+			// 1. client-go (or kubectl) sends a GET request.
+			// 2. Apiserver sends back the headers and then part of the body
+			// 3. Apiserver closes connection.
+			// 4. client-go should catch this and return an error.
+			glog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
+			streamErr := fmt.Errorf("Stream error %#v when reading response body, may be caused by closed connection. Please retry.", err)
+			return Result{
+				err: streamErr,
+			}
+		default:
+			glog.Errorf("Unexpected error when reading response body: %#v", err)
+			unexpectedErr := fmt.Errorf("Unexpected error %#v when reading response body. Please retry.", err)
+			return Result{
+				err: unexpectedErr,
+			}
 		}
 	}
 
