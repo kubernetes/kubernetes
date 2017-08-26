@@ -63,11 +63,10 @@ type NodeInfo struct {
 
 // Resource is a collection of compute resource.
 type Resource struct {
-	MilliCPU       int64
-	Memory         int64
-	NvidiaGPU      int64
-	StorageScratch int64
-	StorageOverlay int64
+	MilliCPU         int64
+	Memory           int64
+	NvidiaGPU        int64
+	EphemeralStorage int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
 	AllowedPodNumber  int
@@ -97,10 +96,8 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.NvidiaGPU += rQuant.Value()
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
-		case v1.ResourceStorageScratch:
-			r.StorageScratch += rQuant.Value()
-		case v1.ResourceStorageOverlay:
-			r.StorageOverlay += rQuant.Value()
+		case v1.ResourceEphemeralStorage:
+			r.EphemeralStorage += rQuant.Value()
 		default:
 			if v1helper.IsExtendedResourceName(rName) {
 				r.AddExtended(rName, rQuant.Value())
@@ -111,12 +108,11 @@ func (r *Resource) Add(rl v1.ResourceList) {
 
 func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
-		v1.ResourceCPU:            *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
-		v1.ResourceMemory:         *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourceNvidiaGPU:      *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
-		v1.ResourcePods:           *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
-		v1.ResourceStorageOverlay: *resource.NewQuantity(r.StorageOverlay, resource.BinarySI),
-		v1.ResourceStorageScratch: *resource.NewQuantity(r.StorageScratch, resource.BinarySI),
+		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
+		v1.ResourceNvidiaGPU:        *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
 	}
 	for rName, rQuant := range r.ExtendedResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
@@ -130,8 +126,7 @@ func (r *Resource) Clone() *Resource {
 		Memory:           r.Memory,
 		NvidiaGPU:        r.NvidiaGPU,
 		AllowedPodNumber: r.AllowedPodNumber,
-		StorageOverlay:   r.StorageOverlay,
-		StorageScratch:   r.StorageScratch,
+		EphemeralStorage: r.EphemeralStorage,
 	}
 	if r.ExtendedResources != nil {
 		res.ExtendedResources = make(map[v1.ResourceName]int64)
@@ -304,8 +299,7 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
-	n.requestedResource.StorageOverlay += res.StorageOverlay
-	n.requestedResource.StorageScratch += res.StorageScratch
+	n.requestedResource.EphemeralStorage += res.EphemeralStorage
 	if n.requestedResource.ExtendedResources == nil && len(res.ExtendedResources) > 0 {
 		n.requestedResource.ExtendedResources = map[v1.ResourceName]int64{}
 	}
@@ -390,14 +384,6 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 		non0_cpu += non0_cpu_req
 		non0_mem += non0_mem_req
 		// No non-zero resources for GPUs or opaque resources.
-	}
-
-	// Account for storage requested by emptydir volumes
-	// If the storage medium is memory, should exclude the size
-	for _, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
-			res.StorageScratch += vol.EmptyDir.SizeLimit.Value()
-		}
 	}
 
 	return

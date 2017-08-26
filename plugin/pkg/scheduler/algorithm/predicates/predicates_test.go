@@ -80,24 +80,24 @@ var (
 func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
-			v1.ResourceCPU:            *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			v1.ResourceMemory:         *resource.NewQuantity(memory, resource.BinarySI),
-			v1.ResourcePods:           *resource.NewQuantity(pods, resource.DecimalSI),
-			v1.ResourceNvidiaGPU:      *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-			opaqueResourceA:           *resource.NewQuantity(opaqueA, resource.DecimalSI),
-			v1.ResourceStorageScratch: *resource.NewQuantity(storage, resource.BinarySI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+			v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+			opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 		},
 	}
 }
 
 func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.ResourceList {
 	return v1.ResourceList{
-		v1.ResourceCPU:            *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-		v1.ResourceMemory:         *resource.NewQuantity(memory, resource.BinarySI),
-		v1.ResourcePods:           *resource.NewQuantity(pods, resource.DecimalSI),
-		v1.ResourceNvidiaGPU:      *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-		opaqueResourceA:           *resource.NewQuantity(opaqueA, resource.DecimalSI),
-		v1.ResourceStorageScratch: *resource.NewQuantity(storage, resource.BinarySI),
+		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+		v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+		opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 	}
 }
 
@@ -421,92 +421,52 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	storagePodsTests := []struct {
-		pod           *v1.Pod
-		emptyDirLimit int64
-		storageMedium v1.StorageMedium
-		nodeInfo      *schedulercache.NodeInfo
-		fits          bool
-		test          string
-		reasons       []algorithm.PredicateFailureReason
+		pod      *v1.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		reasons  []algorithm.PredicateFailureReason
 	}{
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 1}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 10, StorageOverlay: 20})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 10})),
 			fits: false,
 			test: "due to container scratch disk",
 			reasons: []algorithm.PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceCPU, 1, 10, 10),
-				NewInsufficientResourceError(v1.ResourceStorageScratch, 1, 20, 20),
 			},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 10}),
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 10})),
 			fits: true,
 			test: "pod fit",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 18}),
+			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 25}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
 			fits: false,
-			test: "request exceeds allocatable overlay storage resource",
+			test: "storage ephemeral local storage request exceeds allocatable",
 			reasons: []algorithm.PredicateFailureReason{
-				NewInsufficientResourceError(v1.ResourceStorageScratch, 18, 5, 20),
+				NewInsufficientResourceError(v1.ResourceEphemeralStorage, 25, 0, 20),
 			},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{StorageOverlay: 18}),
+			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 10}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
-			fits: false,
-			test: "request exceeds allocatable overlay storage resource",
-			reasons: []algorithm.PredicateFailureReason{
-				NewInsufficientResourceError(v1.ResourceStorageScratch, 18, 5, 20),
-			},
-		},
-		{
-			pod:           newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 10}),
-			emptyDirLimit: 15,
-			storageMedium: v1.StorageMediumDefault,
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
-			fits: false,
-			test: "storage scratchrequest exceeds allocatable",
-			reasons: []algorithm.PredicateFailureReason{
-				NewInsufficientResourceError(v1.ResourceStorageScratch, 25, 5, 20),
-			},
-		},
-		{
-			pod:           newResourcePod(schedulercache.Resource{}),
-			emptyDirLimit: 25,
-			storageMedium: v1.StorageMediumDefault,
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
-			fits: false,
-			test: "storage scratchrequest exceeds allocatable",
-			reasons: []algorithm.PredicateFailureReason{
-				NewInsufficientResourceError(v1.ResourceStorageScratch, 25, 5, 20),
-			},
-		},
-		{
-			pod:           newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1, StorageOverlay: 10}),
-			emptyDirLimit: 15,
-			storageMedium: v1.StorageMediumMemory,
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2, StorageOverlay: 5})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
 			fits: true,
-			test: "pod fit with memory medium",
+			test: "pod fits",
 		},
 	}
 
 	for _, test := range storagePodsTests {
 		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20)}}
 		test.nodeInfo.SetNode(&node)
-		pod := addStorageLimit(test.pod, test.emptyDirLimit, test.storageMedium)
-		fits, reasons, err := PodFitsResources(pod, PredicateMetadata(pod, nil), test.nodeInfo)
+		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
