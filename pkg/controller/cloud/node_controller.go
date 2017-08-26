@@ -237,26 +237,36 @@ func (cnc *CloudNodeController) MonitorNode() {
 			if currentReadyCondition.Status != v1.ConditionTrue {
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
-				if _, err := instances.ExternalID(types.NodeName(node.Name)); err != nil {
-					if err == cloudprovider.InstanceNotFound {
-						glog.V(2).Infof("Deleting node no longer present in cloud provider: %s", node.Name)
-						ref := &v1.ObjectReference{
-							Kind:      "Node",
-							Name:      node.Name,
-							UID:       types.UID(node.UID),
-							Namespace: "",
-						}
-						glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)
-						cnc.recorder.Eventf(ref, v1.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
-						go func(nodeName string) {
-							defer utilruntime.HandleCrash()
-							if err := cnc.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
-								glog.Errorf("unable to delete node %q: %v", node.Name, err)
-							}
-						}(node.Name)
-					}
-					glog.Errorf("Error getting node data from cloud: %v", err)
+				exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
+				if err != nil {
+					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+					continue
 				}
+
+				if exists {
+					// Continue checking the remaining nodes since the current one is fine.
+					continue
+				}
+
+				glog.V(2).Infof("Deleting node since it is no longer present in cloud provider: %s", node.Name)
+
+				ref := &v1.ObjectReference{
+					Kind:      "Node",
+					Name:      node.Name,
+					UID:       types.UID(node.UID),
+					Namespace: "",
+				}
+				glog.V(2).Infof("Recording %s event message for node %s", "DeletingNode", node.Name)
+
+				cnc.recorder.Eventf(ref, v1.EventTypeNormal, fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name), "Node %s event: %s", node.Name, "DeletingNode")
+
+				go func(nodeName string) {
+					defer utilruntime.HandleCrash()
+					if err := cnc.kubeClient.CoreV1().Nodes().Delete(nodeName, nil); err != nil {
+						glog.Errorf("unable to delete node %q: %v", nodeName, err)
+					}
+				}(node.Name)
+
 			}
 		}
 	}
@@ -382,6 +392,25 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 		newTaints = append(newTaints, taint)
 	}
 	return newTaints
+}
+
+// ensureNodeExistsByProviderIDOrExternalID first checks if the instance exists by the provider id and then by calling external id with node name
+func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+	exists, err := instances.InstanceExistsByProviderID(node.Spec.ProviderID)
+	if err != nil {
+		providerIDErr := err
+		_, err = instances.ExternalID(types.NodeName(node.Name))
+		if err == nil {
+			return true, nil
+		}
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("InstanceExistsByProviderID: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
+	}
+
+	return exists, nil
 }
 
 func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {

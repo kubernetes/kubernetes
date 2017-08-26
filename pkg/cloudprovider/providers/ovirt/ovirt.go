@@ -211,6 +211,12 @@ func (v *OVirtCloud) ExternalID(nodeName types.NodeName) (string, error) {
 	return instance.UUID, nil
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (v *OVirtCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (v *OVirtCloud) InstanceID(nodeName types.NodeName) (string, error) {
 	name := mapNodeNameToInstanceName(nodeName)
