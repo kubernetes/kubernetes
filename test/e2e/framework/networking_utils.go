@@ -214,7 +214,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
@@ -270,7 +270,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
 // GetSelfURL executes a curl against the given path via kubectl exec into a
