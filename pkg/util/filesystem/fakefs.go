@@ -18,10 +18,10 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/afero"
-	"path/filepath"
 )
 
 // fakeFs is implemented in terms of afero
