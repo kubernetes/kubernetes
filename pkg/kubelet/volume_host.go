@@ -41,7 +41,8 @@ func NewInitializedVolumePluginMgr(
 	kubelet *Kubelet,
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
-	plugins []volume.VolumePlugin) (*volume.VolumePluginMgr, error) {
+	plugins []volume.VolumePlugin,
+	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 	kvh := &kubeletVolumeHost{
 		kubelet:          kubelet,
 		volumePluginMgr:  volume.VolumePluginMgr{},
@@ -49,7 +50,7 @@ func NewInitializedVolumePluginMgr(
 		configMapManager: configMapManager,
 	}
 
-	if err := kvh.volumePluginMgr.InitPlugins(plugins, kvh); err != nil {
+	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
 		return nil, fmt.Errorf(
 			"Could not initialize volume plugins for KubeletVolumePluginMgr: %v",
 			err)

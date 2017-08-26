@@ -90,7 +90,8 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		resyncPeriod:                  p.SyncPeriod,
 	}
 
-	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, controller); err != nil {
+	// Prober is nil because PV is not aware of Flexvolume.
+	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, controller); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
 	}
 
