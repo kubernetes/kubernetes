@@ -72,6 +72,8 @@ go_test(
         "//pkg/securitycontext:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
+        "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

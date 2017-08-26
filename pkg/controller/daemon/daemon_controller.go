@@ -1351,7 +1351,7 @@ func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		// TODO: There are other node status that the DaemonSet should ideally respect too,
 		//       e.g. MemoryPressure, and DiskPressure
 		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			reasons = append(reasons, predicates.ErrNodeSelectorNotMatch)
+			reasons = append(reasons, predicates.ErrNodeOutOfDisk)
 			break
 		}
 	}
