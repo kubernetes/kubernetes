@@ -269,6 +269,15 @@ message CinderVolumeSource {
   optional bool readOnly = 3;
 }
 
+// ClientIPConfig represents the configurations of Client IP based session affinity.
+message ClientIPConfig {
+  // timeoutSeconds specifies the seconds of ClientIP type session sticky time.
+  // The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+  // Default value is 10800(for 3 hours).
+  // +optional
+  optional int32 timeoutSeconds = 1;
+}
+
 // Information about the condition of a component.
 message ComponentCondition {
   // Type of condition for a component.
@@ -3864,6 +3873,10 @@ message ServiceSpec {
   // field.
   // +optional
   optional bool publishNotReadyAddresses = 13;
+
+  // sessionAffinityConfig contains the configurations of session affinity.
+  // +optional
+  optional SessionAffinityConfig sessionAffinityConfig = 14;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -3872,6 +3885,13 @@ message ServiceStatus {
   // if one is present.
   // +optional
   optional LoadBalancerStatus loadBalancer = 1;
+}
+
+// SessionAffinityConfig represents the configurations of session affinity.
+message SessionAffinityConfig {
+  // clientIP contains the configurations of Client IP based session affinity.
+  // +optional
+  optional ClientIPConfig clientIP = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
