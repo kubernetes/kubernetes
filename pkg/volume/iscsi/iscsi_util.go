@@ -294,6 +294,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil {
+		return fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+	}
 	if !notMnt {
 		glog.Infof("iscsi: %s already mounted", globalPDPath)
 		return nil
