@@ -54,8 +54,6 @@ const (
 	resourceNodeFs v1.ResourceName = "nodefs"
 	// nodefs inodes, number.  internal to this module, used to account for local node root filesystem inodes.
 	resourceNodeFsInodes v1.ResourceName = "nodefsInodes"
-	// container overlay storage, in bytes.  internal to this module, used to account for local disk usage for container overlay.
-	resourceOverlay v1.ResourceName = "overlay"
 )
 
 var (
@@ -400,12 +398,10 @@ func localVolumeNames(pod *v1.Pod) []string {
 func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
-	overlay := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
 		if hasFsStatsType(statsToMeasure, fsStatsRoot) {
 			disk.Add(*diskUsage(container.Rootfs))
 			inodes.Add(*inodeUsage(container.Rootfs))
-			overlay.Add(*diskUsage(container.Rootfs))
 		}
 		if hasFsStatsType(statsToMeasure, fsStatsLogs) {
 			disk.Add(*diskUsage(container.Logs))
@@ -425,9 +421,8 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 		}
 	}
 	return v1.ResourceList{
-		resourceDisk:    disk,
-		resourceInodes:  inodes,
-		resourceOverlay: overlay,
+		resourceDisk:   disk,
+		resourceInodes: inodes,
 	}, nil
 }
 
@@ -727,7 +722,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 		}
 	}
 
-	storageScratchCapacity, storageScratchAllocatable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceStorageScratch)
+	ephemeralStorageCapacity, ephemeralStorageAllocatable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceEphemeralStorage)
 	if exist {
 		for _, pod := range pods {
 			podStat, ok := statsFunc(pod)
@@ -735,25 +730,23 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 				continue
 			}
 
-			usage, err := podDiskUsage(podStat, pod, []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot})
+			fsStatsSet := []fsStatsType{}
+			if withImageFs {
+				fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
+			} else {
+				fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
+			}
+
+			usage, err := podDiskUsage(podStat, pod, fsStatsSet)
 			if err != nil {
 				glog.Warningf("eviction manager: error getting pod disk usage %v", err)
 				continue
 			}
-			// If there is a seperate imagefs set up for container runtimes, the scratch disk usage from nodefs should exclude the overlay usage
-			if withImageFs {
-				diskUsage := usage[resourceDisk]
-				diskUsageP := &diskUsage
-				diskUsagep := diskUsageP.Copy()
-				diskUsagep.Sub(usage[resourceOverlay])
-				storageScratchAllocatable.Sub(*diskUsagep)
-			} else {
-				storageScratchAllocatable.Sub(usage[resourceDisk])
-			}
+			ephemeralStorageAllocatable.Sub(usage[resourceDisk])
 		}
 		result[evictionapi.SignalAllocatableNodeFsAvailable] = signalObservation{
-			available: storageScratchAllocatable,
-			capacity:  storageScratchCapacity,
+			available: ephemeralStorageAllocatable,
+			capacity:  ephemeralStorageCapacity,
 		}
 	}
 

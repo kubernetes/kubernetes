@@ -55,7 +55,6 @@ go_library(
             "//pkg/util/procfs:go_default_library",
             "//pkg/util/sysctl:go_default_library",
             "//pkg/util/version:go_default_library",
-            "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd:go_default_library",

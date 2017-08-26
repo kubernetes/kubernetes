@@ -745,7 +745,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 	for k, v := range m {
 		switch v1.ResourceName(k) {
 		// CPU, memory and local storage resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceStorage:
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
 				return nil, err
@@ -753,12 +753,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			// storage specified in configuration map is mapped to ResourceStorageScratch API
-			if v1.ResourceName(k) == v1.ResourceStorage {
-				rl[v1.ResourceStorageScratch] = q
-			} else {
-				rl[v1.ResourceName(k)] = q
-			}
+			rl[v1.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}
