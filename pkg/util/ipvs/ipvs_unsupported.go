@@ -36,43 +36,43 @@ func (runner *runner) Flush() error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) EnsureServiceAddressBind(*FrontendService, string) (bool, error) {
+func (runner *runner) EnsureVirtualServerAddressBind(*VirtualServer, string) (bool, error) {
 	return false, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) UnbindServiceAddress(*FrontendService, string) error {
+func (runner *runner) UnbindVirtualServerAddress(*VirtualServer, string) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) AddService(*FrontendService) error {
+func (runner *runner) AddVirtualServer(*VirtualServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) UpdateService(*FrontendService) error {
+func (runner *runner) UpdateVirtualServer(*VirtualServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) DeleteService(*FrontendService) error {
+func (runner *runner) DeleteVirtualServer(*VirtualServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetService(*FrontendService) (*FrontendService, error) {
+func (runner *runner) GetVirtualServer(*VirtualServer) (*VirtualServer, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetServices() ([]*FrontendService, error) {
+func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) AddDestination(*FrontendService, *FrontendDestination) error {
+func (runner *runner) AddRealServer(*VirtualServer, *RealServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) GetDestinations(*FrontendService) ([]*FrontendDestination, error) {
+func (runner *runner) GetRealServers(*VirtualServer) ([]*RealServer, error) {
 	return nil, fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) DeleteDestination(*FrontendService, *FrontendDestination) error {
+func (runner *runner) DeleteRealServer(*VirtualServer, *RealServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 

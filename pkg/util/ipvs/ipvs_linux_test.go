@@ -33,8 +33,8 @@ import (
 
 const dummyDevice = "kube-ipvs0"
 
-func TestEnsureServiceAddressBind(t *testing.T) {
-	svc := &FrontendService{
+func TestEnsureVirtualServerAddressBind(t *testing.T) {
+	vs := &VirtualServer{
 		Address:  net.ParseIP("10.20.30.40"),
 		Port:     uint16(1234),
 		Protocol: string("TCP"),
@@ -55,7 +55,7 @@ func TestEnsureServiceAddressBind(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Success.
-	exists, err := runner.EnsureServiceAddressBind(svc, dummyDevice)
+	exists, err := runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -69,7 +69,7 @@ func TestEnsureServiceAddressBind(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Exists.
-	exists, err = runner.EnsureServiceAddressBind(svc, dummyDevice)
+	exists, err = runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -78,8 +78,8 @@ func TestEnsureServiceAddressBind(t *testing.T) {
 	}
 }
 
-func TestUnbindServiceAddress(t *testing.T) {
-	svc := &FrontendService{
+func TestUnbindVirtualServerAddress(t *testing.T) {
+	svc := &VirtualServer{
 		Address:  net.ParseIP("10.20.30.41"),
 		Port:     uint16(80),
 		Protocol: string("TCP"),
@@ -100,7 +100,7 @@ func TestUnbindServiceAddress(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Success.
-	err := runner.UnbindServiceAddress(svc, dummyDevice)
+	err := runner.UnbindVirtualServerAddress(svc, dummyDevice)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -111,7 +111,7 @@ func TestUnbindServiceAddress(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Failure.
-	err = runner.UnbindServiceAddress(svc, dummyDevice)
+	err = runner.UnbindVirtualServerAddress(svc, dummyDevice)
 	if err == nil {
 		t.Errorf("expected failure")
 	}
@@ -119,8 +119,8 @@ func TestUnbindServiceAddress(t *testing.T) {
 
 func Test_toFrontendService(t *testing.T) {
 	Tests := []struct {
-		ipvsService     ipvs.Service
-		frontendService FrontendService
+		ipvsService   ipvs.Service
+		virtualServer VirtualServer
 	}{
 		{
 			ipvs.Service{
@@ -135,7 +135,7 @@ func Test_toFrontendService(t *testing.T) {
 				Address:       nil,
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("0.0.0.0"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -157,7 +157,7 @@ func Test_toFrontendService(t *testing.T) {
 				Address:       net.ParseIP("2012::beef"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "UDP",
 				Port:      33434,
@@ -179,7 +179,7 @@ func Test_toFrontendService(t *testing.T) {
 				Address:       net.ParseIP("1.2.3.4"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "",
 				Port:      0,
@@ -201,7 +201,7 @@ func Test_toFrontendService(t *testing.T) {
 				Address:       nil,
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("::0"),
 				Protocol:  "",
 				Port:      0,
@@ -213,20 +213,20 @@ func Test_toFrontendService(t *testing.T) {
 	}
 
 	for i := range Tests {
-		got, err := toFrontendService(&Tests[i].ipvsService)
+		got, err := toVirtualServer(&Tests[i].ipvsService)
 		if err != nil {
 			t.Errorf("case: %d, unexpected error: %v", i, err)
 		}
-		if !reflect.DeepEqual(*got, Tests[i].frontendService) {
-			t.Errorf("case: %d, got %#v, want %#v", i, *got, Tests[i].frontendService)
+		if !reflect.DeepEqual(*got, Tests[i].virtualServer) {
+			t.Errorf("case: %d, got %#v, want %#v", i, *got, Tests[i].virtualServer)
 		}
 	}
 }
 
 func Test_toBackendService(t *testing.T) {
 	Tests := []struct {
-		ipvsService     ipvs.Service
-		frontendService FrontendService
+		ipvsService   ipvs.Service
+		virtualServer VirtualServer
 	}{
 		{
 			ipvs.Service{
@@ -241,7 +241,7 @@ func Test_toBackendService(t *testing.T) {
 				Address:       net.ParseIP("0.0.0.0"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("0.0.0.0"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -263,7 +263,7 @@ func Test_toBackendService(t *testing.T) {
 				Address:       net.ParseIP("2012::beef"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "UDP",
 				Port:      33434,
@@ -285,7 +285,7 @@ func Test_toBackendService(t *testing.T) {
 				Address:       net.ParseIP("1.2.3.4"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "",
 				Port:      0,
@@ -307,7 +307,7 @@ func Test_toBackendService(t *testing.T) {
 				Address:       net.ParseIP("::0"),
 				PEName:        "",
 			},
-			FrontendService{
+			VirtualServer{
 				Address:   net.ParseIP("::0"),
 				Protocol:  "",
 				Port:      0,
@@ -319,7 +319,7 @@ func Test_toBackendService(t *testing.T) {
 	}
 
 	for i := range Tests {
-		got, err := toBackendService(&Tests[i].frontendService)
+		got, err := toBackendService(&Tests[i].virtualServer)
 		if err != nil {
 			t.Errorf("case: %d, unexpected error: %v", i, err)
 		}
@@ -331,8 +331,8 @@ func Test_toBackendService(t *testing.T) {
 
 func Test_toFrontendDestination(t *testing.T) {
 	Tests := []struct {
-		ipvsDestination     ipvs.Destination
-		frontendDestination FrontendDestination
+		ipvsDestination ipvs.Destination
+		realServer      RealServer
 	}{
 		{
 			ipvs.Destination{
@@ -341,7 +341,7 @@ func Test_toFrontendDestination(t *testing.T) {
 				Weight:          1,
 				Address:         net.ParseIP("1.2.3.4"),
 			},
-			FrontendDestination{
+			RealServer{
 				Address: net.ParseIP("1.2.3.4"),
 				Port:    54321,
 				Weight:  1,
@@ -354,7 +354,7 @@ func Test_toFrontendDestination(t *testing.T) {
 				Weight:          1,
 				Address:         net.ParseIP("2002::cafe"),
 			},
-			FrontendDestination{
+			RealServer{
 				Address: net.ParseIP("2002::cafe"),
 				Port:    53,
 				Weight:  1,
@@ -362,23 +362,23 @@ func Test_toFrontendDestination(t *testing.T) {
 		},
 	}
 	for i := range Tests {
-		got, err := toFrontendDestination(&Tests[i].ipvsDestination)
+		got, err := toRealServer(&Tests[i].ipvsDestination)
 		if err != nil {
 			t.Errorf("case %d unexpected error: %d", i, err)
 		}
-		if !reflect.DeepEqual(*got, Tests[i].frontendDestination) {
-			t.Errorf("case %d Failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].frontendDestination)
+		if !reflect.DeepEqual(*got, Tests[i].realServer) {
+			t.Errorf("case %d Failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].realServer)
 		}
 	}
 }
 
 func Test_toBackendDestination(t *testing.T) {
 	Tests := []struct {
-		frontendDestination FrontendDestination
-		ipvsDestination     ipvs.Destination
+		realServer      RealServer
+		ipvsDestination ipvs.Destination
 	}{
 		{
-			FrontendDestination{
+			RealServer{
 				Address: net.ParseIP("1.2.3.4"),
 				Port:    54321,
 				Weight:  1,
@@ -391,7 +391,7 @@ func Test_toBackendDestination(t *testing.T) {
 			},
 		},
 		{
-			FrontendDestination{
+			RealServer{
 				Address: net.ParseIP("2002::cafe"),
 				Port:    53,
 				Weight:  1,
@@ -405,7 +405,7 @@ func Test_toBackendDestination(t *testing.T) {
 		},
 	}
 	for i := range Tests {
-		got, err := toBackendDestination(&Tests[i].frontendDestination)
+		got, err := toBackendDestination(&Tests[i].realServer)
 		if err != nil {
 			t.Errorf("case %d unexpected error: %d", i, err)
 		}

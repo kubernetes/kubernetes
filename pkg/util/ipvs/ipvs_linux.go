@@ -51,9 +51,9 @@ func New(exec utilexec.Interface) Interface {
 	}
 }
 
-// EnsureServiceAddressBind is part of Interface.
-func (runner *runner) EnsureServiceAddressBind(serv *FrontendService, dummyDev string) (exist bool, err error) {
-	addr := serv.Address.String() + "/32"
+// EnsureVirtualServerAddressBind is part of Interface.
+func (runner *runner) EnsureVirtualServerAddressBind(vs *VirtualServer, dummyDev string) (exist bool, err error) {
+	addr := vs.Address.String() + "/32"
 	args := []string{"addr", "add", addr, "dev", dummyDev}
 	out, err := runner.exec.Command(cmdIP, args...).CombinedOutput()
 	if err != nil {
@@ -63,91 +63,91 @@ func (runner *runner) EnsureServiceAddressBind(serv *FrontendService, dummyDev s
 				return true, nil
 			}
 		}
-		return false, fmt.Errorf("error bind address: %s to dummy interface: %s, err: %v: %s", serv.Address.String(), dummyDev, err, out)
+		return false, fmt.Errorf("error bind address: %s to dummy interface: %s, err: %v: %s", vs.Address.String(), dummyDev, err, out)
 	}
 	return false, nil
 }
 
-// UnbindServiceAddress is part of Interface.
-func (runner *runner) UnbindServiceAddress(serv *FrontendService, dummyDev string) error {
-	addr := serv.Address.String() + "/32"
+// UnbindVirtualServerAddress is part of Interface.
+func (runner *runner) UnbindVirtualServerAddress(vs *VirtualServer, dummyDev string) error {
+	addr := vs.Address.String() + "/32"
 	args := []string{"addr", "del", addr, "dev", dummyDev}
 	out, err := runner.exec.Command(cmdIP, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("error unbind address: %s from dummy interface: %s, err: %v: %s", serv.Address.String(), dummyDev, err, out)
+		return fmt.Errorf("error unbind address: %s from dummy interface: %s, err: %v: %s", vs.Address.String(), dummyDev, err, out)
 	}
 	return nil
 }
 
-// AddService is part of Interface.
-func (runner *runner) AddService(svc *FrontendService) error {
-	eSvc, err := toBackendService(svc)
+// AddVirtualServer is part of Interface.
+func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
+	eSvc, err := toBackendService(vs)
 	if err != nil {
 		return err
 	}
 	return runner.ipvsHandle.NewService(eSvc)
 }
 
-// UpdateService is part of Interface.
-func (runner *runner) UpdateService(svc *FrontendService) error {
-	eSvc, err := toBackendService(svc)
+// UpdateVirtualServer is part of Interface.
+func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.UpdateService(eSvc)
+	return runner.ipvsHandle.UpdateService(bSvc)
 }
 
-// DeleteService is part of Interface.
-func (runner *runner) DeleteService(svc *FrontendService) error {
-	eSvc, err := toBackendService(svc)
+// DeleteVirtualServer is part of Interface.
+func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.DelService(eSvc)
+	return runner.ipvsHandle.DelService(bSvc)
 }
 
-// GetService is part of Interface.
-func (runner *runner) GetService(svc *FrontendService) (*FrontendService, error) {
-	eSvc, err := toBackendService(svc)
+// GetVirtualServer is part of Interface.
+func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error) {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return nil, err
 	}
-	ipvsService, err := runner.ipvsHandle.GetService(eSvc)
+	ipvsService, err := runner.ipvsHandle.GetService(bSvc)
 	if err != nil {
 		return nil, err
 	}
-	intSvc, err := toFrontendService(ipvsService)
+	virtualServer, err := toVirtualServer(ipvsService)
 	if err != nil {
 		return nil, err
 	}
-	return intSvc, nil
+	return virtualServer, nil
 }
 
-// GetServices is part of Interface.
-func (runner *runner) GetServices() ([]*FrontendService, error) {
+// GetVirtualServers is part of Interface.
+func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 	ipvsServices, err := runner.ipvsHandle.GetServices()
 	if err != nil {
 		return nil, err
 	}
-	svcs := make([]*FrontendService, 0)
+	vss := make([]*VirtualServer, 0)
 	for _, ipvsService := range ipvsServices {
-		svc, err := toFrontendService(ipvsService)
+		vs, err := toVirtualServer(ipvsService)
 		if err != nil {
 			return nil, err
 		}
-		svcs = append(svcs, svc)
+		vss = append(vss, vs)
 	}
-	return svcs, nil
+	return vss, nil
 }
 
 // Flush is part of Interface.  Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
-	Services, err := runner.GetServices()
+	vss, err := runner.GetVirtualServers()
 	if err != nil {
 		return err
 	}
-	for _, service := range Services {
-		err := runner.DeleteService(service)
+	for _, vs := range vss {
+		err := runner.DeleteVirtualServer(vs)
 		// TODO: aggregate errors?
 		if err != nil {
 			return err
@@ -156,35 +156,35 @@ func (runner *runner) Flush() error {
 	return nil
 }
 
-// AddDestination is part of Interface.
-func (runner *runner) AddDestination(svc *FrontendService, dst *FrontendDestination) error {
-	bSvc, err := toBackendService(svc)
+// AddRealServer is part of Interface.
+func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return err
 	}
-	bDst, err := toBackendDestination(dst)
+	bDst, err := toBackendDestination(rs)
 	if err != nil {
 		return err
 	}
 	return runner.ipvsHandle.NewDestination(bSvc, bDst)
 }
 
-// DeleteDestination is part of Interface.
-func (runner *runner) DeleteDestination(svc *FrontendService, dst *FrontendDestination) error {
-	eSvc, err := toBackendService(svc)
+// DeleteRealServer is part of Interface.
+func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return err
 	}
-	eDst, err := toBackendDestination(dst)
+	bDst, err := toBackendDestination(rs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.DelDestination(eSvc, eDst)
+	return runner.ipvsHandle.DelDestination(bSvc, bDst)
 }
 
-// GetDestinations is part of Interface.
-func (runner *runner) GetDestinations(svc *FrontendService) ([]*FrontendDestination, error) {
-	bSvc, err := toBackendService(svc)
+// GetRealServers is part of Interface.
+func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
+	bSvc, err := toBackendService(vs)
 	if err != nil {
 		return nil, err
 	}
@@ -192,24 +192,24 @@ func (runner *runner) GetDestinations(svc *FrontendService) ([]*FrontendDestinat
 	if err != nil {
 		return nil, err
 	}
-	frontendDestinations := make([]*FrontendDestination, 0)
+	realServers := make([]*RealServer, 0)
 	for _, dest := range bDestinations {
-		dst, err := toFrontendDestination(dest)
+		dst, err := toRealServer(dest)
 		// TODO: aggregate errors?
 		if err != nil {
 			return nil, err
 		}
-		frontendDestinations = append(frontendDestinations, dst)
+		realServers = append(realServers, dst)
 	}
-	return frontendDestinations, nil
+	return realServers, nil
 }
 
-// toFrontendService converts an "backend" IPVS service representation to the equivalent "frontend" Service structure.
-func toFrontendService(svc *ipvs.Service) (*FrontendService, error) {
+// toVirtualServer converts an IPVS service representation to the equivalent virtual server structure.
+func toVirtualServer(svc *ipvs.Service) (*VirtualServer, error) {
 	if svc == nil {
 		return nil, errors.New("ipvs svc should not be empty")
 	}
-	frontendSvc := &FrontendService{
+	vs := &VirtualServer{
 		Address:   svc.Address,
 		Port:      svc.Port,
 		Scheduler: svc.SchedName,
@@ -218,43 +218,43 @@ func toFrontendService(svc *ipvs.Service) (*FrontendService, error) {
 		Timeout:   svc.Timeout,
 	}
 
-	if frontendSvc.Address == nil {
+	if vs.Address == nil {
 		if svc.AddressFamily == syscall.AF_INET {
-			frontendSvc.Address = net.IPv4zero
+			vs.Address = net.IPv4zero
 		} else {
-			frontendSvc.Address = net.IPv6zero
+			vs.Address = net.IPv6zero
 		}
 	}
-	return frontendSvc, nil
+	return vs, nil
 }
 
-// toFrontendDestination converts an "backend" IPVS destination representation to the equivalent "frontend" destination structure.
-func toFrontendDestination(dst *ipvs.Destination) (*FrontendDestination, error) {
+// toRealServer converts an IPVS destination representation to the equivalent real server structure.
+func toRealServer(dst *ipvs.Destination) (*RealServer, error) {
 	if dst == nil {
 		return nil, errors.New("ipvs destination should not be empty")
 	}
-	return &FrontendDestination{
+	return &RealServer{
 		Address: dst.Address,
 		Port:    dst.Port,
 		Weight:  dst.Weight,
 	}, nil
 }
 
-// toBackendService converts an "frontend" IPVS service representation to the equivalent "backend" service structure.
-func toBackendService(intSvc *FrontendService) (*ipvs.Service, error) {
-	if intSvc == nil {
-		return nil, errors.New("service should not be empty")
+// toBackendService converts an IPVS real server representation to the equivalent "backend" service structure.
+func toBackendService(vs *VirtualServer) (*ipvs.Service, error) {
+	if vs == nil {
+		return nil, errors.New("virtual server should not be empty")
 	}
 	bakSvc := &ipvs.Service{
-		Address:   intSvc.Address,
-		Protocol:  stringToProtocolNumber(intSvc.Protocol),
-		Port:      intSvc.Port,
-		SchedName: intSvc.Scheduler,
-		Flags:     uint32(intSvc.Flags),
-		Timeout:   intSvc.Timeout,
+		Address:   vs.Address,
+		Protocol:  stringToProtocolNumber(vs.Protocol),
+		Port:      vs.Port,
+		SchedName: vs.Scheduler,
+		Flags:     uint32(vs.Flags),
+		Timeout:   vs.Timeout,
 	}
 
-	if ip4 := intSvc.Address.To4(); ip4 != nil {
+	if ip4 := vs.Address.To4(); ip4 != nil {
 		bakSvc.AddressFamily = syscall.AF_INET
 		bakSvc.Netmask = 0xffffffff
 	} else {
@@ -264,15 +264,15 @@ func toBackendService(intSvc *FrontendService) (*ipvs.Service, error) {
 	return bakSvc, nil
 }
 
-// toBackendDestination converts an "frontend" IPVS destination representation to the equivalent "backend" destination structure.
-func toBackendDestination(dst *FrontendDestination) (*ipvs.Destination, error) {
-	if dst == nil {
-		return nil, errors.New("destination should not be empty")
+// toBackendDestination converts an IPVS real server representation to the equivalent "backend" destination structure.
+func toBackendDestination(rs *RealServer) (*ipvs.Destination, error) {
+	if rs == nil {
+		return nil, errors.New("real server should not be empty")
 	}
 	return &ipvs.Destination{
-		Address: dst.Address,
-		Port:    dst.Port,
-		Weight:  dst.Weight,
+		Address: rs.Address,
+		Port:    rs.Port,
+		Weight:  rs.Weight,
 	}, nil
 }
 

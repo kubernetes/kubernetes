@@ -25,8 +25,8 @@ import (
 //FakeIPVS no-op implementation of ipvs Interface
 type FakeIPVS struct {
 	Scheduler    string
-	Services     map[serviceKey]*utilipvs.FrontendService
-	Destinations map[serviceKey][]*utilipvs.FrontendDestination
+	Services     map[serviceKey]*utilipvs.VirtualServer
+	Destinations map[serviceKey][]*utilipvs.RealServer
 }
 
 type serviceKey struct {
@@ -42,12 +42,12 @@ func (s *serviceKey) String() string {
 //NewFake creates a fake ipvs strucuter
 func NewFake() *FakeIPVS {
 	return &FakeIPVS{
-		Services:     make(map[serviceKey]*utilipvs.FrontendService),
-		Destinations: make(map[serviceKey][]*utilipvs.FrontendDestination),
+		Services:     make(map[serviceKey]*utilipvs.VirtualServer),
+		Destinations: make(map[serviceKey][]*utilipvs.RealServer),
 	}
 }
 
-func toServiceKey(serv *utilipvs.FrontendService) serviceKey {
+func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
 	return serviceKey{
 		IP:       serv.Address.To4().String(),
 		Port:     serv.Port,
@@ -55,30 +55,30 @@ func toServiceKey(serv *utilipvs.FrontendService) serviceKey {
 	}
 }
 
-//EnsureServiceAddressBind is a fake implementation
-func (*FakeIPVS) EnsureServiceAddressBind(serv *utilipvs.FrontendService, dev string) (exist bool, err error) {
+//EnsureVirtualServerAddressBind is a fake implementation
+func (*FakeIPVS) EnsureVirtualServerAddressBind(serv *utilipvs.VirtualServer, dev string) (exist bool, err error) {
 	return true, nil
 }
 
-//UnbindServiceAddress is a fake implementation
-func (*FakeIPVS) UnbindServiceAddress(serv *utilipvs.FrontendService, dev string) error {
+//UnbindVirtualServerAddress is a fake implementation
+func (*FakeIPVS) UnbindVirtualServerAddress(serv *utilipvs.VirtualServer, dev string) error {
 	return nil
 }
 
-//AddService is a fake implementation
-func (f *FakeIPVS) AddService(serv *utilipvs.FrontendService) error {
+//AddVirtualServer is a fake implementation
+func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
 		return fmt.Errorf("Failed to add service: service can't be nil")
 	}
 	key := toServiceKey(serv)
 	f.Services[key] = serv
 	// make sure no destination present when creating new service
-	f.Destinations = make(map[serviceKey][]*utilipvs.FrontendDestination)
+	f.Destinations = make(map[serviceKey][]*utilipvs.VirtualServer)
 	return nil
 }
 
-//UpdateService is a fake implementation
-func (f *FakeIPVS) UpdateService(serv *utilipvs.FrontendService) error {
+//UpdateVirtualServer is a fake implementation
+func (f *FakeIPVS) UpdateVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
 		return fmt.Errorf("Failed to update service, service can't be nil")
 	}
@@ -86,7 +86,7 @@ func (f *FakeIPVS) UpdateService(serv *utilipvs.FrontendService) error {
 }
 
 //DeleteService is a fake implementation
-func (f *FakeIPVS) DeleteService(serv *utilipvs.FrontendService) error {
+func (f *FakeIPVS) DeleteVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
 		return fmt.Errorf("Failed to delete service: service can't be nil")
 	}
@@ -97,8 +97,8 @@ func (f *FakeIPVS) DeleteService(serv *utilipvs.FrontendService) error {
 	return nil
 }
 
-//GetService is a fake implementation
-func (f *FakeIPVS) GetService(serv *utilipvs.FrontendService) (*utilipvs.FrontendService, error) {
+//GetVirtualServer is a fake implementation
+func (f *FakeIPVS) GetVirtualServer(serv *utilipvs.VirtualServer) (*utilipvs.VirtualServer, error) {
 	if serv == nil {
 		return nil, fmt.Errorf("Failed to get service: service can't be nil")
 	}
@@ -110,9 +110,9 @@ func (f *FakeIPVS) GetService(serv *utilipvs.FrontendService) (*utilipvs.Fronten
 	return nil, fmt.Errorf("Not found serv: %v", key.String())
 }
 
-//GetServices is a fake implementation
-func (f *FakeIPVS) GetServices() ([]*utilipvs.FrontendService, error) {
-	res := make([]*utilipvs.FrontendService, 0)
+//GetVirtualServers is a fake implementation
+func (f *FakeIPVS) GetVirtualServers() ([]*utilipvs.VirtualServer, error) {
+	res := make([]*utilipvs.VirtualServer, 0)
 	for _, svc := range f.Services {
 		res = append(res, svc)
 	}
@@ -127,8 +127,8 @@ func (f *FakeIPVS) Flush() error {
 	return nil
 }
 
-//AddDestination is a fake implementation
-func (f *FakeIPVS) AddDestination(serv *utilipvs.FrontendService, dest *utilipvs.FrontendDestination) error {
+//AddRealServer is a fake implementation
+func (f *FakeIPVS) AddRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.RealServer) error {
 	if serv == nil || dest == nil {
 		return fmt.Errorf("Failed to add destination for service, neither service nor destination shouldn't be nil")
 	}
@@ -138,15 +138,15 @@ func (f *FakeIPVS) AddDestination(serv *utilipvs.FrontendService, dest *utilipvs
 	}
 	dests := f.Destinations[key]
 	if dests == nil {
-		dests = make([]*utilipvs.FrontendDestination, 0)
+		dests = make([]*utilipvs.VirtualServer, 0)
 		f.Destinations[key] = dests
 	}
 	f.Destinations[key] = append(f.Destinations[key], dest)
 	return nil
 }
 
-//GetDestinations is a fake implementation
-func (f *FakeIPVS) GetDestinations(serv *utilipvs.FrontendService) ([]*utilipvs.FrontendDestination, error) {
+//GetRealServers is a fake implementation
+func (f *FakeIPVS) GetRealServers(serv *utilipvs.VirtualServer) ([]*utilipvs.RealServer, error) {
 	if serv == nil {
 		return nil, fmt.Errorf("Failed to get destination for nil service")
 	}
@@ -157,16 +157,8 @@ func (f *FakeIPVS) GetDestinations(serv *utilipvs.FrontendService) ([]*utilipvs.
 	return f.Destinations[key], nil
 }
 
-//UpdateDestination is a fake implementation
-func (*FakeIPVS) UpdateDestination(serv *utilipvs.FrontendService, dest *utilipvs.FrontendDestination) error {
-	if serv == nil || dest == nil {
-		return fmt.Errorf("Failed to update destination, neither service nor destination can't be nil")
-	}
-	return nil
-}
-
-//DeleteDestination is a fake implementation
-func (*FakeIPVS) DeleteDestination(serv *utilipvs.FrontendService, dest *utilipvs.FrontendDestination) error {
+//DeleteRealServer is a fake implementation
+func (*FakeIPVS) DeleteRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.RealServer) error {
 	if serv == nil || dest == nil {
 		return fmt.Errorf("Failed to delete destination, neither service nor destination can't be nil")
 	}

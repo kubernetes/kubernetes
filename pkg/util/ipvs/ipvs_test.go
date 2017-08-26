@@ -21,15 +21,15 @@ import (
 	"testing"
 )
 
-func TestFrontendServiceEqual(t *testing.T) {
+func TestVirtualServerEqual(t *testing.T) {
 	Tests := []struct {
-		svcA   *FrontendService
-		svcB   *FrontendService
+		svcA   *VirtualServer
+		svcB   *VirtualServer
 		equal  bool
 		reason string
 	}{
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("10.20.30.40"),
 				Protocol:  "",
 				Port:      0,
@@ -37,7 +37,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("10.20.30.41"),
 				Protocol:  "",
 				Port:      0,
@@ -49,7 +49,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "IPv4 address not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "",
 				Port:      0,
@@ -57,7 +57,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("2017::beef"),
 				Protocol:  "",
 				Port:      0,
@@ -69,7 +69,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "IPv6 address not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "TCP",
 				Port:      0,
@@ -77,7 +77,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("2012::beeef"),
 				Protocol:  "UDP",
 				Port:      0,
@@ -89,7 +89,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "Protocol not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -97,7 +97,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "TCP",
 				Port:      8080,
@@ -109,7 +109,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "Port not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -117,7 +117,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -129,7 +129,27 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "Scheduler not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  "TCP",
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     2,
+				Timeout:   0,
+			},
+			svcB: &VirtualServer{
+				Address:   net.ParseIP("1.2.3.4"),
+				Protocol:  "TCP",
+				Port:      80,
+				Scheduler: "rr",
+				Flags:     3,
+				Timeout:   0,
+			},
+			equal:  false,
+			reason: "Flags not equal",
+		},
+		{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "",
 				Port:      0,
@@ -137,7 +157,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0,
 				Timeout:   0,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("2012::beef"),
 				Protocol:  "",
 				Port:      0,
@@ -149,7 +169,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 			reason: "Timeout not equal",
 		},
 		{
-			svcA: &FrontendService{
+			svcA: &VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -157,7 +177,7 @@ func TestFrontendServiceEqual(t *testing.T) {
 				Flags:     0x1,
 				Timeout:   10800,
 			},
-			svcB: &FrontendService{
+			svcB: &VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
 				Protocol:  "TCP",
 				Port:      80,
@@ -180,11 +200,11 @@ func TestFrontendServiceEqual(t *testing.T) {
 
 func TestFrontendServiceString(t *testing.T) {
 	Tests := []struct {
-		svc      *FrontendService
+		svc      *VirtualServer
 		expected string
 	}{
 		{
-			svc: &FrontendService{
+			svc: &VirtualServer{
 				Address:  net.ParseIP("10.20.30.40"),
 				Protocol: "TCP",
 				Port:     80,
@@ -192,7 +212,7 @@ func TestFrontendServiceString(t *testing.T) {
 			expected: "10.20.30.40:80/TCP",
 		},
 		{
-			svc: &FrontendService{
+			svc: &VirtualServer{
 				Address:  net.ParseIP("2012::beef"),
 				Protocol: "UDP",
 				Port:     8080,
@@ -200,7 +220,7 @@ func TestFrontendServiceString(t *testing.T) {
 			expected: "[2012::beef]:8080/UDP",
 		},
 		{
-			svc: &FrontendService{
+			svc: &VirtualServer{
 				Address:  net.ParseIP("10.20.30.41"),
 				Protocol: "ESP",
 				Port:     1234,
@@ -218,18 +238,18 @@ func TestFrontendServiceString(t *testing.T) {
 
 func TestFrontendDestinationString(t *testing.T) {
 	Tests := []struct {
-		svc      *FrontendDestination
+		svc      *RealServer
 		expected string
 	}{
 		{
-			svc: &FrontendDestination{
+			svc: &RealServer{
 				Address: net.ParseIP("10.20.30.40"),
 				Port:    80,
 			},
 			expected: "10.20.30.40:80",
 		},
 		{
-			svc: &FrontendDestination{
+			svc: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    8080,
 			},

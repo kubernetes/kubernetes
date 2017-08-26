@@ -23,32 +23,32 @@ import (
 
 // Interface is an injectable interface for running ipvs commands.  Implementations must be goroutine-safe.
 type Interface interface {
-	// Flush clears all services in system. return occurred error immediately.
+	// Flush clears all virtual servers in system. return occurred error immediately.
 	Flush() error
-	// EnsureServiceAddressBind checks if service's address is bound to dummy interface and, if not, binds it. If the address is already bound, return true.
-	EnsureServiceAddressBind(serv *FrontendService, dev string) (exist bool, err error)
-	// UnbindServiceAddress checks if service's address is bound to dummy interface and, if so, unbinds it.
-	UnbindServiceAddress(serv *FrontendService, dev string) error
-	// AddService creates the specified service.
-	AddService(*FrontendService) error
-	// UpdateService updates an already existing service.  If the service does not exist, return error.
-	UpdateService(*FrontendService) error
-	// DeleteService deletes the specified service.  If the service does not exist, return error.
-	DeleteService(*FrontendService) error
-	// GetService returns the specified service information in the system.
-	GetService(*FrontendService) (*FrontendService, error)
-	// GetServices lists all services in the system.
-	GetServices() ([]*FrontendService, error)
-	// AddDestination creates the specified destination for the specified service.
-	AddDestination(*FrontendService, *FrontendDestination) error
-	// GetDestinations returns all destinations for the specified service.
-	GetDestinations(*FrontendService) ([]*FrontendDestination, error)
-	// DeleteDestination deletes the specified destination from the specified service.
-	DeleteDestination(*FrontendService, *FrontendDestination) error
+	// EnsureVirtualServerAddressBind checks if virtual server's address is bound to dummy interface and, if not, binds it. If the address is already bound, return true.
+	EnsureVirtualServerAddressBind(serv *VirtualServer, dev string) (exist bool, err error)
+	// UnbindVirtualServerAddress checks if virtual server's address is bound to dummy interface and, if so, unbinds it.
+	UnbindVirtualServerAddress(serv *VirtualServer, dev string) error
+	// AddVirtualServer creates the specified virtual server.
+	AddVirtualServer(*VirtualServer) error
+	// UpdateVirtualServer updates an already existing virtual server.  If the virtual server does not exist, return error.
+	UpdateVirtualServer(*VirtualServer) error
+	// DeleteVirtualServer deletes the specified virtual server.  If the virtual server does not exist, return error.
+	DeleteVirtualServer(*VirtualServer) error
+	// Given a partial virtual server, GetVirtualServer will return the specified virtual server information in the system.
+	GetVirtualServer(*VirtualServer) (*VirtualServer, error)
+	// GetVirtualServers lists all virtual servers in the system.
+	GetVirtualServers() ([]*VirtualServer, error)
+	// AddRealServer creates the specified real server for the specified virtual server.
+	AddRealServer(*VirtualServer, *RealServer) error
+	// GetRealServers returns all real servers for the specified virtual server.
+	GetRealServers(*VirtualServer) ([]*RealServer, error)
+	// DeleteRealServer deletes the specified real server from the specified virtual server.
+	DeleteRealServer(*VirtualServer, *RealServer) error
 }
 
-// FrontendService is an user-oriented definition of an IPVS service in its entirety.
-type FrontendService struct {
+// VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.
+type VirtualServer struct {
 	Address   net.IP
 	Protocol  string
 	Port      uint16
@@ -65,26 +65,28 @@ const (
 	FlagPersistent = 0x1
 )
 
-// Equal check the equality of frontend service
-func (svc *FrontendService) Equal(other *FrontendService) bool {
+// Equal check the equality of virtual server.
+// We don't use struct == since it doesn't work because of slice.
+func (svc *VirtualServer) Equal(other *VirtualServer) bool {
 	return svc.Address.Equal(other.Address) &&
 		svc.Protocol == other.Protocol &&
 		svc.Port == other.Port &&
 		svc.Scheduler == other.Scheduler &&
+		svc.Flags == other.Flags &&
 		svc.Timeout == other.Timeout
 }
 
-func (svc *FrontendService) String() string {
+func (svc *VirtualServer) String() string {
 	return net.JoinHostPort(svc.Address.String(), strconv.Itoa(int(svc.Port))) + "/" + svc.Protocol
 }
 
-// FrontendDestination is an user-oriented definition of an IPVS destination in its entirety.
-type FrontendDestination struct {
+// RealServer is an user-oriented definition of an IPVS real server in its entirety.
+type RealServer struct {
 	Address net.IP
 	Port    uint16
 	Weight  int
 }
 
-func (dest *FrontendDestination) String() string {
+func (dest *RealServer) String() string {
 	return net.JoinHostPort(dest.Address.String(), strconv.Itoa(int(dest.Port)))
 }
