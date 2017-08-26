@@ -144,7 +144,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 
 	for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
 		starts = append(starts, t)
-		// An object might miss several starts.  For example, if
+		// An object might miss several starts. For example, if
 		// controller gets wedged on friday at 5:01pm when everyone has
 		// gone home, and someone comes in on tuesday AM and discovers
 		// the problem and restarts the controller, then all the hourly
@@ -159,7 +159,7 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 		// of this controller. In that case, we want to not try to list
 		// all the missed start times.
 		//
-		// I've somewhat arbitrarily picked 100, as more than 80, but
+		// I've somewhat arbitrarily picked 100, as more than 80,
 		// but less than "lots".
 		if len(starts) > 100 {
 			// We can't get the most recent times so just return an empty slice
