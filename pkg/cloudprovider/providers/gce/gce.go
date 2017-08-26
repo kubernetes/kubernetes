@@ -144,51 +144,42 @@ type GCEServiceManager struct {
 	gce *GCECloud
 }
 
-type ConfigGlobal struct {
-	TokenURL  string `gcfg:"token-url"`
-	TokenBody string `gcfg:"token-body"`
-	// ProjectID and NetworkProjectID can either be the numeric or string-based
-	// unique identifier that starts with [a-z].
-	ProjectID string `gcfg:"project-id"`
-	// NetworkProjectID refers to the project which owns the network being used.
-	NetworkProjectID string `gcfg:"network-project-id"`
-	NetworkName      string `gcfg:"network-name"`
-	SubnetworkName   string `gcfg:"subnetwork-name"`
-	// SecondaryRangeName is the name of the secondary range to allocate IP
-	// aliases. The secondary range must be present on the subnetwork the
-	// cluster is attached to.
-	SecondaryRangeName string   `gcfg:"secondary-range-name"`
-	NodeTags           []string `gcfg:"node-tags"`
-	NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
-	Multizone          bool     `gcfg:"multizone"`
-	// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
-	// then the default endpoint is used.
-	ApiEndpoint string `gcfg:"api-endpoint"`
-	// LocalZone specifies the GCE zone that gce cloud client instance is
-	// located in (i.e. where the controller will be running). If this is
-	// blank, then the local zone will be discovered via the metadata server.
-	LocalZone string `gcfg:"local-zone"`
-	// Possible values: List of api names separated by comma. Default to none.
-	// For example: MyFeatureFlag
-	AlphaFeatures []string `gcfg:"alpha-features"`
-}
-
 // ConfigFile is the struct used to parse the /etc/gce.conf configuration file.
 type ConfigFile struct {
-	Global ConfigGlobal `gcfg:"global"`
+	Global struct {
+		TokenURL       string `gcfg:"token-url"`
+		TokenBody      string `gcfg:"token-body"`
+		ProjectID      string `gcfg:"project-id"`
+		NetworkName    string `gcfg:"network-name"`
+		SubnetworkName string `gcfg:"subnetwork-name"`
+		// SecondaryRangeName is the name of the secondary range to allocate IP
+		// aliases. The secondary range must be present on the subnetwork the
+		// cluster is attached to.
+		SecondaryRangeName string   `gcfg:"secondary-range-name"`
+		NodeTags           []string `gcfg:"node-tags"`
+		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
+		Multizone          bool     `gcfg:"multizone"`
+		// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
+		// then the default endpoint is used.
+		ApiEndpoint string `gcfg:"api-endpoint"`
+		// LocalZone specifies the GCE zone that gce cloud client instance is
+		// located in (i.e. where the controller will be running). If this is
+		// blank, then the local zone will be discovered via the metadata server.
+		LocalZone string `gcfg:"local-zone"`
+		// AlphaFeatures is a list of API flags to be enabled. Defaults to none.
+		// Example API name format: "MyFeatureFlag"
+		AlphaFeatures []string `gcfg:"alpha-features"`
+	}
 }
 
 // CloudConfig includes all the necessary configuration for creating GCECloud
 type CloudConfig struct {
 	ApiEndpoint        string
 	ProjectID          string
-	NetworkProjectID   string
 	Region             string
 	Zone               string
 	ManagedZones       []string
-	NetworkName        string
 	NetworkURL         string
-	SubnetworkName     string
 	SubnetworkURL      string
 	SecondaryRangeName string
 	NodeTags           []string
@@ -214,6 +205,11 @@ func (g *GCECloud) GetComputeService() *compute.Service {
 // Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
 func (g *GCECloud) GetKMSService() *cloudkms.Service {
 	return g.cloudkmsService
+}
+
+// Returns the ProjectID corresponding to the project this cloud is in.
+func (g *GCECloud) GetProjectID() string {
+	return g.projectID
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -284,16 +280,12 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 			return nil, err
 		}
 	}
-
 	if configFile != nil {
 		if configFile.Global.ProjectID != "" {
 			cloudConfig.ProjectID = configFile.Global.ProjectID
 		}
 		if configFile.Global.LocalZone != "" {
 			cloudConfig.Zone = configFile.Global.LocalZone
-		}
-		if configFile.Global.NetworkProjectID != "" {
-			cloudConfig.NetworkProjectID = configFile.Global.NetworkProjectID
 		}
 	}
 
@@ -309,27 +301,27 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		cloudConfig.ManagedZones = nil // Use all zones in region
 	}
 
-	// Determine if network parameter is URL or Name
+	// generate networkURL
 	if configFile != nil && configFile.Global.NetworkName != "" {
 		if strings.Contains(configFile.Global.NetworkName, "/") {
 			cloudConfig.NetworkURL = configFile.Global.NetworkName
 		} else {
-			cloudConfig.NetworkName = configFile.Global.NetworkName
+			cloudConfig.NetworkURL = gceNetworkURL(cloudConfig.ApiEndpoint, cloudConfig.ProjectID, configFile.Global.NetworkName)
 		}
 	} else {
-		cloudConfig.NetworkName, err = getNetworkNameViaMetadata()
+		networkName, err := getNetworkNameViaMetadata()
 		if err != nil {
 			return nil, err
 		}
+		cloudConfig.NetworkURL = gceNetworkURL("", cloudConfig.ProjectID, networkName)
 	}
 
-	// Determine if subnetwork parameter is URL or Name
-	// If cluster is on a GCP network of mode=custom, then `SubnetName` must be specified in config file.
+	// generate subnetworkURL
 	if configFile != nil && configFile.Global.SubnetworkName != "" {
 		if strings.Contains(configFile.Global.SubnetworkName, "/") {
 			cloudConfig.SubnetworkURL = configFile.Global.SubnetworkName
 		} else {
-			cloudConfig.SubnetworkName = configFile.Global.SubnetworkName
+			cloudConfig.SubnetworkURL = gceSubnetworkURL(cloudConfig.ApiEndpoint, cloudConfig.ProjectID, cloudConfig.Region, configFile.Global.SubnetworkName)
 		}
 	}
 
@@ -340,15 +332,11 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	return cloudConfig, err
 }
 
-// CreateGCECloud creates a GCECloud object using the specified parameters.
+// Creates a GCECloud object using the specified parameters.
 // If no networkUrl is specified, loads networkName via rest call.
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
-	// Use ProjectID for NetworkProjectID, if it wasn't explicitly set.
-	if config.NetworkProjectID == "" {
-		config.NetworkProjectID = config.ProjectID
-	}
 
 	client, err := newOauthClient(config.TokenSource)
 	if err != nil {
@@ -397,49 +385,19 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		return nil, err
 	}
 
-	// config.ProjectID may be the id or project number
-	// In gce_routes.go, the generated networkURL is compared with a URL within a route
-	// therefore, we need to make sure the URL is constructed with the string ID.
-	projID, err := getProjectID(service, config.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get project %v, err: %v", config.ProjectID, err)
-	}
-
-	// config.NetworkProjectID may be the id or project number. In order to compare project ID
-	// to network project ID to determine XPN status, we need to verify both are actual IDs.
-	netProjID := projID
-	if config.NetworkProjectID != config.ProjectID {
-		netProjID, err = getProjectID(service, config.NetworkProjectID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get network project %v, err: %v", config.NetworkProjectID, err)
-		}
-	}
-
-	onXPN := projID != netProjID
-
-	var networkURL string
-	var subnetURL string
-
-	if config.NetworkName == "" && config.NetworkURL == "" {
-		// TODO: Stop using this call and return an error.
-		// This function returns the first network in a list of networks for a project. The project
-		// should be set via configuration instead of randomly taking the first.
-		networkName, err := getNetworkNameViaAPICall(service, config.NetworkProjectID)
+	if config.NetworkURL == "" {
+		networkName, err := getNetworkNameViaAPICall(service, config.ProjectID)
 		if err != nil {
 			return nil, err
 		}
-		networkURL = gceNetworkURL(config.ApiEndpoint, netProjID, networkName)
-	} else if config.NetworkURL != "" {
-		networkURL = config.NetworkURL
-	} else {
-		networkURL = gceNetworkURL(config.ApiEndpoint, netProjID, config.NetworkName)
+		config.NetworkURL = gceNetworkURL(config.ApiEndpoint, config.ProjectID, networkName)
 	}
 
-	if config.SubnetworkURL != "" {
-		subnetURL = config.SubnetworkURL
-	} else if config.SubnetworkName != "" {
-		subnetURL = gceSubnetworkURL(config.ApiEndpoint, netProjID, config.Region, config.SubnetworkName)
+	networkProjectID, err := getProjectIDInURL(config.NetworkURL)
+	if err != nil {
+		return nil, err
 	}
+	onXPN := networkProjectID != config.ProjectID
 
 	if len(config.ManagedZones) == 0 {
 		config.ManagedZones, err = getZonesForRegion(service, config.ProjectID, config.Region)
@@ -459,14 +417,14 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
 		cloudkmsService:          cloudkmsService,
-		projectID:                projID,
-		networkProjectID:         netProjID,
+		projectID:                config.ProjectID,
+		networkProjectID:         networkProjectID,
 		onXPN:                    onXPN,
 		region:                   config.Region,
 		localZone:                config.Zone,
 		managedZones:             config.ManagedZones,
-		networkURL:               networkURL,
-		subnetworkURL:            subnetURL,
+		networkURL:               config.NetworkURL,
+		subnetworkURL:            config.SubnetworkURL,
 		secondaryRangeName:       config.SecondaryRangeName,
 		nodeTags:                 config.NodeTags,
 		nodeInstancePrefix:       config.NodeInstancePrefix,
@@ -513,16 +471,6 @@ func (gce *GCECloud) Routes() (cloudprovider.Routes, bool) {
 // ProviderName returns the cloud provider ID.
 func (gce *GCECloud) ProviderName() string {
 	return ProviderName
-}
-
-// ProjectID returns the ProjectID corresponding to the project this cloud is in.
-func (g *GCECloud) ProjectID() string {
-	return g.projectID
-}
-
-// NetworkProjectID returns the ProjectID corresponding to the project this cluster's network is in.
-func (g *GCECloud) NetworkProjectID() string {
-	return g.networkProjectID
 }
 
 // Region returns the region
@@ -619,16 +567,6 @@ func getNetworkNameViaAPICall(svc *compute.Service, projectID string) (string, e
 	}
 
 	return networkList.Items[0].Name, nil
-}
-
-// getProjectID returns the project's string ID given a project number or string
-func getProjectID(svc *compute.Service, projectNumberOrID string) (string, error) {
-	proj, err := svc.Projects.Get(projectNumberOrID).Do()
-	if err != nil {
-		return "", err
-	}
-
-	return proj.Name, nil
 }
 
 func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string, error) {

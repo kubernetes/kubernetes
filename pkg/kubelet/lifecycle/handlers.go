@@ -187,6 +187,11 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 		return PodAdmitResult{Admit: true}
 	}
 
+	// Always admit for remote runtime.
+	if a.Runtime.Type() == kubetypes.RemoteContainerRuntime {
+		return PodAdmitResult{Admit: true}
+	}
+
 	// Make sure it is either docker or rkt runtimes.
 	if a.Runtime.Type() != kubetypes.DockerContainerRuntime && a.Runtime.Type() != kubetypes.RktContainerRuntime {
 		return PodAdmitResult{
@@ -196,7 +201,7 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 		}
 	}
 
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+	if a.Runtime.Type() == kubetypes.DockerContainerRuntime {
 		// Make sure docker api version is valid.
 		rversion, err := a.Runtime.APIVersion()
 		if err != nil {
@@ -206,7 +211,7 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
 			}
 		}
-		v, err := rversion.Compare("1.23")
+		v, err := rversion.Compare("1.23.0")
 		if err != nil {
 			return PodAdmitResult{
 				Admit:   false,

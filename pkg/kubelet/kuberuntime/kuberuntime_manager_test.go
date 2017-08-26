@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	apitest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
@@ -216,15 +217,12 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected []string) ([]string, bool) {
-	actual := []string{}
+func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
+	actual := sets.NewString()
 	for _, c := range fakeRuntime.Containers {
-		actual = append(actual, c.Id)
+		actual.Insert(c.Id)
 	}
-	sort.Sort(sort.StringSlice(actual))
-	sort.Sort(sort.StringSlice(expected))
-
-	return actual, reflect.DeepEqual(expected, actual)
+	return actual, actual.Equal(expected)
 }
 
 type containerRecord struct {
@@ -618,9 +616,9 @@ func TestPruneInitContainers(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.pruneInitContainersBeforeStart(pod, podStatus)
-	expectedContainers := []string{fakes[0].Id, fakes[2].Id}
+	expectedContainers := sets.NewString(fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
-		t.Errorf("expected %q, got %q", expectedContainers, actual)
+		t.Errorf("expected %v, got %v", expectedContainers, actual)
 	}
 }
 

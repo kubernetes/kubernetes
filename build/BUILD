@@ -25,23 +25,23 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "cloud-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image",
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@official_busybox//image:image.tar",
+        "base": "@official_busybox//image",
         "target": "//plugin/cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
-        "base": "@debian-iptables-amd64//image:image.tar",
+        "base": "@debian-iptables-amd64//image",
         "target": "//cmd/kube-proxy:kube-proxy",
     },
 }
