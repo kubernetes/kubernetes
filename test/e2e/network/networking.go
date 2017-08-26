@@ -19,6 +19,7 @@ package network
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -217,6 +218,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for client IP based session affinity: udp", func() {
+			startTime := time.Now()
 			config := framework.NewNetworkingTestConfig(f)
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			updateSessionAffinity := func(svc *v1.Service) {
@@ -236,6 +238,7 @@ var _ = SIGDescribe("Networking", func() {
 					framework.Failf("Expect endpoints: %v, got: %v", firstEndpoints, eps)
 				}
 			}
+			framework.Failf("test session affinity, cost time: %v", time.Now().Sub(startTime))
 		})
 	})
 })
