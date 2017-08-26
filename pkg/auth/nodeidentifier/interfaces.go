@@ -22,7 +22,7 @@ import (
 
 // NodeIdentifier determines node information from a given user
 type NodeIdentifier interface {
-	// IdentifyNode determines node information from the given user.Info.
+	// NodeIdentity determines node information from the given user.Info.
 	// nodeName is the name of the Node API object associated with the user.Info,
 	// and may be empty if a specific node cannot be determined.
 	// isNode is true if the user.Info represents an identity issued to a node.
