@@ -1216,7 +1216,7 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
 		if appliedVirtualServer == nil {
 			// IPVS service is not found, create a new service
-			glog.V(3).Infof("Adding new service %q %s:%d/%s", svcName, appliedVirtualServer.Address, appliedVirtualServer.Port, appliedVirtualServer.Protocol)
+			glog.V(3).Infof("Adding new service %q %s:%d/%s", svcName, vs.Address, vs.Port, vs.Protocol)
 			if err := proxier.ipvs.AddVirtualServer(vs); err != nil {
 				glog.Errorf("Failed to add IPVS service %q: %v", svcName, err)
 				return err
