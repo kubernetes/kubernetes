@@ -51,6 +51,7 @@ const (
 	VolumeAvailableStatus = "available"
 	VolumeInUseStatus     = "in-use"
 	VolumeErrorStatus     = "error"
+	AvailabilityZone      = "availability_zone"
 )
 
 var ErrNotFound = errors.New("Failed to find object")
@@ -551,6 +552,7 @@ func (os *Rackspace) Routes() (cloudprovider.Routes, bool) {
 func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
+	// TODO: Get availability_zone from the kubelet querying a local metadata service
 	return cloudprovider.Zone{Region: os.region}, nil
 }
 
@@ -558,14 +560,59 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (os *Rackspace) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	compute, err := os.getComputeClient()
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return cloudprovider.Zone{}, err
+	}
+
+	srv, err := servers.Get(compute, instanceID).Extract()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	az := srv.Metadata[AvailabilityZone]
+	zone := cloudprovider.Zone{
+		FailureDomain: az.(string),
+		Region:        os.region,
+	}
+	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+
+	return zone, nil
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (os *Rackspace) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	compute, err := os.getComputeClient()
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return cloudprovider.Zone{}, err
+	}
+
+	serverName := mapNodeNameToServerName(nodeName)
+	srv, err := getServerByName(compute, serverName)
+	if err != nil {
+		if err == ErrNotFound {
+			return cloudprovider.Zone{}, cloudprovider.InstanceNotFound
+		}
+		return cloudprovider.Zone{}, err
+	}
+
+	az := srv.Metadata[AvailabilityZone]
+	zone := cloudprovider.Zone{
+		FailureDomain: az.(string),
+		Region:        os.region,
+	}
+	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
+
+	return zone, nil
 }
 
 // Create a volume of given size (in GiB)
