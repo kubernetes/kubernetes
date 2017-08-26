@@ -21,7 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const defaultPerm = 0666

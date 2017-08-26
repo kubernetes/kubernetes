@@ -29,8 +29,8 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 func addFile(fs utilfs.Filesystem, path string, file string) error {

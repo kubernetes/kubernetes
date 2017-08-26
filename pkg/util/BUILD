@@ -19,6 +19,7 @@ filegroup(
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
         "//pkg/util/file:all-srcs",
+        "//pkg/util/filesystem:all-srcs",
         "//pkg/util/flock:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
