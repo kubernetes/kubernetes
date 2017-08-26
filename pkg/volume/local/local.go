@@ -18,17 +18,13 @@ package local
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"os"
-	"syscall"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -42,9 +38,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 type localVolumePlugin struct {
-	host        volume.VolumeHost
-	volumeLocks keymutex.KeyMutex
-	recorder    record.EventRecorder
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &localVolumePlugin{}
@@ -56,11 +50,6 @@ const (
 
 func (plugin *localVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.volumeLocks = keymutex.NewKeyMutex()
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "localvolume"})
-	plugin.recorder = recorder
 	return nil
 }
 
@@ -113,7 +102,6 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 
 	return &localVolumeMounter{
 		localVolume: &localVolume{
-			pod:             pod,
 			podUID:          pod.UID,
 			volName:         spec.Name(),
 			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
@@ -158,7 +146,6 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 // The directory at the globalPath will be bind-mounted to the pod's directory
 type localVolume struct {
 	volName string
-	pod     *v1.Pod
 	podUID  types.UID
 	// Global path to the volume
 	globalPath string
@@ -201,9 +188,6 @@ func (m *localVolumeMounter) SetUp(fsGroup *int64) error {
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
 func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	m.plugin.volumeLocks.LockKey(m.globalPath)
-	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
-
 	if m.globalPath == "" {
 		err := fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
 		return err
@@ -220,29 +204,8 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
-
 	if !notMnt {
 		return nil
-	}
-	refs, err := mount.GetMountRefsByDev(m.mounter, m.globalPath)
-	if fsGroup != nil {
-		if err != nil {
-			glog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
-			return err
-		}
-
-		if len(refs) > 0 {
-			fsGroupNew := int64(*fsGroup)
-			fsGroupSame, fsGroupOld, err := isSameFSGroup(m.globalPath, fsGroupNew)
-			if err != nil {
-				err = fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
-				return err
-			}
-			if !fsGroupSame {
-				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, events.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)
-			}
-		}
-
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -284,27 +247,12 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		os.Remove(dir)
 		return err
 	}
+
 	if !m.readOnly {
-		// Volume owner will be written only once on the first volume mount
-		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, fsGroup)
-		}
+		// TODO: how to prevent multiple mounts with conflicting fsGroup?
+		return volume.SetVolumeOwnership(m, fsGroup)
 	}
 	return nil
-}
-
-// isSameFSGroup is called only for requests to mount an already mounted
-// volume. It checks if fsGroup of new mount request is the same or not.
-// It returns false if it not the same. It also returns current Gid of a path
-// provided for dir variable.
-func isSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
-	info, err := os.Stat(dir)
-	if err != nil {
-		glog.Errorf("Error getting stats for %s (%v)", dir, err)
-		return false, 0, err
-	}
-	s := info.Sys().(*syscall.Stat_t)
-	return int(s.Gid) == int(fsGroup), int(s.Gid), nil
 }
 
 type localVolumeUnmounter struct {
