@@ -156,6 +156,10 @@ var (
 	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
 	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
 	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
+
+	// MinimumLimitPodHardAntiAffinityTopologyVersion specifies the minimum apiserver version that
+	// LimitPodHardAntiAffinityTopology admission controller is enabled by default.
+	MinimumLimitPodHardAntiAffinityTopologyVersion = version.MustParseSemantic("v1.8.0-alpha.3")
 )
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
