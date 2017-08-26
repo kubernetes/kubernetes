@@ -1,0 +1,14 @@
+sudo: false
+language: go
+go:
+  - 1.4.x
+  - 1.5.x
+  - 1.6.x
+  - 1.7.x
+  - 1.8.x
+  - master
+
+script: 
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/smartystreets/goconvey
+  - go test -v -cover -race
