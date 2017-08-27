@@ -3699,12 +3699,6 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
-	// Local Storage for container overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageOverlay is alpha and it can change across releases.
-	ResourceStorageOverlay ResourceName = "storage.kubernetes.io/overlay"
-	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageScratch is alpha and it can change across releases.
-	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
