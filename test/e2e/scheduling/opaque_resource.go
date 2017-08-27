@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Opaque resources", func() {
+var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 	f := framework.NewDefaultFramework("opaque-resource")
 	opaqueResName := v1helper.OpaqueIntResourceName("foo")
 	var node *v1.Node

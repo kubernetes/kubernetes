@@ -112,8 +112,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.HealthzBindAddress == "" {
 		obj.HealthzBindAddress = "127.0.0.1"
 	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10248
+	if obj.HealthzPort == nil {
+		obj.HealthzPort = utilpointer.Int32Ptr(10248)
 	}
 	if obj.HostNetworkSources == nil {
 		obj.HostNetworkSources = []string{kubetypes.AllSource}
@@ -174,8 +174,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
 	}
-	if obj.ReadOnlyPort == 0 {
-		obj.ReadOnlyPort = ports.KubeletReadOnlyPort
+	if obj.ReadOnlyPort == nil {
+		obj.ReadOnlyPort = utilpointer.Int32Ptr(ports.KubeletReadOnlyPort)
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = boolVar(true)

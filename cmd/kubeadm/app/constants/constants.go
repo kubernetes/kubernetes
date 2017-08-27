@@ -156,6 +156,10 @@ var (
 	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
 	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
 	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
+
+	// UseEnableBootstrapTokenAuthFlagVersion defines the first version where the API server supports the --enable-bootstrap-token-auth flag instead of the old and deprecated flag.
+	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
+	UseEnableBootstrapTokenAuthFlagVersion = version.MustParseSemantic("v1.8.0-beta.0")
 )
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

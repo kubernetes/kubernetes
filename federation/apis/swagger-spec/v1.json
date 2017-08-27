@@ -5128,6 +5128,10 @@
      "publishNotReadyAddresses": {
       "type": "boolean",
       "description": "publishNotReadyAddresses, when set to true, indicates that DNS implementations must publish the notReadyAddresses of subsets for the Endpoints associated with the Service. The default value is false. The primary use case for setting this field is to use a StatefulSet's Headless Service to propagate SRV records for its Pods without respect to their readiness for purpose of peer discovery. This field will replace the service.alpha.kubernetes.io/tolerate-unready-endpoints when that annotation is deprecated and all clients have been converted to use this field."
+     },
+     "sessionAffinityConfig": {
+      "$ref": "v1.SessionAffinityConfig",
+      "description": "sessionAffinityConfig contains the configurations of session affinity."
      }
     }
    },
@@ -5159,6 +5163,27 @@
       "type": "integer",
       "format": "int32",
       "description": "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport"
+     }
+    }
+   },
+   "v1.SessionAffinityConfig": {
+    "id": "v1.SessionAffinityConfig",
+    "description": "SessionAffinityConfig represents the configurations of session affinity.",
+    "properties": {
+     "clientIP": {
+      "$ref": "v1.ClientIPConfig",
+      "description": "clientIP contains the configurations of Client IP based session affinity."
+     }
+    }
+   },
+   "v1.ClientIPConfig": {
+    "id": "v1.ClientIPConfig",
+    "description": "ClientIPConfig represents the configurations of Client IP based session affinity.",
+    "properties": {
+     "timeoutSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be \u003e0 \u0026\u0026 \u003c=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours)."
      }
     }
    },

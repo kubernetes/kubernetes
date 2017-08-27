@@ -168,11 +168,7 @@ func Convert_v2alpha1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAu
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2alpha1_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *v2alpha1.HorizontalPodAutoscalerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v2alpha1.HorizontalPodAutoscaler, 0)
-	} else {
-		out.Items = *(*[]v2alpha1.HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v2alpha1.HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -231,16 +227,8 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2alpha1_Horizonta
 	out.LastScaleTime = (*meta_v1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	if in.CurrentMetrics == nil {
-		out.CurrentMetrics = make([]v2alpha1.MetricStatus, 0)
-	} else {
-		out.CurrentMetrics = *(*[]v2alpha1.MetricStatus)(unsafe.Pointer(&in.CurrentMetrics))
-	}
-	if in.Conditions == nil {
-		out.Conditions = make([]v2alpha1.HorizontalPodAutoscalerCondition, 0)
-	} else {
-		out.Conditions = *(*[]v2alpha1.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
-	}
+	out.CurrentMetrics = *(*[]v2alpha1.MetricStatus)(unsafe.Pointer(&in.CurrentMetrics))
+	out.Conditions = *(*[]v2alpha1.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 

@@ -103,7 +103,8 @@ func newTestPlugin() []VolumePlugin {
 
 func TestVolumePluginMgrFunc(t *testing.T) {
 	vpm := VolumePluginMgr{}
-	vpm.InitPlugins(newTestPlugin(), nil)
+	var prober DynamicPluginProber = nil // TODO (#51147) inject mock
+	vpm.InitPlugins(newTestPlugin(), prober, nil)
 
 	plug, err := vpm.FindPluginByName("testPlugin")
 	if err != nil {

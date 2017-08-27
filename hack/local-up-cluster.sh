@@ -31,6 +31,8 @@ KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
+# many dev environments run with swap on, so we don't fail in this env
+FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the config files and binaries required by NET_PLUGIN in these directory,
@@ -110,6 +112,11 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
+fi
+
+# warn if users are running with swap allowed
+if [ "${FAIL_SWAP_ON}" == "false" ]; then
+    echo "WARNING : The kubelet is configured to not fail if swap is enabled; production deployments should disable swap."
 fi
 
 if [ "$(id -u)" != "0" ]; then
@@ -665,6 +672,7 @@ function start_kubelet {
         --eviction-soft=${EVICTION_SOFT} \
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
+        --fail-swap-on="${FAIL_SWAP_ON}" \
         ${auth_args} \
         ${dns_args} \
         ${cni_conf_dir_args} \

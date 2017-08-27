@@ -73,7 +73,7 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	host.mounter = &mount.FakeMounter{}
 	host.writer = &io.StdWriter{}
 	host.exec = mount.NewFakeExec(nil)
-	host.pluginMgr.InitPlugins(plugins, host)
+	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	return host
 }
 
@@ -435,7 +435,7 @@ func (fv *FakeVolume) GetAttachCallCount() int {
 	return fv.AttachCallCount
 }
 
-func (fv *FakeVolume) WaitForAttach(spec *Spec, devicePath string, spectimeout time.Duration) (string, error) {
+func (fv *FakeVolume) WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.WaitForAttachCallCount++
@@ -768,7 +768,7 @@ func GetTestVolumePluginMgr(
 		nil, /* plugins */
 	)
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	if err := v.pluginMgr.InitPlugins(plugins, v); err != nil {
+	if err := v.pluginMgr.InitPlugins(plugins, nil /* prober */, v); err != nil {
 		t.Fatal(err)
 	}
 

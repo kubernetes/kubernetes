@@ -36,7 +36,7 @@ type podEvictSpec struct {
 }
 
 const (
-	totalEvict = 3
+	totalEvict = 4
 )
 
 // Eviction Policy is described here:
@@ -48,7 +48,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 
 	emptyDirVolumeName := "volume-emptydir-pod"
 	podTestSpecs := []podEvictSpec{
-		{evicted: true, // This pod should be evicted because emptyDir (defualt storage type) usage violation
+		{evicted: true, // This pod should be evicted because emptyDir (default storage type) usage violation
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "emptydir-hog-pod"},
 				Spec: v1.PodSpec{
@@ -157,7 +157,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 			},
 		},
 
-		{evicted: true, // This pod should be evicted because container overlay usage violation
+		{evicted: true, // This pod should be evicted because container ephemeral storage usage violation
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "container-hog-pod"},
 				Spec: v1.PodSpec{
@@ -173,9 +173,52 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
-									v1.ResourceStorageOverlay: *resource.NewMilliQuantity(
+									v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(
 										int64(40000),
 										resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{evicted: true, // This pod should be evicted because pod ephemeral storage usage violation
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "emptydir-container-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "emptydir-container-hog-pod",
+							Command: []string{
+								"sh",
+								"-c",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(
+										int64(40000),
+										resource.BinarySI),
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      emptyDirVolumeName,
+									MountPath: "/cache",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: emptyDirVolumeName,
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									SizeLimit: *resource.NewQuantity(int64(100000), resource.BinarySI),
 								},
 							},
 						},
@@ -186,7 +229,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	}
 
 	evictionTestTimeout := 10 * time.Minute
-	testCondition := "EmptyDir/ContainerOverlay usage limit violation"
+	testCondition := "EmptyDir/ContainerContainerEphemeralStorage usage limit violation"
 	Context(fmt.Sprintf("EmptyDirEviction when we run containers that should cause %s", testCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates += ", LocalStorageCapacityIsolation=true"

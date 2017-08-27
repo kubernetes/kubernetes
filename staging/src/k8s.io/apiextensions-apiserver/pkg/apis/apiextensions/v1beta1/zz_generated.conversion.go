@@ -123,11 +123,7 @@ func Convert_v1beta1_CustomResourceDefinitionList_To_apiextensions_CustomResourc
 
 func autoConvert_apiextensions_CustomResourceDefinitionList_To_v1beta1_CustomResourceDefinitionList(in *apiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]CustomResourceDefinition, 0)
-	} else {
-		out.Items = *(*[]CustomResourceDefinition)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]CustomResourceDefinition)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -208,11 +204,7 @@ func Convert_v1beta1_CustomResourceDefinitionStatus_To_apiextensions_CustomResou
 }
 
 func autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1beta1_CustomResourceDefinitionStatus(in *apiextensions.CustomResourceDefinitionStatus, out *CustomResourceDefinitionStatus, s conversion.Scope) error {
-	if in.Conditions == nil {
-		out.Conditions = make([]CustomResourceDefinitionCondition, 0)
-	} else {
-		out.Conditions = *(*[]CustomResourceDefinitionCondition)(unsafe.Pointer(&in.Conditions))
-	}
+	out.Conditions = *(*[]CustomResourceDefinitionCondition)(unsafe.Pointer(&in.Conditions))
 	if err := Convert_apiextensions_CustomResourceDefinitionNames_To_v1beta1_CustomResourceDefinitionNames(&in.AcceptedNames, &out.AcceptedNames, s); err != nil {
 		return err
 	}

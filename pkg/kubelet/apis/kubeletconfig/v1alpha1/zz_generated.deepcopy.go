@@ -155,6 +155,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	if in.ReadOnlyPort != nil {
+		in, out := &in.ReadOnlyPort, &out.ReadOnlyPort
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	in.Authentication.DeepCopyInto(&out.Authentication)
 	out.Authorization = in.Authorization
 	if in.AllowPrivileged != nil {
@@ -220,6 +229,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	if in.CAdvisorPort != nil {
 		in, out := &in.CAdvisorPort, &out.CAdvisorPort
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
+	if in.HealthzPort != nil {
+		in, out := &in.HealthzPort, &out.HealthzPort
 		if *in == nil {
 			*out = nil
 		} else {

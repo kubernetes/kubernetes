@@ -250,6 +250,8 @@ message Initializers {
   // When the last pending initializer is removed, and no failing result is set, the initializers
   // struct will be set to nil and the object is considered as initialized and visible to all
   // clients.
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   repeated Initializer pending = 1;
 
   // If result is set with the Failure field, the object will be persisted to storage and then deleted,

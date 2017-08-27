@@ -248,7 +248,9 @@ type Initializers struct {
 	// When the last pending initializer is removed, and no failing result is set, the initializers
 	// struct will be set to nil and the object is considered as initialized and visible to all
 	// clients.
-	Pending []Initializer `json:"pending" protobuf:"bytes,1,rep,name=pending"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Pending []Initializer `json:"pending" protobuf:"bytes,1,rep,name=pending" patchStrategy:"merge" patchMergeKey:"name"`
 	// If result is set with the Failure field, the object will be persisted to storage and then deleted,
 	// ensuring that other clients can observe the deletion.
 	Result *Status `json:"result,omitempty" protobuf:"bytes,2,opt,name=result"`

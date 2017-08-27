@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func Test_NewAttachDetachController_Positive(t *testing.T) {
@@ -45,6 +46,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		informerFactory.Core().V1().PersistentVolumes(),
 		nil, /* cloud */
 		nil, /* plugins */
+		nil, /* prober */
 		false,
 		5*time.Second,
 		DefaultTimerConfig)
@@ -79,8 +81,9 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 
 	// Act
 	plugins := controllervolumetesting.CreateTestPlugin()
+	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
+	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		t.Fatalf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
@@ -141,6 +144,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
+	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	var podsNum, extraPodsNum, nodesNum, i int
@@ -212,6 +216,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		informerFactory.Core().V1().PersistentVolumes(),
 		nil, /* cloud */
 		plugins,
+		prober,
 		false,
 		1*time.Second,
 		DefaultTimerConfig)

@@ -76,11 +76,7 @@ func autoConvert_admissionregistration_AdmissionHookClientConfig_To_v1alpha1_Adm
 	if err := Convert_admissionregistration_ServiceReference_To_v1alpha1_ServiceReference(&in.Service, &out.Service, s); err != nil {
 		return err
 	}
-	if in.CABundle == nil {
-		out.CABundle = make([]byte, 0)
-	} else {
-		out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
-	}
+	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }
 
@@ -154,11 +150,7 @@ func Convert_v1alpha1_ExternalAdmissionHookConfigurationList_To_admissionregistr
 
 func autoConvert_admissionregistration_ExternalAdmissionHookConfigurationList_To_v1alpha1_ExternalAdmissionHookConfigurationList(in *admissionregistration.ExternalAdmissionHookConfigurationList, out *v1alpha1.ExternalAdmissionHookConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1alpha1.ExternalAdmissionHookConfiguration, 0)
-	} else {
-		out.Items = *(*[]v1alpha1.ExternalAdmissionHookConfiguration)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1alpha1.ExternalAdmissionHookConfiguration)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -226,11 +218,7 @@ func Convert_v1alpha1_InitializerConfigurationList_To_admissionregistration_Init
 
 func autoConvert_admissionregistration_InitializerConfigurationList_To_v1alpha1_InitializerConfigurationList(in *admissionregistration.InitializerConfigurationList, out *v1alpha1.InitializerConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1alpha1.InitializerConfiguration, 0)
-	} else {
-		out.Items = *(*[]v1alpha1.InitializerConfiguration)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1alpha1.InitializerConfiguration)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

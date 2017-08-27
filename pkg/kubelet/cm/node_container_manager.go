@@ -218,9 +218,9 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 			value := evictionapi.GetThresholdQuantity(threshold.Value, &memoryCapacity)
 			ret[v1.ResourceMemory] = *value
 		case evictionapi.SignalNodeFsAvailable:
-			storageCapacity := capacity[v1.ResourceStorageScratch]
+			storageCapacity := capacity[v1.ResourceEphemeralStorage]
 			value := evictionapi.GetThresholdQuantity(threshold.Value, &storageCapacity)
-			ret[v1.ResourceStorageScratch] = *value
+			ret[v1.ResourceEphemeralStorage] = *value
 		}
 	}
 	return ret

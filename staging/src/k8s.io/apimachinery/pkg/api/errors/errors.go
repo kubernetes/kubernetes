@@ -128,6 +128,14 @@ func NewUnauthorized(reason string) *StatusError {
 
 // NewForbidden returns an error indicating the requested action was forbidden
 func NewForbidden(qualifiedResource schema.GroupResource, name string, err error) *StatusError {
+	var message string
+	if qualifiedResource.Empty() {
+		message = fmt.Sprintf("forbidden: %v", err)
+	} else if name == "" {
+		message = fmt.Sprintf("%s is forbidden: %v", qualifiedResource.String(), err)
+	} else {
+		message = fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err)
+	}
 	return &StatusError{metav1.Status{
 		Status: metav1.StatusFailure,
 		Code:   http.StatusForbidden,
@@ -137,7 +145,7 @@ func NewForbidden(qualifiedResource schema.GroupResource, name string, err error
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
 		},
-		Message: fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err),
+		Message: message,
 	}}
 }
 

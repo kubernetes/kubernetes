@@ -200,9 +200,6 @@ func ValidateInitializers(initializers *metav1.Initializers, fldPath *field.Path
 		}
 	}
 	allErrs = append(allErrs, validateInitializersResult(initializers.Result, fldPath.Child("result"))...)
-	if len(initializers.Pending) == 0 && initializers.Result == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("pending"), nil, "must be non-empty when result is not set"))
-	}
 	return allErrs
 }
 

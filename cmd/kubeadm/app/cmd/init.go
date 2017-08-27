@@ -327,6 +327,13 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
+	// Upload currently used configuration to the cluster
+	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
+	// depend on centralized information from this source in the future
+	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
+		return err
+	}
+
 	// PHASE 4: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
 		return err
@@ -360,11 +367,6 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 6: Install and deploy all addons, and configure things as necessary
-
-	// Upload currently used configuration to the cluster
-	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		return err
-	}
 
 	if err := apiconfigphase.CreateRBACRules(client, k8sVersion); err != nil {
 		return err

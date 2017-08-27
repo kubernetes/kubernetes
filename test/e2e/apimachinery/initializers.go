@@ -262,6 +262,29 @@ var _ = SIGDescribe("Initializers", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pods.Items)).Should(Equal(1))
 	})
+
+	It("will be set to nil if a patch removes the last pending initializer", func() {
+		ns := f.Namespace.Name
+		c := f.ClientSet
+
+		podName := "to-be-patch-initialized-pod"
+		framework.Logf("Creating pod %s", podName)
+
+		// TODO: lower the timeout so that the server responds faster.
+		_, err := c.CoreV1().Pods(ns).Create(newUninitializedPod(podName))
+		if err != nil && !errors.IsTimeout(err) {
+			framework.Failf("expect err to be timeout error, got %v", err)
+		}
+		uninitializedPod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(uninitializedPod.Initializers).NotTo(BeNil())
+		Expect(len(uninitializedPod.Initializers.Pending)).Should(Equal(1))
+
+		patch := fmt.Sprintf(`{"metadata":{"initializers":{"pending":[{"$patch":"delete","name":"%s"}]}}}`, uninitializedPod.Initializers.Pending[0].Name)
+		patchedPod, err := c.CoreV1().Pods(ns).Patch(uninitializedPod.Name, types.StrategicMergePatchType, []byte(patch))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(patchedPod.Initializers).To(BeNil())
+	})
 })
 
 func newUninitializedPod(podName string) *v1.Pod {

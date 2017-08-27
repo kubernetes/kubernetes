@@ -151,22 +151,22 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	}
 
 	return &kubelet.Dependencies{
-		Auth:               nil, // default does not enforce auth[nz]
-		CAdvisorInterface:  nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
-		Cloud:              nil, // cloud provider might start background processes
-		ContainerManager:   nil,
-		DockerClient:       dockerClient,
-		KubeClient:         nil,
-		ExternalKubeClient: nil,
-		EventClient:        nil,
-		Mounter:            mounter,
-		NetworkPlugins:     ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
-		OOMAdjuster:        oom.NewOOMAdjuster(),
-		OSInterface:        kubecontainer.RealOS{},
-		Writer:             writer,
-		VolumePlugins:      ProbeVolumePlugins(s.VolumePluginDir),
-		TLSOptions:         tlsOptions,
-	}, nil
+		Auth:                nil, // default does not enforce auth[nz]
+		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
+		Cloud:               nil, // cloud provider might start background processes
+		ContainerManager:    nil,
+		DockerClient:        dockerClient,
+		KubeClient:          nil,
+		ExternalKubeClient:  nil,
+		EventClient:         nil,
+		Mounter:             mounter,
+		NetworkPlugins:      ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
+		OOMAdjuster:         oom.NewOOMAdjuster(),
+		OSInterface:         kubecontainer.RealOS{},
+		Writer:              writer,
+		VolumePlugins:       ProbeVolumePlugins(),
+		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir),
+		TLSOptions:          tlsOptions}, nil
 }
 
 // Run runs the specified KubeletServer with the given Dependencies. This should never exit.
@@ -745,7 +745,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 	for k, v := range m {
 		switch v1.ResourceName(k) {
 		// CPU, memory and local storage resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceStorage:
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
 				return nil, err
@@ -753,12 +753,7 @@ func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceLis
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			// storage specified in configuration map is mapped to ResourceStorageScratch API
-			if v1.ResourceName(k) == v1.ResourceStorage {
-				rl[v1.ResourceStorageScratch] = q
-			} else {
-				rl[v1.ResourceName(k)] = q
-			}
+			rl[v1.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

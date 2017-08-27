@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -84,6 +85,12 @@ func (az *Cloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress,
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
 func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 	return az.InstanceID(name)
+}
+
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (az *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
 }
 
 func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {

@@ -250,6 +250,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		}
 		return nil
 	}
+	timeoutSeconds := api.DefaultClientIPServiceAffinitySeconds
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -263,6 +264,11 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			ClusterIP:       serviceIP.String(),
 			SessionAffinity: api.ServiceAffinityClientIP,
 			Type:            serviceType,
+			SessionAffinityConfig: &api.SessionAffinityConfig{
+				ClientIP: &api.ClientIPConfig{
+					TimeoutSeconds: &timeoutSeconds,
+				},
+			},
 		},
 	}
 

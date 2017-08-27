@@ -27,38 +27,38 @@ func newFirewallMetricContext(request string) *metricContext {
 // GetFirewall returns the Firewall by name.
 func (gce *GCECloud) GetFirewall(name string) (*compute.Firewall, error) {
 	mc := newFirewallMetricContext("get")
-	v, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), name).Do()
+	v, err := gce.service.Firewalls.Get(gce.projectID, name).Do()
 	return v, mc.Observe(err)
 }
 
 // CreateFirewall creates the passed firewall
 func (gce *GCECloud) CreateFirewall(f *compute.Firewall) error {
 	mc := newFirewallMetricContext("create")
-	op, err := gce.service.Firewalls.Insert(gce.NetworkProjectID(), f).Do()
+	op, err := gce.service.Firewalls.Insert(gce.projectID, f).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOpInProject(op, gce.NetworkProjectID(), mc)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // DeleteFirewall deletes the given firewall rule.
 func (gce *GCECloud) DeleteFirewall(name string) error {
 	mc := newFirewallMetricContext("delete")
-	op, err := gce.service.Firewalls.Delete(gce.NetworkProjectID(), name).Do()
+	op, err := gce.service.Firewalls.Delete(gce.projectID, name).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOpInProject(op, gce.NetworkProjectID(), mc)
+	return gce.waitForGlobalOp(op, mc)
 }
 
 // UpdateFirewall applies the given firewall as an update to an existing service.
 func (gce *GCECloud) UpdateFirewall(f *compute.Firewall) error {
 	mc := newFirewallMetricContext("update")
-	op, err := gce.service.Firewalls.Update(gce.NetworkProjectID(), f.Name, f).Do()
+	op, err := gce.service.Firewalls.Update(gce.projectID, f.Name, f).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForGlobalOpInProject(op, gce.NetworkProjectID(), mc)
+	return gce.waitForGlobalOp(op, mc)
 }

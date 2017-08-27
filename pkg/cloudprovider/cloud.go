@@ -124,7 +124,7 @@ type Instances interface {
 	// ProviderID is a unique identifier of the node. This will not be called
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
-	NodeAddressesByProviderID(providerId string) ([]v1.NodeAddress, error)
+	NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(nodeName types.NodeName) (string, error)
@@ -140,6 +140,9 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(hostname string) (types.NodeName, error)
+	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+	InstanceExistsByProviderID(providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.

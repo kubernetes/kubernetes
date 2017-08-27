@@ -408,7 +408,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)))
 
 			devicePath, err := volumeAttacher.WaitForAttach(
-				volumeToMount.VolumeSpec, volumeToMount.DevicePath, waitForAttachTimeout)
+				volumeToMount.VolumeSpec, volumeToMount.DevicePath, volumeToMount.Pod, waitForAttachTimeout)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateErrorDetailed("MountVolume.WaitForAttach failed", err)

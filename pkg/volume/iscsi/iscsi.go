@@ -138,7 +138,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	return &iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
 			podUID:         podUID,
-			volName:        spec.Name(),
+			VolName:        spec.Name(),
 			Portals:        bkportal,
 			Iqn:            iscsi.IQN,
 			lun:            lun,
@@ -167,7 +167,7 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
-			volName: volName,
+			VolName: volName,
 			manager: manager,
 			plugin:  plugin,
 		},
@@ -190,7 +190,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 }
 
 type iscsiDisk struct {
-	volName        string
+	VolName        string
 	podUID         types.UID
 	Portals        []string
 	Iqn            string
@@ -209,7 +209,7 @@ type iscsiDisk struct {
 func (iscsi *iscsiDisk) GetPath() string {
 	name := iscsiPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.volName)
+	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.VolName)
 }
 
 type iscsiDiskMounter struct {
