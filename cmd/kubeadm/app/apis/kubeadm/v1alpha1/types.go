@@ -52,8 +52,8 @@ type MasterConfiguration struct {
 	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
 	UnifiedControlPlaneImage string `json:"unifiedControlPlaneImage"`
 
-	// FeatureFlags enabled by the user
-	FeatureFlags map[string]bool `json:"featureFlags"`
+	// FeatureGates enabled by the user
+	FeatureGates map[string]bool `json:"featureGates"`
 }
 
 type API struct {

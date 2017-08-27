@@ -132,7 +132,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	out.FeatureFlags = *(*map[string]bool)(unsafe.Pointer(&in.FeatureFlags))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 
@@ -173,7 +173,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	out.FeatureFlags = *(*map[string]bool)(unsafe.Pointer(&in.FeatureFlags))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 

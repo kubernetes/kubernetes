@@ -130,7 +130,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	api.Scheme.Default(cfg)
 
-	var featureFlagsString string
+	var featureGatesString string
 
 	cmd := &cobra.Command{
 		Use:   "from-flags",
@@ -144,7 +144,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			if cfg.FeatureFlags, err = features.NewFeatureGate(&features.InitFeatureGates, featureFlagsString); err != nil {
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
 
@@ -157,7 +157,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureFlagsString)
+	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
 	return cmd
 }
 
