@@ -25,10 +25,9 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
