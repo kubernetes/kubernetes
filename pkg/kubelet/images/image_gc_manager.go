@@ -290,6 +290,11 @@ func (im *realImageGCManager) GarbageCollect() error {
 
 	// If over the max threshold, free enough to place us at the lower threshold.
 	usagePercent := 100 - int(available*100/capacity)
+	if im.policy.HighThresholdPercent == 0 {
+		glog.Warningf("Disk usage percent is %d, the high threshold is 0, will not image GC on device %q at mount point %q", usagePercent, fsInfo.Device, fsInfo.Mountpoint)
+		return nil
+	}
+
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		glog.Infof("[imageGCManager]: Disk usage on image filesystem is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", usagePercent, im.policy.HighThresholdPercent, amountToFree)
