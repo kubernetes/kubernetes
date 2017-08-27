@@ -1,0 +1,12 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pv-dd-shared-ssd-5g
+  annotations:
+    volume.beta.kubernetes.io/storage-class: sharedssd
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

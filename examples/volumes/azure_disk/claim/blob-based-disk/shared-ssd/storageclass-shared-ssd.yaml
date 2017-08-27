@@ -1,0 +1,8 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: sharedssd
+provisioner: kubernetes.io/azure-disk
+parameters:
+  skuname: Premium_LRS
+  kind: Shared
