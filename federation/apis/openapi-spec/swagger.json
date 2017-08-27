@@ -13441,7 +13441,9 @@
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Initializer"
-      }
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "result": {
       "description": "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.",

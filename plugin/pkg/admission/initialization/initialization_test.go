@@ -18,10 +18,17 @@ package initialization
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 func newInitializer(name string, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {
@@ -96,4 +103,76 @@ func TestFindInitializers(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakeAuthorizer struct {
+	accept bool
+}
+
+func (f *fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+	if f.accept {
+		return true, "", nil
+	}
+	return false, "denied", nil
+}
+
+func TestAdmitUpdate(t *testing.T) {
+	tests := []struct {
+		name             string
+		oldInitializers  *metav1.Initializers
+		newInitializers  *metav1.Initializers
+		verifyUpdatedObj func(runtime.Object) (pass bool, reason string)
+		err              string
+	}{
+		{
+			name:            "updates on initialized resources are allowed",
+			oldInitializers: nil,
+			newInitializers: nil,
+			err:             "",
+		},
+		{
+			name:            "updates on initialized resources are allowed",
+			oldInitializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}},
+			newInitializers: &metav1.Initializers{},
+			verifyUpdatedObj: func(obj runtime.Object) (bool, string) {
+				accessor, err := meta.Accessor(obj)
+				if err != nil {
+					return false, "cannot get accessor"
+				}
+				if accessor.GetInitializers() != nil {
+					return false, "expect nil initializers"
+				}
+				return true, ""
+			},
+			err: "",
+		},
+		{
+			name:            "initializers may not be set once initialized",
+			oldInitializers: nil,
+			newInitializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}},
+			err:             "field is immutable once initialization has completed",
+		},
+	}
+
+	plugin := initializer{
+		config:     nil,
+		authorizer: &fakeAuthorizer{true},
+	}
+	for _, tc := range tests {
+		oldObj := &v1.Pod{}
+		oldObj.Initializers = tc.oldInitializers
+		newObj := &v1.Pod{}
+		newObj.Initializers = tc.newInitializers
+		a := admission.NewAttributesRecord(newObj, oldObj, schema.GroupVersionKind{}, "", "foo", schema.GroupVersionResource{}, "", admission.Update, nil)
+		err := plugin.Admit(a)
+		switch {
+		case tc.err == "" && err != nil:
+			t.Errorf("%q: unexpected error: %v", tc.name, err)
+		case tc.err != "" && err == nil:
+			t.Errorf("%q: unexpected no error, expected %s", tc.name, tc.err)
+		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
+			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
+		}
+	}
+
 }
