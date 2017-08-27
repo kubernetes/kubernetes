@@ -286,6 +286,7 @@ func AddHandlers(h printers.PrintHandler) {
 	persistentVolumeClaimColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["phase"]},
+		{Name: "Volume", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["volumeName"]},
 		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["capacity"]},
 		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
