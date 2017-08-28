@@ -307,6 +307,11 @@
 			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/kms",
+			"Comment": "v1.6.10",
+			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/route53",
 			"Comment": "v1.6.10",
 			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
