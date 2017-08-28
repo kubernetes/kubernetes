@@ -83,6 +83,7 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 
 // Init is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
+	plugin.host = host
 	// Hardwired 'success' as any errors from calling init() will be caught by NewFlexVolumePlugin()
 	return nil
 }
