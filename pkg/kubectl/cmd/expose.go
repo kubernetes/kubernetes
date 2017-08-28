@@ -95,7 +95,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceV2GeneratorName)
 	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
 	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
 	cmd.Flags().String("type", "", i18n.T("Type for this service: ClusterIP, NodePort, or LoadBalancer. Default is 'ClusterIP'."))
@@ -113,7 +113,6 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "identifying the resource to expose a service"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
-	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd

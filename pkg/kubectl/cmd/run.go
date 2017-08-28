@@ -118,8 +118,7 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 }
 
 func addRunFlags(cmd *cobra.Command) {
-	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("generator", "", i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
+	cmdutil.AddGeneratorFlags(cmd, "")
 	cmd.Flags().String("image", "", i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
