@@ -51,6 +51,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// NewProxyServer returns a new ProxyServer.
 func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")

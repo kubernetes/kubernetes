@@ -65,8 +65,12 @@ func CanUseWinKernelProxier(kcompat KernelCompatTester) (bool, error) {
 
 type WindowsKernelCompatTester struct{}
 
-// Todo : Fix the below API to query the OS version
+// IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
+	_, err := hcsshim.HNSListPolicyListRequest()
+	if err != nil {
+		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
+	}
 	return nil
 }
 
@@ -531,6 +535,10 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 	// Remove the Hns Policy corresponding to this service
 	deleteHnsLoadBalancerPolicy(svcInfo.hnsID)
 	svcInfo.hnsID = ""
+
+	deleteHnsLoadBalancerPolicy(svcInfo.nodePorthnsID)
+	svcInfo.nodePorthnsID = ""
+
 	for _, externalIp := range svcInfo.externalIPs {
 		deleteHnsLoadBalancerPolicy(externalIp.hnsID)
 		externalIp.hnsID = ""
@@ -576,7 +584,7 @@ func getHnsLoadBalancer(endpoints []hcsshim.HNSEndpoint, isILB bool, vip string,
 		}
 		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == isILB {
 			if len(vip) > 0 {
-				if len(elbPolicy.VIPs) > 0 && elbPolicy.VIPs[0] != vip {
+				if len(elbPolicy.VIPs) == 0 || elbPolicy.VIPs[0] != vip {
 					continue
 				}
 			}
@@ -1049,7 +1057,7 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				"", // VIP has to be empty to automatically select the nodeIP
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
+				uint16(svcInfo.targetPort),
 				uint16(svcInfo.nodePort),
 			)
 			if err != nil {
@@ -1058,7 +1066,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			svcInfo.nodePorthnsID = hnsLoadBalancer.ID
-			glog.V(3).Infof("Hns LoadBalancer resource created for cluster ip resources %v, Id [%s]", svcInfo.clusterIP, hnsLoadBalancer.ID)
+			glog.V(3).Infof("Hns LoadBalancer resource created for nodePort resources %v, Id [%s]", svcInfo.clusterIP, hnsLoadBalancer.ID)
 		}
 
 		// Create a Load Balancer Policy for each external IP
