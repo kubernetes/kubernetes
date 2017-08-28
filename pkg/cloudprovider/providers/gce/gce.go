@@ -31,6 +31,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -188,6 +190,10 @@ type CloudConfig struct {
 	UseMetadataServer  bool
 	AlphaFeatureGate   *AlphaFeatureGate
 }
+
+// kmsPluginRegisterOnce prevents the cloudprovider from registering its KMS plugin
+// more than once in the KMS plugin registry.
+var kmsPluginRegisterOnce sync.Once
 
 func init() {
 	cloudprovider.RegisterCloudProvider(
@@ -434,6 +440,15 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 
 	gce.manager = &GCEServiceManager{gce}
+
+	// Registering the KMS plugin only the first time.
+	kmsPluginRegisterOnce.Do(func() {
+		// Register the Google Cloud KMS based service in the KMS plugin registry.
+		encryptionconfig.KMSPluginRegistry.Register(KMSServiceName, func(config io.Reader) (envelope.Service, error) {
+			return gce.getGCPCloudKMSService(config)
+		})
+	})
+
 	return gce, nil
 }
 
