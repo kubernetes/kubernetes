@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/utils/exec"
@@ -780,6 +781,7 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 // arguments (sub-commands) are provided, or a usage error otherwise.
 func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 	return func(c *cobra.Command, args []string) {
+		templates.UseMainUsageTemplatesWithoutFlags(c)
 		c.SetOutput(out)
 		RequireNoArguments(c, args)
 		c.Help()

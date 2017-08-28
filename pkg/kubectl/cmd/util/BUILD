@@ -33,6 +33,7 @@ go_library(
         "//pkg/client/unversioned:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",

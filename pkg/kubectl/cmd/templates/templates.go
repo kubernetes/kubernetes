@@ -100,3 +100,25 @@ func OptionsUsageTemplate() string {
 
 {{flagsUsages .InheritedFlags}}{{end}}`
 }
+
+// MainHelpTemplateWithoutFlags if the template for 'help' used by most commands
+// without options information
+func MainHelpTemplateWithoutFlags() string {
+	return `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+}
+
+// MainUsageTemplateWithoutFlags if the template for 'usage' used by most commands
+// without options information
+func MainUsageTemplateWithoutFlags() string {
+	sections := []string{
+		"\n\n",
+		SectionVars,
+		SectionAliases,
+		SectionExamples,
+		SectionSubcommands,
+		SectionUsage,
+		SectionTipsHelp,
+		SectionTipsGlobalOptions,
+	}
+	return strings.TrimRightFunc(strings.Join(sections, ""), unicode.IsSpace)
+}
