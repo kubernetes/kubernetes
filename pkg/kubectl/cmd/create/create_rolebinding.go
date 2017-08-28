@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -36,7 +36,7 @@ var (
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
-// RoleBinding is a command to ease creating RoleBindings.
+// NewCmdCreateRoleBinding is a command to ease creating RoleBindings.
 func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rolebinding NAME --clusterrole=NAME|--role=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
@@ -44,7 +44,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 		Long:    roleBindingLong,
 		Example: roleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateRoleBinding(f, cmdOut, cmd, args)
+			err := RunCreateRoleBinding(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,8 +60,9 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	return cmd
 }
 
-func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+// RunCreateRoleBinding runs the command to create a role binding.
+func RunCreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

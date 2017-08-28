@@ -135,7 +135,7 @@ func TestPodAndContainer(t *testing.T) {
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -190,8 +190,8 @@ func TestExec(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					body := cmdtesting.ObjBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					// Ensures no GET is performed when deleting by name
 					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
@@ -200,7 +200,7 @@ func TestExec(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

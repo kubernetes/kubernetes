@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -26,18 +26,18 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-func TestCreateServiceAccount(t *testing.T) {
-	serviceAccountObject := &api.ServiceAccount{}
-	serviceAccountObject.Name = "my-service-account"
+func TestCreateConfigMap(t *testing.T) {
+	configMap := &api.ConfigMap{}
+	configMap.Name = "my-configmap"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/serviceaccounts" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, serviceAccountObject)}, nil
+			case p == "/namespaces/test/configmaps" && m == "POST":
+				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, configMap)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -46,10 +46,10 @@ func TestCreateServiceAccount(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceAccount(f, buf)
+	cmd := NewCmdCreateConfigMap(f, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
+	cmd.Run(cmd, []string{configMap.Name})
+	expectedOutput := "configmap/" + configMap.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

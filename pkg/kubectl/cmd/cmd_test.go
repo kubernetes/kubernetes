@@ -20,8 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -32,106 +30,14 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/pkg/util/strings"
 )
-
-func initTestErrorHandler(t *testing.T) {
-	cmdutil.BehaviorOnFatal(func(str string, code int) {
-		t.Errorf("Error running command (exit code %d): %s", code, str)
-	})
-}
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func defaultClientConfig() *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: api.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &api.Registry.GroupOrDie(api.GroupName).GroupVersion,
-		},
-	}
-}
-
-func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: api.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         version,
-		},
-	}
-}
-
-type testPrinter struct {
-	Objects        []runtime.Object
-	Err            error
-	GenericPrinter bool
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-// TODO: implement HandledResources()
-func (t *testPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (t *testPrinter) IsGeneric() bool {
-	return t.GenericPrinter
-}
-
-type testDescriber struct {
-	Name, Namespace string
-	Settings        printers.DescriberSettings
-	Output          string
-	Err             error
-}
-
-func (t *testDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (output string, err error) {
-	t.Namespace, t.Name = namespace, name
-	t.Settings = describerSettings
-	return t.Output, t.Err
-}
-
-func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
-}
-
-func policyObjBody(obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Policy.Codec(), obj))))
-}
-
-func bytesBody(bodyBytes []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
-}
-
-func stringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
-}
 
 // TODO(jlowdermilk): refactor the Factory so we can test client versions properly,
 // with different client/server version skew scenarios.
@@ -666,7 +572,7 @@ func genResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
-	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bytesBody(jsonBytes)}, nil
+	return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.BytesBody(jsonBytes)}, nil
 }
 
 func Test_deprecatedAlias(t *testing.T) {

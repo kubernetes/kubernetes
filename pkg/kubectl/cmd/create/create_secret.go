@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -94,7 +94,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 
 // CreateSecretGeneric is the implementation of the create secret generic command
 func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 
 // CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
 func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 // CreateSecretTLS is the implementation of the create secret tls command
 func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}

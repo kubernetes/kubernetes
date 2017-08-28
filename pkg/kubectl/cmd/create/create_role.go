@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -93,12 +93,14 @@ var (
 	}
 )
 
+// ResourceOptions is the start of the data required to perform the operation.
 type ResourceOptions struct {
 	Group       string
 	Resource    string
 	SubResource string
 }
 
+// CreateRoleOptions is the start of the data required to perform the operation.
 type CreateRoleOptions struct {
 	Name          string
 	Verbs         []string
@@ -114,7 +116,7 @@ type CreateRoleOptions struct {
 	PrintObject  func(obj runtime.Object) error
 }
 
-// Role is a command to ease creating Roles.
+// NewCmdCreateRole is a command to ease creating Roles.
 func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateRoleOptions{
 		Out: cmdOut,
@@ -141,8 +143,9 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Complete adapts from the command line args and factory to the data required.
 func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	name, err := NameFromCommandArgs(cmd, args)
+	name, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -215,12 +218,13 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return nil
 }
 
+// Validate checks to the CreateRoleOptions for sufficient information run the command.
 func (c *CreateRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
 
-	// validate verbs.
+	// Validate verbs.
 	if len(c.Verbs) == 0 {
 		return fmt.Errorf("at least one verb must be specified")
 	}
@@ -231,7 +235,7 @@ func (c *CreateRoleOptions) Validate() error {
 		}
 	}
 
-	// validate resources.
+	// Validate resources.
 	if len(c.Resources) == 0 {
 		return fmt.Errorf("at least one resource must be specified")
 	}
@@ -274,6 +278,7 @@ func (c *CreateRoleOptions) validateResource() error {
 	return nil
 }
 
+// RunCreateRole does the work.
 func (c *CreateRoleOptions) RunCreateRole() error {
 	role := &rbac.Role{}
 	role.Name = c.Name

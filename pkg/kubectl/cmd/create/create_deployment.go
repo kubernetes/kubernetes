@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"fmt"
@@ -63,20 +63,20 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	return cmd
 }
 
-// fallbackGeneratorNameIfNecessary returns the name of the old generator
+// FallbackGeneratorNameIfNecessary returns the name of the old generator
 // (v1beta1) if server does not support apps/v1beta1 deployments. Otherwise, the
 // generator string is returned unchanged.
 //
 // If the generator name is changed, print a warning message to let the user
 // know.
-func fallbackGeneratorNameIfNecessary(
+func FallbackGeneratorNameIfNecessary(
 	generatorName string,
 	resourcesList []*metav1.APIResourceList,
 	cmdErr io.Writer,
 ) string {
 
 	if generatorName == cmdutil.DeploymentBasicAppsV1Beta1GeneratorName &&
-		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		!cmdutil.Contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 
 		fmt.Fprintf(cmdErr,
 			"WARNING: New deployments generator %q specified, "+
@@ -131,7 +131,7 @@ func generatorFromName(
 func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 	cmd *cobra.Command, args []string) error {
 
-	deploymentName, err := NameFromCommandArgs(cmd, args)
+	deploymentName, err := cmdutil.NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 
 	// It is possible we have to modify the user-provided generator name if
 	// the server does not have support for the requested generator.
-	generatorName = fallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
+	generatorName = FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
 
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
 	generator, ok := generatorFromName(generatorName, imageNames, deploymentName)

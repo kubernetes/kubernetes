@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -72,7 +72,7 @@ func TestCreateRoleBinding(t *testing.T) {
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
 	tf.Namespace = "test"
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &RoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			APIRegistry:          api.Registry,
@@ -98,7 +98,7 @@ func TestCreateRoleBinding(t *testing.T) {
 
 					responseBinding := &rbac.RoleBinding{}
 					responseBinding.Name = "fake-binding"
-					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
+					return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

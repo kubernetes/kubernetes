@@ -248,9 +248,9 @@ func TestTaint(t *testing.T) {
 				m := &MyReq{req}
 				switch {
 				case m.isFor("GET", "/nodes"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 				case m.isFor("GET", "/nodes/node-name"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 				case m.isFor("PATCH", "/nodes/node-name"):
 					tainted = true
 					data, err := ioutil.ReadAll(req.Body)
@@ -276,7 +276,7 @@ func TestTaint(t *testing.T) {
 					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
 						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 				case m.isFor("PUT", "/nodes/node-name"):
 					tainted = true
 					data, err := ioutil.ReadAll(req.Body)
@@ -290,14 +290,14 @@ func TestTaint(t *testing.T) {
 					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
 						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 				default:
 					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 					return nil, nil
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfig = cmdtesting.DefaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdTaint(f, buf)

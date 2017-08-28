@@ -37,13 +37,13 @@ const (
 )
 
 func TestTopNodeAllMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -54,9 +54,9 @@ func TestTopNodeAllMetrics(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
 				return nil, nil
@@ -64,7 +64,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
@@ -83,13 +83,13 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
 	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
 
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -100,9 +100,9 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
 				return nil, nil
@@ -110,7 +110,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	opts := &TopNodeOptions{
@@ -133,7 +133,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 }
 
 func TestTopNodeWithNameMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
 	expectedMetrics := metrics.Items[0]
 	expectedNode := nodes.Items[0]
@@ -145,7 +145,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -156,9 +156,9 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNode)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNode)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -166,7 +166,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
@@ -185,7 +185,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 }
 
 func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
 	expectedMetrics := v1alpha1.NodeMetricsList{
 		ListMeta: metrics.ListMeta,
@@ -205,7 +205,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.Printer = &cmdtesting.TestPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: ns,
@@ -216,9 +216,9 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -226,7 +226,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
