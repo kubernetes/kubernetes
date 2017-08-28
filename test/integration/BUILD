@@ -33,6 +33,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/integration/apiserver:all-srcs",
+        "//test/integration/apps:all-srcs",
         "//test/integration/auth:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
