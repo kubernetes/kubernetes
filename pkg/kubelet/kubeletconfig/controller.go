@@ -87,7 +87,7 @@ func NewController(initConfigDir string,
 
 	var initLoader configfiles.Loader
 	if len(initConfigDir) > 0 {
-		initLoader, err = configfiles.NewFSLoader(fs, initConfigDir)
+		initLoader, err = configfiles.NewFsLoader(fs, initConfigDir)
 		if err != nil {
 			return nil, err
 		}
