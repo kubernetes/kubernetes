@@ -2,9 +2,8 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: pvcsc001
-  annotations:
-    volume.beta.kubernetes.io/storage-class: fast
 spec:
+  storageClassName: "fast"
   accessModes:
     - ReadWriteOnce
   resources:
