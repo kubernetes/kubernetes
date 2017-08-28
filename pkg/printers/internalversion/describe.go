@@ -856,6 +856,26 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
 }
 
+func printISCSIPersistentVolumeSource(iscsi *api.ISCSIPersistentVolumeSource, w PrefixWriter) {
+	initiatorName := "<none>"
+	if iscsi.InitiatorName != nil {
+		initiatorName = *iscsi.InitiatorName
+	}
+	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
+		"    TargetPortal:\t%v\n"+
+		"    IQN:\t%v\n"+
+		"    Lun:\t%v\n"+
+		"    ISCSIInterface\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    Portals:\t%v\n"+
+		"    DiscoveryCHAPAuth:\t%v\n"+
+		"    SessionCHAPAuth:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    InitiatorName:\t%v\n",
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiatorName)
+}
+
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tGlusterfs (a Glusterfs mount on the host that shares a pod's lifetime)\n"+
 		"    EndpointsName:\t%v\n"+
@@ -1131,7 +1151,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.NFS != nil:
 			printNFSVolumeSource(pv.Spec.NFS, w)
 		case pv.Spec.ISCSI != nil:
-			printISCSIVolumeSource(pv.Spec.ISCSI, w)
+			printISCSIPersistentVolumeSource(pv.Spec.ISCSI, w)
 		case pv.Spec.Glusterfs != nil:
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:

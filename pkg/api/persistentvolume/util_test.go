@@ -93,8 +93,15 @@ func TestPVSecrets(t *testing.T) {
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				ISCSI: &api.ISCSIVolumeSource{
-					SecretRef: &api.LocalObjectReference{
+				ISCSI: &api.ISCSIPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.ISCSI.SecretRef",
+						Namespace: "iscsi"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ISCSI: &api.ISCSIPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
@@ -161,6 +168,7 @@ func TestPVSecrets(t *testing.T) {
 		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"scaleions/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.ISCSI.SecretRef",
+		"iscsi/Spec.PersistentVolumeSource.ISCSI.SecretRef",
 		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {

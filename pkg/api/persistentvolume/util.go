@@ -88,8 +88,16 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 			}
 		}
 	case source.ISCSI != nil:
-		if source.ISCSI.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.ISCSI.SecretRef.Name) {
-			return false
+		if source.ISCSI.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.ISCSI.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.ISCSI.SecretRef.Namespace
+			}
+			if !visitor(ns, source.ISCSI.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.StorageOS != nil:
 		if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Namespace, source.StorageOS.SecretRef.Name) {

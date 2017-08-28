@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -100,7 +101,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 			return err
 		}
 	}
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return err
 	}
@@ -112,7 +113,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(iscsiPluginName)}
 		mountOptions := volume.MountOptionFromSpec(spec, options...)
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, fsType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err
@@ -159,29 +160,75 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 func (attacher *iscsiAttacher) volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
 	var bkportal []string
-	iscsi, readOnly, err := getVolumeSource(spec)
+	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
-	// Obtain secret for AttachDisk
-	if iscsi.SecretRef != nil && pod != nil {
-		if secret, err = volumeutil.GetSecretForPod(pod, iscsi.SecretRef.Name, host.GetKubeClient()); err != nil {
-			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, iscsi.SecretRef)
+	if pod != nil {
+		chapDiscovery, err := getISCSIDiscoveryCHAPInfo(spec)
+		if err != nil {
 			return nil, err
 		}
+		chapSession, err := getISCSISessionCHAPInfo(spec)
+		if err != nil {
+			return nil, err
+		}
+		if chapDiscovery || chapSession {
+			secretName, secretNamespace, err := getISCSISecretNameAndNamespace(spec, pod.Namespace)
+			if err != nil {
+				return nil, err
+			}
+			if len(secretNamespace) == 0 || len(secretName) == 0 {
+				return nil, fmt.Errorf("CHAP enabled but secret name or namespace is empty")
+			}
+			// if secret is provided, retrieve it
+			kubeClient := host.GetKubeClient()
+			if kubeClient == nil {
+				return nil, fmt.Errorf("Cannot get kube client")
+			}
+			secretObj, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+			if err != nil {
+				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
+				return nil, err
+			}
+			secret = make(map[string]string)
+			for name, data := range secretObj.Data {
+				glog.V(6).Infof("retrieving CHAP secret name: %s", name)
+				secret[name] = string(data)
+			}
+		}
+
 	}
-	lun := strconv.Itoa(int(iscsi.Lun))
-	portal := portalMounter(iscsi.TargetPortal)
+	tp, portals, iqn, lunStr, err := getISCSITargetInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	lun := strconv.Itoa(int(lunStr))
+	portal := portalMounter(tp)
 	bkportal = append(bkportal, portal)
-	for _, tp := range iscsi.Portals {
-		bkportal = append(bkportal, portalMounter(string(tp)))
+	for _, p := range portals {
+		bkportal = append(bkportal, portalMounter(string(p)))
 	}
-	iface := iscsi.ISCSIInterface
-	exec := attacher.host.GetExec(iscsiPluginName)
+
+	iface, initiatorNamePtr, err := getISCSIInitiatorInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	var initiatorName string
-	if iscsi.InitiatorName != nil {
-		initiatorName = *iscsi.InitiatorName
+	if initiatorNamePtr != nil {
+		initiatorName = *initiatorNamePtr
 	}
+	chapDiscovery, err := getISCSIDiscoveryCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	chapSession, err := getISCSISessionCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	exec := attacher.host.GetExec(iscsiPluginName)
 
 	return &iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
@@ -190,15 +237,15 @@ func (attacher *iscsiAttacher) volumeSpecToMounter(spec *volume.Spec, host volum
 			},
 			VolName:        spec.Name(),
 			Portals:        bkportal,
-			Iqn:            iscsi.IQN,
+			Iqn:            iqn,
 			lun:            lun,
 			Iface:          iface,
-			chap_discovery: iscsi.DiscoveryCHAPAuth,
-			chap_session:   iscsi.SessionCHAPAuth,
+			chap_discovery: chapDiscovery,
+			chap_session:   chapSession,
 			secret:         secret,
 			InitiatorName:  initiatorName,
 			manager:        &ISCSIUtil{}},
-		fsType:     iscsi.FSType,
+		fsType:     fsType,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
 		exec:       exec,
