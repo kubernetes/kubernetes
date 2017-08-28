@@ -307,7 +307,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 		}
 
 		// Watches for single objects are routed to this function.
-		// Treat a /name parameter the same as a field selector entry.
+		// Treat a name parameter the same as a field selector entry.
 		hasName := true
 		_, name, err := scope.Namer.Name(req)
 		if err != nil {

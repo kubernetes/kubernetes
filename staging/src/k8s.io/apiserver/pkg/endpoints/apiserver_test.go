@@ -1522,107 +1522,138 @@ func TestMetadata(t *testing.T) {
 }
 
 func TestExport(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{
-		item: genericapitesting.Simple{
+
+	tests := []struct {
+		name         string
+		accept       string
+		exportAccept bool
+		exportParam  bool
+		params       url.Values
+		list         bool // set true to list all resources instead of get a specific one
+	}{
+		{
+			name:   "get export via query parameter",
+			accept: runtime.ContentTypeJSON,
+			params: url.Values{"export": {"true"}},
+		},
+		{
+			name:   "get export via accept export=true header",
+			accept: runtime.ContentTypeJSON + ";export=true",
+		},
+		{
+			name:   "list export via query parameter",
+			accept: runtime.ContentTypeJSON,
+			params: url.Values{"export": {"true"}},
+			list:   true,
+		},
+		{
+			name:   "list export via accept export=true header",
+			accept: runtime.ContentTypeJSON + ";export=true",
+			list:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test: %s", test.name)
+
+		storage := map[string]rest.Storage{}
+		originalObj := genericapitesting.Simple{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion:   "1234",
 				CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
 			},
 			Other: "foo",
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
-		name:        "id",
-		namespace:   "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
+		}
+		var simpleStorage SimpleRESTStorage
+		var selfLinker *setTestSelfLinker
+		if test.list {
+			originalObj := genericapitesting.Simple{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion:   "1234",
+					CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
+				},
+				Other: "foo",
+			}
+			simpleStorage = SimpleRESTStorage{
+				list: []genericapitesting.Simple{originalObj},
+			}
+			selfLinker = &setTestSelfLinker{
+				t:           t,
+				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
+				namespace:   "default",
+			}
+		} else {
+			simpleStorage = SimpleRESTStorage{
+				item: originalObj,
+			}
+			selfLinker = &setTestSelfLinker{
+				t:           t,
+				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+				name:        "id",
+				namespace:   "default",
+			}
+		}
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id?export=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		data, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
-	}
-	var itemOut genericapitesting.Simple
-	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+		storage["simple"] = &simpleStorage
+		handler := handleLinker(storage, selfLinker)
+		server := httptest.NewServer(handler)
+		defer server.Close()
 
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if itemOut.Other != "exported" {
-		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
-	}
+		resourceSuffix := "/simple/id"
+		if test.list {
+			resourceSuffix = "/simple"
+		}
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version +
+			"/namespaces/default" + resourceSuffix)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
-	}
-}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			data, _ := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
+		}
 
-func TestListExport(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	originalObj := genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{
-			ResourceVersion:   "1234",
-			CreationTimestamp: metav1.NewTime(time.Unix(10, 10)),
-		},
-		Other: "foo",
-	}
-	simpleStorage := SimpleRESTStorage{
-		list: []genericapitesting.Simple{originalObj},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
-		namespace:   "default",
-	}
-	storage["simple"] = &simpleStorage
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
+		var itemOut genericapitesting.Simple
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple?export=true")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		data, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		t.Fatalf("unexpected response: %#v\n%s\n", resp, string(data))
-	}
+		var body string
+		if test.list {
+			var listOut genericapitesting.SimpleList
+			body, err = extractBody(resp, &listOut)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-	var listOut genericapitesting.SimpleList
-	body, err := extractBody(resp, &listOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+			if len(listOut.Items) != 1 {
+				t.Errorf("expected 1 element in list, got: %d", len(listOut.Items))
+				return
+			}
+			itemOut = listOut.Items[0]
+		} else {
+			body, err = extractBody(resp, &itemOut)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
 
-	if len(listOut.Items) != 1 {
-		t.Errorf("expected 1 element in list, got: %d", len(listOut.Items))
-		return
-	}
-
-	itemOut := listOut.Items[0]
-	if itemOut.Name != simpleStorage.item.Name {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-	}
-	if itemOut.Other != "exported" {
-		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
-	}
-
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+		if itemOut.Name != simpleStorage.item.Name {
+			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+		}
+		if itemOut.Other != "exported" {
+			t.Errorf("Expected: exported, saw: %s", itemOut.Other)
+		}
+		if !selfLinker.called {
+			t.Errorf("Never set self link")
+		}
 	}
 }
 
