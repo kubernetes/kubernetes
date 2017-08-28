@@ -404,6 +404,9 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 	}
 	defer configFile.Close()
 	wh, err := NewImagePolicyWebhook(configFile)
+	if err != nil {
+		return nil, err
+	}
 	return wh.(*imagePolicyWebhook), err
 }
 
