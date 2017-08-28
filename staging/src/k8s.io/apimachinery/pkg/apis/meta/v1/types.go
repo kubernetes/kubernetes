@@ -758,7 +758,7 @@ type ServerAddressByClientCIDR struct {
 	ServerAddress string `json:"serverAddress" protobuf:"bytes,2,opt,name=serverAddress"`
 }
 
-// GroupVersion contains the "group/version" and "version" string of a version.
+// GroupVersionForDiscovery contains the "group/version" and "version" string of a version.
 // It is made a struct to keep extensibility.
 type GroupVersionForDiscovery struct {
 	// groupVersion specifies the API group and version in the form "group/version"
