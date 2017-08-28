@@ -28,13 +28,13 @@ data:
 
         # Allow for REST discovery.
         location = / {
-            if ($args ~ "recursive=true") {
+            if ($args ~* "recursive") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location = /computeMetadata/ {
-            if ($args ~ "recursive=true") {
+            if ($args ~* "recursive") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
@@ -42,19 +42,19 @@ data:
 
         # By default, allow the v0.1, v1beta1, and v1 APIs.
         location /0.1/ {
-            if ($args ~ "recursive=true") {
+            if ($args ~* "recursive") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location /computeMetadata/v1beta1/ {
-            if ($args ~ "recursive=true") {
+            if ($args ~* "recursive") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location /computeMetadata/v1/ {
-            if ($args ~ "recursive=true") {
+            if ($args ~* "recursive") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
