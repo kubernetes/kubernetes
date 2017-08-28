@@ -17,13 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -48,133 +47,57 @@ var (
 
 		# Create a ClusterRole name "foo" with NonResourceURL specified
 		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*`))
-
-	// Valid nonResource verb list for validation.
-	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
 )
-
-type CreateClusterRoleOptions struct {
-	*CreateRoleOptions
-	NonResourceURLs []string
-}
 
 // ClusterRole is a command to ease creating ClusterRoles.
 func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
-	c := &CreateClusterRoleOptions{
-		CreateRoleOptions: &CreateRoleOptions{
-			Out: cmdOut,
-		},
-	}
+
 	cmd := &cobra.Command{
 		Use:     "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
 		Short:   clusterRoleLong,
 		Long:    clusterRoleLong,
 		Example: clusterRoleExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(c.Complete(f, cmd, args))
-			cmdutil.CheckErr(c.Validate())
-			cmdutil.CheckErr(c.RunCreateRole())
+			cmdutil.CheckErr(CreateClusterRole(f, cmdOut, cmd, args))
 		},
 	}
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "Verb that applies to the resources contained in the rule")
-	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", []string{}, "A partial url that user should have access to.")
-	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
-	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterRoleV1GeneratorName)
+	cmd.Flags().StringSlice("verb", []string{}, "verb that applies to the resources contained in the rule")
+	cmd.Flags().StringSlice("non-resource-url", []string{}, "a partial url that user should have access to.")
+	cmd.Flags().StringSlice("resource", []string{}, "resource that the rule applies to")
+	cmd.Flags().StringArray("resource-name", []string{}, "resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }
 
-func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	// Remove duplicate nonResourceURLs
-	nonResourceURLs := []string{}
-	for _, n := range c.NonResourceURLs {
-		if !arrayContains(nonResourceURLs, n) {
-			nonResourceURLs = append(nonResourceURLs, n)
-		}
-	}
-	c.NonResourceURLs = nonResourceURLs
-
-	return c.CreateRoleOptions.Complete(f, cmd, args)
-}
-
-func (c *CreateClusterRoleOptions) Validate() error {
-	if c.Name == "" {
-		return fmt.Errorf("name must be specified")
-	}
-
-	// validate verbs.
-	if len(c.Verbs) == 0 {
-		return fmt.Errorf("at least one verb must be specified")
-	}
-
-	if len(c.Resources) == 0 && len(c.NonResourceURLs) == 0 {
-		return fmt.Errorf("one of resource or nonResourceURL must be specified")
-	}
-
-	// validate resources
-	if len(c.Resources) > 0 {
-		for _, v := range c.Verbs {
-			if !arrayContains(validResourceVerbs, v) {
-				return fmt.Errorf("invalid verb: '%s'", v)
-			}
-		}
-		if err := c.validateResource(); err != nil {
-			return err
-		}
-	}
-
-	//validate non-resource-url
-	if len(c.NonResourceURLs) > 0 {
-		for _, v := range c.Verbs {
-			if !arrayContains(validNonResourceVerbs, v) {
-				return fmt.Errorf("invalid verb: '%s' for nonResourceURL", v)
-			}
-		}
-
-		for _, nonResourceURL := range c.NonResourceURLs {
-			if nonResourceURL == "*" {
-				continue
-			}
-
-			if nonResourceURL == "" || !strings.HasPrefix(nonResourceURL, "/") {
-				return fmt.Errorf("nonResourceURL should start with /")
-			}
-
-			if strings.ContainsRune(nonResourceURL[:len(nonResourceURL)-1], '*') {
-				return fmt.Errorf("nonResourceURL only supports wildcard matches when '*' is at the end")
-			}
-		}
-	}
-
-	return nil
-
-}
-
-func (c *CreateClusterRoleOptions) RunCreateRole() error {
-	clusterRole := &rbac.ClusterRole{}
-	clusterRole.Name = c.Name
-	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
+func CreateClusterRole(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
-	clusterRole.Rules = rules
+	mapper, _ := f.Object()
 
-	// Create ClusterRole.
-	if !c.DryRun {
-		_, err = c.Client.ClusterRoles().Create(clusterRole)
-		if err != nil {
-			return err
+	var generator kubectl.StructuredGenerator
+	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
+	case cmdutil.ClusterRoleV1GeneratorName:
+		generator = &kubectl.ClusterRoleGeneratorV1{
+			Mapper:          mapper,
+			Name:            name,
+			Verbs:           cmdutil.GetFlagStringSlice(cmd, "verb"),
+			Resources:       cmdutil.GetFlagStringSlice(cmd, "resource"),
+			ResourceNames:   cmdutil.GetFlagStringArray(cmd, "resource-name"),
+			NonResourceURLs: cmdutil.GetFlagStringSlice(cmd, "non-resource-url"),
 		}
+	default:
+		return errUnsupportedGenerator(cmd, generatorName)
 	}
-
-	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(c.Mapper, useShortOutput, c.Out, "clusterroles", c.Name, c.DryRun, "created")
-		return nil
-	}
-
-	return c.PrintObject(clusterRole)
+	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+		Name:                name,
+		StructuredGenerator: generator,
+		DryRun:              cmdutil.GetDryRunFlag(cmd),
+		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
+	})
 }

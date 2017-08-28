@@ -490,6 +490,8 @@ const (
 	ClusterV1Beta1GeneratorName             = "cluster/v1beta1"
 	PodDisruptionBudgetV1GeneratorName      = "poddisruptionbudget/v1beta1"
 	PodDisruptionBudgetV2GeneratorName      = "poddisruptionbudget/v1beta1/v2"
+	RoleV1GeneratorName                     = "role.rbac.authorization.k8s.io/v1beta1"
+	ClusterRoleV1GeneratorName              = "clusterrole.rbac.authorization.k8s.io/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
