@@ -21,7 +21,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -67,7 +67,7 @@ func getNonOrphanOptions() *metav1.DeleteOptions {
 var (
 	zero = int64(0)
 
-	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
 
 func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
@@ -265,19 +265,19 @@ func gatherMetrics(f *framework.Framework) {
 	}
 }
 
-func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
+func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batchv2alpha1.CronJob{
+	return &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind: "CronJob",
 		},
-		Spec: batchv2alpha1.CronJobSpec{
+		Spec: batchv1beta1.CronJobSpec{
 			Schedule: schedule,
-			JobTemplate: batchv2alpha1.JobTemplateSpec{
+			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
@@ -941,7 +941,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
-		cronJob, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Create(cronJob)
+		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Wait for the CronJob to create new Job")

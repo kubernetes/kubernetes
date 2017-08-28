@@ -21,7 +21,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -213,20 +213,20 @@ var _ = SIGDescribe("Generated release_1_5 clientset", func() {
 	})
 })
 
-func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
+func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batchv2alpha1.CronJob{
+	return &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"time": value,
 			},
 		},
-		Spec: batchv2alpha1.CronJobSpec{
+		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          "*/1 * * * ?",
-			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
-			JobTemplate: batchv2alpha1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
@@ -263,25 +263,13 @@ func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
 
 var _ = SIGDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs", func() {
-		var enabled bool
-		groupList, err := f.ClientSet.Discovery().ServerGroups()
-		framework.ExpectNoError(err)
-		for _, group := range groupList.Groups {
-			if group.Name == batchv2alpha1.GroupName {
-				for _, version := range group.Versions {
-					if version.Version == batchv2alpha1.SchemeGroupVersion.Version {
-						enabled = true
-						break
-					}
-				}
-			}
-		}
-		if !enabled {
-			framework.Logf("%s is not enabled, test skipped", batchv2alpha1.SchemeGroupVersion)
-			return
-		}
-		cronJobClient := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name)
+
+	BeforeEach(func() {
+		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+	})
+
+	It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
+		cronJobClient := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name)
 		By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
