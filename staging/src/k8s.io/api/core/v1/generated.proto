@@ -1327,21 +1327,22 @@ message HostPathVolumeSource {
   optional string type = 2;
 }
 
-// Represents an ISCSI disk.
+// ISCSIPersistentVolumeSource represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
-message ISCSIVolumeSource {
-  // iSCSI target portal. The portal is either an IP or ip_addr:port if the port
+message ISCSIPersistentVolumeSource {
+  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   optional string targetPortal = 1;
 
   // Target iSCSI Qualified Name.
   optional string iqn = 2;
 
-  // iSCSI target lun number.
+  // iSCSI Target Lun number.
   optional int32 lun = 3;
 
-  // Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.
+  // iSCSI Interface Name that uses an iSCSI transport.
+  // Defaults to 'default' (tcp).
   // +optional
   optional string iscsiInterface = 4;
 
@@ -1358,7 +1359,7 @@ message ISCSIVolumeSource {
   // +optional
   optional bool readOnly = 6;
 
-  // iSCSI target portal List. The portal is either an IP or ip_addr:port if the port
+  // iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
   repeated string portals = 7;
@@ -1371,11 +1372,67 @@ message ISCSIVolumeSource {
   // +optional
   optional bool chapAuthSession = 11;
 
-  // CHAP secret for iSCSI target and initiator authentication
+  // CHAP Secret for iSCSI target and initiator authentication
+  // +optional
+  optional SecretReference secretRef = 10;
+
+  // Custom iSCSI Initiator Name.
+  // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+  // <target portal>:<volume name> will be created for the connection.
+  // +optional
+  optional string initiatorName = 12;
+}
+
+// Represents an ISCSI disk.
+// ISCSI volumes can only be mounted as read/write once.
+// ISCSI volumes support ownership management and SELinux relabeling.
+message ISCSIVolumeSource {
+  // iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  optional string targetPortal = 1;
+
+  // Target iSCSI Qualified Name.
+  optional string iqn = 2;
+
+  // iSCSI Target Lun number.
+  optional int32 lun = 3;
+
+  // iSCSI Interface Name that uses an iSCSI transport.
+  // Defaults to 'default' (tcp).
+  // +optional
+  optional string iscsiInterface = 4;
+
+  // Filesystem type of the volume that you want to mount.
+  // Tip: Ensure that the filesystem type is supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#iscsi
+  // TODO: how do we prevent errors in the filesystem from compromising the machine
+  // +optional
+  optional string fsType = 5;
+
+  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // Defaults to false.
+  // +optional
+  optional bool readOnly = 6;
+
+  // iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
+  // is other than default (typically TCP ports 860 and 3260).
+  // +optional
+  repeated string portals = 7;
+
+  // whether support iSCSI Discovery CHAP authentication
+  // +optional
+  optional bool chapAuthDiscovery = 8;
+
+  // whether support iSCSI Session CHAP authentication
+  // +optional
+  optional bool chapAuthSession = 11;
+
+  // CHAP Secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
 
-  // Custom iSCSI initiator name.
+  // Custom iSCSI Initiator Name.
   // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
   // <target portal>:<volume name> will be created for the connection.
   // +optional
@@ -2326,7 +2383,7 @@ message PersistentVolumeSource {
   // ISCSI represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod. Provisioned by an admin.
   // +optional
-  optional ISCSIVolumeSource iscsi = 7;
+  optional ISCSIPersistentVolumeSource iscsi = 7;
 
   // Cinder represents a cinder volume attached and mounted on kubelets host machine
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
