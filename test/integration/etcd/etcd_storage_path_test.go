@@ -201,8 +201,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("batch", "v1beta1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cjv1beta1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv1beta1",
-		// TODO this needs to be updated to batch/v1beta1 when it's enabed by default
-		expectedGVK: gvkP("batch", "v2alpha1", "CronJob"),
 	},
 	// --
 
@@ -210,6 +208,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("batch", "v2alpha1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cjv2alpha1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv2alpha1",
+		expectedGVK:      gvkP("batch", "v1beta1", "CronJob"),
 	},
 	// --
 
