@@ -182,9 +182,8 @@ func Run(s *options.CMServer) error {
 		if err != nil {
 			glog.Fatalf("error building controller context: %v", err)
 		}
-		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-		if err := StartControllers(ctx, saTokenControllerInitFunc, NewControllerInitializers()); err != nil {
+		if err := StartControllers(ctx, rootClientBuilder, NewControllerInitializers()); err != nil {
 			glog.Fatalf("error starting controllers: %v", err)
 		}
 
@@ -432,9 +431,10 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 	return ctx, nil
 }
 
-func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc) error {
+func StartControllers(ctx ControllerContext, rootClientBuilder controller.ControllerClientBuilder, controllers map[string]InitFunc) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
+	startSATokenController := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 	if _, err := startSATokenController(ctx); err != nil {
 		return err
 	}
