@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+type PodFilter func(*v1.Pod) bool
+
 // Cache collects pods' information and provides node-level aggregated information.
 // It's intended for generic scheduler to do efficient lookup.
 // Cache's operations are pod centric. It does incremental updates based on pod events.
@@ -93,4 +95,7 @@ type Cache interface {
 
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*v1.Pod, error)
+
+	// FilteredList returns all cached pods that pass the filter.
+	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }

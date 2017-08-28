@@ -142,7 +142,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 				)
 
 				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicatePrecomputation(policy.Name, precomputationFunction)
+				predicates.RegisterPredicateMetadataProducer(policy.Name, precomputationFunction)
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
