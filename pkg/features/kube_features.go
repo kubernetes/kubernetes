@@ -164,4 +164,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:            {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.Initializers:     {Default: false, PreRelease: utilfeature.Alpha},
 }
