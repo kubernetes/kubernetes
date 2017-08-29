@@ -54660,10 +54660,6 @@
      "name"
     ],
     "properties": {
-     "failurePolicy": {
-      "description": "FailurePolicy defines what happens if the responsible initializer controller fails to takes action. Allowed values are Ignore, or Fail. If \"Ignore\" is set, initializer is removed from the initializers list of an object if the timeout is reached; If \"Fail\" is set, admissionregistration returns timeout error if the timeout is reached.",
-      "type": "string"
-     },
      "name": {
       "description": "Name is the identifier of the initializer. It will be added to the object that needs to be initialized. Name should be fully qualified, e.g., alwayspullimages.kubernetes.io, where \"alwayspullimages\" is the name of the webhook, and kubernetes.io is the name of the organization. Required",
       "type": "string"
