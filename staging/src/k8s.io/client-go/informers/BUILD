@@ -12,6 +12,7 @@ go_library(
         "generic.go",
     ],
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
