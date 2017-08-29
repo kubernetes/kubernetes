@@ -259,6 +259,14 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		return nil, nil, nil, nil, nil, utilerrors.NewAggregate(errs)
 	}
 
+	if s.CloudProvider != nil {
+		// Initialize the cloudprovider once, to give it a chance to register KMS plugins, if any.
+		_, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
+	}
+
 	genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, err := BuildGenericConfig(s)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -539,7 +547,8 @@ func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.Shar
 	return authorizationConfig.New()
 }
 
-// BuildStorageFactory constructs the storage factory
+// BuildStorageFactory constructs the storage factory. If encryption at rest is used, it expects
+// all supported KMS plugins to be registered in the KMS plugin registry before being called.
 func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultStorageFactory, error) {
 	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
@@ -581,7 +590,7 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	if s.Etcd.EncryptionProviderConfigFilepath != "" {
+	if len(s.Etcd.EncryptionProviderConfigFilepath) != 0 {
 		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath)
 		if err != nil {
 			return nil, err
