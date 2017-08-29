@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
+							Image: busyboxImage,
 							Name:  "container-emptydir-hog-pod",
 							Command: []string{
 								"sh",
@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
+							Image: busyboxImage,
 							Name:  "container-emptydir-memory-pod",
 							Command: []string{
 								"sh",
@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
+							Image: busyboxImage,
 							Name:  "container-emptydir-hog-pod",
 							Command: []string{
 								"sh",
@@ -164,7 +164,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
+							Image: busyboxImage,
 							Name:  "container-hog-pod",
 							Command: []string{
 								"sh",

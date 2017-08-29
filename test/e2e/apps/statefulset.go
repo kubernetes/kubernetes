@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -777,7 +778,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},

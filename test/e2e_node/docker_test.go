@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -54,12 +55,12 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker]", func() {
 					Containers: []v1.Container{
 						{
 							Name:    "test-container-1",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   imageutils.GetBusyBoxImage(),
 							Command: []string{"/bin/top"},
 						},
 						{
 							Name:    "test-container-2",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   imageutils.GetBusyBoxImage(),
 							Command: []string{"/bin/sleep"},
 							Args:    []string{"10000"},
 						},

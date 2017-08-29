@@ -90,7 +90,7 @@ func makePodToVerifyCgroups(cgroupNames []cm.CgroupName) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -128,7 +128,7 @@ func makePodToVerifyCgroupRemoved(cgroupName cm.CgroupName) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyOnFailure,
 			Containers: []v1.Container{
 				{
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", "for i in `seq 1 10`; do if [ ! -d /tmp/memory/" + cgroupFsName + " ] && [ ! -d /tmp/cpu/" + cgroupFsName + " ]; then exit 0; else sleep 10; fi; done; exit 1"},
 					VolumeMounts: []v1.VolumeMount{

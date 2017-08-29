@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
@@ -81,7 +81,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{
 							{
@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c"},
 						Args:    []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""},
 						Env: []v1.EnvVar{

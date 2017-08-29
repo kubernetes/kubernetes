@@ -279,7 +279,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 				Containers: []v1.Container{
 					{
 						Name:    "busybox-container",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{

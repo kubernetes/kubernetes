@@ -60,19 +60,19 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 				},
 				Containers: []v1.Container{
 					{
 						Name:    "run1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -135,12 +135,12 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -216,12 +216,12 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/false"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 				},
@@ -349,19 +349,19 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				InitContainers: []v1.Container{
 					{
 						Name:    "init1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 					},
 					{
 						Name:    "init2",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/false"},
 					},
 				},
 				Containers: []v1.Container{
 					{
 						Name:    "run1",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"/bin/true"},
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
