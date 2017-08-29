@@ -72,7 +72,7 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
@@ -253,10 +253,12 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
 		return
 	}
+
 	times, err := getRecentUnmetScheduleTimes(*sj, now)
 	if err != nil {
 		recorder.Eventf(sj, v1.EventTypeWarning, "FailedNeedsStart", "Cannot determine if job needs to be started: %v", err)
 		glog.Errorf("Cannot determine if %s needs to be started: %v", nameForLog, err)
+		return
 	}
 	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
 	if len(times) == 0 {
@@ -266,6 +268,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	if len(times) > 1 {
 		glog.V(4).Infof("Multiple unmet start times for %s so only starting last one", nameForLog)
 	}
+
 	scheduledTime := times[len(times)-1]
 	tooLate := false
 	if sj.Spec.StartingDeadlineSeconds != nil {
@@ -376,6 +379,7 @@ func deleteJob(sj *batchv1beta1.CronJob, job *batchv1.Job, jc jobControlInterfac
 	podList, err := pc.ListPods(job.Namespace, options)
 	if err != nil {
 		recorder.Eventf(sj, v1.EventTypeWarning, "FailedList", "List job-pods: %v", err)
+		return false
 	}
 	errList := []error{}
 	for _, pod := range podList.Items {
