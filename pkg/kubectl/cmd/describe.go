@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	describeLong = templates.LongDesc(`
+	describeLong = `
 		Show details of a specific resource or group of resources.
 		This command joins many API calls together to form a detailed description of a
 		given resource or group of resources.
@@ -47,7 +47,7 @@ var (
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.
 
-		%[1]s`)
+		%[1]s`
 
 	describeExample = templates.Examples(i18n.T(`
 		# Describe a node
@@ -82,7 +82,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   i18n.T("Show details of a specific resource or group of resources"),
-		Long:    fmt.Sprintf(describeLong, f.ValidResourcesFromDiscoveryClient()),
+		Long:    templates.LongDesc(fmt.Sprintf(describeLong, f.ValidResourcesFromDiscoveryClient())),
 		Example: describeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmdErr, cmd, args, options, describerSettings)

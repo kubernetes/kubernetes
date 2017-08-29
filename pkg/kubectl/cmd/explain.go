@@ -31,10 +31,10 @@ import (
 )
 
 var (
-	explainLong = templates.LongDesc(`
+	explainLong = `
 		Documentation of resources.
 
-		%[1]s`)
+		%[1]s`
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
@@ -49,7 +49,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   i18n.T("Documentation of resources"),
-		Long:    fmt.Sprintf(explainLong, f.ValidResourcesFromDiscoveryClient()),
+		Long:    templates.LongDesc(fmt.Sprintf(explainLong, f.ValidResourcesFromDiscoveryClient())),
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExplain(f, out, cmdErr, cmd, args)

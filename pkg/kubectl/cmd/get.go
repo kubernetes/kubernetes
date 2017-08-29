@@ -51,7 +51,7 @@ type GetOptions struct {
 }
 
 var (
-	getLong = templates.LongDesc(`
+	getLong = `
 		Display one or many resources.
 
 		%[1]s` +
@@ -61,7 +61,7 @@ var (
 		resource by providing the '--show-all' flag.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resources.`)
+		of the --template flag, you can filter the attributes of the fetched resources.`
 
 	getExample = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
@@ -115,7 +115,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   i18n.T("Display one or many resources"),
-		Long:    fmt.Sprintf(getLong, f.ValidResourcesFromDiscoveryClient()),
+		Long:    templates.LongDesc(fmt.Sprintf(getLong, f.ValidResourcesFromDiscoveryClient())),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, errOut, cmd, args, options)
