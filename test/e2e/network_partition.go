@@ -420,7 +420,7 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 			completions := int32(4)
 
 			job := framework.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
-				parallelism, completions)
+				parallelism, completions, nil)
 			job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
 			label := labels.SelectorFromSet(labels.Set(map[string]string{framework.JobSelectorKey: job.Name}))
