@@ -267,7 +267,8 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 }
 
 // startMonitors ensures the current set of monitors are running. Any newly
-// started monitors will also cause shared informers to be started.
+// started monitors will also cause associated shared informers to be started if they have not been
+// started yet..
 //
 // If called before Run, startMonitors does nothing (as there is no stop channel
 // to support monitor/informer execution).
@@ -284,7 +285,6 @@ func (gb *GraphBuilder) startMonitors() {
 	for _, monitor := range monitors {
 		if monitor.stopCh == nil {
 			monitor.stopCh = make(chan struct{})
-			gb.sharedInformers.Start(gb.stopCh)
 			go monitor.Run()
 			started++
 		}
