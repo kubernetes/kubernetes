@@ -31,12 +31,10 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
-const globalTimeout = time.Minute
-
 var errConnKilled = fmt.Errorf("kill connection/stream")
 
-// WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by globalTimeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck) http.Handler {
+// WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck, timeout time.Duration) http.Handler {
 	if longRunning == nil {
 		return handler
 	}
@@ -45,13 +43,13 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no context mapper
-			return time.After(globalTimeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no context found for request during timeout"))
+			return time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no context found for request during timeout"))
 		}
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			return time.After(globalTimeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
+			return time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
 
 		if longRunning(req, requestInfo) {
@@ -69,7 +67,7 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 				metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, "", scope, http.StatusGatewayTimeout, 0, now)
 			}
 		}
-		return time.After(globalTimeout), metricFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", globalTimeout), 0)
+		return time.After(timeout), metricFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
