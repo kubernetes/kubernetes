@@ -151,17 +151,8 @@ func getResourceHandler(e rest.Exporter, scope RequestScope, getter getterFunc) 
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(e, scope,
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
-			// check for export
 			options := metav1.GetOptions{}
-			exportOptions := metav1.ExportOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
-				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exportOptions); err != nil {
-					err = errors.NewBadRequest(err.Error())
-					return nil, err
-				}
-				if exportOptions.Export && e == nil {
-					return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
-				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					err = errors.NewBadRequest(err.Error())
 					return nil, err
@@ -175,9 +166,6 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 				return nil, err
 			}
 
-			if exportOptions.Export {
-				return e.Export(ctx, result, exportOptions)
-			}
 			return result, err
 		})
 }
@@ -414,22 +402,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			if err := meta.SetList(result, []runtime.Object{}); err != nil {
 				scope.err(err, w, req)
 				return
-			}
-		}
-
-		// Apply export logic to every item in list if requested:
-		if exportOptions.Export && meta.IsListType(result) {
-			items, err := meta.ExtractList(result)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			for i := range items {
-				items[i], err = e.Export(ctx, items[i], exportOptions)
-				if err != nil {
-					scope.err(err, w, req)
-					return
-				}
 			}
 		}
 

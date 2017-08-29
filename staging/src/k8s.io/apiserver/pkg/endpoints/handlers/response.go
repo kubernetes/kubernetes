@@ -43,18 +43,23 @@ func transformResponseObject(ctx request.Context, e rest.Exporter, scope Request
 		return
 	}
 
-	// TODO: check if request has export query param as well for backward compatability
-	// TODO: how do we handle ExportOptions.Exact?
-	if mediaType.Export {
+	// Check for legacy "export=true" query parameter:
+	exportOptions := metav1.ExportOptions{}
+	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &exportOptions); err != nil {
+		err = errors.NewBadRequest(err.Error())
+		scope.err(err, w, req)
+		return
+	}
+
+	// Media type is the preferred path to trigger export but we need to maintain backward
+	// compatability with the export query parameter.
+	if mediaType.Export || exportOptions.Export {
+		exportOptions.Export = true
 		if e == nil {
 			err = errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
 			scope.err(err, w, req)
 			return
 		}
-
-		// NOTE: assuming exact = false here, may want to add support for this in future?
-		// Better idea might be to expand beyond just export=1 and support configurable strategies.
-		exportOptions := metav1.ExportOptions{Export: true}
 
 		// Apply export logic to every item of a list:
 		if meta.IsListType(result) {
