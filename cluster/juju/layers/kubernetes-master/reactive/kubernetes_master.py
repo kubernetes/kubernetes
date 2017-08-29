@@ -301,6 +301,7 @@ def get_keys_from_leader(keys, overwrite_local=False):
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
+                fp.write('\n')
 
     return True
 
