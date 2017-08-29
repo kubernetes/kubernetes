@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// BaseDeploymentGenerator: implement the common functionality of
+// BaseDeploymentGenerator implements the common functionality of
 // DeploymentBasicGeneratorV1 and DeploymentBasicAppsGeneratorV1. To reduce
 // confusion, it's best to keep this struct in the same file as those
 // generators.

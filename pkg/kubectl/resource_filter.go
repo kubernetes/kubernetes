@@ -32,6 +32,7 @@ type FilterFunc func(runtime.Object, printers.PrintOptions) bool
 // Filters is a collection of filter funcs
 type Filters []FilterFunc
 
+// NewResourceFilter returns single element filter list containing filterPods().
 func NewResourceFilter() Filters {
 	return []FilterFunc{
 		filterPods,
@@ -69,7 +70,7 @@ func (f Filters) Filter(obj runtime.Object, opts *printers.PrintOptions) (bool, 
 	return false, nil
 }
 
-// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand.
+// DecodeUnknownObject attempts to convert object, if is unstructured, to a type we can understand.
 func DecodeUnknownObject(obj runtime.Object) (runtime.Object, error) {
 	var err error
 
