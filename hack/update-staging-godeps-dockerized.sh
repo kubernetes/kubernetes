@@ -50,11 +50,16 @@ while getopts ":df" opt; do
   esac
 done
 
+# Confirm this is running inside a docker container, as this will modify the git tree (unsafe to run outside of container)
 kube::util::ensure_dockerized
 kube::golang::setup_env
+# Ensure we have a simple gopath so that we can modify it, and that no staging repos have made their way in
 kube::util::ensure_single_dir_gopath
 kube::util::ensure_no_staging_repos_in_gopath
+# Confirm we have the right godep version installed
 kube::util::ensure_godep_version v79
+# Create a fake git repo the root of the repo to prevent godeps from complaining
+kube::util::create-fake-git-tree "${KUBE_ROOT}"
 
 kube::log::status "Checking whether godeps are restored"
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
@@ -87,27 +92,13 @@ function diffGodepManifest() {
   fi
 }
 
-# Create a fake git repo for staging to prevent godeps from complaining
-pushd "${KUBE_ROOT}" >/dev/null
-  git init >/dev/null
-  git config --local user.email "nobody@k8s.io"
-  git config --local user.name "$0"
-  git add . >/dev/null
-  git commit -q -m "Snapshot" >/dev/null
-popd >/dev/null
-
 # move into staging and save the dependencies for everything in order
 mkdir -p "${TMP_GOPATH}/src/k8s.io"
 for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
   cp -a "${KUBE_ROOT}/staging/src/k8s.io/${repo}" "${TMP_GOPATH}/src/k8s.io/"
 
-  pushd "${TMP_GOPATH}/src/k8s.io/${repo}" >/dev/null
-    git init >/dev/null
-    git config --local user.email "nobody@k8s.io"
-    git config --local user.name "$0"
-    git add . >/dev/null
-    git commit -q -m "Snapshot" >/dev/null
-  popd >/dev/null
+  # Create a fake git tree for the staging repo to prevent godeps from complaining
+  kube::util::create-fake-git-tree "${TMP_GOPATH}/src/k8s.io/${repo}"
 
   updateGodepManifest
   diffGodepManifest
