@@ -98,7 +98,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := framework.WaitForClusterSize(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
@@ -124,7 +124,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForGroupSize(group, replicas-1)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
+			err = framework.WaitForReadyNodes(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
@@ -152,7 +152,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForGroupSize(group, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForClusterSize(c, int(replicas+1), 10*time.Minute)
+			err = framework.WaitForReadyNodes(c, int(replicas+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))

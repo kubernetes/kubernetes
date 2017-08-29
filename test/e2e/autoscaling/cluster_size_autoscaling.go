@@ -97,7 +97,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			sum += size
 		}
 		// Give instances time to spin up
-		framework.ExpectNoError(framework.WaitForClusterSize(c, sum, scaleUpTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
@@ -127,7 +127,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		for _, size := range originalSizes {
 			expectedNodes += size
 		}
-		framework.ExpectNoError(framework.WaitForClusterSize(c, expectedNodes, scaleDownTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, expectedNodes, scaleDownTimeout))
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 
@@ -226,7 +226,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		const extraPoolName = "extra-pool"
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
 		By("Get memory available on new node, so we can account for it when creating RC")
@@ -253,7 +253,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		const extraPoolName = "extra-pool"
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		framework.ExpectNoError(disableAutoscaler(extraPoolName, 1, 2))
 	})
@@ -283,7 +283,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "extra-pod")
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	It("should increase cluster size if pod requesting EmptyDir volume is pending [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -304,7 +304,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "extra-pod")
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	It("should increase cluster size if pod requesting volume is pending [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -377,7 +377,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}()
 
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+newPods, scaleUpTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+newPods, scaleUpTimeout))
 	})
 
 	It("should add node to the particular mig [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -478,7 +478,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		const extraPoolName = "extra-pool"
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
@@ -489,7 +489,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// reseting all the timers in scale down code. Adding 5 extra minutes to workaround
 		// this issue.
 		// TODO: Remove the extra time when GKE restart is fixed.
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount+2, scaleUpTimeout+5*time.Minute))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+2, scaleUpTimeout+5*time.Minute))
 	})
 
 	simpleScaleDownTest := func(unready int) {
@@ -588,7 +588,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 		err := framework.ResizeGroup(minMig, int32(0))
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount-minSize, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
 
 		By("Make remaining nodes unschedulable")
 		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -628,7 +628,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 		err := framework.ResizeGroup(minMig, int32(1))
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForClusterSize(c, nodeCount-minSize+1, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 
 		By("Make the single node unschedulable")
 		allNodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -699,7 +699,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 		testFunction()
 		// Give nodes time to recover from network failure
-		framework.ExpectNoError(framework.WaitForClusterSize(c, len(nodes.Items), nodesRecoverTimeout))
+		framework.ExpectNoError(framework.WaitForReadyNodes(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
 })
@@ -937,7 +937,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 	return nil
 }
 
-// WaitForClusterSize waits until the cluster size matches the given function.
+// WaitForClusterSizeFunc waits until the cluster size matches the given function.
 func WaitForClusterSizeFunc(c clientset.Interface, sizeFunc func(int) bool, timeout time.Duration) error {
 	return WaitForClusterSizeFuncWithUnready(c, sizeFunc, timeout, 0)
 }
