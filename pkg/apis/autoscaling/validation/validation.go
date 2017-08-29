@@ -44,10 +44,10 @@ var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationContr
 func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("minReplicas"), *autoscaler.MinReplicas, "must be greater than or equal to 1"))
 	}
 	if autoscaler.MaxReplicas < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to 1"))
 	}
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to `minReplicas`"))
@@ -209,7 +209,7 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 	}
 
 	if src.TargetAverageUtilization != nil && *src.TargetAverageUtilization < 1 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageUtilization"), src.TargetAverageUtilization, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageUtilization"), src.TargetAverageUtilization, "must be greater than or equal to 1"))
 	}
 
 	if src.TargetAverageUtilization != nil && src.TargetAverageValue != nil {

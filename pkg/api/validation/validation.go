@@ -4249,14 +4249,14 @@ func ValidatePodLogOptions(opts *api.PodLogOptions) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, isNegativeErrorMsg))
 	}
 	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than or equal to 1"))
 	}
 	switch {
 	case opts.SinceSeconds != nil && opts.SinceTime != nil:
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `sinceTime` or `sinceSeconds` may be specified"))
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than or equal to 1"))
 		}
 	}
 	return allErrs
