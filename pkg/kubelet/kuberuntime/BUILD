@@ -30,6 +30,7 @@ go_library(
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/cpumanager:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

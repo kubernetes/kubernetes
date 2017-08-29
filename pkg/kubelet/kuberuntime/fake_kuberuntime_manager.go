@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -69,6 +70,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		runtimeService:      runtimeService,
 		imageService:        imageService,
 		keyring:             keyring,
+		cpuManager:          cpumanager.NewFakeManager(),
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

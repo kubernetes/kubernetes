@@ -105,7 +105,6 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	if containerStatus != nil {
 		restartCount = containerStatus.RestartCount + 1
 	}
-
 	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP, imageRef)
 	if err != nil {
 		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
@@ -116,8 +115,12 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainer
 	}
+	err = m.cpuManager.RegisterContainer(pod, container, containerID)
+	if err != nil {
+		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Failed to register container with CPU manager: %v", err)
+		return "Registering With CPU Manager Failed", err
+	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
-
 	if ref != nil {
 		m.containerRefManager.SetRef(kubecontainer.ContainerID{
 			Type: m.runtimeName,
@@ -810,6 +813,7 @@ func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 	if err := m.removeContainerLog(containerID); err != nil {
 		return err
 	}
+	m.cpuManager.UnregisterContainer(containerID)
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(containerID)
 }

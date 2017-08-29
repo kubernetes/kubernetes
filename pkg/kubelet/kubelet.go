@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
@@ -539,6 +540,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager)
 
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+
+	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
+	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+
 	if kubeCfg.RemoteRuntimeEndpoint != "" {
 		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
 		if kubeCfg.RemoteImageEndpoint == "" {
@@ -619,6 +625,22 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		if err != nil {
 			return nil, err
 		}
+
+		cpuManager, err := cpumanager.NewManager(
+			kubeCfg.CPUManagerPolicy,
+			runtimeService,
+			klet,
+			klet.statusManager,
+			klet.containerManager,
+			klet.GetActivePods,
+			killPodNow(klet.podWorkers, kubeDeps.Recorder),
+			kubeDeps.Recorder)
+		if err != nil {
+			glog.Errorf("failed to initialize cpu manager: %v", err)
+			return nil, err
+		}
+		klet.cpuManager = cpuManager
+
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
@@ -636,6 +658,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeCfg.CPUCFSQuota,
 			runtimeService,
 			imageService,
+			klet.cpuManager,
 		)
 		if err != nil {
 			return nil, err
@@ -698,8 +721,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	klet.imageManager = imageManager
-
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
 		var ips []net.IP
@@ -768,8 +789,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
-	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
@@ -1104,6 +1123,9 @@ type Kubelet struct {
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
+
+	// CPU Manager
+	cpuManager cpumanager.Manager
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
@@ -1237,6 +1259,9 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Start resource analyzer
 	kl.resourceAnalyzer.Start()
+
+	// Start the CPU manager
+	kl.cpuManager.Start()
 
 	return nil
 }
