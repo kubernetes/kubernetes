@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -63,8 +64,20 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter,
-	timeout time.Duration, exportOptions metav1.ExportOptions) {
+func serveWatch(watcher watch.Interface, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+
+	// TODO: this probably shouldn't be here, but watch doesn't seem to go through transformResponseObject.
+	exportOptions := metav1.ExportOptions{}
+	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &exportOptions); err != nil {
+		err = errors.NewBadRequest(err.Error())
+		scope.err(err, w, req)
+		return
+	}
+	if exportOptions.Export && e == nil {
+		err := errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+		scope.err(err, w, req)
+		return
+	}
 
 	// negotiate for the stream serializer
 	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
