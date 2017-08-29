@@ -59,7 +59,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+			return nil, fmt.Errorf("'name' is a required parameter")
 		}
 	}
 	minString, found := params["min"]
@@ -72,7 +72,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	maxString, found := params["max"]
 	if !found {
-		return nil, fmt.Errorf("'max' is a required parameter.")
+		return nil, fmt.Errorf("'max' is a required parameter")
 	}
 	max, err := strconv.Atoi(maxString)
 	if err != nil {
@@ -80,7 +80,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 
 	if min > max {
-		return nil, fmt.Errorf("'max' must be greater than or equal to 'min'.")
+		return nil, fmt.Errorf("'max' must be greater than or equal to 'min'")
 	}
 
 	cpuString, found := params["cpu-percent"]
