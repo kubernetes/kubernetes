@@ -29,17 +29,54 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx request.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
+func transformResponseObject(ctx request.Context, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
 	// TODO: fetch the media type much earlier in request processing and pass it into this method.
 	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
 	if err != nil {
 		status := responsewriters.ErrorToAPIStatus(err)
 		responsewriters.WriteRawJSON(int(status.Code), status, w)
 		return
+	}
+
+	// TODO: check if request has export query param as well for backward compatability
+	// TODO: how do we handle ExportOptions.Exact?
+	if mediaType.Export {
+		if e == nil {
+			err = errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+			scope.err(err, w, req)
+			return
+		}
+
+		// NOTE: assuming exact = false here, may want to add support for this in future?
+		// Better idea might be to expand beyond just export=1 and support configurable strategies.
+		exportOptions := metav1.ExportOptions{Export: true}
+
+		// Apply export logic to every item of a list:
+		if meta.IsListType(result) {
+			items, err := meta.ExtractList(result)
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+			for i := range items {
+				items[i], err = e.Export(ctx, items[i], exportOptions)
+				if err != nil {
+					scope.err(err, w, req)
+					return
+				}
+			}
+		} else {
+			result, err = e.Export(ctx, result, exportOptions)
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
 	}
 
 	// If conversion was allowed by the scope, perform it before writing the response

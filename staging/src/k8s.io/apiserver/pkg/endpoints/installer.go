@@ -599,7 +599,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, hasSubresource)
+				handler = restfulGetResourceWithOptions(getterWithOptions, exporter, reqScope, hasSubresource)
 			} else {
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
@@ -1117,9 +1117,9 @@ func restfulGetResource(r rest.Getter, e rest.Exporter, scope handlers.RequestSc
 	}
 }
 
-func restfulGetResourceWithOptions(r rest.GetterWithOptions, scope handlers.RequestScope, isSubresource bool) restful.RouteFunction {
+func restfulGetResourceWithOptions(r rest.GetterWithOptions, e rest.Exporter, scope handlers.RequestScope, isSubresource bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.GetResourceWithOptions(r, scope, isSubresource)(res.ResponseWriter, req.Request)
+		handlers.GetResourceWithOptions(r, e, scope, isSubresource)(res.ResponseWriter, req.Request)
 	}
 }
 

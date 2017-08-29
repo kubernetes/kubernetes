@@ -1534,21 +1534,21 @@ func TestExport(t *testing.T) {
 		{
 			name:   "get export via query parameter",
 			accept: runtime.ContentTypeJSON,
-			params: url.Values{"export": {"true"}},
+			params: url.Values{"export": {"1"}},
 		},
 		{
-			name:   "get export via accept export=true header",
-			accept: runtime.ContentTypeJSON + ";export=true",
+			name:   "get export via accept export=1 header",
+			accept: runtime.ContentTypeJSON + ";export=1",
 		},
 		{
 			name:   "list export via query parameter",
 			accept: runtime.ContentTypeJSON,
-			params: url.Values{"export": {"true"}},
+			params: url.Values{"export": {"1"}},
 			list:   true,
 		},
 		{
-			name:   "list export via accept export=true header",
-			accept: runtime.ContentTypeJSON + ";export=true",
+			name:   "list export via accept export=1 header",
+			accept: runtime.ContentTypeJSON + ";export=1",
 			list:   true,
 		},
 	}

@@ -114,7 +114,7 @@ const MaxRetryWhenPatchConflicts = 5
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
-func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
+func getResourceHandler(e rest.Exporter, scope RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		trace := utiltrace.New("Get " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -143,13 +143,13 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		}
 
 		trace.Step("About to write a response")
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 	}
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
-	return getResourceHandler(scope,
+	return getResourceHandler(e, scope,
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
@@ -183,8 +183,8 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
-	return getResourceHandler(scope,
+func GetResourceWithOptions(r rest.GetterWithOptions, e rest.Exporter, scope RequestScope, isSubresource bool) http.HandlerFunc {
+	return getResourceHandler(e, scope,
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
@@ -335,12 +335,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			scope.err(err, w, req)
 			return
 		}
-		if scope.Kind.Kind == "ConfigMap" {
-			glog.V(2).Infoln("#### ListResource on ConfigMap")
-			glog.V(2).Infof("#### Query: %v", req.URL.Query())
-			glog.V(2).Infof("#### Export Options: %v", exportOptions)
-			glog.V(2).Infof("#### Options: %v", opts)
-		}
 
 		// transform fields
 		// TODO: DecodeParametersInto should do this.
@@ -387,7 +381,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
 			glog.V(2).Infof("#### Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
-			glog.V(2).Infof("#### Export Options: %v", exportOptions)
 
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
@@ -440,7 +433,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -550,7 +543,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			status.Code = int32(code)
 		}
 
-		transformResponseObject(ctx, scope, req, w, code, result)
+		transformResponseObject(ctx, nil, scope, req, w, code, result)
 	}
 }
 
@@ -650,7 +643,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -980,7 +973,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			status = http.StatusCreated
 		}
 
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1103,7 +1096,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1210,7 +1203,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 

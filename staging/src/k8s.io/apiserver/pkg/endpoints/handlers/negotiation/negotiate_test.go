@@ -106,6 +106,12 @@ func TestNegotiate(t *testing.T) {
 			serializer:  fakeCodec,
 		},
 		{
+			accept:      "application/json; export=true",
+			contentType: "application/json",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer:  fakeCodec,
+		},
+		{
 			accept:      "application/json",
 			contentType: "application/json",
 			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json", "application/protobuf"}},
