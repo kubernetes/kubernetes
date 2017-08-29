@@ -17,6 +17,7 @@ limitations under the License.
 package clouddns
 
 import (
+	"google.golang.org/api/googleapi"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
@@ -30,12 +31,16 @@ type Zones struct {
 }
 
 func (zones Zones) List() ([]dnsprovider.Zone, error) {
+	var zoneList []dnsprovider.Zone
 	response, err := zones.impl.List(zones.project()).Do()
 	if err != nil {
+		if apiErr, ok := err.(*googleapi.Error); ok && apiErr.Code == 404 {
+			return zoneList, nil
+		}
 		return nil, err
 	}
 	managedZones := response.ManagedZones()
-	zoneList := make([]dnsprovider.Zone, len(managedZones))
+	zoneList = make([]dnsprovider.Zone, len(managedZones))
 	for i, zone := range managedZones {
 		zoneList[i] = &Zone{zone, &zones}
 	}

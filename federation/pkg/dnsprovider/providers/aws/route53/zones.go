@@ -17,6 +17,7 @@ limitations under the License.
 package route53
 
 import (
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/route53"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,6 +42,12 @@ func (zones Zones) List() ([]dnsprovider.Zone, error) {
 		return true
 	})
 	if err != nil {
+		if apiErr, ok := err.(awserr.Error); ok &&
+			apiErr.Code() == "DelegationSetNotReusable" ||
+			apiErr.Code() == "NoSuchDelegationSet" ||
+			apiErr.Code() == "InvalidInput" {
+			return []dnsprovider.Zone{}, nil
+		}
 		return []dnsprovider.Zone{}, err
 	}
 	return zoneList, nil
