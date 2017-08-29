@@ -68,6 +68,7 @@ func NewAPIServiceRegistrationController(apiServiceInformer informers.APIService
 		servicesSynced:    serviceInformer.Informer().HasSynced,
 		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "APIServiceRegistrationController"),
 	}
+	c.syncFn = c.sync
 
 	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addAPIService,
@@ -80,8 +81,6 @@ func NewAPIServiceRegistrationController(apiServiceInformer informers.APIService
 		UpdateFunc: c.updateService,
 		DeleteFunc: c.deleteService,
 	})
-
-	c.syncFn = c.sync
 
 	return c
 }

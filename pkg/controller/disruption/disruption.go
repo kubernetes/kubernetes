@@ -119,10 +119,22 @@ func NewDisruptionController(
 	kubeClient clientset.Interface,
 ) *DisruptionController {
 	dc := &DisruptionController{
-		kubeClient:   kubeClient,
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
-		recheckQueue: workqueue.NewNamedDelayingQueue("disruption-recheck"),
-		broadcaster:  record.NewBroadcaster(),
+		kubeClient:      kubeClient,
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
+		recheckQueue:    workqueue.NewNamedDelayingQueue("disruption-recheck"),
+		broadcaster:     record.NewBroadcaster(),
+		podLister:       podInformer.Lister(),
+		podListerSynced: podInformer.Informer().HasSynced,
+		pdbLister:       pdbInformer.Lister(),
+		pdbListerSynced: pdbInformer.Informer().HasSynced,
+		rcLister:        rcInformer.Lister(),
+		rcListerSynced:  rcInformer.Informer().HasSynced,
+		rsLister:        rsInformer.Lister(),
+		rsListerSynced:  rsInformer.Informer().HasSynced,
+		dLister:         dInformer.Lister(),
+		dListerSynced:   dInformer.Informer().HasSynced,
+		ssLister:        ssInformer.Lister(),
+		ssListerSynced:  ssInformer.Informer().HasSynced,
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
@@ -133,8 +145,6 @@ func NewDisruptionController(
 		UpdateFunc: dc.updatePod,
 		DeleteFunc: dc.deletePod,
 	})
-	dc.podLister = podInformer.Lister()
-	dc.podListerSynced = podInformer.Informer().HasSynced
 
 	pdbInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -144,20 +154,6 @@ func NewDisruptionController(
 		},
 		30*time.Second,
 	)
-	dc.pdbLister = pdbInformer.Lister()
-	dc.pdbListerSynced = pdbInformer.Informer().HasSynced
-
-	dc.rcLister = rcInformer.Lister()
-	dc.rcListerSynced = rcInformer.Informer().HasSynced
-
-	dc.rsLister = rsInformer.Lister()
-	dc.rsListerSynced = rsInformer.Informer().HasSynced
-
-	dc.dLister = dInformer.Lister()
-	dc.dListerSynced = dInformer.Informer().HasSynced
-
-	dc.ssLister = ssInformer.Lister()
-	dc.ssListerSynced = ssInformer.Informer().HasSynced
 
 	return dc
 }

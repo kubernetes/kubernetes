@@ -79,6 +79,8 @@ func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.
 	ttlc := &TTLController{
 		kubeClient: kubeClient,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
+		nodeStore:  listers.NewNodeLister(nodeInformer.Informer().GetIndexer()),
+		hasSynced:  nodeInformer.Informer().HasSynced,
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -86,9 +88,6 @@ func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.
 		UpdateFunc: ttlc.updateNode,
 		DeleteFunc: ttlc.deleteNode,
 	})
-
-	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
-	ttlc.hasSynced = nodeInformer.Informer().HasSynced
 
 	return ttlc
 }

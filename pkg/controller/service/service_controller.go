@@ -113,16 +113,18 @@ func New(
 	}
 
 	s := &ServiceController{
-		cloud:            cloud,
-		knownHosts:       []*v1.Node{},
-		kubeClient:       kubeClient,
-		clusterName:      clusterName,
-		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster: broadcaster,
-		eventRecorder:    recorder,
-		nodeLister:       nodeInformer.Lister(),
-		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		workingQueue:     workqueue.NewNamedDelayingQueue("service"),
+		cloud:               cloud,
+		knownHosts:          []*v1.Node{},
+		kubeClient:          kubeClient,
+		clusterName:         clusterName,
+		cache:               &serviceCache{serviceMap: make(map[string]*cachedService)},
+		eventBroadcaster:    broadcaster,
+		eventRecorder:       recorder,
+		nodeLister:          nodeInformer.Lister(),
+		nodeListerSynced:    nodeInformer.Informer().HasSynced,
+		workingQueue:        workqueue.NewNamedDelayingQueue("service"),
+		serviceLister:       serviceInformer.Lister(),
+		serviceListerSynced: serviceInformer.Informer().HasSynced,
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -139,8 +141,6 @@ func New(
 		},
 		serviceSyncPeriod,
 	)
-	s.serviceLister = serviceInformer.Lister()
-	s.serviceListerSynced = serviceInformer.Informer().HasSynced
 
 	if err := s.init(); err != nil {
 		return nil, err

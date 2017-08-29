@@ -62,8 +62,10 @@ func NewCertificateController(
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
+		csrLister:  csrInformer.Lister(),
+		csrsSynced: csrInformer.Informer().HasSynced,
 		handler:    handler,
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
 	}
 
 	// Manage the addition/update of certificate requests
@@ -96,9 +98,7 @@ func NewCertificateController(
 			cc.enqueueCertificateRequest(obj)
 		},
 	})
-	cc.csrLister = csrInformer.Lister()
-	cc.csrsSynced = csrInformer.Informer().HasSynced
-	cc.handler = handler
+
 	return cc, nil
 }
 

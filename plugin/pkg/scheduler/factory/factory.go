@@ -149,9 +149,13 @@ func NewConfigFactory(
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		scheduledPodsHasSynced:         podInformer.Informer().HasSynced,
+		// scheduledPodLister is something we provide to plug-in functions that
+		// they may need to call.
+		scheduledPodLister: assignedPodLister{podInformer.Lister()},
+		nodeLister:         nodeInformer.Lister(),
 	}
 
-	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
@@ -202,9 +206,6 @@ func NewConfigFactory(
 			},
 		},
 	)
-	// ScheduledPodLister is something we provide to plug-in functions that
-	// they may need to call.
-	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
 	// Only nodes in the "Ready" condition with status == "True" are schedulable
 	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -215,7 +216,6 @@ func NewConfigFactory(
 		},
 		0,
 	)
-	c.nodeLister = nodeInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
@@ -227,7 +227,6 @@ func NewConfigFactory(
 		},
 		0,
 	)
-	c.pVLister = pvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
 	pvcInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -237,7 +236,6 @@ func NewConfigFactory(
 		},
 		0,
 	)
-	c.pVCLister = pvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
@@ -250,7 +248,6 @@ func NewConfigFactory(
 		},
 		0,
 	)
-	c.serviceLister = serviceInformer.Lister()
 
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted

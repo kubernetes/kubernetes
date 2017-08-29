@@ -76,6 +76,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		maxRetries = 10
 	}
 
+	secretCache := secrets.Informer().GetIndexer()
+
 	e := &TokensController{
 		client: cl,
 		token:  options.TokenGenerator,
@@ -85,13 +87,18 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
 
 		maxRetries: maxRetries,
+
+		serviceAccounts:      serviceAccounts.Lister(),
+		serviceAccountSynced: serviceAccounts.Informer().HasSynced,
+
+		updatedSecrets: cache.NewIntegerResourceVersionMutationCache(secretCache, secretCache, 60*time.Second, true),
+		secretSynced:   secrets.Informer().HasSynced,
 	}
+
 	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
 
-	e.serviceAccounts = serviceAccounts.Lister()
-	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
 	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
@@ -101,9 +108,6 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		options.ServiceAccountResync,
 	)
 
-	secretCache := secrets.Informer().GetIndexer()
-	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(secretCache, secretCache, 60*time.Second, true)
-	e.secretSynced = secrets.Informer().HasSynced
 	secrets.Informer().AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {

@@ -107,10 +107,15 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
-		burstReplicas: burstReplicas,
-		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicaset"),
+		burstReplicas:   burstReplicas,
+		expectations:    controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicaset"),
+		rsLister:        rsInformer.Lister(),
+		rsListerSynced:  rsInformer.Informer().HasSynced,
+		podLister:       podInformer.Lister(),
+		podListerSynced: podInformer.Informer().HasSynced,
 	}
+	rsc.syncHandler = rsc.syncReplicaSet
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    rsc.enqueueReplicaSet,
@@ -120,8 +125,6 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 		// way of achieving this is by performing a `stop` operation on the replica set.
 		DeleteFunc: rsc.enqueueReplicaSet,
 	})
-	rsc.rsLister = rsInformer.Lister()
-	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rsc.addPod,
@@ -131,10 +134,6 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 		UpdateFunc: rsc.updatePod,
 		DeleteFunc: rsc.deletePod,
 	})
-	rsc.podLister = podInformer.Lister()
-	rsc.podListerSynced = podInformer.Informer().HasSynced
-
-	rsc.syncHandler = rsc.syncReplicaSet
 
 	return rsc
 }

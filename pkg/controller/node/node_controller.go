@@ -259,6 +259,11 @@ func NewNodeController(
 		zoneStates:                  make(map[string]zoneState),
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
+		podInformerSynced:           podInformer.Informer().HasSynced,
+		nodeLister:                  nodeInformer.Lister(),
+		nodeInformerSynced:          nodeInformer.Informer().HasSynced,
+		daemonSetStore:              daemonSetInformer.Lister(),
+		daemonSetInformerSynced:     daemonSetInformer.Informer().HasSynced,
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("NodeController is using taint based evictions.")
@@ -303,7 +308,6 @@ func NewNodeController(
 			}
 		},
 	})
-	nc.podInformerSynced = podInformer.Informer().HasSynced
 
 	if nc.allocateNodeCIDRs {
 		var nodeList *v1.NodeList
@@ -370,6 +374,8 @@ func NewNodeController(
 	}
 
 	if nc.runTaintManager {
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
+
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: util.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
@@ -384,14 +390,7 @@ func NewNodeController(
 				return nil
 			}),
 		})
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
 	}
-
-	nc.nodeLister = nodeInformer.Lister()
-	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
-
-	nc.daemonSetStore = daemonSetInformer.Lister()
-	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
 
 	return nc, nil
 }

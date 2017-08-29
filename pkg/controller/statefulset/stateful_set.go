@@ -104,6 +104,10 @@ func NewStatefulSetController(
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		podLister:       podInformer.Lister(),
+		podListerSynced: podInformer.Informer().HasSynced,
+		setLister:       setInformer.Lister(),
+		setListerSynced: setInformer.Informer().HasSynced,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -114,8 +118,6 @@ func NewStatefulSetController(
 		// lookup statefulset accounting for deletion tombstones
 		DeleteFunc: ssc.deletePod,
 	})
-	ssc.podLister = podInformer.Lister()
-	ssc.podListerSynced = podInformer.Informer().HasSynced
 
 	setInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
@@ -132,8 +134,6 @@ func NewStatefulSetController(
 		},
 		statefulSetResyncPeriod,
 	)
-	ssc.setLister = setInformer.Lister()
-	ssc.setListerSynced = setInformer.Informer().HasSynced
 
 	// TODO: Watch volumes
 	return ssc

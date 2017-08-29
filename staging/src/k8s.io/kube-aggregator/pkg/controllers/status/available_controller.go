@@ -77,6 +77,7 @@ func NewAvailableConditionController(
 		endpointsSynced:  endpointsInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "AvailableConditionController"),
 	}
+	c.syncFn = c.sync
 
 	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addAPIService,
@@ -95,8 +96,6 @@ func NewAvailableConditionController(
 		UpdateFunc: c.updateEndpoints,
 		DeleteFunc: c.deleteEndpoints,
 	})
-
-	c.syncFn = c.sync
 
 	return c
 }

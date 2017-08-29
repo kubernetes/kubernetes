@@ -71,14 +71,13 @@ func NewNamingConditionController(
 
 	informerIndexer := crdInformer.Informer().GetIndexer()
 	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(informerIndexer, informerIndexer, 60*time.Second, false)
+	c.syncFn = c.sync
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
 	})
-
-	c.syncFn = c.sync
 
 	return c
 }

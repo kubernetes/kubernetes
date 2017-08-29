@@ -83,6 +83,12 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 		client:           client,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
 		workerLoopPeriod: time.Second,
+		serviceLister:    serviceInformer.Lister(),
+		servicesSynced:   serviceInformer.Informer().HasSynced,
+		podLister:        podInformer.Lister(),
+		podsSynced:       podInformer.Informer().HasSynced,
+		endpointsLister:  endpointsInformer.Lister(),
+		endpointsSynced:  endpointsInformer.Informer().HasSynced,
 	}
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -92,19 +98,12 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 		},
 		DeleteFunc: e.enqueueService,
 	})
-	e.serviceLister = serviceInformer.Lister()
-	e.servicesSynced = serviceInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.addPod,
 		UpdateFunc: e.updatePod,
 		DeleteFunc: e.deletePod,
 	})
-	e.podLister = podInformer.Lister()
-	e.podsSynced = podInformer.Informer().HasSynced
-
-	e.endpointsLister = endpointsInformer.Lister()
-	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
 	return e
 }

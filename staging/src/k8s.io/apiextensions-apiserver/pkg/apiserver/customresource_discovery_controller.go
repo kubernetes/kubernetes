@@ -61,14 +61,13 @@ func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInform
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
+	c.syncFn = c.sync
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
 	})
-
-	c.syncFn = c.sync
 
 	return c
 }
