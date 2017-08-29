@@ -394,8 +394,8 @@ func localVolumeNames(pod *v1.Pod) []string {
 	return result
 }
 
-// podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
-func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+// containerUsage aggregates container disk usage and inode consumption for the specified stats to measure.
+func containerUsage(podStats statsapi.PodStats, statsToMeasure []fsStatsType) v1.ResourceList {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
@@ -408,17 +408,45 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 			inodes.Add(*inodeUsage(container.Logs))
 		}
 	}
-	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
-		volumeNames := localVolumeNames(pod)
-		for _, volumeName := range volumeNames {
-			for _, volumeStats := range podStats.VolumeStats {
-				if volumeStats.Name == volumeName {
-					disk.Add(*diskUsage(&volumeStats.FsStats))
-					inodes.Add(*inodeUsage(&volumeStats.FsStats))
-					break
-				}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
+	}
+}
+
+// podLocalVolumeUsage aggregates pod local volumes disk usage and inode consumption for the specified stats to measure.
+func podLocalVolumeUsage(volumeNames []string, podStats statsapi.PodStats) v1.ResourceList {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+	for _, volumeName := range volumeNames {
+		for _, volumeStats := range podStats.VolumeStats {
+			if volumeStats.Name == volumeName {
+				disk.Add(*diskUsage(&volumeStats.FsStats))
+				inodes.Add(*inodeUsage(&volumeStats.FsStats))
+				break
 			}
 		}
+	}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
+	}
+}
+
+// podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
+func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+
+	containerUsageList := containerUsage(podStats, statsToMeasure)
+	disk.Add(containerUsageList[resourceDisk])
+	inodes.Add(containerUsageList[resourceInodes])
+
+	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
+		volumeNames := localVolumeNames(pod)
+		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
+		disk.Add(podLocalVolumeUsageList[resourceDisk])
+		inodes.Add(podLocalVolumeUsageList[resourceInodes])
 	}
 	return v1.ResourceList{
 		resourceDisk:   disk,
@@ -441,6 +469,40 @@ func podMemoryUsage(podStats statsapi.PodStats) (v1.ResourceList, error) {
 	return v1.ResourceList{
 		v1.ResourceMemory: memory,
 		resourceDisk:      disk,
+	}, nil
+}
+
+// localEphemeralVolumeNames returns the set of ephemeral volumes for the pod that are local
+func localEphemeralVolumeNames(pod *v1.Pod) []string {
+	result := []string{}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.GitRepo != nil ||
+			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
+			volume.ConfigMap != nil || volume.DownwardAPI != nil {
+			result = append(result, volume.Name)
+		}
+	}
+	return result
+}
+
+// podLocalEphemeralStorageUsage  aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
+func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+
+	containerUsageList := containerUsage(podStats, statsToMeasure)
+	disk.Add(containerUsageList[resourceDisk])
+	inodes.Add(containerUsageList[resourceInodes])
+
+	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
+		volumeNames := localEphemeralVolumeNames(pod)
+		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
+		disk.Add(podLocalVolumeUsageList[resourceDisk])
+		inodes.Add(podLocalVolumeUsageList[resourceInodes])
+	}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
 	}, nil
 }
 
