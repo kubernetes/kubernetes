@@ -291,6 +291,15 @@ func Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *exten
 			return err
 		}
 	}
+	if in.PolicyTypes != nil {
+		in, out := &in.PolicyTypes, &out.PolicyTypes
+		*out = make([]networking.PolicyType, len(*in))
+		for i := range *in {
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -308,6 +317,15 @@ func Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *netwo
 	for i := range in.Egress {
 		if err := Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(&in.Egress[i], &out.Egress[i], s); err != nil {
 			return err
+		}
+	}
+	if in.PolicyTypes != nil {
+		in, out := &in.PolicyTypes, &out.PolicyTypes
+		*out = make([]extensionsv1beta1.PolicyType, len(*in))
+		for i := range *in {
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

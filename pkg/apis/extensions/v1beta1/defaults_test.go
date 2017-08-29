@@ -509,6 +509,210 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 }
 
+func TestSetDefaultNetworkPolicy(t *testing.T) {
+	tests := []struct {
+		original *extensionsv1beta1.NetworkPolicy
+		expected *extensionsv1beta1.NetworkPolicy
+	}{
+		{ // Empty NetworkPolicy should be set to PolicyTypes Ingress
+			original: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+				},
+			},
+			expected: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress},
+				},
+			},
+		},
+		{ // Empty Ingress NetworkPolicy should be set to PolicyTypes Ingress
+			original: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensionsv1beta1.NetworkPolicyIngressRule{},
+				},
+			},
+			expected: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress:     []extensionsv1beta1.NetworkPolicyIngressRule{},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress},
+				},
+			},
+		},
+		{ // Defined Ingress and Egress should be set to Ingress,Egress
+			original: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensionsv1beta1.NetworkPolicyIngressRule{
+						{
+							From: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									PodSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []extensionsv1beta1.NetworkPolicyIngressRule{
+						{
+							From: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									PodSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress, extensionsv1beta1.PolicyTypeEgress},
+				},
+			},
+		},
+		{ // Egress only with unset PolicyTypes should be set to Ingress, Egress
+			original: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"c": "d"},
+									},
+								},
+							},
+						},
+					},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress, extensionsv1beta1.PolicyTypeEgress},
+				},
+			},
+		},
+		{ // Egress only with PolicyTypes set to Egress should be set to only Egress
+			original: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"Egress": "only"},
+									},
+								},
+							},
+						},
+					},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeEgress},
+				},
+			},
+			expected: &extensionsv1beta1.NetworkPolicy{
+				Spec: extensionsv1beta1.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Egress: []extensionsv1beta1.NetworkPolicyEgressRule{
+						{
+							To: []extensionsv1beta1.NetworkPolicyPeer{
+								{
+									NamespaceSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{"Egress": "only"},
+									},
+								},
+							},
+						},
+					},
+					PolicyTypes: []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeEgress},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*extensionsv1beta1.NetworkPolicy)
+		if !ok {
+			t.Errorf("(%d) unexpected object: %v", i, got)
+			t.FailNow()
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {

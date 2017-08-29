@@ -121,7 +121,6 @@ pkg/apis/imagepolicy
 pkg/apis/imagepolicy/v1alpha1
 pkg/apis/meta/v1
 pkg/apis/networking
-pkg/apis/networking/v1
 pkg/apis/policy
 pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1

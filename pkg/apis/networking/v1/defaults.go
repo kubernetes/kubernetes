@@ -33,3 +33,13 @@ func SetDefaults_NetworkPolicyPort(obj *networkingv1.NetworkPolicyPort) {
 		obj.Protocol = &proto
 	}
 }
+
+func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
+	if len(obj.Spec.PolicyTypes) == 0 {
+		// Any policy that does not specify policyTypes implies at least "Ingress".
+		obj.Spec.PolicyTypes = []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}
+		if len(obj.Spec.Egress) != 0 {
+			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
+		}
+	}
+}

@@ -1157,6 +1157,17 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
+// Policy Type string describes the NetworkPolicy type
+// This type is beta-level in 1.8
+type PolicyType string
+
+const (
+	// PolicyTypeIngress is a NetworkPolicy that affects ingress traffic on selected pods
+	PolicyTypeIngress PolicyType = "Ingress"
+	// PolicyTypeEgress is a NetworkPolicy that affects egress traffic on selected pods
+	PolicyTypeEgress PolicyType = "Egress"
+)
+
 type NetworkPolicySpec struct {
 	// Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
 	// is applied to any pods selected by this field. Multiple network policies can select the
@@ -1179,10 +1190,24 @@ type NetworkPolicySpec struct {
 	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
 	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
 	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
-	// this field is empty then this NetworkPolicy does not limit any outgoing traffic
-	// (and serves solely to ensure that the pods it selects does not allow any outgoing traffic.)
+	// this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
+	// solely to ensure that the pods it selects are isolated by default).
+	// This field is beta-level in 1.8
 	// +optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
+
+	// List of rule types that the NetworkPolicy relates to.
+	// Valid options are Ingress, Egress, or Ingress,Egress.
+	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
+	// policies that contain an Egress section are assumed to affect Egress, and all policies
+	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
+	// If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
+	// Likewise, if you want to write a policy that specifies that no egress is allowed,
+	// you must specify a policyTypes value that include "Egress" (since such a policy would not include
+	// an Egress section and would otherwise default to just [ "Ingress" ]).
+	// This field is beta-level in 1.8
+	// +optional
+	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
 }
 
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
@@ -1206,6 +1231,7 @@ type NetworkPolicyIngressRule struct {
 
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
+// This type is beta-level in 1.8
 type NetworkPolicyEgressRule struct {
 	// List of destination ports for outgoing traffic.
 	// Each item in this list is combined using a logical OR. If this field is

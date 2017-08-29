@@ -21,6 +21,7 @@ import (
 
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
@@ -120,6 +121,20 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 				allErrs = append(allErrs, field.Required(toPath, "must specify a to type"))
 			} else if numTo > 1 {
 				allErrs = append(allErrs, field.Forbidden(toPath, "may not specify more than 1 to type"))
+			}
+		}
+	}
+	// Validate PolicyTypes
+	allowed := sets.NewString(string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress))
+	if len(spec.PolicyTypes) > len(allowed) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("policyTypes"), &spec.PolicyTypes, "may not specify more than two policyTypes"))
+		return allErrs
+	}
+	for i, pType := range spec.PolicyTypes {
+		policyPath := fldPath.Child("policyTypes").Index(i)
+		for _, p := range spec.PolicyTypes {
+			if !allowed.Has(string(p)) {
+				allErrs = append(allErrs, field.NotSupported(policyPath, pType, []string{string(networking.PolicyTypeIngress), string(networking.PolicyTypeEgress)}))
 			}
 		}
 	}
