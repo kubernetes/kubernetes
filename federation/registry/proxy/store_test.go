@@ -110,6 +110,13 @@ func TestStoreGet(t *testing.T) {
 	assert.Equal(t, "dup", pod.Name)
 	assert.Equal(t, "foo", pod.ClusterName)
 
+	obj, err = store.Get(NewTestContextWithNamespace(testNamespace), "dup@foo", &metav1.GetOptions{})
+	assert.Nil(t, err)
+	pod, ok = obj.(*api.Pod)
+	assert.True(t, ok)
+	assert.Equal(t, "dup", pod.Name)
+	assert.Equal(t, "foo", pod.ClusterName)
+
 	obj, err = store.Get(NewTestContextWithNamespace(testNamespace), "not-found", &metav1.GetOptions{})
 	assert.True(t, errors.IsNotFound(err))
 }

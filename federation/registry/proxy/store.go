@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,30 +153,34 @@ func (s *Store) List(ctx request.Context, options *metainternalversion.ListOptio
 
 // Get implements StandardStorage.Get.
 func (s *Store) Get(ctx request.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	objName, clusterName := extractObjectAtCluster(name)
+	if len(clusterName) == 0 {
+		clusterName = options.ClusterName
+	}
 
 	// from federation
-	if len(options.ClusterName) == 0 {
+	if len(clusterName) == 0 {
 		if s.FedStore == nil {
 			return nil, errors.NewNotFound(s.QualifiedResource, name)
 		}
-		return s.FedStore.Get(ctx, name, options)
+		return s.FedStore.Get(ctx, objName, options)
 	}
 
 	// from specified cluster
 	userInfo, _ := request.UserFrom(ctx)
-	clusterClient, err := s.getClusterClientByName(options.ClusterName, userInfo)
+	clusterClient, err := s.getClusterClientByName(clusterName, userInfo)
 	if err != nil {
-		glog.Warningf("error creating cluster client for cluster %s, err: %v", options.ClusterName, err)
+		glog.Warningf("error creating cluster client for cluster %s, err: %v", clusterName, err)
 		return nil, err
 	}
 
-	obj, err := s.tryGet(ctx, name, options.ClusterName, options, clusterClient)
+	obj, err := s.tryGet(ctx, objName, clusterName, options, clusterClient)
 	if err != nil {
 		return nil, err
 	}
 
 	accessor, _ := meta.Accessor(obj)
-	accessor.SetClusterName(options.ClusterName)
+	accessor.SetClusterName(clusterName)
 	return obj, nil
 }
 
@@ -361,4 +366,12 @@ func mergeList(target runtime.Object, src runtime.Object) error {
 	merged := reflect.AppendSlice(targetItems, srcItems)
 	targetItems.Set(merged)
 	return nil
+}
+
+func extractObjectAtCluster(objAtCluster string) (string, string) {
+	atIndex := strings.LastIndex(objAtCluster, "@")
+	if atIndex == -1 {
+		return objAtCluster, ""
+	}
+	return objAtCluster[:atIndex], objAtCluster[atIndex+1:]
 }
