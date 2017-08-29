@@ -36,7 +36,7 @@ type podEvictSpec struct {
 }
 
 const (
-	totalEvict = 4
+	totalEvict = 7
 )
 
 // Eviction Policy is described here:
@@ -47,6 +47,9 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
 
 	emptyDirVolumeName := "volume-emptydir-pod"
+	gitRepoVolumeName := "volume-gitrepo-pod"
+	configMapVolumeName := "volume-configmap-pod"
+	downwardAPIVolumeName := "volume-downwardapi-pod"
 	podTestSpecs := []podEvictSpec{
 		{evicted: true, // This pod should be evicted because emptyDir (default storage type) usage violation
 			pod: v1.Pod{
@@ -226,10 +229,139 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 				},
 			},
 		},
+
+		{evicted: true, // This pod should be evicted because pod ephemeral storage usage violation
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "downward-api-container-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "downward-api-container-hog-pod",
+							Command: []string{
+								"sh",
+								"-c",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(
+										int64(40000),
+										resource.BinarySI),
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      downwardAPIVolumeName,
+									MountPath: "/cache",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: downwardAPIVolumeName,
+							VolumeSource: v1.VolumeSource{
+								DownwardAPI: &v1.DownwardAPIVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{evicted: true, // This pod should be evicted because pod ephemeral storage usage violation
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "configmap-container-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "configmap-container-hog-pod",
+							Command: []string{
+								"sh",
+								"-c",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(
+										int64(40000),
+										resource.BinarySI),
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      configMapVolumeName,
+									MountPath: "/cache",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: configMapVolumeName,
+							VolumeSource: v1.VolumeSource{
+								ConfigMap: &v1.ConfigMapVolumeSource{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: "my-cfgmap",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{evicted: true, // This pod should be evicted because pod ephemeral storage usage violation
+			pod: v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "gitrepo-container-hog-pod"},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image: "gcr.io/google_containers/busybox:1.24",
+							Name:  "gitrepo-container-hog-pod",
+							Command: []string{
+								"sh",
+								"-c",
+								"sleep 5; dd if=/dev/urandom of=target-file of=/cache/target-file bs=50000 count=1; while true; do sleep 5; done",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(
+										int64(40000),
+										resource.BinarySI),
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      gitRepoVolumeName,
+									MountPath: "/cache",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: gitRepoVolumeName,
+							VolumeSource: v1.VolumeSource{
+								GitRepo: &v1.GitRepoVolumeSource{
+									Repository: "my-repo",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	evictionTestTimeout := 10 * time.Minute
-	testCondition := "EmptyDir/ContainerContainerEphemeralStorage usage limit violation"
+	testCondition := "PodLocalEphemeralStorage/ContainerLocalEphemeralStorage usage limit violation"
 	Context(fmt.Sprintf("EmptyDirEviction when we run containers that should cause %s", testCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates += ", LocalStorageCapacityIsolation=true"
