@@ -26,8 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
+// HorizontalPodAutoscalerV1 implements the Generate interface.
 type HorizontalPodAutoscalerV1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"default-name", true},
@@ -41,6 +43,7 @@ func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (HorizontalPodAutoscalerV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	return generateHPA(genericParams)
 }
