@@ -191,6 +191,28 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						},
 					},
 				},
+				PolicyTypes: []networking.PolicyType{networking.PolicyTypeEgress},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
 			},
 		},
 	}
@@ -419,6 +441,48 @@ func TestValidateNetworkPolicy(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"invalid policyTypes": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+				PolicyTypes: []networking.PolicyType{"foo", "bar"},
+			},
+		},
+		"too many policyTypes": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+				PolicyTypes: []networking.PolicyType{"foo", "bar", "baz"},
 			},
 		},
 	}

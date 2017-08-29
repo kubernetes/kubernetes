@@ -123,6 +123,17 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 			}
 		}
 	}
+	// Validate PolicyTypes
+	if len(spec.PolicyTypes) > 2 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("policyTypes"), &spec.PolicyTypes, "may not specify more than two policyTypes"))
+		return allErrs
+	}
+	for i, pType := range spec.PolicyTypes {
+		policyPath := fldPath.Child("policyTypes").Index(i)
+		if pType != "Ingress" && pType != "Egress" {
+			allErrs = append(allErrs, field.NotSupported(policyPath, pType, []string{string("Ingress"), string("Egress")}))
+		}
+	}
 	return allErrs
 }
 
@@ -140,6 +151,8 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.Er
 	allErrs = append(allErrs, ValidateNetworkPolicySpec(&update.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
+
+// ValidatePolicyTypes validates the PolicyTypes field in a NetworkPolicySpec
 
 // ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
