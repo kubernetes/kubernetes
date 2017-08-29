@@ -448,7 +448,7 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 		info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 		info.nodePort = int(servicePort.NodePort)
 		info.sessionAffinityType = service.Spec.SessionAffinity
-		// Set session affinity timeout value when sessionAffinity==ClientIP
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
 			info.stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 		}

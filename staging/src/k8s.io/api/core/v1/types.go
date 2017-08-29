@@ -2998,6 +2998,8 @@ const (
 	ServiceAffinityNone ServiceAffinity = "None"
 )
 
+const DefaultClientIPServiceAffinitySeconds int32 = 10800
+
 // SessionAffinityConfig represents the configurations of session affinity.
 type SessionAffinityConfig struct {
 	// clientIP contains the configurations of Client IP based session affinity.
