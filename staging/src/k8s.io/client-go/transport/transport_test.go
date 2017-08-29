@@ -18,6 +18,7 @@ package transport
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -181,8 +182,22 @@ func TestNew(t *testing.T) {
 		}
 
 		switch {
-		case testCase.Default && transport != http.DefaultTransport:
-			t.Errorf("%s: expected the default transport, got %#v", k, transport)
+		case testCase.Default:
+			defaulTransport := http.DefaultTransport.(*http.Transport)
+			httpTransport, ok := transport.(*http.Transport)
+			if !ok {
+				t.Errorf("%s: expected transport did not match the default transport, got %#v", k, transport)
+			}
+			match := reflect.ValueOf(httpTransport.Proxy).Pointer() == reflect.ValueOf(defaulTransport.Proxy).Pointer() &&
+				reflect.ValueOf(httpTransport.DialContext).Pointer() == reflect.ValueOf(defaulTransport.DialContext).Pointer() &&
+				httpTransport.MaxIdleConns == defaulTransport.MaxIdleConns &&
+				httpTransport.IdleConnTimeout == defaulTransport.IdleConnTimeout &&
+				httpTransport.TLSHandshakeTimeout == defaulTransport.TLSHandshakeTimeout &&
+				httpTransport.ExpectContinueTimeout == defaulTransport.ExpectContinueTimeout
+
+			if !match {
+				t.Errorf("%s: expected transport did not match the default transport, got %#v", k, transport)
+			}
 			continue
 		case !testCase.Default && transport == http.DefaultTransport:
 			t.Errorf("%s: expected non-default transport, got %#v", k, transport)
