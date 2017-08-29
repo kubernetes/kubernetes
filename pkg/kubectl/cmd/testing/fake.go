@@ -428,6 +428,10 @@ func (f *FakeFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) 
 	return nil, nil
 }
 
+func (f *FakeFactory) ValidResourcesFromDiscoveryClient() string {
+	return ""
+}
+
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
