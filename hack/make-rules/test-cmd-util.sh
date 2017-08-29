@@ -932,6 +932,30 @@ run_kubectl_apply_tests() {
   kubectl delete pods test-pod "${kube_flags[@]}"
 
 
+  ## kubectl apply should be able to clear defaulted fields.
+  # Pre-Condition: no deployment exists
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
+  kubectl apply -f hack/testdata/retainKeys/deployment/deployment-before.yaml "${kube_flags[@]}"
+  # Post-Condition: deployment "test-deployment-retainkeys" created
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}{{end}}" 'test-deployment-retainkeys'
+  # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxSurge)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxUnavailable)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Command: apply a deployment "test-deployment-retainkeys" should clear
+  # defaulted fields and successfully update the deployment
+  [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]}")" ]]
+  # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep Recreate)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep hostPath)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Clean up
+  kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]}"
+
+
   ## kubectl apply -f with label selector should only apply matching objects
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''

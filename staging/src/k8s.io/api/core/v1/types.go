@@ -2494,8 +2494,8 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes
 	// +optional
 	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
+	// +patchStrategy=merge,retainKeys
+	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
 	// List of initialization containers belonging to the pod.
 	// Init containers are executed in order prior to containers being started. If any
 	// init container fails, the pod is considered to have failed and is handled according
