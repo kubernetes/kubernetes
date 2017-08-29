@@ -14,23 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core
+package podconfig
 
 import (
 	"testing"
-	//common "k8s.io/kubernetes/test/integration/apps/common_types"
-	//Useful in the future
-	//"k8s.io/api/core/v1"
 )
 
 //Name of the package
-var Name = "core"
+var Name = "Configurations"
 
-//Tests List of internel tests.
+//Tests List of internal tests.
 var Tests = []testing.InternalTest{
-	{Name: "BasicPod", F: basicPod},
-	{Name: "BasicNode", F: basicNode},
-	{Name: "BasicScheduler", F: basicScheduler},
+	{Name: "Affinity", F: testAffinity},
+	{Name: "Disruption", F: testDisruption},
+	{Name: "Services", F: testServices},
 }
 
 // RunTests Starting point of tests in this package
@@ -52,18 +49,18 @@ func setup(t *testing.T) {
 	return
 }
 
-func basicPod(t *testing.T) {
-	//Tests related to simple Pods
+func testAffinity(t *testing.T) {
+	//Tests Related to Inter-Affinity and Node-Affinity
 	t.SkipNow()
 }
 
-func basicNode(t *testing.T) {
-	//Tests related to basic node operations
+func testServices(t *testing.T) {
+	//Tests Related to Basic Services
 	t.SkipNow()
 }
 
-func basicScheduler(t *testing.T) {
-	//Tests related to basic scheduler
+func testDisruption(t *testing.T) {
+	//Tests Related to Pod Disruption budget
 	t.SkipNow()
 }
 

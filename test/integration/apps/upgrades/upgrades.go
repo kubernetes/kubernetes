@@ -15,3 +15,55 @@ limitations under the License.
 */
 
 package upgrades
+
+import (
+	"testing"
+)
+
+//Name of the package
+var Name = "Upgrades"
+
+//Tests List of internal tests.
+var Tests = []testing.InternalTest{
+	{Name: "Statefulset", F: statefulsetUpgrades},
+	{Name: "Daemon", F: daemonsetUpgrades},
+	{Name: "Deployment", F: deploymentUpgrades},
+}
+
+// RunTests Starting point of tests in this package
+func RunTests(t *testing.T) {
+
+	setup(t)
+	defer teardown(t)
+
+	//Run one test case after other
+	for _, tst := range Tests {
+		t.Run(tst.Name, tst.F)
+	}
+
+	//Tear-down
+
+}
+
+func setup(t *testing.T) {
+	return
+}
+
+func statefulsetUpgrades(t *testing.T) {
+	//Tests Related SS upgrades
+	t.SkipNow()
+}
+
+func deploymentUpgrades(t *testing.T) {
+	//Tests Related Deployment upgrades
+	t.SkipNow()
+}
+
+func daemonsetUpgrades(t *testing.T) {
+	//Tests Related to DaemonSet upgrades
+	t.SkipNow()
+}
+
+func teardown(t *testing.T) {
+	return
+}

@@ -19,18 +19,26 @@ package apps
 import (
 	"flag"
 	"testing"
-	"time"
 
 	common "k8s.io/kubernetes/test/integration/apps/common_types"
 	"k8s.io/kubernetes/test/integration/apps/core"
+	"k8s.io/kubernetes/test/integration/apps/hrcontrollers"
+	"k8s.io/kubernetes/test/integration/apps/podconfig"
+	"k8s.io/kubernetes/test/integration/apps/podcontrollers"
+	"k8s.io/kubernetes/test/integration/apps/upgrades"
 	"k8s.io/kubernetes/test/integration/framework"
+	"time"
 )
 
 //RunBySuite Below flag will be set to 'True' if run the by the script via go test -ldflags
 var RunBySuite string
 
 var Tests = []testing.InternalTest{
-	{core.Name, core.RunTests},
+	{Name: core.Name, F: core.RunTests},
+	{Name: podconfig.Name, F: podconfig.RunTests},
+	{Name: podcontrollers.Name, F: podcontrollers.RunTests},
+	{Name: hrcontrollers.Name, F: hrcontrollers.RunTests},
+	{Name: upgrades.Name, F: upgrades.RunTests},
 }
 
 func TestMain(m *testing.M) {
@@ -46,11 +54,11 @@ func Setup(t *testing.T) error {
 
 func TearDown(t *testing.T) error {
 
-	t.Logf("Finsiesed TearDown\n")
+	//t.Logf("Finsiesed TearDown\n")
 	return nil
 }
 
-func TestAppGroups(t *testing.T) {
+func TestApps(t *testing.T) {
 
 	if RunBySuite != "True" {
 		t.Skipf("Sikkping the tests...only run by the script")
@@ -65,6 +73,6 @@ func TestAppGroups(t *testing.T) {
 		t.Run(tst.Name, tst.F)
 	}
 
-	time.Sleep(3600 * time.Second)
+	time.Sleep(time.Hour)
 
 }

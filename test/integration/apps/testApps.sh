@@ -152,7 +152,6 @@ cleanup() {
   scheduler::stop
   apiserver::stop
   kube::etcd::cleanup
-  popd >> /dev/null 2>&1
   kube::log::status "App Integration test cleanup completed"
 
 }

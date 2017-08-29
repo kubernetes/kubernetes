@@ -190,7 +190,6 @@ func (hn *HollowNode) Init(t *testing.T) {
 func (hn *HollowNode) Run() {
 
 	go hn.HollowKubelet.Run()
-	fmt.Printf("====== Starting Holow-node=%s =======\n", hn.Name)
 	time.Sleep(time.Second)
 }
 
@@ -207,7 +206,7 @@ func (hns *HollowNodes) Add(hn *HollowNode) {
 
 // Initialize Initalize test suite to do the following
 // 1) Create NumNodes * Hollow-Nodes
-// 2) Monitor Kube-syste processoes
+// 2) Monitor Kube-system processes such as ApiServer, Controller Manager and Scheduler
 func Initialize(t *testing.T) error {
 
 	// Get the root dir
@@ -216,7 +215,7 @@ func Initialize(t *testing.T) error {
 	Cfg.NameSpace = NameSpace
 	Cfg.Nodes = &HollowNodes{N: make(map[string]*HollowNode)}
 
-	fmt.Printf("Initialized with CFG = %v\nCreating Nodes....\n", Cfg)
+	fmt.Printf("Creating %d Hollow-nodes...\n", NumNodes)
 
 	for i := 0; i < NumNodes; i++ {
 
@@ -224,7 +223,6 @@ func Initialize(t *testing.T) error {
 		hn.Init(t)
 		Cfg.Nodes.Add(hn)
 		hn.Run()
-		//hn.Run()
 	}
 
 	fmt.Printf("Monitoring and waiting for kubernetes components..\n")

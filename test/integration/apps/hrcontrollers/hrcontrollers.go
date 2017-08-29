@@ -14,23 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package core
+package hrcontrollers
 
 import (
 	"testing"
-	//common "k8s.io/kubernetes/test/integration/apps/common_types"
-	//Useful in the future
-	//"k8s.io/api/core/v1"
 )
 
 //Name of the package
-var Name = "core"
+var Name = "HigherControllers"
 
-//Tests List of internel tests.
+//Tests List of internal tests.
 var Tests = []testing.InternalTest{
-	{Name: "BasicPod", F: basicPod},
-	{Name: "BasicNode", F: basicNode},
-	{Name: "BasicScheduler", F: basicScheduler},
+	{Name: "Deployments", F: testDeployments},
+	{Name: "Cronjobs", F: testCronjobs},
 }
 
 // RunTests Starting point of tests in this package
@@ -52,18 +48,13 @@ func setup(t *testing.T) {
 	return
 }
 
-func basicPod(t *testing.T) {
-	//Tests related to simple Pods
+func testDeployments(t *testing.T) {
+	//Tests Related to Deployments
 	t.SkipNow()
 }
 
-func basicNode(t *testing.T) {
-	//Tests related to basic node operations
-	t.SkipNow()
-}
-
-func basicScheduler(t *testing.T) {
-	//Tests related to basic scheduler
+func testCronjobs(t *testing.T) {
+	//Tests Related to Corn Jobs
 	t.SkipNow()
 }
 
