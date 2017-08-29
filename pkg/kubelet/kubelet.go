@@ -773,6 +773,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder,
 		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount,
 		kubeCfg.KeepTerminatedPodVolumes)
+	if err != nil {
+		return nil, err
+	}
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
