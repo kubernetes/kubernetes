@@ -3892,8 +3892,8 @@ func WaitForControllerManagerUp() error {
 	return fmt.Errorf("waiting for controller-manager timed out")
 }
 
-// Returns cluster size (number of ready Nodes excluding Master Node).
-func ClusterSize(c clientset.Interface) (int, error) {
+// Returns number of ready Nodes excluding Master Node.
+func NumberOfReadyNodes(c clientset.Interface) (int, error) {
 	nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 		"spec.unschedulable": "false",
 	}.AsSelector().String()})
@@ -3909,9 +3909,9 @@ func ClusterSize(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// WaitForClusterSize waits until the cluster has desired size and there is no not-ready nodes in it.
+// WaitForReadyNodes waits until the cluster has desired size and there is no not-ready nodes in it.
 // By cluster size we mean number of Nodes excluding Master Node.
-func WaitForClusterSize(c clientset.Interface, size int, timeout time.Duration) error {
+func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
@@ -3929,12 +3929,12 @@ func WaitForClusterSize(c clientset.Interface, size int, timeout time.Duration) 
 		numReady := len(nodes.Items)
 
 		if numNodes == size && numReady == size {
-			Logf("Cluster has reached the desired size %d", size)
+			Logf("Cluster has reached the desired number of ready nodes %d", size)
 			return nil
 		}
-		Logf("Waiting for cluster size %d, current size %d, not ready nodes %d", size, numNodes, numNodes-numReady)
+		Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numNodes, numNodes-numReady)
 	}
-	return fmt.Errorf("timeout waiting %v for cluster size to be %d", timeout, size)
+	return fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
 }
 
 func GenerateMasterRegexp(prefix string) string {
