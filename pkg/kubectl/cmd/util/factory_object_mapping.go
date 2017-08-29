@@ -24,9 +24,9 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
 	swagger "github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"

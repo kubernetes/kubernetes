@@ -803,6 +803,10 @@ func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (openapi.Resources, erro
 	return nil, nil
 }
 
+func (f *fakeAPIFactory) ValidResourcesFromDiscoveryClient() string {
+	return ""
+}
+
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
 	t := &TestFactory{
 		Validator: validation.NullSchema{},
