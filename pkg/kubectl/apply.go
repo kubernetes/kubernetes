@@ -174,8 +174,8 @@ func CreateApplyAnnotation(info *resource.Info, codec runtime.Encoder) error {
 	return SetOriginalConfiguration(info, modified)
 }
 
-// Create the annotation used by kubectl apply only when createAnnotation is true
-// Otherwise, only update the annotation when it already exists
+// CreateOrUpdateAnnotation creates the annotation used by kubectl apply if createAnnotation is true.
+// Otherwise, only update the annotation when it already exists.
 func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info, codec runtime.Encoder) error {
 	if createAnnotation {
 		return CreateApplyAnnotation(info, codec)
