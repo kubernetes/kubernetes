@@ -457,7 +457,6 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 			pods: []v1.Pod{
 				*testutil.NewPod("pod1", "node1"),
 				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
-				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
 			},
 			oldNode: testutil.NewNode("node1"),
 			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
@@ -528,7 +527,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 					}
 				}
 				if !deleted {
-					t.Errorf("Failed to deleted pod %v after %v", podName, delay)
+					t.Errorf("Failed to delete pod %v after %v", podName, delay)
 				}
 			}
 			for _, action := range fakeClientset.Actions() {
