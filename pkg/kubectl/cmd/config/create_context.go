@@ -40,24 +40,25 @@ type createContextOptions struct {
 }
 
 var (
-	create_context_long = templates.LongDesc(`
+	createContextLong = templates.LongDesc(`
 		Sets a context entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_context_example = templates.Examples(`
+	createContextExample = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values
 		kubectl config set-context gce --user=cluster-admin`)
 )
 
+// NewCmdConfigSetContext creates the `set-context` subcommand.
 func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-context NAME [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		Short:   i18n.T("Sets a context entry in kubeconfig"),
-		Long:    create_context_long,
-		Example: create_context_example,
+		Long:    createContextLong,
+		Example: createContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			exists, err := options.run()
@@ -77,6 +78,7 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
+// run implements the actual command.
 func (o createContextOptions) run() (bool, error) {
 	err := o.validate()
 	if err != nil {
@@ -118,6 +120,7 @@ func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Contex
 	return modifiedContext
 }
 
+// complete completes all the required options.
 func (o *createContextOptions) complete(cmd *cobra.Command) error {
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
@@ -128,6 +131,7 @@ func (o *createContextOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// validate command options for sufficient information to run the command.
 func (o createContextOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty context name")

@@ -38,6 +38,7 @@ const (
 	additionStepRequiredUnlessUnsettingError = "Must have additional steps after %v unless you are unsetting it"
 )
 
+// setOptions holds command line options required to run the command.
 type setOptions struct {
 	configAccess  clientcmd.ConfigAccess
 	propertyName  string
@@ -45,20 +46,21 @@ type setOptions struct {
 	setRawBytes   flag.Tristate
 }
 
-var set_long = templates.LongDesc(`
+var setLong = templates.LongDesc(`
 	Sets an individual value in a kubeconfig file
 
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
 
 	PROPERTY_VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.`)
 
+// NewCmdConfigSet creates the `set` subcommand.
 func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
 		Short: i18n.T("Sets an individual value in a kubeconfig file"),
-		Long:  set_long,
+		Long:  setLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
@@ -71,6 +73,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 	return cmd
 }
 
+// run implements the actual command.
 func (o setOptions) run() error {
 	err := o.validate()
 	if err != nil {
@@ -96,13 +99,10 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, false)
 }
 
+// complete completes all the required options.
 func (o *setOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 2 {
@@ -114,6 +114,7 @@ func (o *setOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// validate command options for sufficient information to run the command.
 func (o setOptions) validate() error {
 	if len(o.propertyValue) == 0 {
 		return errors.New("you cannot use set to unset a property")
