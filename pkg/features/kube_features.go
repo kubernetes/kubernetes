@@ -266,7 +266,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	// unintentionally on either side:
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 
