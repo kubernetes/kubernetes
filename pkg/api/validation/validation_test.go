@@ -2709,6 +2709,62 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 
 }
 
+func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.T) {
+	spec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:                      resource.MustParse("100"),
+			api.ResourceMemory:                   resource.MustParse("10000"),
+			api.ResourceRequestsCPU:              resource.MustParse("100"),
+			api.ResourceRequestsMemory:           resource.MustParse("10000"),
+			api.ResourceLimitsCPU:                resource.MustParse("100"),
+			api.ResourceLimitsMemory:             resource.MustParse("10000"),
+			api.ResourcePods:                     resource.MustParse("10"),
+			api.ResourceServices:                 resource.MustParse("0"),
+			api.ResourceReplicationControllers:   resource.MustParse("10"),
+			api.ResourceQuotas:                   resource.MustParse("10"),
+			api.ResourceConfigMaps:               resource.MustParse("10"),
+			api.ResourceSecrets:                  resource.MustParse("10"),
+			api.ResourceEphemeralStorage:         resource.MustParse("10000"),
+			api.ResourceRequestsEphemeralStorage: resource.MustParse("10000"),
+			api.ResourceLimitsEphemeralStorage:   resource.MustParse("10000"),
+		},
+	}
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "foo",
+		},
+		Spec: spec,
+	}
+
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	errs := ValidateResourceQuota(resourceQuota)
+	if len(errs) == 0 {
+		t.Errorf("expected failure for %s", resourceQuota.Name)
+	}
+	expectedErrMes := "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"
+	for i := range errs {
+		if !strings.Contains(errs[i].Detail, expectedErrMes) {
+			t.Errorf("[%s]: expected error detail either empty or %s, got %s", resourceQuota.Name, expectedErrMes, errs[i].Detail)
+		}
+	}
+}
+
 func TestValidatePorts(t *testing.T) {
 	successCase := []api.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
