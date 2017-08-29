@@ -267,7 +267,7 @@ message Initializers {
   optional Status result = 2;
 }
 
-// A label selector is a label query over a set of resources. The result of matchLabels and
+// LabelSelector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
 message LabelSelector {
@@ -282,7 +282,7 @@ message LabelSelector {
   repeated LabelSelectorRequirement matchExpressions = 2;
 }
 
-// A label selector requirement is a selector that contains values, a key, and an operator that
+// LabelSelectorRequirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
 message LabelSelectorRequirement {
   // key is the label key that the selector applies to.

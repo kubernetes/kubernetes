@@ -1563,7 +1563,7 @@
    },
    "v1.LabelSelector": {
     "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "description": "LabelSelector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
       "type": "object",
@@ -1580,7 +1580,7 @@
    },
    "v1.LabelSelectorRequirement": {
     "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "description": "LabelSelectorRequirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
      "operator"
