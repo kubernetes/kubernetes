@@ -1,23 +1,17 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "fake_mirror_client.go",
-        "mock_manager.go",
-    ],
+    srcs = ["mock_stats_provider.go"],
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
+        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
+        "//pkg/volume:go_default_library",
+        "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -32,4 +26,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

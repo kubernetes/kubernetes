@@ -113,7 +113,7 @@ func TestRunOnce(t *testing.T) {
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), kubeletconfig.HairpinNone, "", network.UseDefaultMTU)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
-	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
+	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kb.nodeName),
