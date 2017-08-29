@@ -444,3 +444,19 @@ func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinit
 	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
 	return nil
 }
+
+// GetPersistentVolumeMode returns VolumeMode.
+func GetPersistentVolumeMode(volume *v1.PersistentVolume) v1.PersistentVolumeMode {
+	if volume.Spec.VolumeMode != nil {
+		return *volume.Spec.VolumeMode
+	}
+	return v1.PersistentVolumeFilesystem
+}
+
+// GetPersistentVolumeClaimVolumeMode returns VolumeMode.
+func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) v1.PersistentVolumeMode {
+	if claim.Spec.VolumeMode != nil {
+		return *claim.Spec.VolumeMode
+	}
+	return v1.PersistentVolumeFilesystem
+}

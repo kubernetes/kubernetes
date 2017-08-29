@@ -235,3 +235,49 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	}
 	return pod, nil
 }
+
+func GetVolumeModeForVolume(pod *v1.Pod, kubeClient clientset.Interface, pv *v1.PersistentVolume) (v1.PersistentVolumeMode, error) {
+	if kubeClient == nil {
+		return "", fmt.Errorf("Cannot get kube client")
+	}
+	if pv == nil || pv.Spec.ClaimRef == nil {
+		return "", fmt.Errorf("Cannot get PV and PVC")
+	}
+
+	pvVolumeMode := v1helper.GetPersistentVolumeMode(pv)
+	glog.Infof("#### DEBUG LOG ####: GetVolumeModeForVolume: PV VolumeMode %s", pvVolumeMode)
+
+	claimName := pv.Spec.ClaimRef.Name
+	pvc, _ := kubeClient.Core().PersistentVolumeClaims(pod.Namespace).Get(claimName, metav1.GetOptions{})
+	pvcVolumeMode := v1helper.GetPersistentVolumeClaimVolumeMode(pvc)
+	glog.Infof("#### DEBUG LOG ####: GetVolumeModeForVolume: PVC VolumeMode  %s", pvcVolumeMode)
+
+	if pvVolumeMode == v1.PersistentVolumeFilesystem && pvcVolumeMode == v1.PersistentVolumeFilesystem {
+		return v1.PersistentVolumeFilesystem, nil
+	} else if pvVolumeMode == v1.PersistentVolumeFilesystem && pvcVolumeMode == v1.PersistentVolumeBlock {
+		return "", fmt.Errorf("Unexpected volumeType combination")
+	} else if pvVolumeMode == v1.PersistentVolumeBlock && pvcVolumeMode == v1.PersistentVolumeFilesystem {
+		return v1.PersistentVolumeFilesystem, nil
+	} else if pvVolumeMode == v1.PersistentVolumeBlock && pvcVolumeMode == v1.PersistentVolumeBlock {
+		return v1.PersistentVolumeBlock, nil
+	}
+	return "", fmt.Errorf("Unexpected volumeMode combination")
+}
+
+func GetVolumeModeFromPVC(namespace string, kubeClient clientset.Interface, pv *v1.PersistentVolume) (v1.PersistentVolumeMode, error) {
+	if kubeClient == nil {
+		return "", fmt.Errorf("Cannot get kube client")
+	}
+	if pv == nil || pv.Spec.ClaimRef == nil {
+		return "", fmt.Errorf("Cannot get PV and PVC")
+	}
+
+	pvVolumeMode := v1helper.GetPersistentVolumeMode(pv)
+	glog.Infof("#### DEBUG LOG ####: GetVolumeModeForVolume: PV pvVolumeMode %s", pvVolumeMode)
+
+	claimName := pv.Spec.ClaimRef.Name
+	pvc, _ := kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	pvcVolumeMode := v1helper.GetPersistentVolumeClaimVolumeMode(pvc)
+	glog.Infof("#### DEBUG LOG ####: GetVolumeModeForVolume: PVC pvcVolumeMode  %s", pvcVolumeMode)
+	return pvcVolumeMode, nil
+}

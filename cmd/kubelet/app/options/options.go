@@ -39,6 +39,7 @@ import (
 const (
 	DefaultKubeletPodsDirName       = "pods"
 	DefaultKubeletVolumesDirName    = "volumes"
+	DefaultKubeletDevicesDirName    = "devices"
 	DefaultKubeletPluginsDirName    = "plugins"
 	DefaultKubeletContainersDirName = "containers"
 )

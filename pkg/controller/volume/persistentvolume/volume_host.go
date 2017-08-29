@@ -45,6 +45,10 @@ func (ctrl *PersistentVolumeController) GetPodPluginDir(podUID types.UID, plugin
 	return ""
 }
 
+func (ctrl *PersistentVolumeController) GetPodDeviceDir(ppodUID types.UID, pluginName string, volumeName string) string {
+	return ""
+}
+
 func (ctrl *PersistentVolumeController) GetKubeClient() clientset.Interface {
 	return ctrl.kubeClient
 }

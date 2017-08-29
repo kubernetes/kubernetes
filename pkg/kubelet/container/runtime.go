@@ -449,6 +449,8 @@ type RunContainerOptions struct {
 type VolumeInfo struct {
 	// Mounter is the volume's mounter
 	Mounter volume.Mounter
+	// BlockVolumeMapper is the Block volume's mounter
+	BlockVolumeMapper volume.BlockVolumeMapper
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool

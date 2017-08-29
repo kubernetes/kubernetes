@@ -201,6 +201,14 @@ type AttachableVolumePlugin interface {
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 }
 
+type BlockVolumePlugin interface {
+	VolumePlugin
+	//
+	NewBlockVolumeMapper(spec *Spec, podRef *v1.Pod, devicePath string, opts VolumeOptions) (BlockVolumeMapper, error)
+	//
+	NewBlockVolumeUnmapper(name string, podUID types.UID) (BlockVolumeUnmapper, error)
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -220,6 +228,12 @@ type VolumeHost interface {
 	// does not exist, the result of this call might not exist.  This
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
+
+	// GetPodDeviceDir returns the absolute path a directory which
+	// represents the named volume under the named plugin for the given
+	// pod.  If the specified pod does not exist, the result of this call
+	// might not exist.
+	GetPodDeviceDir(podUID types.UID, pluginName string, volumeName string) string
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface
@@ -638,6 +652,30 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 	}
 	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
 		return attachablePlugin, nil
+	}
+	return nil, nil
+}
+
+//
+func (pm *VolumePluginMgr) FindBlockVolumeMapperPluginBySpec(spec *Spec) (BlockVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
+		return blockVolumePlugin, nil
+	}
+	return nil, nil
+}
+
+//
+func (pm *VolumePluginMgr) FindBlockVolumeMapperByName(name string) (BlockVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
+		return blockVolumePlugin, nil
 	}
 	return nil, nil
 }

@@ -524,6 +524,10 @@ func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName 
 	return ""
 }
 
+func (adc *attachDetachController) GetPodDeviceDir(podUID types.UID, pluginName, volumeName string) string {
+	return ""
+}
+
 func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 	return adc.kubeClient
 }
