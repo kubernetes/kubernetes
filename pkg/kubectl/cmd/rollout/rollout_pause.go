@@ -34,9 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type PauseConfig struct {
+// PauseOptions holds command line options required to run the command.
+type PauseOptions struct {
 	resource.FilenameOptions
 
 	Pauser  func(info *resource.Info) ([]byte, error)
@@ -49,22 +48,23 @@ type PauseConfig struct {
 }
 
 var (
-	pause_long = templates.LongDesc(`
+	pauseLong = templates.LongDesc(`
 		Mark the provided resource as paused
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
 		Currently only deployments support being paused.`)
 
-	pause_example = templates.Examples(`
+	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
 		# the deployment will continue its function, new updates to the deployment will not
 		# have an effect as long as the deployment is paused.
 		kubectl rollout pause deployment/nginx`)
 )
 
+// NewCmdRolloutPause creates the `pause` subcommand.
 func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &PauseConfig{}
+	options := &PauseOptions{}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -72,15 +72,15 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pause RESOURCE",
 		Short:   i18n.T("Mark the provided resource as paused"),
-		Long:    pause_long,
-		Example: pause_example,
+		Long:    pauseLong,
+		Example: pauseExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := options.CompletePause(f, cmd, out, args)
+			err := options.Complete(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = options.RunPause()
+			err = options.Run()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -95,7 +95,8 @@ func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+// Complete completes all the required options.
+func (o *PauseOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
@@ -131,7 +132,8 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 	return nil
 }
 
-func (o PauseConfig) RunPause() error {
+// Run implements the actual command.
+func (o PauseOptions) Run() error {
 	allErrs := []error{}
 	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Pauser) {
 		info := patch.Info

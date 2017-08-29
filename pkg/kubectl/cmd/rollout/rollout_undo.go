@@ -31,8 +31,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// UndoOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
+// UndoOptions holds command line options required to run the command.
 type UndoOptions struct {
 	resource.FilenameOptions
 
@@ -47,10 +46,10 @@ type UndoOptions struct {
 }
 
 var (
-	undo_long = templates.LongDesc(`
+	undoLong = templates.LongDesc(`
 		Rollback to a previous rollout.`)
 
-	undo_example = templates.Examples(`
+	undoExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
@@ -61,6 +60,7 @@ var (
 		kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
+// NewCmdRolloutUndo creates the `undo` subcommand.
 func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &UndoOptions{}
 
@@ -70,15 +70,15 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   i18n.T("Undo a previous rollout"),
-		Long:    undo_long,
-		Example: undo_example,
+		Long:    undoLong,
+		Example: undoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := options.CompleteUndo(f, cmd, out, args)
+			err := options.Complete(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = options.RunUndo()
+			err = options.Run()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -95,7 +95,8 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+// Complete completes all the required options.
+func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
@@ -138,7 +139,8 @@ func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io
 	return err
 }
 
-func (o *UndoOptions) RunUndo() error {
+// Run implements the actual command.
+func (o *UndoOptions) Run() error {
 	allErrs := []error{}
 	for ix, info := range o.Infos {
 		result, err := o.Rollbackers[ix].Rollback(info.Object, nil, o.ToRevision, o.DryRun)

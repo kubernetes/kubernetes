@@ -30,10 +30,10 @@ import (
 )
 
 var (
-	history_long = templates.LongDesc(`
+	historyLong = templates.LongDesc(`
 		View previous rollout revisions and configurations.`)
 
-	history_example = templates.Examples(`
+	historyExample = templates.Examples(`
 		# View the rollout history of a deployment
 		kubectl rollout history deployment/abc
 
@@ -41,6 +41,7 @@ var (
 		kubectl rollout history daemonset/abc --revision=3`)
 )
 
+// NewCmdRolloutHistory creates the `history` subcommand.
 func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
@@ -50,8 +51,8 @@ func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "history (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   i18n.T("View rollout history"),
-		Long:    history_long,
-		Example: history_example,
+		Long:    historyLong,
+		Example: historyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunHistory(f, cmd, out, args, options))
 		},
@@ -65,6 +66,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// RunHistory implements the actual command.
 func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")

@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	status_long = templates.LongDesc(`
+	statusLong = templates.LongDesc(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -42,11 +42,12 @@ var (
 		pin to a specific revision and abort if it is rolled over by another revision,
 		use --revision=N where N is the revision you need to watch for.`)
 
-	status_example = templates.Examples(`
+	statusExample = templates.Examples(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
 )
 
+// NewCmdRolloutStatus creates the `status` subcommand.
 func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
@@ -56,8 +57,8 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   i18n.T("Show the status of the rollout"),
-		Long:    status_long,
-		Example: status_example,
+		Long:    statusLong,
+		Example: statusExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunStatus(f, cmd, out, args, options))
 		},
@@ -72,6 +73,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// RunStatus implements the actual command.
 func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
