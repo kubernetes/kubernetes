@@ -18,11 +18,13 @@ package auth
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -65,10 +67,6 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 		framework.ExpectNoError(err, "failed to get audit-secret")
 		err = f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete audit-secret")
-
-		// /version should not be audited
-		_, err = f.ClientSet.Core().RESTClient().Get().AbsPath("/version").DoRaw()
-		framework.ExpectNoError(err, "failed to query version")
 
 		expectedEvents := []auditEvent{{
 			method:    "create",
@@ -126,9 +124,6 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 		if _, found := expectations[event]; found {
 			expectations[event] = true
 		}
-
-		// /version should not be audited (filtered in the policy).
-		Expect(event.uri).NotTo(HavePrefix("/version"))
 	}
 	framework.ExpectNoError(scanner.Err(), "error reading audit log")
 
@@ -138,6 +133,21 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 }
 
 func parseAuditLine(line string) (auditEvent, error) {
+	var e v1beta1.Event
+	if err := json.Unmarshal([]byte(line), &e); err == nil {
+		event := auditEvent{
+			method: e.Verb,
+			uri:    e.RequestURI,
+		}
+		if e.ObjectRef != nil {
+			event.namespace = e.ObjectRef.Namespace
+		}
+		if e.ResponseStatus != nil {
+			event.response = fmt.Sprintf("%d", e.ResponseStatus.Code)
+		}
+		return event, nil
+	}
+
 	fields := strings.Fields(line)
 	if len(fields) < 3 {
 		return auditEvent{}, fmt.Errorf("could not parse audit line: %s", line)
