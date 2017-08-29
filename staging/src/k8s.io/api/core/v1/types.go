@@ -4743,7 +4743,7 @@ type SecurityContext struct {
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 	// AllowPrivilegeEscalation controls whether a process can gain more
-	// privileges than it's parent process. This bool directly controls if
+	// privileges than its parent process. This bool directly controls if
 	// the no_new_privs flag will be set on the container process.
 	// AllowPrivilegeEscalation is true always when the container is:
 	// 1) run as Privileged
