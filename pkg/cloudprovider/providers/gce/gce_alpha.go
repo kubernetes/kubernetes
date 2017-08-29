@@ -23,7 +23,13 @@ import (
 )
 
 // All known alpha features
-var knownAlphaFeatures = map[string]bool{}
+var knownAlphaFeatures = map[string]bool{
+	GCEDiskAlphaFeatureGate: true,
+}
+
+const (
+	GCEDiskAlphaFeatureGate = "GCEDiskAlphaAPI"
+)
 
 type AlphaFeatureGate struct {
 	features map[string]bool

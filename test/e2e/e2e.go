@@ -78,6 +78,11 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
+		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{})
+		if err != nil {
+			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
+		}
+
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
 			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
 			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
@@ -89,7 +94,8 @@ func setupProviderConfig() error {
 			NodeTags:           nil,
 			NodeInstancePrefix: "",
 			TokenSource:        nil,
-			UseMetadataServer:  false})
+			UseMetadataServer:  false,
+			AlphaFeatureGate:   gceAlphaFeatureGate})
 
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
