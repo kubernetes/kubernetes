@@ -138,14 +138,7 @@ func Generate(outfile, buildTag, codecPkgPath string, uid int64, useUnsafe bool,
 		tv.CodecPkgName = "codec"
 	} else {
 		// HACK: always handle vendoring. It should be typically on in go 1.6, 1.7
-		s := tv.ImportPath
-		const vendorStart = "vendor/"
-		const vendorInline = "/vendor/"
-		if i := strings.LastIndex(s, vendorInline); i >= 0 {
-			tv.ImportPath = s[i+len(vendorInline):]
-		} else if strings.HasPrefix(s, vendorStart) {
-			tv.ImportPath = s[len(vendorStart):]
-		}
+		tv.ImportPath = stripVendor(tv.ImportPath)
 	}
 	astfiles := make([]*ast.File, len(infiles))
 	for i, infile := range infiles {
@@ -295,6 +288,20 @@ func gen1(frunName, tmplStr string, tv interface{}) (frun *os.File, err error) {
 		return
 	}
 	return
+}
+
+// copied from ../gen.go (keep in sync).
+func stripVendor(s string) string {
+	// HACK: Misbehaviour occurs in go 1.5. May have to re-visit this later.
+	// if s contains /vendor/ OR startsWith vendor/, then return everything after it.
+	const vendorStart = "vendor/"
+	const vendorInline = "/vendor/"
+	if i := strings.LastIndex(s, vendorInline); i >= 0 {
+		s = s[i+len(vendorInline):]
+	} else if strings.HasPrefix(s, vendorStart) {
+		s = s[len(vendorStart):]
+	}
+	return s
 }
 
 func main() {

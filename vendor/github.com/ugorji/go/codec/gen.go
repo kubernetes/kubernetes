@@ -1653,15 +1653,8 @@ func (x *genV) MethodNamePfx(prefix string, prim bool) string {
 func genImportPath(t reflect.Type) (s string) {
 	s = t.PkgPath()
 	if genCheckVendor {
-		// HACK: Misbehaviour occurs in go 1.5. May have to re-visit this later.
-		// if s contains /vendor/ OR startsWith vendor/, then return everything after it.
-		const vendorStart = "vendor/"
-		const vendorInline = "/vendor/"
-		if i := strings.LastIndex(s, vendorInline); i >= 0 {
-			s = s[i+len(vendorInline):]
-		} else if strings.HasPrefix(s, vendorStart) {
-			s = s[len(vendorStart):]
-		}
+		// HACK: always handle vendoring. It should be typically on in go 1.6, 1.7
+		s = stripVendor(s)
 	}
 	return
 }
@@ -1882,6 +1875,19 @@ func genInternalSortType(s string, elem bool) string {
 		}
 	}
 	panic("sorttype: unexpected type: " + s)
+}
+
+func stripVendor(s string) string {
+	// HACK: Misbehaviour occurs in go 1.5. May have to re-visit this later.
+	// if s contains /vendor/ OR startsWith vendor/, then return everything after it.
+	const vendorStart = "vendor/"
+	const vendorInline = "/vendor/"
+	if i := strings.LastIndex(s, vendorInline); i >= 0 {
+		s = s[i+len(vendorInline):]
+	} else if strings.HasPrefix(s, vendorStart) {
+		s = s[len(vendorStart):]
+	}
+	return s
 }
 
 // var genInternalMu sync.Mutex

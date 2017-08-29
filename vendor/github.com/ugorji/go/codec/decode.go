@@ -107,10 +107,10 @@ type DecodeOptions struct {
 	// If nil, we use []interface{}
 	SliceType reflect.Type
 
-	// MaxInitLen defines the initial length that we "make" a collection (slice, chan or map) with.
+	// MaxInitLen defines the maxinum initial length that we "make" a collection (string, slice, map, chan).
 	// If 0 or negative, we default to a sensible value based on the size of an element in the collection.
 	//
-	// For example, when decoding, a stream may say that it has MAX_UINT elements.
+	// For example, when decoding, a stream may say that it has 2^64 elements.
 	// We should not auto-matically provision a slice of that length, to prevent Out-Of-Memory crash.
 	// Instead, we provision up to MaxInitLen, fill that up, and start appending after that.
 	MaxInitLen int
@@ -161,7 +161,9 @@ type DecodeOptions struct {
 	// look them up from a map (than to allocate them afresh).
 	//
 	// Note: Handles will be smart when using the intern functionality.
-	// So everything will not be interned.
+	// Every string should not be interned.
+	// An excellent use-case for interning is struct field names,
+	// or map keys where key type is string.
 	InternString bool
 
 	// PreferArrayOverSlice controls whether to decode to an array or a slice.
@@ -740,7 +742,8 @@ func (f *decFnInfo) kStruct(rv reflect.Value) {
 				if cr != nil {
 					cr.sendContainerState(containerMapKey)
 				}
-				rvkencname := stringView(dd.DecodeBytes(f.d.b[:], true, true))
+				rvkencnameB := dd.DecodeBytes(f.d.b[:], true, true)
+				rvkencname := stringView(rvkencnameB)
 				// rvksi := ti.getForEncName(rvkencname)
 				if cr != nil {
 					cr.sendContainerState(containerMapValue)
@@ -755,6 +758,7 @@ func (f *decFnInfo) kStruct(rv reflect.Value) {
 				} else {
 					d.structFieldNotFound(-1, rvkencname)
 				}
+				keepAlive4StringView(rvkencnameB) // maintain ref 4 stringView
 			}
 		} else {
 			for j := 0; !dd.CheckBreak(); j++ {
@@ -762,7 +766,8 @@ func (f *decFnInfo) kStruct(rv reflect.Value) {
 				if cr != nil {
 					cr.sendContainerState(containerMapKey)
 				}
-				rvkencname := stringView(dd.DecodeBytes(f.d.b[:], true, true))
+				rvkencnameB := dd.DecodeBytes(f.d.b[:], true, true)
+				rvkencname := stringView(rvkencnameB)
 				// rvksi := ti.getForEncName(rvkencname)
 				if cr != nil {
 					cr.sendContainerState(containerMapValue)
@@ -777,6 +782,7 @@ func (f *decFnInfo) kStruct(rv reflect.Value) {
 				} else {
 					d.structFieldNotFound(-1, rvkencname)
 				}
+				keepAlive4StringView(rvkencnameB) // maintain ref 4 stringView
 			}
 		}
 		if cr != nil {
@@ -1338,6 +1344,7 @@ func (d *Decoder) Reset(r io.Reader) {
 
 func (d *Decoder) ResetBytes(in []byte) {
 	// d.s = d.sa[:0]
+	d.bytes = true
 	d.rb.reset(in)
 	d.r = &d.rb
 	d.resetCommon()
@@ -1872,11 +1879,14 @@ func (d *Decoder) errorf(format string, params ...interface{}) {
 	panic(err)
 }
 
+// Possibly get an interned version of a string
+//
+// This should mostly be used for map keys, where the key type is string
 func (d *Decoder) string(v []byte) (s string) {
 	if d.is != nil {
-		s, ok := d.is[string(v)] // no allocation here.
+		s, ok := d.is[string(v)] // no allocation here, per go implementation
 		if !ok {
-			s = string(v)
+			s = string(v) // new allocation here
 			d.is[s] = s
 		}
 		return s
@@ -1884,11 +1894,11 @@ func (d *Decoder) string(v []byte) (s string) {
 	return string(v) // don't return stringView, as we need a real string here.
 }
 
-func (d *Decoder) intern(s string) {
-	if d.is != nil {
-		d.is[s] = s
-	}
-}
+// func (d *Decoder) intern(s string) {
+// 	if d.is != nil {
+// 		d.is[s] = s
+// 	}
+// }
 
 // nextValueBytes returns the next value in the stream as a set of bytes.
 func (d *Decoder) nextValueBytes() []byte {
@@ -1961,18 +1971,31 @@ func (x decSliceHelper) ElemContainerState(index int) {
 	}
 }
 
-func decByteSlice(r decReader, clen int, bs []byte) (bsOut []byte) {
+func decByteSlice(r decReader, clen, maxInitLen int, bs []byte) (bsOut []byte) {
 	if clen == 0 {
 		return zeroByteSlice
 	}
 	if len(bs) == clen {
 		bsOut = bs
+		r.readb(bsOut)
 	} else if cap(bs) >= clen {
 		bsOut = bs[:clen]
+		r.readb(bsOut)
 	} else {
-		bsOut = make([]byte, clen)
+		// bsOut = make([]byte, clen)
+		len2, _ := decInferLen(clen, maxInitLen, 1)
+		bsOut = make([]byte, len2)
+		r.readb(bsOut)
+		for len2 < clen {
+			len3, _ := decInferLen(clen-len2, maxInitLen, 1)
+			// fmt.Printf(">>>>> TESTING: in loop: clen: %v, maxInitLen: %v, len2: %v, len3: %v\n", clen, maxInitLen, len2, len3)
+			bs3 := bsOut
+			bsOut = make([]byte, len2+len3)
+			copy(bsOut, bs3)
+			r.readb(bsOut[len2:])
+			len2 += len3
+		}
 	}
-	r.readb(bsOut)
 	return
 }
 

@@ -1027,6 +1027,8 @@ func (e *Encoder) ResetBytes(out *[]byte) {
 // However, struct values may encode as arrays. This happens when:
 //    - StructToArray Encode option is set, OR
 //    - the tag on the _struct field sets the "toarray" option
+// Note that omitempty is ignored when encoding struct values as arrays,
+// as an entry must be encoded for each field, to maintain its position.
 //
 // Values with types that implement MapBySlice are encoded as stream maps.
 //
@@ -1053,8 +1055,7 @@ func (e *Encoder) ResetBytes(out *[]byte) {
 //      }
 //
 //      type MyStruct struct {
-//          _struct bool    `codec:",omitempty,toarray"`   //set omitempty for every field
-//                                                         //and encode struct as an array
+//          _struct bool    `codec:",toarray"`   //encode struct as an array
 //      }
 //
 // The mode of encoding is based on the type of the value. When a value is seen:

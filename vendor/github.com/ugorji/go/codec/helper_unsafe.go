@@ -6,10 +6,12 @@
 package codec
 
 import (
+	"runtime"
 	"unsafe"
 )
 
 // This file has unsafe variants of some helper methods.
+// NOTE: See helper_not_unsafe.go for the usage information.
 
 type unsafeString struct {
 	Data uintptr
@@ -22,9 +24,6 @@ type unsafeSlice struct {
 	Cap  int
 }
 
-// stringView returns a view of the []byte as a string.
-// In unsafe mode, it doesn't incur allocation and copying caused by conversion.
-// In regular safe mode, it is an allocation and copy.
 func stringView(v []byte) string {
 	if len(v) == 0 {
 		return ""
@@ -35,9 +34,6 @@ func stringView(v []byte) string {
 	return *(*string)(unsafe.Pointer(&sx))
 }
 
-// bytesView returns a view of the string as a []byte.
-// In unsafe mode, it doesn't incur allocation and copying caused by conversion.
-// In regular safe mode, it is an allocation and copy.
 func bytesView(v string) []byte {
 	if len(v) == 0 {
 		return zeroByteSlice
@@ -46,4 +42,12 @@ func bytesView(v string) []byte {
 	sx := (*unsafeString)(unsafe.Pointer(&v))
 	bx := unsafeSlice{sx.Data, sx.Len, sx.Len}
 	return *(*[]byte)(unsafe.Pointer(&bx))
+}
+
+func keepAlive4BytesView(v string) {
+	runtime.KeepAlive(v)
+}
+
+func keepAlive4StringView(v []byte) {
+	runtime.KeepAlive(v)
 }
