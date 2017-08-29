@@ -24,6 +24,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+// NewCmdAuth creates the `auth` sub command.
 func NewCmdAuth(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
@@ -33,6 +34,7 @@ func NewCmdAuth(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Run:   cmdutil.DefaultSubCommandRun(errOut),
 	}
 
+	// Add subcommand to `auth`.
 	cmds.AddCommand(NewCmdCanI(f, out, errOut))
 	cmds.AddCommand(NewCmdReconcile(f, out, errOut))
 
