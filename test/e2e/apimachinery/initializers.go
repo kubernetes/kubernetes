@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("Initializers", func() {
+var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 	f := framework.NewDefaultFramework("initializers")
 
 	// TODO: Add failure traps once we have JustAfterEach
