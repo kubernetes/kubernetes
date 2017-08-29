@@ -68,7 +68,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
 	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
-	allErrs = append(allErrs, ValidateFeatureFlags(c.FeatureFlags, field.NewPath("feature-flags"))...)
+	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
 	return allErrs
 }
@@ -297,14 +297,14 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	return nil
 }
 
-func ValidateFeatureFlags(featureFlags map[string]bool, fldPath *field.Path) field.ErrorList {
+func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	validFeatures := features.Keys(features.InitFeatureGates)
 
 	// check valid feature names are provided
-	for k := range featureFlags {
+	for k := range featureGates {
 		if !features.Supports(features.InitFeatureGates, k) {
-			allErrs = append(allErrs, field.Invalid(fldPath, featureFlags,
+			allErrs = append(allErrs, field.Invalid(fldPath, featureGates,
 				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
 		}
 	}

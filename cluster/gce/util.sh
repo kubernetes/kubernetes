@@ -336,7 +336,7 @@ function detect-node-names() {
   INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
     --zones "${ZONE}" --project "${PROJECT}" \
     --regexp "${NODE_INSTANCE_PREFIX}-.+" \
-    --format='value(instanceGroup)' || true))
+    --format='value(name)' || true))
   NODE_NAMES=()
   if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
     for group in "${INSTANCE_GROUPS[@]}"; do

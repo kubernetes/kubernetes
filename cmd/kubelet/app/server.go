@@ -283,6 +283,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		}
 	}
 
+	if s.CloudProvider == kubeletconfigv1alpha1.AutoDetectCloudProvider {
+		glog.Warning("--cloud-provider=auto-detect is deprecated. The desired cloud provider should be set explicitly")
+	}
+
 	if kubeDeps.Cloud == nil {
 		if !cloudprovider.IsExternal(s.CloudProvider) && s.CloudProvider != kubeletconfigv1alpha1.AutoDetectCloudProvider {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)

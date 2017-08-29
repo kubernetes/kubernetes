@@ -52,10 +52,6 @@ func validateInitializer(initializer *admissionregistration.Initializer, fldPath
 		notAllowSubresources := false
 		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i), notAllowSubresources)...)
 	}
-	// TODO: relax the validation rule when admissionregistration is beta.
-	if initializer.FailurePolicy != nil && *initializer.FailurePolicy != admissionregistration.Ignore {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *initializer.FailurePolicy, []string{string(admissionregistration.Ignore)}))
-	}
 	return allErrors
 }
 

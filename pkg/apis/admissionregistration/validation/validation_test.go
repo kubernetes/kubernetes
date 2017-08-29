@@ -214,20 +214,6 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 				}),
 			expectedError: ` "a/b": must not specify subresources`,
 		},
-		{
-			name: "FailurePolicy can only be \"Ignore\"",
-			config: getInitializerConfiguration(
-				[]admissionregistration.Initializer{
-					{
-						Name: "initializer.k8s.io",
-						FailurePolicy: func() *admissionregistration.FailurePolicyType {
-							r := admissionregistration.Fail
-							return &r
-						}(),
-					},
-				}),
-			expectedError: `failurePolicy: Unsupported value: "Fail": supported values: Ignore`,
-		},
 	}
 
 	for _, test := range tests {

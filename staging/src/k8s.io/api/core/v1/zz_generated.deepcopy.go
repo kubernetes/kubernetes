@@ -3870,6 +3870,11 @@ func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
 			**out = **in
 		}
 	}
+	if in.MountOptions != nil {
+		in, out := &in.MountOptions, &out.MountOptions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

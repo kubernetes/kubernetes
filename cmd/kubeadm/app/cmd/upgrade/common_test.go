@@ -55,7 +55,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  extraArgs: null
 	  image: ""
 	  keyFile: ""
-	featureFlags: null
+	featureGates: null
 	imageRepository: ""
 	kubernetesVersion: v1.7.1
 	networking:
@@ -94,7 +94,7 @@ func TestPrintConfiguration(t *testing.T) {
 	  extraArgs: null
 	  image: ""
 	  keyFile: ""
-	featureFlags: null
+	featureGates: null
 	imageRepository: ""
 	kubernetesVersion: v1.7.1
 	networking:

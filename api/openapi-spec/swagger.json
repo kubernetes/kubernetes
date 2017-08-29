@@ -54660,10 +54660,6 @@
      "name"
     ],
     "properties": {
-     "failurePolicy": {
-      "description": "FailurePolicy defines what happens if the responsible initializer controller fails to takes action. Allowed values are Ignore, or Fail. If \"Ignore\" is set, initializer is removed from the initializers list of an object if the timeout is reached; If \"Fail\" is set, admissionregistration returns timeout error if the timeout is reached.",
-      "type": "string"
-     },
      "name": {
       "description": "Name is the identifier of the initializer. It will be added to the object that needs to be initialized. Name should be fully qualified, e.g., alwayspullimages.kubernetes.io, where \"alwayspullimages\" is the name of the webhook, and kubernetes.io is the name of the organization. Required",
       "type": "string"
@@ -59118,7 +59114,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.ObjectFieldSelector"
      },
      "resourceFieldRef": {
-      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceFieldSelector"
      },
      "secretKeyRef": {
@@ -60552,6 +60548,13 @@
       "description": "Local represents directly-attached storage with node affinity",
       "$ref": "#/definitions/io.k8s.api.core.v1.LocalVolumeSource"
      },
+     "mountOptions": {
+      "description": "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "nfs": {
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
       "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource"
@@ -60953,7 +60956,7 @@
        "$ref": "#/definitions/io.k8s.api.core.v1.Volume"
       },
       "x-kubernetes-patch-merge-key": "name",
-      "x-kubernetes-patch-strategy": "merge"
+      "x-kubernetes-patch-strategy": "merge,retainKeys"
      }
     }
    },
@@ -62772,6 +62775,7 @@
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
+      "x-kubernetes-patch-strategy": "retainKeys",
       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStrategy"
      },
      "template": {

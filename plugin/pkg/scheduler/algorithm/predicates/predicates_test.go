@@ -1550,7 +1550,7 @@ func TestServiceAffinity(t *testing.T) {
 			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 			predicate, precompute := NewServiceAffinityPredicate(schedulertesting.FakePodLister(test.pods), schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
 			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
-			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+			RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 				if !skipPrecompute {
 					precompute(pm)
 				}
@@ -3398,6 +3398,78 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 		}
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
+		}
+	}
+}
+
+func TestNodeConditionPredicate(t *testing.T) {
+	tests := []struct {
+		node        *v1.Node
+		schedulable bool
+	}{
+		// node1 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+			schedulable: true,
+		},
+		// node2 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node3 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+
+		// node4 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node5 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node6 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node7 ignored - node out of disk, node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node8 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node9 ignored - node unschedulable
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
+			schedulable: false,
+		},
+		// node10 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
+			schedulable: true,
+		},
+		// node11 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
+			schedulable: true,
+		},
+	}
+
+	for _, test := range tests {
+		nodeInfo := makeEmptyNodeInfo(test.node)
+		if fit, reasons, err := CheckNodeConditionPredicate(nil, nil, nodeInfo); fit != test.schedulable {
+			t.Errorf("%s: expected: %t, got %t; %+v, %v",
+				test.node.Name, test.schedulable, fit, reasons, err)
 		}
 	}
 }

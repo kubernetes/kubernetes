@@ -44,6 +44,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -52,6 +53,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 var scheme = runtime.NewScheme()
@@ -390,6 +393,8 @@ func isQualifiedResource(err error, kind, group string) bool {
 }
 
 func TestStoreCreateInitialized(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
@@ -493,6 +498,8 @@ func TestStoreCreateInitialized(t *testing.T) {
 }
 
 func TestStoreCreateInitializedFailed(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
@@ -991,6 +998,8 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 }
 
 func TestFailedInitializationStoreUpdate(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	initialGeneration := int64(1)
 	podInitializing := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Test"}}}, Generation: initialGeneration},

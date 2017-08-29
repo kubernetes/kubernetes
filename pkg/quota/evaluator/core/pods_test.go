@@ -142,6 +142,24 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceMemory:         resource.MustParse("1m"),
 			},
 		},
+		"init container local ephemeral storage": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}},
+				},
+			},
+			usage: api.ResourceList{
+				api.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				api.ResourcePods:                     resource.MustParse("1"),
+			},
+		},
 		"container CPU": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
@@ -176,6 +194,24 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsMemory:   resource.MustParse("2m"),
 				api.ResourcePods:           resource.MustParse("1"),
 				api.ResourceMemory:         resource.MustParse("1m"),
+			},
+		},
+		"container local ephemeral storage": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}},
+				},
+			},
+			usage: api.ResourceList{
+				api.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				api.ResourcePods:                     resource.MustParse("1"),
 			},
 		},
 		"init container maximums override sum of containers": {

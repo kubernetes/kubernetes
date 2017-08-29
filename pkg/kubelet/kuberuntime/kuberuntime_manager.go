@@ -607,6 +607,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		if err != nil {
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			glog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
+			ref, err := ref.GetReference(api.Scheme, pod)
+			if err != nil {
+				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+			}
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox.")
 			return
 		}
 		glog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))

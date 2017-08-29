@@ -40,6 +40,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "metadata_test.go",
         "predicates_test.go",
         "utils_test.go",
     ],

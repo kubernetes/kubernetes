@@ -81,6 +81,7 @@ func TestAddFlags(t *testing.T) {
 		"--kubelet-certificate-authority=/var/run/kubernetes/caserver.crt",
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
+		"--request-timeout=2m",
 		"--storage-backend=etcd2",
 	}
 	f.Parse(args)
@@ -95,6 +96,7 @@ func TestAddFlags(t *testing.T) {
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 			MaxRequestsInFlight:         400,
 			MaxMutatingRequestsInFlight: 200,
+			RequestTimeout:              time.Duration(2) * time.Minute,
 			MinRequestTimeout:           1800,
 		},
 		Admission: &apiserveroptions.AdmissionOptions{

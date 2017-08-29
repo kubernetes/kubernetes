@@ -63,7 +63,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	mutators := getDefaultMutators()
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
-	if features.Enabled(cfg.FeatureFlags, features.StoreCertsInSecrets) {
+	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
 
 		// Upload the certificates and kubeconfig files from disk to the cluster as Secrets
 		if err := uploadTLSSecrets(client, cfg.CertificatesDir); err != nil {

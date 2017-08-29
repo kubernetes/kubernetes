@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -123,8 +123,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                                 {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}:               {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfigurationList"}:           {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},

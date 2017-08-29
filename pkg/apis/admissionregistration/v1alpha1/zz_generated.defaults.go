@@ -35,12 +35,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1alpha1.ExternalAdmissionHookConfigurationList{}, func(obj interface{}) {
 		SetObjectDefaults_ExternalAdmissionHookConfigurationList(obj.(*v1alpha1.ExternalAdmissionHookConfigurationList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1alpha1.InitializerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_InitializerConfiguration(obj.(*v1alpha1.InitializerConfiguration))
-	})
-	scheme.AddTypeDefaultingFunc(&v1alpha1.InitializerConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_InitializerConfigurationList(obj.(*v1alpha1.InitializerConfigurationList))
-	})
 	return nil
 }
 
@@ -55,19 +49,5 @@ func SetObjectDefaults_ExternalAdmissionHookConfigurationList(in *v1alpha1.Exter
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ExternalAdmissionHookConfiguration(a)
-	}
-}
-
-func SetObjectDefaults_InitializerConfiguration(in *v1alpha1.InitializerConfiguration) {
-	for i := range in.Initializers {
-		a := &in.Initializers[i]
-		SetDefaults_Initializer(a)
-	}
-}
-
-func SetObjectDefaults_InitializerConfigurationList(in *v1alpha1.InitializerConfigurationList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_InitializerConfiguration(a)
 	}
 }

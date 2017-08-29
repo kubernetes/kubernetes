@@ -42,7 +42,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageRepository = "foo"
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
-			obj.FeatureFlags = map[string]bool{}
+			obj.FeatureGates = map[string]bool{}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
