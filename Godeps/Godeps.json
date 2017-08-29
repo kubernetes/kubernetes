@@ -1567,10 +1567,10 @@
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
 			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
 		},
-                {
-                        "ImportPath": "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions",
-                        "Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
-                },
+		{
+			"ImportPath": "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions",
+			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"
+		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes",
 			"Rev": "54086d6c81b90e91e1d52b866ee726baf5cbe2b1"

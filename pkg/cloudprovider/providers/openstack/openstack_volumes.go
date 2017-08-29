@@ -24,9 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/gophercloud/gophercloud"
+	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
@@ -39,6 +41,7 @@ type volumeService interface {
 	createVolume(opts VolumeCreateOpts) (string, string, error)
 	getVolume(volumeID string) (Volume, error)
 	deleteVolume(volumeName string) error
+	expandVolume(volumeID string, newSize int) error
 }
 
 // Volumes implementation for v1
@@ -64,6 +67,8 @@ type Volume struct {
 	Name string
 	// Current status of the volume.
 	Status string
+	// Volume size in GB
+	Size int
 }
 
 type VolumeCreateOpts struct {
@@ -139,6 +144,7 @@ func (volumes *VolumesV1) getVolume(volumeID string) (Volume, error) {
 		ID:     volumeV1.ID,
 		Name:   volumeV1.Name,
 		Status: volumeV1.Status,
+		Size:   volumeV1.Size,
 	}
 
 	if len(volumeV1.Attachments) > 0 && volumeV1.Attachments[0]["server_id"] != nil {
@@ -162,6 +168,7 @@ func (volumes *VolumesV2) getVolume(volumeID string) (Volume, error) {
 		ID:     volumeV2.ID,
 		Name:   volumeV2.Name,
 		Status: volumeV2.Status,
+		Size:   volumeV2.Size,
 	}
 
 	if len(volumeV2.Attachments) > 0 {
@@ -185,6 +192,30 @@ func (volumes *VolumesV2) deleteVolume(volumeID string) error {
 	err := volumes_v2.Delete(volumes.blockstorage, volumeID).ExtractErr()
 	timeTaken := time.Since(startTime).Seconds()
 	recordOpenstackOperationMetric("delete_v2_volume", timeTaken, err)
+	return err
+}
+
+func (volumes *VolumesV1) expandVolume(volumeID string, newSize int) error {
+	startTime := time.Now()
+	create_opts := volumeexpand.ExtendSizeOpts{
+		NewSize: newSize,
+	}
+	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, create_opts).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+
+	return err
+}
+
+func (volumes *VolumesV2) expandVolume(volumeID string, newSize int) error {
+	startTime := time.Now()
+	create_opts := volumeexpand.ExtendSizeOpts{
+		NewSize: newSize,
+	}
+	err := volumeexpand.ExtendSize(volumes.blockstorage, volumeID, create_opts).ExtractErr()
+	timeTaken := time.Since(startTime).Seconds()
+	recordOpenstackOperationMetric("expand_volume", timeTaken, err)
+
 	return err
 }
 
@@ -272,6 +303,39 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	}
 
 	return nil
+}
+
+// ExpandVolume expands the size of specific cinder volume (in GiB)
+func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	volume, err := os.getVolume(volumeID)
+	if err != nil {
+		return oldSize, err
+	}
+	if volume.Status != VolumeAvailableStatus {
+		// cinder volume can not be expanded if its status is not available
+		return oldSize, fmt.Errorf("volume status is not available")
+	}
+
+	volSizeBytes := newSize.Value()
+	// Cinder works with gigabytes, convert to GiB with rounding up
+	volSizeGB := int(k8s_volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGB))
+
+	// if volume size equals to or greater than the newSize, return nil
+	if volume.Size >= volSizeGB {
+		return newSizeQuant, nil
+	}
+
+	volumes, err := os.volumeService("")
+	if err != nil {
+		return oldSize, err
+	}
+
+	err = volumes.expandVolume(volumeID, volSizeGB)
+	if err != nil {
+		return oldSize, err
+	}
+	return newSizeQuant, nil
 }
 
 // getVolume retrieves Volume by its ID.
