@@ -42,12 +42,12 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 }
 
 func startDeploymentController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "deployments"}] {
 		return false, nil
 	}
 	go deployment.NewDeploymentController(
-		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
-		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
+		ctx.InformerFactory.Apps().V1beta2().Deployments(),
+		ctx.InformerFactory.Apps().V1beta2().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
 	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)

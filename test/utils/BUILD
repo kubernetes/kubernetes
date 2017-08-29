@@ -21,7 +21,7 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/deploymentv1beta1:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

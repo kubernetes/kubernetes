@@ -20,15 +20,15 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) extensions.DeploymentStatus {
-	return extensions.DeploymentStatus{
+func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) apps.DeploymentStatus {
+	return apps.DeploymentStatus{
 		Replicas:          replicas,
 		UpdatedReplicas:   updatedReplicas,
 		AvailableReplicas: availableReplicas,
@@ -36,16 +36,16 @@ func newDeploymentStatus(replicas, updatedReplicas, availableReplicas int32) ext
 }
 
 // assumes the retuned deployment is always observed - not needed to be tested here.
-func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, availableReplicas int32, conditions []extensions.DeploymentCondition) *extensions.Deployment {
-	d := &extensions.Deployment{
+func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, availableReplicas int32, conditions []apps.DeploymentCondition) *apps.Deployment {
+	d := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "progress-test",
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			ProgressDeadlineSeconds: pds,
 			Replicas:                &replicas,
-			Strategy: extensions.DeploymentStrategy{
-				Type: extensions.RecreateDeploymentStrategyType,
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
 			},
 		},
 		Status: newDeploymentStatus(statusReplicas, updatedReplicas, availableReplicas),
@@ -56,16 +56,16 @@ func currentDeployment(pds *int32, replicas, statusReplicas, updatedReplicas, av
 
 func TestRequeueStuckDeployment(t *testing.T) {
 	pds := int32(60)
-	failed := []extensions.DeploymentCondition{
+	failed := []apps.DeploymentCondition{
 		{
-			Type:   extensions.DeploymentProgressing,
+			Type:   apps.DeploymentProgressing,
 			Status: v1.ConditionFalse,
 			Reason: util.TimedOutReason,
 		},
 	}
-	stuck := []extensions.DeploymentCondition{
+	stuck := []apps.DeploymentCondition{
 		{
-			Type:           extensions.DeploymentProgressing,
+			Type:           apps.DeploymentProgressing,
 			Status:         v1.ConditionTrue,
 			LastUpdateTime: metav1.Date(2017, 2, 15, 18, 49, 00, 00, time.UTC),
 		},
@@ -73,8 +73,8 @@ func TestRequeueStuckDeployment(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		d        *extensions.Deployment
-		status   extensions.DeploymentStatus
+		d        *apps.Deployment
+		status   apps.DeploymentStatus
 		nowFn    func() time.Time
 		expected time.Duration
 	}{

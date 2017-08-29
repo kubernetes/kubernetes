@@ -38,7 +38,7 @@ import (
 	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"

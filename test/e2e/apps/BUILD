@@ -29,7 +29,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
+        "//pkg/controller/deploymentv1beta1:go_default_library",
         "//pkg/controller/job:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
         "//pkg/controller/replication:go_default_library",

@@ -37,7 +37,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 

@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -397,7 +398,7 @@ type RealRSControl struct {
 var _ RSControlInterface = &RealRSControl{}
 
 func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.Extensions().ReplicaSets(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.Apps().ReplicaSets(namespace).Patch(name, types.StrategicMergePatchType, data)
 	return err
 }
 
@@ -417,7 +418,7 @@ type RealControllerRevisionControl struct {
 var _ ControllerRevisionControlInterface = &RealControllerRevisionControl{}
 
 func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.AppsV1beta1().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.AppsV1beta2().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
 	return err
 }
 
@@ -807,17 +808,38 @@ func IsPodActive(p *v1.Pod) bool {
 }
 
 // FilterActiveReplicaSets returns replica sets that have (or at least ought to have) pods.
-func FilterActiveReplicaSets(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
-	activeFilter := func(rs *extensions.ReplicaSet) bool {
+func FilterActiveReplicaSets(replicaSets []*apps.ReplicaSet) []*apps.ReplicaSet {
+	activeFilter := func(rs *apps.ReplicaSet) bool {
 		return rs != nil && *(rs.Spec.Replicas) > 0
 	}
 	return FilterReplicaSets(replicaSets, activeFilter)
 }
 
-type filterRS func(rs *extensions.ReplicaSet) bool
+type filterRS func(rs *apps.ReplicaSet) bool
 
 // FilterReplicaSets returns replica sets that are filtered by filterFn (all returned ones should match filterFn).
-func FilterReplicaSets(RSes []*extensions.ReplicaSet, filterFn filterRS) []*extensions.ReplicaSet {
+func FilterReplicaSets(RSes []*apps.ReplicaSet, filterFn filterRS) []*apps.ReplicaSet {
+	var filtered []*apps.ReplicaSet
+	for i := range RSes {
+		if filterFn(RSes[i]) {
+			filtered = append(filtered, RSes[i])
+		}
+	}
+	return filtered
+}
+
+// FilterActiveReplicaSetsExtensionsV1beta1 returns extensions/v1beta1 replica sets that have (or at least ought to have) pods.
+func FilterActiveReplicaSetsExtensionsV1beta1(replicaSets []*extensions.ReplicaSet) []*extensions.ReplicaSet {
+	activeFilter := func(rs *extensions.ReplicaSet) bool {
+		return rs != nil && *(rs.Spec.Replicas) > 0
+	}
+	return FilterReplicaSetsExtensionsV1beta1(replicaSets, activeFilter)
+}
+
+type filterRSExtensionsV1beta1 func(rs *extensions.ReplicaSet) bool
+
+// FilterReplicaSets returns extensions/v1beta1 replica sets that are filtered by filterFn (all returned ones should match filterFn).
+func FilterReplicaSetsExtensionsV1beta1(RSes []*extensions.ReplicaSet, filterFn filterRSExtensionsV1beta1) []*extensions.ReplicaSet {
 	var filtered []*extensions.ReplicaSet
 	for i := range RSes {
 		if filterFn(RSes[i]) {
@@ -848,7 +870,7 @@ func (o ControllersByCreationTimestamp) Less(i, j int) bool {
 }
 
 // ReplicaSetsByCreationTimestamp sorts a list of ReplicaSet by creation timestamp, using their names as a tie breaker.
-type ReplicaSetsByCreationTimestamp []*extensions.ReplicaSet
+type ReplicaSetsByCreationTimestamp []*apps.ReplicaSet
 
 func (o ReplicaSetsByCreationTimestamp) Len() int      { return len(o) }
 func (o ReplicaSetsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -859,9 +881,21 @@ func (o ReplicaSetsByCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
+// ReplicaSetsByCreationTimestampExtensionsV1beta1 sorts a list of extensions/v1beta1 ReplicaSet by creation timestamp, using their names as a tie breaker.
+type ReplicaSetsByCreationTimestampExtensionsV1beta1 []*extensions.ReplicaSet
+
+func (o ReplicaSetsByCreationTimestampExtensionsV1beta1) Len() int      { return len(o) }
+func (o ReplicaSetsByCreationTimestampExtensionsV1beta1) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsByCreationTimestampExtensionsV1beta1) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
 // ReplicaSetsBySizeOlder sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
 // By using the creation timestamp, this sorts from old to new replica sets.
-type ReplicaSetsBySizeOlder []*extensions.ReplicaSet
+type ReplicaSetsBySizeOlder []*apps.ReplicaSet
 
 func (o ReplicaSetsBySizeOlder) Len() int      { return len(o) }
 func (o ReplicaSetsBySizeOlder) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
@@ -874,7 +908,7 @@ func (o ReplicaSetsBySizeOlder) Less(i, j int) bool {
 
 // ReplicaSetsBySizeNewer sorts a list of ReplicaSet by size in descending order, using their creation timestamp or name as a tie breaker.
 // By using the creation timestamp, this sorts from new to old replica sets.
-type ReplicaSetsBySizeNewer []*extensions.ReplicaSet
+type ReplicaSetsBySizeNewer []*apps.ReplicaSet
 
 func (o ReplicaSetsBySizeNewer) Len() int      { return len(o) }
 func (o ReplicaSetsBySizeNewer) Swap(i, j int) { o[i], o[j] = o[j], o[i] }

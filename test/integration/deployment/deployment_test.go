@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deploymentv1beta1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
