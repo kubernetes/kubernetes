@@ -100,7 +100,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Com
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.CreateAnnotation, "create-annotation", false, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
 	usage := "that contains the last-applied-configuration annotations"
-	kubectl.AddJsonFilenameFlag(cmd, &options.FilenameOptions.Filenames, "Filename, directory, or URL to files "+usage)
+	cmdutil.AddFilenameFlag(cmd, &options.FilenameOptions.Filenames, "Filename, directory, or URL to files "+usage)
 
 	return cmd
 }
