@@ -253,7 +253,7 @@ func (o *Options) writeConfigFile() error {
 		return err
 	}
 
-	fmt.Printf("Wrote configuration to: %s\n", o.WriteConfigTo)
+	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
 
 	return nil
 }
