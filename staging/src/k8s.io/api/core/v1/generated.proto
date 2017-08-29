@@ -2351,6 +2351,12 @@ message PersistentVolumeSpec {
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
+
+  // A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+  // simply fail if one is invalid.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+  // +optional
+  repeated string mountOptions = 7;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.

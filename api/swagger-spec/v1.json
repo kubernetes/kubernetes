@@ -18934,6 +18934,13 @@
      "storageClassName": {
       "type": "string",
       "description": "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass."
+     },
+     "mountOptions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options"
      }
     }
    },
