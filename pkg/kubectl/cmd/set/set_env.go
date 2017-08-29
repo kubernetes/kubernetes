@@ -89,6 +89,7 @@ var (
 	  env | grep RAILS_ | kubectl set env -e - dc/registry`)
 )
 
+// EnvOptions holds command line options required to run the command.
 type EnvOptions struct {
 	Out io.Writer
 	Err io.Writer
@@ -140,7 +141,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 		Example: fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.RunEnv(f))
+			cmdutil.CheckErr(options.Run(f))
 		},
 	}
 	usage := "the resource to update the env"
@@ -176,6 +177,7 @@ func keyToEnvName(key string) string {
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
+// Complete completes all the required options.
 func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
 	if !ok {
@@ -213,8 +215,8 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	return nil
 }
 
-// RunEnv contains all the necessary functionality for the OpenShift cli env command
-func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
+// Run contains all the necessary functionality for the OpenShift cli env command.
+func (o *EnvOptions) Run(f cmdutil.Factory) error {
 	kubeClient, err := f.ClientSet()
 	if err != nil {
 		return err
@@ -397,7 +399,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
 
@@ -415,7 +417,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v", err))
 			continue
 		}
 		info.Refresh(obj, true)

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"os"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -29,7 +31,6 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
-	"os"
 )
 
 func TestSetEnvLocal(t *testing.T) {
@@ -59,7 +60,7 @@ func TestSetEnvLocal(t *testing.T) {
 		Local: true}
 	err := opts.Complete(f, cmd, []string{"env=prod"})
 	if err == nil {
-		err = opts.RunEnv(f)
+		err = opts.Run(f)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
