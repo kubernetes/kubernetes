@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -85,6 +86,7 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 }
 
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
+// If the pod references PVCs, the prometheus metrics for those are updated with the result.
 func (s *volumeStatCalculator) calcAndStoreStats() {
 	// Find all Volumes for the Pod
 	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
@@ -117,6 +119,8 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 				Namespace: s.pod.GetNamespace(),
 			}
 			fsStats = append(fsStats, s.parsePodVolumeStats(name, &pvcRef, metric))
+			// Set the PVC's prometheus metrics
+			s.setPVCMetrics(&pvcRef, metric)
 		} else {
 			fsStats = append(fsStats, s.parsePodVolumeStats(name, nil, metric))
 		}
@@ -140,4 +144,14 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
+}
+
+// setPVCMetrics sets the given PVC's prometheus metrics to match the given volume.Metrics
+func (s *volumeStatCalculator) setPVCMetrics(pvcRef *stats.PVCReference, metric *volume.Metrics) {
+	metrics.VolumeStatsAvailableBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Available.Value()))
+	metrics.VolumeStatsCapacityBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Capacity.Value()))
+	metrics.VolumeStatsUsedBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Used.Value()))
+	metrics.VolumeStatsInodes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Inodes.Value()))
+	metrics.VolumeStatsInodesFree.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.InodesFree.Value()))
+	metrics.VolumeStatsInodesUsed.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.InodesUsed.Value()))
 }

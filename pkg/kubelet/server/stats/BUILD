@@ -25,6 +25,7 @@ go_library(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",

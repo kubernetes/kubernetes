@@ -26,18 +26,24 @@ import (
 )
 
 const (
-	KubeletSubsystem           = "kubelet"
-	PodWorkerLatencyKey        = "pod_worker_latency_microseconds"
-	PodStartLatencyKey         = "pod_start_latency_microseconds"
-	CgroupManagerOperationsKey = "cgroup_manager_latency_microseconds"
-	DockerOperationsLatencyKey = "docker_operations_latency_microseconds"
-	DockerOperationsKey        = "docker_operations"
-	DockerOperationsErrorsKey  = "docker_operations_errors"
-	DockerOperationsTimeoutKey = "docker_operations_timeout"
-	PodWorkerStartLatencyKey   = "pod_worker_start_latency_microseconds"
-	PLEGRelistLatencyKey       = "pleg_relist_latency_microseconds"
-	PLEGRelistIntervalKey      = "pleg_relist_interval_microseconds"
-	EvictionStatsAgeKey        = "eviction_stats_age_microseconds"
+	KubeletSubsystem             = "kubelet"
+	PodWorkerLatencyKey          = "pod_worker_latency_microseconds"
+	PodStartLatencyKey           = "pod_start_latency_microseconds"
+	CgroupManagerOperationsKey   = "cgroup_manager_latency_microseconds"
+	DockerOperationsLatencyKey   = "docker_operations_latency_microseconds"
+	DockerOperationsKey          = "docker_operations"
+	DockerOperationsErrorsKey    = "docker_operations_errors"
+	DockerOperationsTimeoutKey   = "docker_operations_timeout"
+	PodWorkerStartLatencyKey     = "pod_worker_start_latency_microseconds"
+	PLEGRelistLatencyKey         = "pleg_relist_latency_microseconds"
+	PLEGRelistIntervalKey        = "pleg_relist_interval_microseconds"
+	EvictionStatsAgeKey          = "eviction_stats_age_microseconds"
+	VolumeStatsCapacityBytesKey  = "volume_stats_capacity_bytes"
+	VolumeStatsAvailableBytesKey = "volume_stats_available_bytes"
+	VolumeStatsUsedBytesKey      = "volume_stats_used_bytes"
+	VolumeStatsInodesKey         = "volume_stats_inodes"
+	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
+	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey        = "runtime_operations"
 	RuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
@@ -162,6 +168,54 @@ var (
 		},
 		[]string{"eviction_signal"},
 	)
+	VolumeStatsCapacityBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsCapacityBytesKey,
+			Help:      "Capacity in bytes of the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
+	VolumeStatsAvailableBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsAvailableBytesKey,
+			Help:      "Number of available bytes in the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
+	VolumeStatsUsedBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsUsedBytesKey,
+			Help:      "Number of used bytes in the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
+	VolumeStatsInodes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsInodesKey,
+			Help:      "Maximum number of inodes in the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
+	VolumeStatsInodesFree = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsInodesFreeKey,
+			Help:      "Number of free inodes in the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
+	VolumeStatsInodesUsed = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      VolumeStatsInodesUsedKey,
+			Help:      "Number of used inodes in the volume",
+		},
+		[]string{"namespace", "persistentvolumeclaim"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -186,6 +240,12 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 		prometheus.MustRegister(RuntimeOperationsLatency)
 		prometheus.MustRegister(RuntimeOperationsErrors)
 		prometheus.MustRegister(EvictionStatsAge)
+		prometheus.MustRegister(VolumeStatsCapacityBytes)
+		prometheus.MustRegister(VolumeStatsAvailableBytes)
+		prometheus.MustRegister(VolumeStatsUsedBytes)
+		prometheus.MustRegister(VolumeStatsInodes)
+		prometheus.MustRegister(VolumeStatsInodesFree)
+		prometheus.MustRegister(VolumeStatsInodesUsed)
 	})
 }
 
