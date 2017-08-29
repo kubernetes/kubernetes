@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/rand"
 )
 
 // rollingUpdate deletes old daemon set pods making sure that no more than
@@ -317,7 +318,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 		return nil, err
 	}
 	hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
-	name := ds.Name + "-" + hash
+	name := ds.Name + "-" + rand.SafeEncodeString(hash)
 	history := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,

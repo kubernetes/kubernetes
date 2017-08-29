@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 )
@@ -50,7 +51,8 @@ func ControllerRevisionName(prefix string, hash uint32) string {
 	if len(prefix) > 223 {
 		prefix = prefix[:223]
 	}
-	return fmt.Sprintf("%s-%d", prefix, hash)
+
+	return fmt.Sprintf("%s-%s", prefix, rand.SafeEncodeString(strconv.FormatInt(int64(hash), 10)))
 }
 
 // NewControllerRevision returns a ControllerRevision with a ControllerRef pointing to parent and indicating that
