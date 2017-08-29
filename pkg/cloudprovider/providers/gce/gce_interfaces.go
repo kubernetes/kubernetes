@@ -26,10 +26,22 @@ type CloudAddressService interface {
 	ReserveRegionAddress(*compute.Address, string) error
 	GetRegionAddress(string, string) (*compute.Address, error)
 	GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error)
-	// TODO: Mock `DeleteRegionAddress(name, region string) endpoint
+	DeleteRegionAddress(name, region string) error
 	// TODO: Mock Global endpoints
 
 	// Alpha API.
 	GetAlphaRegionAddress(name, region string) (*computealpha.Address, error)
 	ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error
+}
+
+// CloudForwardingRuleService is an interface for managing forwarding rules.
+// TODO: Expand the interface to include more methods.
+type CloudForwardingRuleService interface {
+	GetRegionForwardingRule(name, region string) (*compute.ForwardingRule, error)
+	CreateRegionForwardingRule(rule *compute.ForwardingRule, region string) error
+	DeleteRegionForwardingRule(name, region string) error
+
+	// Alpha API.
+	GetAlphaRegionForwardingRule(name, region string) (*computealpha.ForwardingRule, error)
+	CreateAlphaRegionForwardingRule(rule *computealpha.ForwardingRule, region string) error
 }

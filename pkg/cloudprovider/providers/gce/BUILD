@@ -22,6 +22,7 @@ go_library(
         "gce_disks.go",
         "gce_firewall.go",
         "gce_forwardingrule.go",
+        "gce_forwardingrule_fakes.go",
         "gce_healthchecks.go",
         "gce_instancegroup.go",
         "gce_instances.go",
