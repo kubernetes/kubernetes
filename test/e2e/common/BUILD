@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "apparmor.go",
         "autoscaling_utils.go",
+        "configmap_volume.go",
         "configmap.go",
         "container_probe.go",
         "docker_containers.go",
@@ -26,6 +27,7 @@ go_library(
         "privileged.go",
         "projected.go",
         "secrets.go",
+        "secrets_volume.go",
         "sysctl.go",
         "util.go",
         "volumes.go",

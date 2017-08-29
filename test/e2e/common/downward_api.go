@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Downward API", func() {
+var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
@@ -220,3 +220,214 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 func testDownwardAPIUsingPod(f *framework.Framework, pod *v1.Pod, env []v1.EnvVar, expectations []string) {
 	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
 }
+
+func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *v1.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.8",
+			Command: []string{"/mt", "--file_mode=" + filePath},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+				},
+			},
+		},
+	}
+	if itemMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].Mode = itemMode
+	}
+	if defaultMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode = defaultMode
+	}
+
+	return pod
+}
+
+func downwardAPIVolumePodForSimpleTest(name string, filePath string) *v1.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.8",
+			Command: []string{"/mt", "--file_content=" + filePath},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	return pod
+}
+
+func downwardAPIVolumeForContainerResources(name string, filePath string) *v1.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+	pod.Spec.Containers = downwardAPIVolumeBaseContainers("client-container", filePath)
+	return pod
+}
+
+func downwardAPIVolumeForDefaultContainerResources(name string, filePath string) *v1.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+	pod.Spec.Containers = downwardAPIVolumeDefaultBaseContainer("client-container", filePath)
+	return pod
+}
+
+func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
+	return []v1.Container{
+		{
+			Name:    name,
+			Image:   "gcr.io/google_containers/mounttest:0.8",
+			Command: []string{"/mt", "--file_content=" + filePath},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("250m"),
+					v1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1250m"),
+					v1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+}
+
+func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container {
+	return []v1.Container{
+		{
+			Name:    name,
+			Image:   "gcr.io/google_containers/mounttest:0.8",
+			Command: []string{"/mt", "--file_content=" + filePath},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+				},
+			},
+		},
+	}
+
+}
+
+func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[string]string, filePath string) *v1.Pod {
+	pod := downwardAPIVolumeBasePod(name, labels, annotations)
+
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.8",
+			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations, pod)
+	return pod
+}
+
+func downwardAPIVolumeBasePod(name string, labels, annotations map[string]string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "podinfo",
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: []v1.DownwardAPIVolumeFile{
+								{
+									Path: "podname",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.name",
+									},
+								},
+								{
+									Path: "cpu_limit",
+									ResourceFieldRef: &v1.ResourceFieldSelector{
+										ContainerName: "client-container",
+										Resource:      "limits.cpu",
+									},
+								},
+								{
+									Path: "cpu_request",
+									ResourceFieldRef: &v1.ResourceFieldSelector{
+										ContainerName: "client-container",
+										Resource:      "requests.cpu",
+									},
+								},
+								{
+									Path: "memory_limit",
+									ResourceFieldRef: &v1.ResourceFieldSelector{
+										ContainerName: "client-container",
+										Resource:      "limits.memory",
+									},
+								},
+								{
+									Path: "memory_request",
+									ResourceFieldRef: &v1.ResourceFieldSelector{
+										ContainerName: "client-container",
+										Resource:      "requests.memory",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+
+	return pod
+}
+
+func applyLabelsAndAnnotationsToDownwardAPIPod(labels, annotations map[string]string, pod *v1.Pod) {
+	if len(labels) > 0 {
+		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, v1.DownwardAPIVolumeFile{
+			Path: "labels",
+			FieldRef: &v1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.labels",
+			},
+		})
+	}
+
+	if len(annotations) > 0 {
+		pod.Spec.Volumes[0].DownwardAPI.Items = append(pod.Spec.Volumes[0].DownwardAPI.Items, v1.DownwardAPIVolumeFile{
+			Path: "annotations",
+			FieldRef: &v1.ObjectFieldSelector{
+				APIVersion: "v1",
+				FieldPath:  "metadata.annotations",
+			},
+		})
+	}
+}
+
+// TODO: add test-webserver example as pointed out in https://github.com/kubernetes/kubernetes/pull/5093#discussion-diff-37606771
