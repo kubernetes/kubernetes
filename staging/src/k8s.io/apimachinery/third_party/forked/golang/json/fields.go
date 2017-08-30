@@ -35,6 +35,9 @@ func LookupPatchMetadata(t reflect.Type, jsonField string) (
 		elemType = t.Elem()
 		return
 	}
+	if t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
+		t = t.Elem()
+	}
 	if t.Kind() != reflect.Struct {
 		e = fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
 			t.Kind().String())
