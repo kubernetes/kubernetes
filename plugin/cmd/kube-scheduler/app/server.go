@@ -93,7 +93,9 @@ func Run(s *options.SchedulerServer) error {
 		return fmt.Errorf("error creating scheduler: %v", err)
 	}
 
-	go startHTTP(s)
+	if s.Port != -1 {
+		go startHTTP(s)
+	}
 
 	stop := make(chan struct{})
 	defer close(stop)
