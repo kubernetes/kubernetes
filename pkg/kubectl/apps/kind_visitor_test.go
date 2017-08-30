@@ -31,7 +31,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		visitor = &TestKindVisitor{map[string]int{}}
 	})
 
-	It("should Visit DaemonSet iff the Kind is a DaemonSet", func() {
+	It("should Visit DaemonSet if the Kind is a DaemonSet", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "DaemonSet",
 			Group: "apps",
@@ -51,7 +51,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
-	It("should Visit Deployment iff the Kind is a Deployment", func() {
+	It("should Visit Deployment if the Kind is a Deployment", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "Deployment",
 			Group: "apps",
@@ -71,7 +71,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
-	It("should Visit Job iff the Kind is a Job", func() {
+	It("should Visit Job if the Kind is a Job", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "Job",
 			Group: "batch",
@@ -103,7 +103,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
-	It("should Visit ReplicationController iff the Kind is a ReplicationController", func() {
+	It("should Visit ReplicationController if the Kind is a ReplicationController", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "ReplicationController",
 			Group: "",
@@ -123,7 +123,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
-	It("should Visit ReplicaSet iff the Kind is a ReplicaSet", func() {
+	It("should Visit ReplicaSet if the Kind is a ReplicaSet", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "ReplicaSet",
 			Group: "extensions",
@@ -134,7 +134,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		}))
 	})
 
-	It("should Visit StatefulSet iff the Kind is a StatefulSet", func() {
+	It("should Visit StatefulSet if the Kind is a StatefulSet", func() {
 		kind := apps.GroupKindElement{
 			Kind:  "StatefulSet",
 			Group: "apps",
