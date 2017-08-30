@@ -106,6 +106,18 @@ func (cas *FakeCloudAddressService) GetRegionAddress(name, region string) (*comp
 	return nil, err
 }
 
+func (cas *FakeCloudAddressService) DeleteRegionAddress(name, region string) error {
+	if _, exists := cas.addrsByRegionAndName[region]; !exists {
+		return makeGoogleAPINotFoundError("")
+	}
+
+	if _, exists := cas.addrsByRegionAndName[region][name]; !exists {
+		return makeGoogleAPINotFoundError("")
+	}
+	delete(cas.addrsByRegionAndName[region], name)
+	return nil
+}
+
 func (cas *FakeCloudAddressService) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
 		return nil, makeGoogleAPINotFoundError("")

@@ -9,6 +9,7 @@ go_library(
     srcs = [
         "helper.go",
         "set.go",
+        "set_env.go",
         "set_image.go",
         "set_resources.go",
         "set_selector.go",
@@ -22,6 +23,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/cmd/util/env:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -40,6 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "set_env_test.go",
         "set_image_test.go",
         "set_resources_test.go",
         "set_selector_test.go",

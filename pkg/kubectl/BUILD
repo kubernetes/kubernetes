@@ -133,6 +133,7 @@ go_library(
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util:go_default_library",
+        "//pkg/kubectl/util/hash:go_default_library",
         "//pkg/kubectl/util/slice:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",

@@ -28,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 type strategy struct {
@@ -50,6 +52,11 @@ func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Obje
 	crd := obj.(*apiextensions.CustomResourceDefinition)
 	crd.Status = apiextensions.CustomResourceDefinitionStatus{}
 	crd.Generation = 1
+
+	// if the feature gate is disabled, drop the feature.
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+		crd.Spec.Validation = nil
+	}
 }
 
 func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
@@ -67,6 +74,11 @@ func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime
 	// the controller has *seen*.
 	if !apiequality.Semantic.DeepEqual(oldCRD.Spec, newCRD.Spec) {
 		newCRD.Generation = oldCRD.Generation + 1
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+		newCRD.Spec.Validation = nil
+		oldCRD.Spec.Validation = nil
 	}
 }
 

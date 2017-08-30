@@ -196,6 +196,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 					SecretNamespace: &secretNamespace,
 				},
 			},
+			MountOptions: a.options.MountOptions,
 		},
 	}
 	return pv, nil

@@ -465,6 +465,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*v1.PersistentVolume, err
 					ReadOnly:  false,
 				},
 			},
+			MountOptions: c.options.MountOptions,
 		},
 	}
 

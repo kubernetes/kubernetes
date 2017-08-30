@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -288,9 +287,5 @@ func (ttlc *TTLController) updateNodeIfNeeded(key string) error {
 		return nil
 	}
 
-	objCopy, err := scheme.Scheme.DeepCopy(node)
-	if err != nil {
-		return err
-	}
-	return ttlc.patchNodeWithAnnotation(objCopy.(*v1.Node), v1.ObjectTTLAnnotationKey, desiredTTL)
+	return ttlc.patchNodeWithAnnotation(node.DeepCopy(), v1.ObjectTTLAnnotationKey, desiredTTL)
 }

@@ -151,7 +151,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 		By("Restoring cluster size")
 		setMigSizes(originalSizes)
-		Expect(framework.WaitForClusterSize(c, sum, scaleDownTimeout)).NotTo(HaveOccurred())
+		Expect(framework.WaitForReadyNodes(c, sum, scaleDownTimeout)).NotTo(HaveOccurred())
 
 		By("Wait for kube-dns scaled to expected number")
 		Expect(waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)).NotTo(HaveOccurred())

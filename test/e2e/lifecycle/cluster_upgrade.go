@@ -216,6 +216,69 @@ var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func()
 	})
 })
 
+var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
+	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
+
+	// Create the frameworks here because we can only create them
+	// in a "Describe".
+	testFrameworks := createUpgradeFrameworks(upgradeTests)
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce")
+	})
+
+	Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
+		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "kube-proxy upgrade"}
+			kubeProxyUpgradeTest := &junit.TestCase{
+				Name:      "kube-proxy-ds-upgrade",
+				Classname: "upgrade_tests",
+			}
+			testSuite.TestCases = append(testSuite.TestCases, kubeProxyUpgradeTest)
+
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
+				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, true))
+				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+		})
+	})
+
+	Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
+		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "kube-proxy downgrade"}
+			kubeProxyDowngradeTest := &junit.TestCase{
+				Name:      "kube-proxy-ds-downgrade",
+				Classname: "upgrade_tests",
+			}
+			testSuite.TestCases = append(testSuite.TestCases, kubeProxyDowngradeTest)
+
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, kubeProxyDowngradeTest)
+				// Yes this really is a downgrade. And nodes must downgrade first.
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, false))
+				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
+				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+			}
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+		})
+	})
+})
+
 type chaosMonkeyAdapter struct {
 	test        upgrades.Test
 	testReport  *junit.TestCase

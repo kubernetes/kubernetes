@@ -54,6 +54,11 @@ type StorageClass struct {
 	// PersistentVolumes of this storage class are created with
 	// +optional
 	ReclaimPolicy *api.PersistentVolumeReclaimPolicy
+
+	// mountOptions are the mount options that dynamically provisioned
+	// PersistentVolumes of this storage class are created with
+	// +optional
+	MountOptions []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

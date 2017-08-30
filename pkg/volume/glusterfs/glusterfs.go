@@ -711,6 +711,7 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if len(pv.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = p.plugin.GetAccessModes()
 	}
+	pv.Spec.MountOptions = p.options.MountOptions
 
 	gidStr := strconv.FormatInt(int64(gid), 10)
 

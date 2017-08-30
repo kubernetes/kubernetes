@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -595,15 +596,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 
 	dirty := false
 
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
-
+	claimClone := claim.DeepCopy()
 	if claim.Status.Phase != phase {
 		claimClone.Status.Phase = phase
 		dirty = true
@@ -700,15 +693,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *v1.PersistentV
 		return volume, nil
 	}
 
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
-
+	volumeClone := volume.DeepCopy()
 	volumeClone.Status.Phase = phase
 	volumeClone.Status.Message = message
 
@@ -765,14 +750,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	volumeClone := volume.DeepCopy()
 
 	// Bind the volume to the claim if it is not bound yet
 	if volume.Spec.ClaimRef == nil ||
@@ -830,14 +808,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
+	claimClone := claim.DeepCopy()
 
 	if shouldBind {
 		dirty = true
@@ -928,15 +899,8 @@ func (ctrl *PersistentVolumeController) bind(volume *v1.PersistentVolume, claim 
 func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume) error {
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
-	// Save the PV only when any modification is necessary.
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	// Save the PV only when any modification is neccessary.
+	volumeClone := volume.DeepCopy()
 
 	if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 		// The volume was bound by the controller.
@@ -1319,11 +1283,21 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
+		MountOptions:                  storageClass.MountOptions,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
+	}
+
+	// Refuse to provision if the plugin doesn't support mount options, creation
+	// of PV would be rejected by validation anyway
+	if !plugin.SupportsMountOption() && len(options.MountOptions) > 0 {
+		strerr := fmt.Sprintf("Mount options are not supported by the provisioner but StorageClass %q has mount options %v", storageClass.Name, options.MountOptions)
+		glog.V(2).Infof("Mount options are not supported by the provisioner but claim %q's StorageClass %q has mount options %v", claimToClaimKey(claim), storageClass.Name, options.MountOptions)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		return
 	}
 
 	// Provision the volume
@@ -1364,14 +1338,19 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
 		var newVol *v1.PersistentVolume
-		if newVol, err = ctrl.kubeClient.Core().PersistentVolumes().Create(volume); err == nil {
+		if newVol, err = ctrl.kubeClient.Core().PersistentVolumes().Create(volume); err == nil || apierrs.IsAlreadyExists(err) {
 			// Save succeeded.
-			glog.V(3).Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
+			if err != nil {
+				glog.V(3).Infof("volume %q for claim %q already exists, reusing", volume.Name, claimToClaimKey(claim))
+				err = nil
+			} else {
+				glog.V(3).Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
 
-			_, updateErr := ctrl.storeVolumeUpdate(newVol)
-			if updateErr != nil {
-				// We will get an "volume added" event soon, this is not a big error
-				glog.V(4).Infof("provisionClaimOperation [%s]: cannot update internal cache: %v", volume.Name, updateErr)
+				_, updateErr := ctrl.storeVolumeUpdate(newVol)
+				if updateErr != nil {
+					// We will get an "volume added" event soon, this is not a big error
+					glog.V(4).Infof("provisionClaimOperation [%s]: cannot update internal cache: %v", volume.Name, updateErr)
+				}
 			}
 			break
 		}

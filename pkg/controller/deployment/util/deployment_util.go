@@ -36,7 +36,6 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
@@ -649,16 +648,8 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
 func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) (bool, error) {
-	cp, err := scheme.Scheme.DeepCopy(template1)
-	if err != nil {
-		return false, err
-	}
-	t1Copy := cp.(*v1.PodTemplateSpec)
-	cp, err = scheme.Scheme.DeepCopy(template2)
-	if err != nil {
-		return false, err
-	}
-	t2Copy := cp.(*v1.PodTemplateSpec)
+	t1Copy := template1.DeepCopy()
+	t2Copy := template2.DeepCopy()
 	// First, compare template.Labels (ignoring hash)
 	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
 	if len(labels1) > len(labels2) {
@@ -989,16 +980,4 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
-}
-
-func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	objCopy, err := scheme.Scheme.DeepCopy(deployment)
-	if err != nil {
-		return nil, err
-	}
-	copied, ok := objCopy.(*extensions.Deployment)
-	if !ok {
-		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
-	}
-	return copied, nil
 }

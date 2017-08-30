@@ -20,10 +20,15 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"github.com/go-openapi/spec"
+
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -100,6 +105,12 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionNames(&spec.Names, fldPath.Child("names"))...)
 
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(spec.Validation, fldPath.Child("validation"))...)
+	} else if spec.Validation != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("validation"), "disabled by feature-gate"))
+	}
+
 	return allErrs
 }
 
@@ -154,6 +165,165 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 	// kind and listKind may not be the same or parsing become ambiguous
 	if len(names.Kind) > 0 && names.Kind == names.ListKind {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("listKind"), names.ListKind, "kind and listKind may not be the same"))
+	}
+
+	return allErrs
+}
+
+// specStandardValidator applies validations for different OpenAPI specfication versions.
+type specStandardValidator interface {
+	validate(spec *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList
+}
+
+// ValidateCustomResourceDefinitionValidation statically validates
+func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiextensions.CustomResourceValidation, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if customResourceValidation == nil {
+		return allErrs
+	}
+
+	if customResourceValidation.OpenAPIV3Schema != nil {
+		openAPIV3Schema := &specStandardValidatorV3{}
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(customResourceValidation.OpenAPIV3Schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema)...)
+	}
+
+	return allErrs
+}
+
+// ValidateCustomResourceDefinitionOpenAPISchema statically validates
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if schema == nil {
+		return allErrs
+	}
+
+	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
+
+	if schema.UniqueItems == true {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uniqueItems"), "uniqueItems cannot be set to true since the runtime complexity becomes quadratic"))
+	}
+
+	// additionalProperties contradicts Kubernetes API convention to ignore unknown fields
+	if schema.AdditionalProperties != nil {
+		if schema.AdditionalProperties.Allows == false {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "additionalProperties cannot be set to false"))
+		}
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), ssv)...)
+	}
+
+	if schema.Ref != nil {
+		openapiRef, err := spec.NewRef(*schema.Ref)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ref"), *schema.Ref, err.Error()))
+		}
+
+		if !openapiRef.IsValidURI() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ref"), *schema.Ref, "ref does not point to a valid URI"))
+		}
+	}
+
+	if schema.AdditionalItems != nil {
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalItems.Schema, fldPath.Child("additionalItems"), ssv)...)
+	}
+
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv)...)
+
+	if len(schema.AllOf) != 0 {
+		for _, jsonSchema := range schema.AllOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf"), ssv)...)
+		}
+	}
+
+	if len(schema.OneOf) != 0 {
+		for _, jsonSchema := range schema.OneOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf"), ssv)...)
+		}
+	}
+
+	if len(schema.AnyOf) != 0 {
+		for _, jsonSchema := range schema.AnyOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf"), ssv)...)
+		}
+	}
+
+	if len(schema.Properties) != 0 {
+		for property, jsonSchema := range schema.Properties {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), ssv)...)
+		}
+	}
+
+	if len(schema.PatternProperties) != 0 {
+		for property, jsonSchema := range schema.PatternProperties {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("patternProperties").Key(property), ssv)...)
+		}
+	}
+
+	if len(schema.Definitions) != 0 {
+		for definition, jsonSchema := range schema.Definitions {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv)...)
+		}
+	}
+
+	if schema.Items != nil {
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv)...)
+		if len(schema.Items.JSONSchemas) != 0 {
+			for _, jsonSchema := range schema.Items.JSONSchemas {
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items"), ssv)...)
+			}
+		}
+	}
+
+	if schema.Dependencies != nil {
+		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv)...)
+		}
+	}
+
+	return allErrs
+}
+
+type specStandardValidatorV3 struct{}
+
+// validate validates against OpenAPI Schema v3.
+func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if schema == nil {
+		return allErrs
+	}
+
+	if schema.Default != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "default is not supported"))
+	}
+
+	if schema.ID != "" {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("id"), "id is not supported"))
+	}
+
+	if schema.AdditionalItems != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalItems"), "additionalItems is not supported"))
+	}
+
+	if len(schema.PatternProperties) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("patternProperties"), "patternProperties is not supported"))
+	}
+
+	if len(schema.Definitions) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("definitions"), "definitions is not supported"))
+	}
+
+	if schema.Dependencies != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dependencies"), "dependencies is not supported"))
+	}
+
+	if schema.Type == "null" {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("type"), "type cannot be set to null"))
+	}
+
+	if schema.Items != nil && len(schema.Items.JSONSchemas) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "items must be a schema object and not an array"))
 	}
 
 	return allErrs

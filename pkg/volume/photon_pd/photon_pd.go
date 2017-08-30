@@ -375,6 +375,7 @@ func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, err
 					FSType: fstype,
 				},
 			},
+			MountOptions: p.options.MountOptions,
 		},
 	}
 	if len(p.options.PVC.Spec.AccessModes) == 0 {

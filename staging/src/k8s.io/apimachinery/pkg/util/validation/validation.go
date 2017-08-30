@@ -188,6 +188,14 @@ func IsValidPortNum(port int) []string {
 	return []string{InclusiveRangeError(1, 65535)}
 }
 
+// IsInRange tests that the argument is in an inclusive range.
+func IsInRange(value int, min int, max int) []string {
+	if value >= min && value <= max {
+		return nil
+	}
+	return []string{InclusiveRangeError(min, max)}
+}
+
 // Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
 // TODO: once we have a type for UID/GID we should make these that type.
 const (
