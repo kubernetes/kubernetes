@@ -147,7 +147,7 @@ func MakeProtocols(protocols map[string]string) string {
 func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	protocolsString, isString := protocols.(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v", protocols)
+		return nil, fmt.Errorf("expected string, found %T", protocols)
 	}
 	if len(protocolsString) == 0 {
 		return nil, fmt.Errorf("no protocols passed")
