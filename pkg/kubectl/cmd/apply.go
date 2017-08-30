@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -127,6 +128,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().Bool("openapi-patch", true, "If true, use openapi rather than baked-in types when calculating diff.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -187,9 +189,18 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 }
 
 func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	openAPIcacheDir := cmdutil.GetFlagString(cmd, "schema-cache-dir")
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), openAPIcacheDir)
 	if err != nil {
 		return err
+	}
+
+	var openapiSchema openapi.Resources
+	if cmdutil.GetFlagBool(cmd, "openapi-patch") {
+		openapiSchema, err = f.OpenAPISchema(openAPIcacheDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -321,6 +332,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				cascade:       options.Cascade,
 				timeout:       options.Timeout,
 				gracePeriod:   options.GracePeriod,
+				openapiSchema: openapiSchema,
 			}
 
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
@@ -567,6 +579,8 @@ type patcher struct {
 	cascade     bool
 	timeout     time.Duration
 	gracePeriod int
+
+	openapiSchema openapi.Resources
 }
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, runtime.Object, error) {
@@ -582,16 +596,42 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
 	}
 
-	// Create the versioned struct from the type defined in the restmapping
-	// (which is the API version we'll be submitting the patch to)
-	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
 	var patchType types.PatchType
 	var patch []byte
+	var lookupPatchMeta strategicpatch.LookupPatchMeta
+	var schema openapi.Schema
 	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
-	switch {
-	case runtime.IsNotRegisteredError(err):
-		// fall back to generic JSON merge patch
-		patchType = types.MergePatchType
+	// Try to use openapi first if the openapi spec is available.
+	// Otherwise, fall back to baked-in types.
+	if p.openapiSchema != nil {
+		schema = p.openapiSchema.LookupResource(p.mapping.GroupVersionKind)
+	}
+
+	if schema != nil {
+		patchType = types.StrategicMergePatchType
+		lookupPatchMeta = strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
+	} else {
+		// Create the versioned struct from the type defined in the restmapping
+		// (which is the API version we'll be submitting the patch to)
+		versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
+		switch {
+		case runtime.IsNotRegisteredError(err):
+			// fall back to generic JSON merge patch
+			patchType = types.MergePatchType
+		case err != nil:
+			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+		case err == nil:
+			// Compute a three way strategic merge patch to send to server.
+			patchType = types.StrategicMergePatchType
+			lookupPatchMeta, err = strategicpatch.NewPatchMetaFromStruct(versionedObject)
+			if err != nil {
+				cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+			}
+		}
+	}
+
+	switch patchType {
+	case types.MergePatchType:
 		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
 			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
 		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
@@ -601,12 +641,8 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 			}
 			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 		}
-	case err != nil:
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
-	case err == nil:
-		// Compute a three way strategic merge patch to send to server.
-		patchType = types.StrategicMergePatchType
-		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+	case types.StrategicMergePatchType:
+		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite)
 		if err != nil {
 			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 		}
