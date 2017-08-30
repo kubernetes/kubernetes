@@ -387,7 +387,7 @@ func findNewName(args []string, oldRc *api.ReplicationController) string {
 		return args[1]
 	}
 	if oldRc != nil {
-		newName, _ := kubectl.GetNextControllerAnnotation(oldRc)
+		newName, _ := kubectl.NextControllerAnnotation(oldRc)
 		return newName
 	}
 	return ""

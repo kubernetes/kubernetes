@@ -672,8 +672,8 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	return nil
 }
 
-// GetNextControllerAnnotation gets the annotation for the next RC.
-func GetNextControllerAnnotation(rc *api.ReplicationController) (string, bool) {
+// NextControllerAnnotation gets the annotation for the next RC.
+func NextControllerAnnotation(rc *api.ReplicationController) (string, bool) {
 	res, found := rc.Annotations[nextControllerAnnotation]
 	return res, found
 }
