@@ -22,6 +22,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
 var Scheme = runtime.NewScheme()
@@ -49,5 +50,6 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	metricsv1alpha1.AddToScheme(scheme)
+	metricsv1beta1.AddToScheme(scheme)
 
 }

@@ -790,6 +790,7 @@ staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/metrics
 staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1
+staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/client/custom_metrics
 staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
