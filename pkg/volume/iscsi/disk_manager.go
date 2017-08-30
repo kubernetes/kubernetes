@@ -62,7 +62,29 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
 	if err != nil {
-		glog.Errorf("failed to bind mount:%s", globalPDPath)
+		glog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)
+		noMnt, mntErr := b.mounter.IsLikelyNotMountPoint(volPath)
+		if mntErr != nil {
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			return err
+		}
+		if !noMnt {
+			if mntErr = b.mounter.Unmount(volPath); mntErr != nil {
+				glog.Errorf("Failed to unmount: %v", mntErr)
+				return err
+			}
+			noMnt, mntErr = b.mounter.IsLikelyNotMountPoint(volPath)
+			if mntErr != nil {
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				return err
+			}
+			if !noMnt {
+				//  will most likely retry on next sync loop.
+				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", volPath)
+				return err
+			}
+		}
+		os.Remove(volPath)
 		return err
 	}
 
