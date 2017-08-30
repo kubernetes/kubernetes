@@ -7,9 +7,9 @@ http_archive(
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "5da78568ffb9a323410c701618c23da8c93f4bf4aea76eee41ac244dbd8c8f95",
-    strip_prefix = "repo-infra-4eaf9e671bbb549fb4ec292cf251f921d7ef80ac",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/4eaf9e671bbb549fb4ec292cf251f921d7ef80ac.tar.gz"],
+    sha256 = "ca8fa1ee0928220d77fcaa6bcf40a26c57800c024e21b08c8dd9cc8fbf910236",
+    strip_prefix = "repo-infra-0aafaab9e158d3628804242c6a9c4dd3eb8bce1f",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/0aafaab9e158d3628804242c6a9c4dd3eb8bce1f.tar.gz"],
 )
 
 ETCD_VERSION = "3.0.17"
