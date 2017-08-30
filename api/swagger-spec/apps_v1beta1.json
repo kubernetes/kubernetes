@@ -5093,6 +5093,13 @@
       },
       "description": "Pod volumes to mount into the container's filesystem. Cannot be updated."
      },
+     "volumeDevices": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeDevice"
+      },
+      "description": "Block devices to be used by the container."
+     },
      "livenessProbe": {
       "$ref": "v1.Probe",
       "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
@@ -5334,6 +5341,24 @@
      "subPath": {
       "type": "string",
       "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root)."
+     }
+    }
+   },
+   "v1.VolumeDevice": {
+    "id": "v1.VolumeDevice",
+    "description": "volumeDevice describes a mounting of a raw block device within a container.",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Required: This must match the Name of a Volume in the pod."
+     },
+     "devicePath": {
+      "type": "string",
+      "description": "Required: Path inside of the container that the device will be mounted."
      }
     }
    },
@@ -6199,11 +6224,19 @@
      "storageClassName": {
       "type": "string",
       "description": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1"
+     },
+     "volumeMode": {
+      "$ref": "v1.PersistentVolumeMode",
+      "description": "volumeMode defines what type of volume is required by the claim. values include Filesystem or Block and default is Filesystem if not present"
      }
     }
    },
    "v1.PersistentVolumeAccessMode": {
     "id": "v1.PersistentVolumeAccessMode",
+    "properties": {}
+   },
+   "v1.PersistentVolumeMode": {
+    "id": "v1.PersistentVolumeMode",
     "properties": {}
    },
    "v1.PersistentVolumeClaimStatus": {

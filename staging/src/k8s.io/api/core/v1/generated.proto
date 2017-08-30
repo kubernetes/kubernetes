@@ -513,6 +513,12 @@ message Container {
   // +patchStrategy=merge
   repeated VolumeMount volumeMounts = 9;
 
+  // Block devices to be used by the container.
+  // +patchMergeKey=devicePath
+  // +patchStrategy=merge
+  // +optional
+  repeated VolumeDevice deviceMounts = 21;
+
   // Periodic probe of container liveness.
   // Container will be restarted if the probe fails.
   // Cannot be updated.
@@ -2170,6 +2176,11 @@ message PersistentVolumeClaimSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
   // +optional
   optional string storageClassName = 5;
+
+  // volumeMode defines what type of volume is required by the claim.
+  // values include Filesystem or Block and default is Filesystem if not present
+  // +optional
+  optional string volumeMode = 6;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2358,6 +2369,11 @@ message PersistentVolumeSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
   // +optional
   repeated string mountOptions = 7;
+
+  // volumeMode defines if a volume is intended to be used with a formatted filesystem
+  // or to remain in raw block state.
+  // +optional
+  optional string volumeMode = 8;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -4051,6 +4067,15 @@ message Volume {
   // If not specified, the Volume is implied to be an EmptyDir.
   // This implied behavior is deprecated and will be removed in a future version.
   optional VolumeSource volumeSource = 2;
+}
+
+// volumeDevice describes a mounting of a raw block device within a container.
+message VolumeDevice {
+  // Required: This must match the Name of a Volume in the pod.
+  optional string name = 1;
+
+  // Required: Path inside of the container that the device will be mounted.
+  optional string devicePath = 2;
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
