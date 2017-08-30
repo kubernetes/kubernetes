@@ -43,13 +43,14 @@ import (
 type Scaler interface {
 	// Scale scales the named resource after checking preconditions. It optionally
 	// retries in the event of resource version mismatch (if retry is not nil),
-	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
+	// and optionally waits until the status of the resource matches newSize (if wait is not nil).
 	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
 	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
-	// a necessary building block for Scale
+	// a necessary building block for Scale.
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
+// ScalerFor returns a Scaler for the resource specified by kind.
 func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
@@ -83,15 +84,20 @@ type PreconditionError struct {
 	ActualValue   string
 }
 
+// Error returns an error message string.
 func (pe PreconditionError) Error() string {
 	return fmt.Sprintf("Expected %s to be %s, was %s", pe.Precondition, pe.ExpectedValue, pe.ActualValue)
 }
 
+// ScaleErrorType opaque error value indicating type of Scale failure.
 type ScaleErrorType int
 
 const (
+	// ScaleGetFailure indicates failure to Get() resource.
 	ScaleGetFailure ScaleErrorType = iota
+	// ScaleUpdateFailure indicates failure to Update() resource.
 	ScaleUpdateFailure
+	// ScaleUpdateConflictFailure indicates the update conflicts.
 	ScaleUpdateConflictFailure
 )
 
@@ -103,6 +109,7 @@ type ScaleError struct {
 	ActualError     error
 }
 
+// Error returns an error message string.
 func (c ScaleError) Error() string {
 	return fmt.Sprintf(
 		"Scaling the resource failed with: %v; Current resource version %s",
@@ -114,6 +121,7 @@ type RetryParams struct {
 	Interval, Timeout time.Duration
 }
 
+// NewRetryParams creates a RetryParams structure from interval and timeout.
 func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 	return &RetryParams{interval, timeout}
 }
@@ -138,7 +146,7 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 	}
 }
 
-// ValidateStatefulSet ensures that the preconditions match. Returns nil if they are valid, an error otherwise.
+// ValidateStatefulSet ensures that the preconditions match.
 func (precondition *ScalePrecondition) ValidateStatefulSet(ps *apps.StatefulSet) error {
 	if precondition.Size != -1 && int(ps.Spec.Replicas) != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(ps.Spec.Replicas))}
@@ -149,7 +157,7 @@ func (precondition *ScalePrecondition) ValidateStatefulSet(ps *apps.StatefulSet)
 	return nil
 }
 
-// ValidateReplicationController ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
+// ValidateReplicationController ensures that the preconditions match.
 func (precondition *ScalePrecondition) ValidateReplicationController(controller *api.ReplicationController) error {
 	if precondition.Size != -1 && int(controller.Spec.Replicas) != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(controller.Spec.Replicas))}
@@ -160,6 +168,7 @@ func (precondition *ScalePrecondition) ValidateReplicationController(controller 
 	return nil
 }
 
+// ReplicationControllerScaler implements the Scaler interface.
 type ReplicationControllerScaler struct {
 	c coreclient.ReplicationControllersGetter
 }
@@ -258,6 +267,7 @@ func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions
 	return nil
 }
 
+// ReplicaSetScaler implements the Scaler interface.
 type ReplicaSetScaler struct {
 	c extensionsclient.ReplicaSetsGetter
 }
@@ -315,7 +325,7 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 	return nil
 }
 
-// ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
+// ValidateJob ensures that the preconditions match.
 func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	if precondition.Size != -1 && job.Spec.Parallelism == nil {
 		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
@@ -329,6 +339,7 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	return nil
 }
 
+// StatefulSetScaler implements the Scaler interface.
 type StatefulSetScaler struct {
 	c appsclient.StatefulSetsGetter
 }
@@ -356,6 +367,9 @@ func (scaler *StatefulSetScaler) ScaleSimple(namespace, name string, preconditio
 	return updatedStatefulSet.ResourceVersion, nil
 }
 
+// Scale updates a StatefulSet to a new size, with optional precondition check (if preconditions is
+// not nil), optional retries (if retry is not nil), and then optionally waits for it's replica
+// count to reach the new value (if wait is not nil).
 func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
 	if preconditions == nil {
 		preconditions = &ScalePrecondition{-1, ""}
@@ -382,6 +396,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 	return nil
 }
 
+// JobScaler implements the Scaler interface.
 type JobScaler struct {
 	c batchclient.JobsGetter
 }
@@ -439,7 +454,7 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 	return nil
 }
 
-// ValidateDeployment ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
+// ValidateDeployment ensures that the preconditions match.
 func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions.Deployment) error {
 	if precondition.Size != -1 && int(deployment.Spec.Replicas) != precondition.Size {
 		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(deployment.Spec.Replicas))}
@@ -450,6 +465,7 @@ func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions
 	return nil
 }
 
+// DeploymentScaler implements the Scaler interface.
 type DeploymentScaler struct {
 	c extensionsclient.DeploymentsGetter
 }
@@ -481,8 +497,9 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 	return updatedDeployment.ObjectMeta.ResourceVersion, nil
 }
 
-// Scale updates a deployment to a new size, with optional precondition check (if preconditions is not nil),
-// optional retries (if retry is not nil), and then optionally waits for the status to reach desired count.
+// Scale updates a Deployment to a new size, with optional precondition check (if preconditions is
+// not nil), optional retries (if retry is not nil), and then optionally waits for it's replica
+// count to reach the new value (if wait is not nil).
 func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
 	if preconditions == nil {
 		preconditions = &ScalePrecondition{-1, ""}
