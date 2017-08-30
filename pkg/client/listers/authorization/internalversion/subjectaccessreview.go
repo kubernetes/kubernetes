@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type SubjectAccessReviewLister interface {
 	// List lists all SubjectAccessReviews in the indexer.
 	List(selector labels.Selector) (ret []*authorization.SubjectAccessReview, err error)
+	// ListWithOptions lists all SubjectAccessReviews in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*authorization.SubjectAccessReview, err error)
 	// Get retrieves the SubjectAccessReview from the index for a given name.
 	Get(name string) (*authorization.SubjectAccessReview, error)
 	SubjectAccessReviewListerExpansion
@@ -48,6 +52,15 @@ func NewSubjectAccessReviewLister(indexer cache.Indexer) SubjectAccessReviewList
 // List lists all SubjectAccessReviews in the indexer.
 func (s *subjectAccessReviewLister) List(selector labels.Selector) (ret []*authorization.SubjectAccessReview, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*authorization.SubjectAccessReview))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all SubjectAccessReviews in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *subjectAccessReviewLister) ListWithOptions(options metav1.ListOptions) (ret []*authorization.SubjectAccessReview, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*authorization.SubjectAccessReview))
 	})
 	return ret, err

@@ -38,7 +38,7 @@ func BenchmarkListener(b *testing.B) {
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
-	}, 0, 0, time.Now())
+	}, 0, 0, time.Now(), nil)
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop

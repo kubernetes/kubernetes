@@ -22,10 +22,9 @@ import (
 	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	cache "k8s.io/client-go/tools/cache"
-	time "time"
 )
 
-type NewInformerFunc func(clientset.Interface, time.Duration) cache.SharedIndexInformer
+type NewInformerFunc func(clientset.Interface, cache.SharedInformerOptions) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {

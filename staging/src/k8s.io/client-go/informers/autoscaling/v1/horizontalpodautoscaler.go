@@ -60,8 +60,27 @@ func NewHorizontalPodAutoscalerInformer(client kubernetes.Interface, namespace s
 	)
 }
 
-func defaultHorizontalPodAutoscalerInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewHorizontalPodAutoscalerInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewHorizontalPodAutoscalerInformerWithOptions constructs a new informer for HorizontalPodAutoscaler type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewHorizontalPodAutoscalerInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.AutoscalingV1().HorizontalPodAutoscalers(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Watch(options)
+			},
+		},
+		options,
+		&autoscaling_v1.HorizontalPodAutoscaler{},
+		indexers,
+	)
+}
+
+func defaultHorizontalPodAutoscalerInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewHorizontalPodAutoscalerInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {

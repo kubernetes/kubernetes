@@ -60,8 +60,27 @@ func NewEventInformer(client kubernetes.Interface, namespace string, resyncPerio
 	)
 }
 
-func defaultEventInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewEventInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewEventInformerWithOptions constructs a new informer for Event type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewEventInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.CoreV1().Events(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.CoreV1().Events(namespace).Watch(options)
+			},
+		},
+		options,
+		&core_v1.Event{},
+		indexers,
+	)
+}
+
+func defaultEventInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewEventInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *eventInformer) Informer() cache.SharedIndexInformer {

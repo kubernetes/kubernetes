@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type JobLister interface {
 	// List lists all Jobs in the indexer.
 	List(selector labels.Selector) (ret []*v1.Job, err error)
+	// ListWithOptions lists all Jobs in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Job, err error)
 	// Jobs returns an object that can list and get Jobs.
 	Jobs(namespace string) JobNamespaceLister
 	JobListerExpansion
@@ -52,6 +56,15 @@ func (s *jobLister) List(selector labels.Selector) (ret []*v1.Job, err error) {
 	return ret, err
 }
 
+// ListWithOptions lists all Jobs in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *jobLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Job, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.Job))
+	})
+	return ret, err
+}
+
 // Jobs returns an object that can list and get Jobs.
 func (s *jobLister) Jobs(namespace string) JobNamespaceLister {
 	return jobNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *jobLister) Jobs(namespace string) JobNamespaceLister {
 type JobNamespaceLister interface {
 	// List lists all Jobs in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.Job, err error)
+	// ListWithOptions lists all Jobs that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Job, err error)
 	// Get retrieves the Job from the indexer for a given namespace and name.
 	Get(name string) (*v1.Job, error)
 	JobNamespaceListerExpansion
@@ -76,6 +93,15 @@ type jobNamespaceLister struct {
 // List lists all Jobs in the indexer for a given namespace.
 func (s jobNamespaceLister) List(selector labels.Selector) (ret []*v1.Job, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Job))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Jobs that matches the options
+// in the indexer for a given namespace.
+func (s jobNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Job, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.Job))
 	})
 	return ret, err

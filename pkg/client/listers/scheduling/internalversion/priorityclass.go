@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type PriorityClassLister interface {
 	// List lists all PriorityClasses in the indexer.
 	List(selector labels.Selector) (ret []*scheduling.PriorityClass, err error)
+	// ListWithOptions lists all PriorityClasses in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*scheduling.PriorityClass, err error)
 	// Get retrieves the PriorityClass from the index for a given name.
 	Get(name string) (*scheduling.PriorityClass, error)
 	PriorityClassListerExpansion
@@ -48,6 +52,15 @@ func NewPriorityClassLister(indexer cache.Indexer) PriorityClassLister {
 // List lists all PriorityClasses in the indexer.
 func (s *priorityClassLister) List(selector labels.Selector) (ret []*scheduling.PriorityClass, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*scheduling.PriorityClass))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PriorityClasses in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *priorityClassLister) ListWithOptions(options metav1.ListOptions) (ret []*scheduling.PriorityClass, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*scheduling.PriorityClass))
 	})
 	return ret, err

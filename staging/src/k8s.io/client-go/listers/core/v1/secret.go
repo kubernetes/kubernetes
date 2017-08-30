@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type SecretLister interface {
 	// List lists all Secrets in the indexer.
 	List(selector labels.Selector) (ret []*v1.Secret, err error)
+	// ListWithOptions lists all Secrets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Secret, err error)
 	// Secrets returns an object that can list and get Secrets.
 	Secrets(namespace string) SecretNamespaceLister
 	SecretListerExpansion
@@ -52,6 +56,15 @@ func (s *secretLister) List(selector labels.Selector) (ret []*v1.Secret, err err
 	return ret, err
 }
 
+// ListWithOptions lists all Secrets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *secretLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Secret, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.Secret))
+	})
+	return ret, err
+}
+
 // Secrets returns an object that can list and get Secrets.
 func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 	return secretNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 type SecretNamespaceLister interface {
 	// List lists all Secrets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.Secret, err error)
+	// ListWithOptions lists all Secrets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.Secret, err error)
 	// Get retrieves the Secret from the indexer for a given namespace and name.
 	Get(name string) (*v1.Secret, error)
 	SecretNamespaceListerExpansion
@@ -76,6 +93,15 @@ type secretNamespaceLister struct {
 // List lists all Secrets in the indexer for a given namespace.
 func (s secretNamespaceLister) List(selector labels.Selector) (ret []*v1.Secret, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Secret))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Secrets that matches the options
+// in the indexer for a given namespace.
+func (s secretNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.Secret, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.Secret))
 	})
 	return ret, err

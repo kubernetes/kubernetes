@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
@@ -29,6 +30,9 @@ import (
 type CronJobLister interface {
 	// List lists all CronJobs in the indexer.
 	List(selector labels.Selector) (ret []*batch.CronJob, err error)
+	// ListWithOptions lists all CronJobs in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*batch.CronJob, err error)
 	// CronJobs returns an object that can list and get CronJobs.
 	CronJobs(namespace string) CronJobNamespaceLister
 	CronJobListerExpansion
@@ -52,6 +56,15 @@ func (s *cronJobLister) List(selector labels.Selector) (ret []*batch.CronJob, er
 	return ret, err
 }
 
+// ListWithOptions lists all CronJobs in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *cronJobLister) ListWithOptions(options metav1.ListOptions) (ret []*batch.CronJob, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*batch.CronJob))
+	})
+	return ret, err
+}
+
 // CronJobs returns an object that can list and get CronJobs.
 func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
 	return cronJobNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
 type CronJobNamespaceLister interface {
 	// List lists all CronJobs in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*batch.CronJob, err error)
+	// ListWithOptions lists all CronJobs that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*batch.CronJob, err error)
 	// Get retrieves the CronJob from the indexer for a given namespace and name.
 	Get(name string) (*batch.CronJob, error)
 	CronJobNamespaceListerExpansion
@@ -76,6 +93,15 @@ type cronJobNamespaceLister struct {
 // List lists all CronJobs in the indexer for a given namespace.
 func (s cronJobNamespaceLister) List(selector labels.Selector) (ret []*batch.CronJob, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*batch.CronJob))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all CronJobs that matches the options
+// in the indexer for a given namespace.
+func (s cronJobNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*batch.CronJob, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*batch.CronJob))
 	})
 	return ret, err

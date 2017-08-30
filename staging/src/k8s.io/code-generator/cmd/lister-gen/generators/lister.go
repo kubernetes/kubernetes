@@ -222,6 +222,8 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
 	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
+	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
+	imports = append(imports, `metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"`)
 	// for Indexer
 	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
@@ -251,6 +253,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 	sw.Do(typeListerStruct, m)
 	sw.Do(typeListerConstructor, m)
 	sw.Do(typeLister_List, m)
+	sw.Do(typeLister_ListWithOptions, m)
 
 	if tags.NonNamespaced {
 		sw.Do(typeLister_NonNamespacedGet, m)
@@ -261,6 +264,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 	sw.Do(namespaceListerInterface, m)
 	sw.Do(namespaceListerStruct, m)
 	sw.Do(namespaceLister_List, m)
+	sw.Do(namespaceLister_ListWithOptions, m)
 	sw.Do(namespaceLister_Get, m)
 
 	return sw.Error()
@@ -271,6 +275,9 @@ var typeListerInterface = `
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// ListWithOptions lists all $.type|publicPlural$ in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*$.type|raw$, err error)
 	// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 	$.type|publicPlural$(namespace string) $.type|public$NamespaceLister
 	$.type|public$ListerExpansion
@@ -282,6 +289,9 @@ var typeListerInterface_NonNamespaced = `
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// ListWithOptions lists all $.type|publicPlural$ in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the index for a given name.
 	Get(name string) (*$.type|raw$, error)
 	$.type|public$ListerExpansion
@@ -306,6 +316,17 @@ var typeLister_List = `
 // List lists all $.type|publicPlural$ in the indexer.
 func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*$.type|raw$))
+	})
+	return ret, err
+}
+`
+
+var typeLister_ListWithOptions = `
+// ListWithOptions lists all $.type|publicPlural$ in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *$.type|private$Lister) ListWithOptions(options metav1.ListOptions) (ret []*$.type|raw$, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*$.type|raw$))
 	})
 	return ret, err
@@ -339,6 +360,10 @@ var namespaceListerInterface = `
 type $.type|public$NamespaceLister interface {
 	// List lists all $.type|publicPlural$ in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// ListWithOptions lists all $.type|publicPlural$ that matches the options 
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
 	Get(name string) (*$.type|raw$, error)
 	$.type|public$NamespaceListerExpansion
@@ -358,6 +383,16 @@ var namespaceLister_List = `
 // List lists all $.type|publicPlural$ in the indexer for a given namespace.
 func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*$.type|raw$))
+	})
+	return ret, err
+}
+`
+var namespaceLister_ListWithOptions = `
+// ListWithOptions lists all $.type|publicPlural$ that matches the options 
+// in the indexer for a given namespace.
+func (s $.type|private$NamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*$.type|raw$, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*$.type|raw$))
 	})
 	return ret, err

@@ -60,8 +60,27 @@ func NewDeploymentInformer(client kubernetes.Interface, namespace string, resync
 	)
 }
 
-func defaultDeploymentInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewDeploymentInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewDeploymentInformerWithOptions constructs a new informer for Deployment type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewDeploymentInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.AppsV1beta2().Deployments(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.AppsV1beta2().Deployments(namespace).Watch(options)
+			},
+		},
+		options,
+		&apps_v1beta2.Deployment{},
+		indexers,
+	)
+}
+
+func defaultDeploymentInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewDeploymentInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {

@@ -394,12 +394,12 @@ func (kubemarkCluster *kubemarkCluster) markNodeForDeletion(name string) {
 	kubemarkCluster.nodesToDelete[name] = true
 }
 
-func newReplicationControllerInformer(kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newReplicationControllerInformer(kubeClient kubeclient.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
 	rcListWatch := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "replicationcontrollers", namespaceKubemark, fields.Everything())
-	return cache.NewSharedIndexInformer(rcListWatch, &apiv1.ReplicationController{}, resyncPeriod, nil)
+	return cache.NewSharedIndexInformer(rcListWatch, &apiv1.ReplicationController{}, options.ResyncPeriod, nil)
 }
 
-func newPodInformer(kubeClient kubeclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodInformer(kubeClient kubeclient.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
 	podListWatch := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "pods", namespaceKubemark, fields.Everything())
-	return cache.NewSharedIndexInformer(podListWatch, &apiv1.Pod{}, resyncPeriod, nil)
+	return cache.NewSharedIndexInformer(podListWatch, &apiv1.Pod{}, options.ResyncPeriod, nil)
 }

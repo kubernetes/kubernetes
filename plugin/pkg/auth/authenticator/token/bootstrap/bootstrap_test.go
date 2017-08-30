@@ -37,6 +37,10 @@ func (l *lister) List(selector labels.Selector) (ret []*api.Secret, err error) {
 	return l.secrets, nil
 }
 
+func (l *lister) ListWithOptions(options metav1.ListOptions) (ret []*api.Secret, err error) {
+	return l.secrets, nil
+}
+
 func (l *lister) Get(name string) (*api.Secret, error) {
 	for _, s := range l.secrets {
 		if s.Name == name {

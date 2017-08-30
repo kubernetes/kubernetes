@@ -60,8 +60,27 @@ func NewPodPresetInformer(client kubernetes.Interface, namespace string, resyncP
 	)
 }
 
-func defaultPodPresetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPodPresetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewPodPresetInformerWithOptions constructs a new informer for PodPreset type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodPresetInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.SettingsV1alpha1().PodPresets(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.SettingsV1alpha1().PodPresets(namespace).Watch(options)
+			},
+		},
+		options,
+		&settings_v1alpha1.PodPreset{},
+		indexers,
+	)
+}
+
+func defaultPodPresetInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewPodPresetInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podPresetInformer) Informer() cache.SharedIndexInformer {

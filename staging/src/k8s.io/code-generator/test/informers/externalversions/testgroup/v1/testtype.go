@@ -60,8 +60,27 @@ func NewTestTypeInformer(client versioned.Interface, namespace string, resyncPer
 	)
 }
 
-func defaultTestTypeInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewTestTypeInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewTestTypeInformerWithOptions constructs a new informer for TestType type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTestTypeInformerWithOptions(client versioned.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.TestgroupV1().TestTypes(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.TestgroupV1().TestTypes(namespace).Watch(options)
+			},
+		},
+		options,
+		&testgroup_v1.TestType{},
+		indexers,
+	)
+}
+
+func defaultTestTypeInformer(client versioned.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewTestTypeInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *testTypeInformer) Informer() cache.SharedIndexInformer {

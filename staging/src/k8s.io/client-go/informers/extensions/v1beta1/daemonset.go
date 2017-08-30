@@ -60,8 +60,27 @@ func NewDaemonSetInformer(client kubernetes.Interface, namespace string, resyncP
 	)
 }
 
-func defaultDaemonSetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewDaemonSetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewDaemonSetInformerWithOptions constructs a new informer for DaemonSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewDaemonSetInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.ExtensionsV1beta1().DaemonSets(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.ExtensionsV1beta1().DaemonSets(namespace).Watch(options)
+			},
+		},
+		options,
+		&extensions_v1beta1.DaemonSet{},
+		indexers,
+	)
+}
+
+func defaultDaemonSetInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewDaemonSetInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {

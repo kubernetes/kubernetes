@@ -60,8 +60,27 @@ func NewCertificateSigningRequestInformer(client kubernetes.Interface, resyncPer
 	)
 }
 
-func defaultCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewCertificateSigningRequestInformerWithOptions constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewCertificateSigningRequestInformerWithOptions(client kubernetes.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.CertificatesV1beta1().CertificateSigningRequests().List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.CertificatesV1beta1().CertificateSigningRequests().Watch(options)
+			},
+		},
+		options,
+		&certificates_v1beta1.CertificateSigningRequest{},
+		indexers,
+	)
+}
+
+func defaultCertificateSigningRequestInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewCertificateSigningRequestInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {

@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type PersistentVolumeClaimLister interface {
 	// List lists all PersistentVolumeClaims in the indexer.
 	List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error)
+	// ListWithOptions lists all PersistentVolumeClaims in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.PersistentVolumeClaim, err error)
 	// PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 	PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister
 	PersistentVolumeClaimListerExpansion
@@ -52,6 +56,15 @@ func (s *persistentVolumeClaimLister) List(selector labels.Selector) (ret []*api
 	return ret, err
 }
 
+// ListWithOptions lists all PersistentVolumeClaims in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *persistentVolumeClaimLister) ListWithOptions(options metav1.ListOptions) (ret []*api.PersistentVolumeClaim, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.PersistentVolumeClaim))
+	})
+	return ret, err
+}
+
 // PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister {
 	return persistentVolumeClaimNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) P
 type PersistentVolumeClaimNamespaceLister interface {
 	// List lists all PersistentVolumeClaims in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error)
+	// ListWithOptions lists all PersistentVolumeClaims that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.PersistentVolumeClaim, err error)
 	// Get retrieves the PersistentVolumeClaim from the indexer for a given namespace and name.
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	PersistentVolumeClaimNamespaceListerExpansion
@@ -76,6 +93,15 @@ type persistentVolumeClaimNamespaceLister struct {
 // List lists all PersistentVolumeClaims in the indexer for a given namespace.
 func (s persistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.PersistentVolumeClaim))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PersistentVolumeClaims that matches the options
+// in the indexer for a given namespace.
+func (s persistentVolumeClaimNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.PersistentVolumeClaim, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.PersistentVolumeClaim))
 	})
 	return ret, err

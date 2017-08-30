@@ -21,6 +21,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type LocalSubjectAccessReviewLister interface {
 	// List lists all LocalSubjectAccessReviews in the indexer.
 	List(selector labels.Selector) (ret []*v1beta1.LocalSubjectAccessReview, err error)
+	// ListWithOptions lists all LocalSubjectAccessReviews in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.LocalSubjectAccessReview, err error)
 	// LocalSubjectAccessReviews returns an object that can list and get LocalSubjectAccessReviews.
 	LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewNamespaceLister
 	LocalSubjectAccessReviewListerExpansion
@@ -52,6 +56,15 @@ func (s *localSubjectAccessReviewLister) List(selector labels.Selector) (ret []*
 	return ret, err
 }
 
+// ListWithOptions lists all LocalSubjectAccessReviews in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *localSubjectAccessReviewLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.LocalSubjectAccessReview, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.LocalSubjectAccessReview))
+	})
+	return ret, err
+}
+
 // LocalSubjectAccessReviews returns an object that can list and get LocalSubjectAccessReviews.
 func (s *localSubjectAccessReviewLister) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewNamespaceLister {
 	return localSubjectAccessReviewNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *localSubjectAccessReviewLister) LocalSubjectAccessReviews(namespace str
 type LocalSubjectAccessReviewNamespaceLister interface {
 	// List lists all LocalSubjectAccessReviews in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1beta1.LocalSubjectAccessReview, err error)
+	// ListWithOptions lists all LocalSubjectAccessReviews that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.LocalSubjectAccessReview, err error)
 	// Get retrieves the LocalSubjectAccessReview from the indexer for a given namespace and name.
 	Get(name string) (*v1beta1.LocalSubjectAccessReview, error)
 	LocalSubjectAccessReviewNamespaceListerExpansion
@@ -76,6 +93,15 @@ type localSubjectAccessReviewNamespaceLister struct {
 // List lists all LocalSubjectAccessReviews in the indexer for a given namespace.
 func (s localSubjectAccessReviewNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.LocalSubjectAccessReview, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.LocalSubjectAccessReview))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all LocalSubjectAccessReviews that matches the options
+// in the indexer for a given namespace.
+func (s localSubjectAccessReviewNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.LocalSubjectAccessReview, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta1.LocalSubjectAccessReview))
 	})
 	return ret, err

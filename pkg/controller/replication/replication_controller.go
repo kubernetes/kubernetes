@@ -119,14 +119,14 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 	rm.rcLister = rcInformer.Lister()
 	rm.rcListerSynced = rcInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: rm.addPod,
 		// This invokes the rc for every pod change, eg: host assignment. Though this might seem like overkill
 		// the most frequent pod update is status, and the associated rc will only list from local storage, so
 		// it should be ok.
 		UpdateFunc: rm.updatePod,
 		DeleteFunc: rm.deletePod,
-	})
+	}, cache.HandlerOptions{IncludeUninitialized: true})
 	rm.podLister = podInformer.Lister()
 	rm.podListerSynced = podInformer.Informer().HasSynced
 
@@ -584,7 +584,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// list all pods to include the pods that don't match the rc's selector
 	// anymore but has the stale controller ref.
 	// TODO: Do the List and Filter in a single pass, or use an index.
-	allPods, err := rm.podLister.Pods(rc.Namespace).List(labels.Everything())
+	allPods, err := rm.podLister.Pods(rc.Namespace).ListWithOptions(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return err
 	}

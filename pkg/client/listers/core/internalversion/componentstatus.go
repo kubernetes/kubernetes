@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type ComponentStatusLister interface {
 	// List lists all ComponentStatuses in the indexer.
 	List(selector labels.Selector) (ret []*api.ComponentStatus, err error)
+	// ListWithOptions lists all ComponentStatuses in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.ComponentStatus, err error)
 	// Get retrieves the ComponentStatus from the index for a given name.
 	Get(name string) (*api.ComponentStatus, error)
 	ComponentStatusListerExpansion
@@ -48,6 +52,15 @@ func NewComponentStatusLister(indexer cache.Indexer) ComponentStatusLister {
 // List lists all ComponentStatuses in the indexer.
 func (s *componentStatusLister) List(selector labels.Selector) (ret []*api.ComponentStatus, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ComponentStatus))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ComponentStatuses in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *componentStatusLister) ListWithOptions(options metav1.ListOptions) (ret []*api.ComponentStatus, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*api.ComponentStatus))
 	})
 	return ret, err

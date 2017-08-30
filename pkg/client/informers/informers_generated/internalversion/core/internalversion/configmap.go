@@ -60,8 +60,27 @@ func NewConfigMapInformer(client internalclientset.Interface, namespace string, 
 	)
 }
 
-func defaultConfigMapInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewConfigMapInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewConfigMapInformerWithOptions constructs a new informer for ConfigMap type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewConfigMapInformerWithOptions(client internalclientset.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().ConfigMaps(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().ConfigMaps(namespace).Watch(options)
+			},
+		},
+		options,
+		&api.ConfigMap{},
+		indexers,
+	)
+}
+
+func defaultConfigMapInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewConfigMapInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *configMapInformer) Informer() cache.SharedIndexInformer {

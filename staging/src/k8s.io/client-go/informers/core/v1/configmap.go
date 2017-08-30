@@ -60,8 +60,27 @@ func NewConfigMapInformer(client kubernetes.Interface, namespace string, resyncP
 	)
 }
 
-func defaultConfigMapInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewConfigMapInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewConfigMapInformerWithOptions constructs a new informer for ConfigMap type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewConfigMapInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.CoreV1().ConfigMaps(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.CoreV1().ConfigMaps(namespace).Watch(options)
+			},
+		},
+		options,
+		&core_v1.ConfigMap{},
+		indexers,
+	)
+}
+
+func defaultConfigMapInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewConfigMapInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *configMapInformer) Informer() cache.SharedIndexInformer {

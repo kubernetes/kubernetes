@@ -84,6 +84,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"schemaGroupVersionResource": c.Universe.Type(schemaGroupVersionResource),
 		"syncMutex":                  c.Universe.Type(syncMutex),
 		"timeDuration":               c.Universe.Type(timeDuration),
+		"cacheInformerOptions":       c.Universe.Type(cacheInformerOptions),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -96,7 +97,7 @@ var sharedInformerFactoryStruct = `
 type sharedInformerFactory struct {
 	client {{.clientSetInterface|raw}}
 	lock {{.syncMutex|raw}}
-	defaultResync {{.timeDuration|raw}}
+	options {{.cacheInformerOptions|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -108,7 +109,17 @@ type sharedInformerFactory struct {
 func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
   return &sharedInformerFactory{
 		client: client,
-    defaultResync:    defaultResync,
+	options:    {{.cacheInformerOptions|raw}}{ResyncPeriod: defaultResync},
+    informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
+    startedInformers: make(map[{{.reflectType|raw}}]bool),
+  }
+}
+// NewSharedInformerFactoryWithOptions constructs a new instance of sharedInformerFactory.
+// Callers can specify resync period and if to include uninitialized objects via options.
+func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, options {{.cacheInformerOptions|raw}}) SharedInformerFactory {
+  return &sharedInformerFactory{
+		client: client,
+	options: options,
     informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
     startedInformers: make(map[{{.reflectType|raw}}]bool),
   }
@@ -160,7 +171,7 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   if exists {
     return informer
   }
-  informer = newFunc(f.client, f.defaultResync)
+  informer = newFunc(f.client, f.options)
   f.informers[informerType] = informer
 
   return informer

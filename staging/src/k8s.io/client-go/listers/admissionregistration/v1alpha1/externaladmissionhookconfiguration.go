@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -30,6 +31,9 @@ import (
 type ExternalAdmissionHookConfigurationLister interface {
 	// List lists all ExternalAdmissionHookConfigurations in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error)
+	// ListWithOptions lists all ExternalAdmissionHookConfigurations in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error)
 	// Get retrieves the ExternalAdmissionHookConfiguration from the index for a given name.
 	Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error)
 	ExternalAdmissionHookConfigurationListerExpansion
@@ -48,6 +52,15 @@ func NewExternalAdmissionHookConfigurationLister(indexer cache.Indexer) External
 // List lists all ExternalAdmissionHookConfigurations in the indexer.
 func (s *externalAdmissionHookConfigurationLister) List(selector labels.Selector) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.ExternalAdmissionHookConfiguration))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ExternalAdmissionHookConfigurations in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *externalAdmissionHookConfigurationLister) ListWithOptions(options metav1.ListOptions) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*v1alpha1.ExternalAdmissionHookConfiguration))
 	})
 	return ret, err

@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	networking "k8s.io/kubernetes/pkg/apis/networking"
@@ -29,6 +30,9 @@ import (
 type NetworkPolicyLister interface {
 	// List lists all NetworkPolicies in the indexer.
 	List(selector labels.Selector) (ret []*networking.NetworkPolicy, err error)
+	// ListWithOptions lists all NetworkPolicies in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*networking.NetworkPolicy, err error)
 	// NetworkPolicies returns an object that can list and get NetworkPolicies.
 	NetworkPolicies(namespace string) NetworkPolicyNamespaceLister
 	NetworkPolicyListerExpansion
@@ -52,6 +56,15 @@ func (s *networkPolicyLister) List(selector labels.Selector) (ret []*networking.
 	return ret, err
 }
 
+// ListWithOptions lists all NetworkPolicies in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *networkPolicyLister) ListWithOptions(options metav1.ListOptions) (ret []*networking.NetworkPolicy, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*networking.NetworkPolicy))
+	})
+	return ret, err
+}
+
 // NetworkPolicies returns an object that can list and get NetworkPolicies.
 func (s *networkPolicyLister) NetworkPolicies(namespace string) NetworkPolicyNamespaceLister {
 	return networkPolicyNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *networkPolicyLister) NetworkPolicies(namespace string) NetworkPolicyNam
 type NetworkPolicyNamespaceLister interface {
 	// List lists all NetworkPolicies in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*networking.NetworkPolicy, err error)
+	// ListWithOptions lists all NetworkPolicies that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*networking.NetworkPolicy, err error)
 	// Get retrieves the NetworkPolicy from the indexer for a given namespace and name.
 	Get(name string) (*networking.NetworkPolicy, error)
 	NetworkPolicyNamespaceListerExpansion
@@ -76,6 +93,15 @@ type networkPolicyNamespaceLister struct {
 // List lists all NetworkPolicies in the indexer for a given namespace.
 func (s networkPolicyNamespaceLister) List(selector labels.Selector) (ret []*networking.NetworkPolicy, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*networking.NetworkPolicy))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all NetworkPolicies that matches the options
+// in the indexer for a given namespace.
+func (s networkPolicyNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*networking.NetworkPolicy, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*networking.NetworkPolicy))
 	})
 	return ret, err

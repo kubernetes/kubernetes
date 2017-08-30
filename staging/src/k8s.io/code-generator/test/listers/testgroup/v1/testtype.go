@@ -20,6 +20,7 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/code-generator/test/apis/testgroup/v1"
@@ -29,6 +30,9 @@ import (
 type TestTypeLister interface {
 	// List lists all TestTypes in the indexer.
 	List(selector labels.Selector) (ret []*v1.TestType, err error)
+	// ListWithOptions lists all TestTypes in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.TestType, err error)
 	// TestTypes returns an object that can list and get TestTypes.
 	TestTypes(namespace string) TestTypeNamespaceLister
 	TestTypeListerExpansion
@@ -52,6 +56,15 @@ func (s *testTypeLister) List(selector labels.Selector) (ret []*v1.TestType, err
 	return ret, err
 }
 
+// ListWithOptions lists all TestTypes in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *testTypeLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.TestType, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1.TestType))
+	})
+	return ret, err
+}
+
 // TestTypes returns an object that can list and get TestTypes.
 func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
 	return testTypeNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
 type TestTypeNamespaceLister interface {
 	// List lists all TestTypes in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1.TestType, err error)
+	// ListWithOptions lists all TestTypes that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.TestType, err error)
 	// Get retrieves the TestType from the indexer for a given namespace and name.
 	Get(name string) (*v1.TestType, error)
 	TestTypeNamespaceListerExpansion
@@ -76,6 +93,15 @@ type testTypeNamespaceLister struct {
 // List lists all TestTypes in the indexer for a given namespace.
 func (s testTypeNamespaceLister) List(selector labels.Selector) (ret []*v1.TestType, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.TestType))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all TestTypes that matches the options
+// in the indexer for a given namespace.
+func (s testTypeNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.TestType, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.TestType))
 	})
 	return ret, err

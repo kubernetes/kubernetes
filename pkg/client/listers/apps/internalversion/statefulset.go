@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
@@ -29,6 +30,9 @@ import (
 type StatefulSetLister interface {
 	// List lists all StatefulSets in the indexer.
 	List(selector labels.Selector) (ret []*apps.StatefulSet, err error)
+	// ListWithOptions lists all StatefulSets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*apps.StatefulSet, err error)
 	// StatefulSets returns an object that can list and get StatefulSets.
 	StatefulSets(namespace string) StatefulSetNamespaceLister
 	StatefulSetListerExpansion
@@ -52,6 +56,15 @@ func (s *statefulSetLister) List(selector labels.Selector) (ret []*apps.Stateful
 	return ret, err
 }
 
+// ListWithOptions lists all StatefulSets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *statefulSetLister) ListWithOptions(options metav1.ListOptions) (ret []*apps.StatefulSet, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*apps.StatefulSet))
+	})
+	return ret, err
+}
+
 // StatefulSets returns an object that can list and get StatefulSets.
 func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceLister {
 	return statefulSetNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceL
 type StatefulSetNamespaceLister interface {
 	// List lists all StatefulSets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*apps.StatefulSet, err error)
+	// ListWithOptions lists all StatefulSets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*apps.StatefulSet, err error)
 	// Get retrieves the StatefulSet from the indexer for a given namespace and name.
 	Get(name string) (*apps.StatefulSet, error)
 	StatefulSetNamespaceListerExpansion
@@ -76,6 +93,15 @@ type statefulSetNamespaceLister struct {
 // List lists all StatefulSets in the indexer for a given namespace.
 func (s statefulSetNamespaceLister) List(selector labels.Selector) (ret []*apps.StatefulSet, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*apps.StatefulSet))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all StatefulSets that matches the options
+// in the indexer for a given namespace.
+func (s statefulSetNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*apps.StatefulSet, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*apps.StatefulSet))
 	})
 	return ret, err

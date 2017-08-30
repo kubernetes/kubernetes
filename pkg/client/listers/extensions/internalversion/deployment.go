@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,6 +30,9 @@ import (
 type DeploymentLister interface {
 	// List lists all Deployments in the indexer.
 	List(selector labels.Selector) (ret []*extensions.Deployment, err error)
+	// ListWithOptions lists all Deployments in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*extensions.Deployment, err error)
 	// Deployments returns an object that can list and get Deployments.
 	Deployments(namespace string) DeploymentNamespaceLister
 	DeploymentListerExpansion
@@ -52,6 +56,15 @@ func (s *deploymentLister) List(selector labels.Selector) (ret []*extensions.Dep
 	return ret, err
 }
 
+// ListWithOptions lists all Deployments in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *deploymentLister) ListWithOptions(options metav1.ListOptions) (ret []*extensions.Deployment, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*extensions.Deployment))
+	})
+	return ret, err
+}
+
 // Deployments returns an object that can list and get Deployments.
 func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceLister {
 	return deploymentNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceList
 type DeploymentNamespaceLister interface {
 	// List lists all Deployments in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*extensions.Deployment, err error)
+	// ListWithOptions lists all Deployments that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*extensions.Deployment, err error)
 	// Get retrieves the Deployment from the indexer for a given namespace and name.
 	Get(name string) (*extensions.Deployment, error)
 	DeploymentNamespaceListerExpansion
@@ -76,6 +93,15 @@ type deploymentNamespaceLister struct {
 // List lists all Deployments in the indexer for a given namespace.
 func (s deploymentNamespaceLister) List(selector labels.Selector) (ret []*extensions.Deployment, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*extensions.Deployment))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Deployments that matches the options
+// in the indexer for a given namespace.
+func (s deploymentNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*extensions.Deployment, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*extensions.Deployment))
 	})
 	return ret, err

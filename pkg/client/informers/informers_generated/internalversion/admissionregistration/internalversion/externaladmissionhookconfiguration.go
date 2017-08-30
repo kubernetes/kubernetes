@@ -60,8 +60,27 @@ func NewExternalAdmissionHookConfigurationInformer(client internalclientset.Inte
 	)
 }
 
-func defaultExternalAdmissionHookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewExternalAdmissionHookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewExternalAdmissionHookConfigurationInformerWithOptions constructs a new informer for ExternalAdmissionHookConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewExternalAdmissionHookConfigurationInformerWithOptions(client internalclientset.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Admissionregistration().ExternalAdmissionHookConfigurations().List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Admissionregistration().ExternalAdmissionHookConfigurations().Watch(options)
+			},
+		},
+		options,
+		&admissionregistration.ExternalAdmissionHookConfiguration{},
+		indexers,
+	)
+}
+
+func defaultExternalAdmissionHookConfigurationInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewExternalAdmissionHookConfigurationInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *externalAdmissionHookConfigurationInformer) Informer() cache.SharedIndexInformer {

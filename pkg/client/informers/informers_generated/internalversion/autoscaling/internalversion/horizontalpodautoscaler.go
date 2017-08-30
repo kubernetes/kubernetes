@@ -60,8 +60,27 @@ func NewHorizontalPodAutoscalerInformer(client internalclientset.Interface, name
 	)
 }
 
-func defaultHorizontalPodAutoscalerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewHorizontalPodAutoscalerInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewHorizontalPodAutoscalerInformerWithOptions constructs a new informer for HorizontalPodAutoscaler type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewHorizontalPodAutoscalerInformerWithOptions(client internalclientset.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).Watch(options)
+			},
+		},
+		options,
+		&autoscaling.HorizontalPodAutoscaler{},
+		indexers,
+	)
+}
+
+func defaultHorizontalPodAutoscalerInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewHorizontalPodAutoscalerInformerWithOptions(client, v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {

@@ -60,8 +60,27 @@ func NewAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duratio
 	)
 }
 
-func defaultAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewAPIServiceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewAPIServiceInformerWithOptions constructs a new informer for APIService type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewAPIServiceInformerWithOptions(client clientset.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.ApiregistrationV1beta1().APIServices().List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.ApiregistrationV1beta1().APIServices().Watch(options)
+			},
+		},
+		options,
+		&apiregistration_v1beta1.APIService{},
+		indexers,
+	)
+}
+
+func defaultAPIServiceInformer(client clientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewAPIServiceInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *aPIServiceInformer) Informer() cache.SharedIndexInformer {

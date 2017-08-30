@@ -33,15 +33,11 @@ import (
 // ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
 func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource schema.GroupVersionResource) ListFuncByNamespace {
 	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		labelSelector, err := labels.Parse(options.LabelSelector)
-		if err != nil {
-			return nil, err
-		}
 		informer, err := f.ForResource(resource)
 		if err != nil {
 			return nil, err
 		}
-		return informer.Lister().ByNamespace(namespace).List(labelSelector)
+		return informer.Lister().ByNamespace(namespace).ListWithOptions(options)
 	}
 }
 
@@ -92,7 +88,8 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 		result.Used[resourceName] = resource.Quantity{Format: resource.DecimalSI}
 	}
 	items, err := listFunc(options.Namespace, metav1.ListOptions{
-		LabelSelector: labels.Everything().String(),
+		LabelSelector:        labels.Everything().String(),
+		IncludeUninitialized: true,
 	})
 	if err != nil {
 		return result, fmt.Errorf("failed to list content: %v", err)

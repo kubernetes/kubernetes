@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -30,6 +31,9 @@ import (
 type PersistentVolumeLister interface {
 	// List lists all PersistentVolumes in the indexer.
 	List(selector labels.Selector) (ret []*v1.PersistentVolume, err error)
+	// ListWithOptions lists all PersistentVolumes in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.PersistentVolume, err error)
 	// Get retrieves the PersistentVolume from the index for a given name.
 	Get(name string) (*v1.PersistentVolume, error)
 	PersistentVolumeListerExpansion
@@ -48,6 +52,15 @@ func NewPersistentVolumeLister(indexer cache.Indexer) PersistentVolumeLister {
 // List lists all PersistentVolumes in the indexer.
 func (s *persistentVolumeLister) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.PersistentVolume))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PersistentVolumes in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *persistentVolumeLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.PersistentVolume, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.PersistentVolume))
 	})
 	return ret, err

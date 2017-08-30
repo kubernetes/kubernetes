@@ -21,6 +21,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type PodDisruptionBudgetLister interface {
 	// List lists all PodDisruptionBudgets in the indexer.
 	List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error)
+	// ListWithOptions lists all PodDisruptionBudgets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.PodDisruptionBudget, err error)
 	// PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 	PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister
 	PodDisruptionBudgetListerExpansion
@@ -52,6 +56,15 @@ func (s *podDisruptionBudgetLister) List(selector labels.Selector) (ret []*v1bet
 	return ret, err
 }
 
+// ListWithOptions lists all PodDisruptionBudgets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *podDisruptionBudgetLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.PodDisruptionBudget, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.PodDisruptionBudget))
+	})
+	return ret, err
+}
+
 // PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister {
 	return podDisruptionBudgetNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDi
 type PodDisruptionBudgetNamespaceLister interface {
 	// List lists all PodDisruptionBudgets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error)
+	// ListWithOptions lists all PodDisruptionBudgets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.PodDisruptionBudget, err error)
 	// Get retrieves the PodDisruptionBudget from the indexer for a given namespace and name.
 	Get(name string) (*v1beta1.PodDisruptionBudget, error)
 	PodDisruptionBudgetNamespaceListerExpansion
@@ -76,6 +93,15 @@ type podDisruptionBudgetNamespaceLister struct {
 // List lists all PodDisruptionBudgets in the indexer for a given namespace.
 func (s podDisruptionBudgetNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.PodDisruptionBudget))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all PodDisruptionBudgets that matches the options
+// in the indexer for a given namespace.
+func (s podDisruptionBudgetNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta1.PodDisruptionBudget, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta1.PodDisruptionBudget))
 	})
 	return ret, err

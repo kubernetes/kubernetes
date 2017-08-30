@@ -20,6 +20,7 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -29,6 +30,9 @@ import (
 type EndpointsLister interface {
 	// List lists all Endpoints in the indexer.
 	List(selector labels.Selector) (ret []*api.Endpoints, err error)
+	// ListWithOptions lists all Endpoints in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.Endpoints, err error)
 	// Endpoints returns an object that can list and get Endpoints.
 	Endpoints(namespace string) EndpointsNamespaceLister
 	EndpointsListerExpansion
@@ -52,6 +56,15 @@ func (s *endpointsLister) List(selector labels.Selector) (ret []*api.Endpoints, 
 	return ret, err
 }
 
+// ListWithOptions lists all Endpoints in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *endpointsLister) ListWithOptions(options metav1.ListOptions) (ret []*api.Endpoints, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*api.Endpoints))
+	})
+	return ret, err
+}
+
 // Endpoints returns an object that can list and get Endpoints.
 func (s *endpointsLister) Endpoints(namespace string) EndpointsNamespaceLister {
 	return endpointsNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *endpointsLister) Endpoints(namespace string) EndpointsNamespaceLister {
 type EndpointsNamespaceLister interface {
 	// List lists all Endpoints in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*api.Endpoints, err error)
+	// ListWithOptions lists all Endpoints that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*api.Endpoints, err error)
 	// Get retrieves the Endpoints from the indexer for a given namespace and name.
 	Get(name string) (*api.Endpoints, error)
 	EndpointsNamespaceListerExpansion
@@ -76,6 +93,15 @@ type endpointsNamespaceLister struct {
 // List lists all Endpoints in the indexer for a given namespace.
 func (s endpointsNamespaceLister) List(selector labels.Selector) (ret []*api.Endpoints, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.Endpoints))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all Endpoints that matches the options
+// in the indexer for a given namespace.
+func (s endpointsNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*api.Endpoints, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*api.Endpoints))
 	})
 	return ret, err

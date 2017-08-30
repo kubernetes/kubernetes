@@ -60,8 +60,27 @@ func NewComponentStatusInformer(client internalclientset.Interface, resyncPeriod
 	)
 }
 
-func defaultComponentStatusInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewComponentStatusInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewComponentStatusInformerWithOptions constructs a new informer for ComponentStatus type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewComponentStatusInformerWithOptions(client internalclientset.Interface, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return client.Core().ComponentStatuses().List(options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return client.Core().ComponentStatuses().Watch(options)
+			},
+		},
+		options,
+		&api.ComponentStatus{},
+		indexers,
+	)
+}
+
+func defaultComponentStatusInformer(client internalclientset.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewComponentStatusInformerWithOptions(client, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *componentStatusInformer) Informer() cache.SharedIndexInformer {

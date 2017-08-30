@@ -60,8 +60,27 @@ func NewResourceQuotaInformer(client kubernetes.Interface, namespace string, res
 	)
 }
 
-func defaultResourceQuotaInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewResourceQuotaInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+// NewResourceQuotaInformerWithOptions constructs a new informer for ResourceQuota type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewResourceQuotaInformerWithOptions(client kubernetes.Interface, namespace string, options cache.SharedInformerOptions, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformerWithOptions(
+		&cache.ListWatch{
+			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				return client.CoreV1().ResourceQuotas(namespace).List(options)
+			},
+			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				return client.CoreV1().ResourceQuotas(namespace).Watch(options)
+			},
+		},
+		options,
+		&core_v1.ResourceQuota{},
+		indexers,
+	)
+}
+
+func defaultResourceQuotaInformer(client kubernetes.Interface, options cache.SharedInformerOptions) cache.SharedIndexInformer {
+	return NewResourceQuotaInformerWithOptions(client, meta_v1.NamespaceAll, options, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {

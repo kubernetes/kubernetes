@@ -21,6 +21,7 @@ package v1beta2
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -29,6 +30,9 @@ import (
 type ReplicaSetLister interface {
 	// List lists all ReplicaSets in the indexer.
 	List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)
+	// ListWithOptions lists all ReplicaSets in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta2.ReplicaSet, err error)
 	// ReplicaSets returns an object that can list and get ReplicaSets.
 	ReplicaSets(namespace string) ReplicaSetNamespaceLister
 	ReplicaSetListerExpansion
@@ -52,6 +56,15 @@ func (s *replicaSetLister) List(selector labels.Selector) (ret []*v1beta2.Replic
 	return ret, err
 }
 
+// ListWithOptions lists all ReplicaSets in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *replicaSetLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta2.ReplicaSet, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
+		ret = append(ret, m.(*v1beta2.ReplicaSet))
+	})
+	return ret, err
+}
+
 // ReplicaSets returns an object that can list and get ReplicaSets.
 func (s *replicaSetLister) ReplicaSets(namespace string) ReplicaSetNamespaceLister {
 	return replicaSetNamespaceLister{indexer: s.indexer, namespace: namespace}
@@ -61,6 +74,10 @@ func (s *replicaSetLister) ReplicaSets(namespace string) ReplicaSetNamespaceList
 type ReplicaSetNamespaceLister interface {
 	// List lists all ReplicaSets in the indexer for a given namespace.
 	List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)
+	// ListWithOptions lists all ReplicaSets that matches the options
+	// in the indexer for a given namespace.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1beta2.ReplicaSet, err error)
 	// Get retrieves the ReplicaSet from the indexer for a given namespace and name.
 	Get(name string) (*v1beta2.ReplicaSet, error)
 	ReplicaSetNamespaceListerExpansion
@@ -76,6 +93,15 @@ type replicaSetNamespaceLister struct {
 // List lists all ReplicaSets in the indexer for a given namespace.
 func (s replicaSetNamespaceLister) List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta2.ReplicaSet))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ReplicaSets that matches the options
+// in the indexer for a given namespace.
+func (s replicaSetNamespaceLister) ListWithOptions(options metav1.ListOptions) (ret []*v1beta2.ReplicaSet, err error) {
+	err = cache.ListAllByNamespaceWithOptions(s.indexer, s.namespace, options, func(m interface{}) {
 		ret = append(ret, m.(*v1beta2.ReplicaSet))
 	})
 	return ret, err

@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -30,6 +31,9 @@ import (
 type ClusterRoleLister interface {
 	// List lists all ClusterRoles in the indexer.
 	List(selector labels.Selector) (ret []*v1.ClusterRole, err error)
+	// ListWithOptions lists all ClusterRoles in the indexer that matches the options.
+	// Only options.Selector and options.IncludeUninitialized are respected.
+	ListWithOptions(options metav1.ListOptions) (ret []*v1.ClusterRole, err error)
 	// Get retrieves the ClusterRole from the index for a given name.
 	Get(name string) (*v1.ClusterRole, error)
 	ClusterRoleListerExpansion
@@ -48,6 +52,15 @@ func NewClusterRoleLister(indexer cache.Indexer) ClusterRoleLister {
 // List lists all ClusterRoles in the indexer.
 func (s *clusterRoleLister) List(selector labels.Selector) (ret []*v1.ClusterRole, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ClusterRole))
+	})
+	return ret, err
+}
+
+// ListWithOptions lists all ClusterRoles in the indexer.
+// Only options.Selector and options.IncludeUninitialized are respected.
+func (s *clusterRoleLister) ListWithOptions(options metav1.ListOptions) (ret []*v1.ClusterRole, err error) {
+	err = cache.ListAllWithOptions(s.indexer, options, func(m interface{}) {
 		ret = append(ret, m.(*v1.ClusterRole))
 	})
 	return ret, err
