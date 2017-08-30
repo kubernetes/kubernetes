@@ -49,7 +49,7 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
-	argAliases := kubectl.ResourceAliases(validArgs)
+	argAliases := cmdutil.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",

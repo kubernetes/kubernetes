@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
@@ -83,7 +82,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
+		argAliases = cmdutil.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{

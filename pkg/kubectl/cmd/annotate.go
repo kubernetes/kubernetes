@@ -107,7 +107,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
+		argAliases = cmdutil.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{

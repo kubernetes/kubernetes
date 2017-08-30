@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -81,7 +80,7 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TaintOptions{}
 
 	validArgs := []string{"node"}
-	argAliases := kubectl.ResourceAliases(validArgs)
+	argAliases := cmdutil.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
@@ -189,7 +188,7 @@ func (o TaintOptions) validateFlags() error {
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
 func (o TaintOptions) Validate() error {
 	resourceType := strings.ToLower(o.resources[0])
-	validResources, isValidResource := append(kubectl.ResourceAliases([]string{"node"}), "node"), false
+	validResources, isValidResource := append(cmdutil.ResourceAliases([]string{"node"}), "node"), false
 	for _, validResource := range validResources {
 		if resourceType == validResource {
 			isValidResource = true

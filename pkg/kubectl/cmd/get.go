@@ -109,7 +109,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
+		argAliases = cmdutil.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{
@@ -500,7 +500,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				if resourceName == "" {
 					resourceName = mapping.Resource
 				}
-				if alias, ok := kubectl.ResourceShortFormFor(mapping.Resource); ok {
+				if alias, ok := cmdutil.ResourceShortFormFor(mapping.Resource); ok {
 					resourceName = alias
 				} else if resourceName == "" {
 					resourceName = "none"

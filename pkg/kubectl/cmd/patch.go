@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -88,7 +87,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.CheckErr(err)
 	if p != nil {
 		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
+		argAliases = cmdutil.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{
