@@ -54,6 +54,7 @@ type Rollbacker interface {
 	Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error)
 }
 
+// RollbackerFor returns a Rollbacker for the resource specified by kind.
 func RollbackerFor(kind schema.GroupKind, c clientset.Interface) (Rollbacker, error) {
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
@@ -66,10 +67,12 @@ func RollbackerFor(kind schema.GroupKind, c clientset.Interface) (Rollbacker, er
 	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 }
 
+// DeploymentRollbacker implements the Rollbacker interface.
 type DeploymentRollbacker struct {
 	c clientset.Interface
 }
 
+// Rollback rolls back a deployment.
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
 	d, ok := obj.(*extensions.Deployment)
 	if !ok {
@@ -108,7 +111,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	return result, err
 }
 
-// watchRollbackEvent watches for rollback events and returns rollback result
+// watchRollbackEvent watches for rollback events and returns rollback result.
 func watchRollbackEvent(w watch.Interface) string {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGTERM)
@@ -211,10 +214,12 @@ func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRe
 	return buf.String(), nil
 }
 
+// DaemonSetRollbacker implements the Rollbacker interface.
 type DaemonSetRollbacker struct {
 	c clientset.Interface
 }
 
+// Rollback rolls back a Daemon Set.
 func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
@@ -269,11 +274,15 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	return rollbackSuccess, nil
 }
 
+// StatefulSetRollbacker implements the Rollbacker interface.
 type StatefulSetRollbacker struct {
 	c clientset.Interface
 }
 
-// toRevision is a non-negative integer, with 0 being reserved to indicate rolling back to previous configuration
+// toRevision
+
+// Rollback rolls back a StatefulSet. toRevision is a non-negative integer,
+// with 0 being reserved to indicate rolling back to previous configuration.
 func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
 	if toRevision < 0 {
 		return "", revisionNotFoundErr(toRevision)
