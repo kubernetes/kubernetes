@@ -27,6 +27,7 @@ docs/man/man1/kubectl-apply-view-last-applied.1
 docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
 docs/man/man1/kubectl-auth-can-i.1
+docs/man/man1/kubectl-auth-reconcile.1
 docs/man/man1/kubectl-auth.1
 docs/man/man1/kubectl-autoscale.1
 docs/man/man1/kubectl-certificate-approve.1
@@ -121,6 +122,7 @@ docs/user-guide/kubectl/kubectl_apply_view-last-applied.md
 docs/user-guide/kubectl/kubectl_attach.md
 docs/user-guide/kubectl/kubectl_auth.md
 docs/user-guide/kubectl/kubectl_auth_can-i.md
+docs/user-guide/kubectl/kubectl_auth_reconcile.md
 docs/user-guide/kubectl/kubectl_autoscale.md
 docs/user-guide/kubectl/kubectl_certificate.md
 docs/user-guide/kubectl/kubectl_certificate_approve.md
