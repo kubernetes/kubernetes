@@ -34,6 +34,7 @@ type StatusViewer interface {
 	Status(namespace, name string, revision int64) (string, bool, error)
 }
 
+// StatusViewerFor returns a StatusViewer for the resource specified by kind.
 func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
@@ -46,19 +47,22 @@ func StatusViewerFor(kind schema.GroupKind, c internalclientset.Interface) (Stat
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
+// DeploymentStatusViewer implements the StatusViewer interface.
 type DeploymentStatusViewer struct {
 	c extensionsclient.DeploymentsGetter
 }
 
+// DaemonSetStatusViewer implements the StatusViewer interface.
 type DaemonSetStatusViewer struct {
 	c extensionsclient.DaemonSetsGetter
 }
 
+// StatefulSetStatusViewer implements the StatusViewer interface.
 type StatefulSetStatusViewer struct {
 	c appsclient.StatefulSetsGetter
 }
 
-// Status returns a message describing deployment status, and a bool value indicating if the status is considered done
+// Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
 func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	deployment, err := s.c.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -92,7 +96,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
 }
 
-// Status returns a message describing daemon set status, and a bool value indicating if the status is considered done
+// Status returns a message describing daemon set status, and a bool value indicating if the status is considered done.
 func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	//ignoring revision as DaemonSets does not have history yet
 
@@ -115,7 +119,7 @@ func (s *DaemonSetStatusViewer) Status(namespace, name string, revision int64) (
 	return fmt.Sprintf("Waiting for daemon set spec update to be observed...\n"), false, nil
 }
 
-// Status returns a message describing statefulset status, and a bool value indicating if the status is considered done
+// Status returns a message describing statefulset status, and a bool value indicating if the status is considered done.
 func (s *StatefulSetStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	sts, err := s.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
