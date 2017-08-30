@@ -959,7 +959,7 @@ type PodSecurityPolicySpec struct {
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
 	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
-	// process can gain more privileges than it's parent process.
+	// process can gain more privileges than its parent process.
 	// +optional
 	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"varint,15,opt,name=defaultAllowPrivilegeEscalation"`
 	// AllowPrivilegeEscalation determines if a pod can request to allow
