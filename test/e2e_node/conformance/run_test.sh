@@ -153,7 +153,7 @@ allow_privileged=true
 serialize_image_pulls=false
 config_dir=`mktemp -d`
 file_check_frequency=10s
-pod_cidr=10.100.0.0/24
+pod_cidr=10.64.0.0/24
 log_level=4
 start_kubelet --api-servers $apiserver \
   --volume-stats-agg-period $volume_stats_agg_period \
