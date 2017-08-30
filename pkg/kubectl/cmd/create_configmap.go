@@ -77,6 +77,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd.Flags().StringSlice("from-file", []string{}, "Key file can be specified using its file path, in which case file basename will be used as configmap key, or optionally with a key and file path, in which case the given key will be used.  Specifying a directory will iterate each named file in the directory whose basename is a valid configmap key.")
 	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
 	cmd.Flags().String("from-env-file", "", "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
+	cmd.Flags().Bool("append-hash", false, "Append a hash of the configmap to its name.")
 	return cmd
 }
 
@@ -94,6 +95,7 @@ func CreateConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
 			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
+			AppendHash:     cmdutil.GetFlagBool(cmd, "append-hash"),
 		}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
