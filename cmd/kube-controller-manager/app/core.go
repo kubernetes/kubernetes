@@ -58,17 +58,22 @@ import (
 )
 
 func startServiceController(ctx ControllerContext) (bool, error) {
-	serviceController, err := servicecontroller.New(
+	serviceController := servicecontroller.New(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.Options.ClusterName,
 	)
-	if err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
-		return true, err
+
+	//Some Scenarios it not an cloud  provider
+	// or the cloud  provider is not support external load balancers
+	// we treat it as we will not configure the service controller
+	if err := serviceController.Init(); err != nil {
+		glog.Warningf("It not configure cloud provider or not support external load balancers and we not start service controller")
+		return false, nil
 	}
+
 	go serviceController.Run(ctx.Stop, int(ctx.Options.ConcurrentServiceSyncs))
 	return true, nil
 }

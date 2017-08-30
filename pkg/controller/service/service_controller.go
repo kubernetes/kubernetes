@@ -103,7 +103,7 @@ func New(
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
 	clusterName string,
-) (*ServiceController, error) {
+) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
@@ -142,10 +142,7 @@ func New(
 	s.serviceLister = serviceInformer.Lister()
 	s.serviceListerSynced = serviceInformer.Informer().HasSynced
 
-	if err := s.init(); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
@@ -205,7 +202,7 @@ func (s *ServiceController) worker() {
 	}
 }
 
-func (s *ServiceController) init() error {
+func (s *ServiceController) Init() error {
 	if s.cloud == nil {
 		return fmt.Errorf("WARNING: no cloud provider provided, services of type LoadBalancer will fail.")
 	}

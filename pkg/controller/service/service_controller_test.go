@@ -59,12 +59,12 @@ func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
-	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
+	controller := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
 	controller.nodeListerSynced = alwaysReady
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
 
-	controller.init()
+	controller.Init()
 	cloud.Calls = nil     // ignore any cloud calls made in init()
 	client.ClearActions() // ignore any client calls made in init()
 
