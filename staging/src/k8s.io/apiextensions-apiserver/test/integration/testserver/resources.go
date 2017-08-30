@@ -213,7 +213,7 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 		return err
 	}
 
-	instanceName := "foo"
+	instanceName := "setup-instance"
 	instance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": crd.Spec.Group + "/" + crd.Spec.Version,
@@ -222,6 +222,11 @@ func checkForWatchCachePrimed(crd *apiextensionsv1beta1.CustomResourceDefinition
 				"namespace": ns,
 				"name":      instanceName,
 			},
+			"alpha":   "foo_123",
+			"beta":    10,
+			"gamma":   "bar",
+			"delta":   "hello",
+			"epsilon": "foobar",
 		},
 	}
 	if _, err := resourceClient.Create(instance); err != nil {

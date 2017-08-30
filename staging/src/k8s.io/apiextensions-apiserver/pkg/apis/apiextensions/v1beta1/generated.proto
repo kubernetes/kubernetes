@@ -103,6 +103,11 @@ message CustomResourceDefinitionSpec {
 
   // Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
   optional string scope = 4;
+
+  // Validation describes the validation methods for CustomResources
+  // This field is alpha-level and should only be sent to servers that enable the CustomResourceValidation feature.
+  // +optional
+  optional CustomResourceValidation validation = 5;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
@@ -113,5 +118,122 @@ message CustomResourceDefinitionStatus {
   // AcceptedNames are the names that are actually being used to serve discovery
   // They may be different than the names in spec.
   optional CustomResourceDefinitionNames acceptedNames = 2;
+}
+
+// CustomResourceValidation is a list of validation methods for CustomResources.
+message CustomResourceValidation {
+  // OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+  optional JSONSchemaProps openAPIV3Schema = 1;
+}
+
+// ExternalDocumentation allows referencing an external resource for extended documentation.
+message ExternalDocumentation {
+  optional string description = 1;
+
+  optional string url = 2;
+}
+
+// JSON represents any valid JSON value.
+// These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.
+message JSON {
+  optional bytes raw = 1;
+}
+
+// JSONSchemaProps is a JSON-Schema following Specification Draft 4 (http://json-schema.org/).
+message JSONSchemaProps {
+  optional string id = 1;
+
+  optional string schema = 2;
+
+  optional string ref = 3;
+
+  optional string description = 4;
+
+  optional string type = 5;
+
+  optional string format = 6;
+
+  optional string title = 7;
+
+  optional JSON default = 8;
+
+  optional double maximum = 9;
+
+  optional bool exclusiveMaximum = 10;
+
+  optional double minimum = 11;
+
+  optional bool exclusiveMinimum = 12;
+
+  optional int64 maxLength = 13;
+
+  optional int64 minLength = 14;
+
+  optional string pattern = 15;
+
+  optional int64 maxItems = 16;
+
+  optional int64 minItems = 17;
+
+  optional bool uniqueItems = 18;
+
+  optional double multipleOf = 19;
+
+  repeated JSON enum = 20;
+
+  optional int64 maxProperties = 21;
+
+  optional int64 minProperties = 22;
+
+  repeated string required = 23;
+
+  optional JSONSchemaPropsOrArray items = 24;
+
+  repeated JSONSchemaProps allOf = 25;
+
+  repeated JSONSchemaProps oneOf = 26;
+
+  repeated JSONSchemaProps anyOf = 27;
+
+  optional JSONSchemaProps not = 28;
+
+  map<string, JSONSchemaProps> properties = 29;
+
+  optional JSONSchemaPropsOrBool additionalProperties = 30;
+
+  map<string, JSONSchemaProps> patternProperties = 31;
+
+  map<string, JSONSchemaPropsOrStringArray> dependencies = 32;
+
+  optional JSONSchemaPropsOrBool additionalItems = 33;
+
+  map<string, JSONSchemaProps> definitions = 34;
+
+  optional ExternalDocumentation externalDocs = 35;
+
+  optional JSON example = 36;
+}
+
+// JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
+// or an array of JSONSchemaProps. Mainly here for serialization purposes.
+message JSONSchemaPropsOrArray {
+  optional JSONSchemaProps schema = 1;
+
+  repeated JSONSchemaProps jSONSchemas = 2;
+}
+
+// JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value.
+// Defaults to true for the boolean property.
+message JSONSchemaPropsOrBool {
+  optional bool allows = 1;
+
+  optional JSONSchemaProps schema = 2;
+}
+
+// JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.
+message JSONSchemaPropsOrStringArray {
+  optional JSONSchemaProps schema = 1;
+
+  repeated string property = 2;
 }
 
