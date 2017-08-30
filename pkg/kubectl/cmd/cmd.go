@@ -32,6 +32,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/view"
 )
 
 const (
@@ -293,6 +294,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, in, out, err),
 				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
+				view.NewCmdView(f, out, err),
 			},
 		},
 		{

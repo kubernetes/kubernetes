@@ -120,6 +120,7 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/cmd/view",
     ],
 )
 
@@ -203,6 +204,7 @@ package_group(
         "//pkg/kubectl/cmd/templates",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/sanity",
+        "//pkg/kubectl/cmd/view",
     ],
 )
 
@@ -230,6 +232,7 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/set",
+        "//pkg/kubectl/cmd/view",
     ],
 )
 
@@ -264,6 +267,7 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/cmd/view",
     ],
 )
 
@@ -342,6 +346,7 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/cmd/view",
     ],
 )
 
@@ -369,6 +374,17 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/resource",
+    ],
+)
+
+package_group(
+    name = "pkg_kubectl_cmd_view_CONSUMERS",
+    packages = [
+        "//cmd/kubectl",
+        "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/templates",
+        "//pkg/kubectl/cmd/util",
+        "//pkg/kubectl/cmd/util/sanity",
     ],
 )
 
