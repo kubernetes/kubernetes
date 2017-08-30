@@ -18,15 +18,17 @@ package view
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"io"
+	"strings"
+
+	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"strings"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -79,8 +81,8 @@ func NewCmdImage(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmdutil.AddNoHeadersFlags(cmd, true)
-	cmd.Flags().StringP("output", "o", "name", "default name, if not name will show all informations")
+	cmdutil.AddNoHeadersFlags(cmd, false)
+	cmd.Flags().StringP("output", "o", "", "default name, if not name will show all informations")
 	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
@@ -109,18 +111,21 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	if err != nil {
 		return err
 	}
+	w := printers.GetNewTabWriter(o.Out)
+	defer w.Flush()
+
 	if !cmdutil.GetFlagBool(cmd, "no-headers") {
 		if cmdutil.GetFlagString(cmd, "output") == "name" {
-			printHeaders(o.Out, true)
+			printHeaders(w, true)
 		} else {
-			printHeaders(o.Out, false)
+			printHeaders(w, false)
 		}
 	}
 	for _, info := range infos {
 		_, err := f.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for _, container := range spec.Containers {
 				if cmdutil.GetFlagString(cmd, "output") == "name" {
-					_, err := fmt.Fprintln(o.Out, container.Image)
+					_, err := fmt.Fprintln(w, container.Image)
 					if err != nil {
 						return err
 					}
@@ -133,7 +138,7 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 					resourceName = "none"
 				}
 				Name := resourceName + "/" + info.Name
-				_, err := fmt.Fprintf(o.Out, "%s\t%s\t%s\n", Name, container.Name, container.Image)
+				_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", Name, container.Name, container.Image)
 				if err != nil {
 					return err
 				}
@@ -147,9 +152,9 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	return nil
 }
 
-func printHeaders(out io.Writer, nameOnly bool) error {
+func printHeaders(out io.Writer, imageOnly bool) error {
 	columnNames := []string{"NAME", "CONTAINER(s)", "IMAGE(s)"}
-	if nameOnly {
+	if imageOnly {
 		columnNames = columnNames[2:]
 	}
 	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))

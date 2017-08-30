@@ -14,6 +14,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
+        "//pkg/printers:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
@@ -21,6 +22,10 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["view_image_test.go"],
+    data = [
+        "//examples:config",
+        "//test/fixtures",
+    ],
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
