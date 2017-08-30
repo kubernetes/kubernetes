@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/kms"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
@@ -123,6 +124,7 @@ type FakeAWSServices struct {
 	elb      *FakeELB
 	asg      *FakeASG
 	metadata *FakeMetadata
+	kms      *FakeKMS
 }
 
 func NewFakeAWSServices() *FakeAWSServices {
@@ -132,6 +134,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.elb = &FakeELB{aws: s}
 	s.asg = &FakeASG{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
+	s.kms = &FakeKMS{aws: s}
 
 	s.networkInterfacesMacs = []string{"aa:bb:cc:dd:ee:00", "aa:bb:cc:dd:ee:01"}
 	s.networkInterfacesVpcIDs = []string{"vpc-mac0", "vpc-mac1"}
@@ -177,6 +180,10 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 
 func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
 	return s.metadata, nil
+}
+
+func (s *FakeAWSServices) KeyManagement(region string) (KMS, error) {
+	return s.kms, nil
 }
 
 func TestNewAWSCloud(t *testing.T) {
@@ -508,6 +515,15 @@ func (a *FakeASG) UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInpu
 }
 
 func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
+	panic("Not implemented")
+}
+
+type FakeKMS struct {
+	aws *FakeAWSServices
+	mock.Mock
+}
+
+func (kms *FakeKMS) DescribeKey(*kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error) {
 	panic("Not implemented")
 }
 
