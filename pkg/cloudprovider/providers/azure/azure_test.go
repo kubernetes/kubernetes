@@ -67,6 +67,104 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	validateLoadBalancer(t, lb, svc)
 }
 
+// Test additional of a new service/port on an internal LB with a subnet.
+func TestReconcileLoadBalancerAddPortOnInternalSubnet(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	addTestSubnet(&svc)
+	configProperties := getTestPublicFipConfigurationProperties()
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+		Name:     fmt.Sprintf("port-udp-%d", 1234),
+		Protocol: v1.ProtocolUDP,
+		Port:     1234,
+		NodePort: getBackendPort(1234),
+	})
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration
+	if len(*lb.FrontendIPConfigurations) != 1 {
+		t.Error("Expected the loadbalancer to have a frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb, svc)
+}
+
+// Test addition of services on an internal LB using both default and explicit subnets.
+func TestReconcileLoadBalancerAddServicesOnMultipleSubnets(t *testing.T) {
+	az := getTestCloud()
+	svc1 := getTestService("service1", v1.ProtocolTCP, 8081)
+	svc2 := getTestService("service2", v1.ProtocolTCP, 8081)
+	addTestSubnet(&svc2)
+	configProperties := getTestPublicFipConfigurationProperties()
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc1, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling svc1: %q", err)
+	}
+
+	lb, updated, err = az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc2, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling svc2: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration for each service
+	if len(*lb.FrontendIPConfigurations) != 2 {
+		t.Error("Expected the loadbalancer to have 2 frontend ip configurations")
+	}
+
+	validateLoadBalancer(t, lb, svc1, svc2)
+}
+
+// Test moving a service exposure from one subnet to another.
+func TestReconcileLoadBalancerEditServiceSubnet(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("service1", v1.ProtocolTCP, 8081)
+	addTestSubnet(&svc)
+	configProperties := getTestPublicFipConfigurationProperties()
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling initial svc: %q", err)
+	}
+
+	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "NewSubnet"
+
+	lb, updated, err = az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling edits to svc: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration for the service
+	if len(*lb.FrontendIPConfigurations) != 1 {
+		t.Error("Expected the loadbalancer to have 1 frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb, svc)
+}
+
 func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80)
@@ -337,7 +435,7 @@ func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getLoadBalancerRuleName(&service, port)
+			ruleName := getLoadBalancerRuleName(&service, port, nil)
 			rules = append(rules, network.LoadBalancingRule{
 				Name: to.StringPtr(ruleName),
 				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -381,7 +479,7 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 		for _, port := range service.Spec.Ports {
 			sources := getServiceSourceRanges(&service)
 			for _, src := range sources {
-				ruleName := getSecurityRuleName(&service, port, src)
+				ruleName := getSecurityRuleName(&service, port, nil, src)
 				rules = append(rules, network.SecurityRule{
 					Name: to.StringPtr(ruleName),
 					SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -412,7 +510,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule)
+			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule, subnet(&svc))
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -484,7 +582,7 @@ func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, se
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
 			for _, source := range sources {
-				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
+				wantedRuleName := getSecurityRuleName(&svc, wantedRule, nil, source)
 				expectedRuleCount++
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
@@ -886,4 +984,9 @@ func TestMetadataParsing(t *testing.T) {
 	if !reflect.DeepEqual(network, networkJSON) {
 		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
+}
+
+func addTestSubnet(svc *v1.Service) {
+	svc.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
+	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "TestSubnet"
 }
