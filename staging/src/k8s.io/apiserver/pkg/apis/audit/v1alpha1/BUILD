@@ -11,7 +11,6 @@ go_library(
         "doc.go",
         "generated.pb.go",
         "register.go",
-        "types.generated.go",
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
@@ -19,7 +18,6 @@ go_library(
     ],
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/github.com/ugorji/go/codec:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
