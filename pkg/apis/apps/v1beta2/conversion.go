@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -67,6 +68,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
 		Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
 		Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		// TODO: remove below conversions after extensions/v1beta1 ReplicaSet is deleted
+		Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet,
+		Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet,
+		Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus,
+		Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus,
 	)
 	if err != nil {
 		return err
@@ -545,5 +551,61 @@ func Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrate
 			return err
 		}
 	}
+	return nil
+}
+
+func Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet(in *appsv1beta2.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	if conditionsEnc, hasConditions := in.Annotations[appsv1beta2.DeprecatedReplicaSetConditionAnnotation]; hasConditions {
+		if err := json.Unmarshal([]byte(conditionsEnc), &out.Status.Conditions); err != nil {
+			return err
+		}
+		delete(out.Annotations, appsv1beta2.DeprecatedReplicaSetConditionAnnotation)
+	}
+	return nil
+}
+
+func Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet(in *extensions.ReplicaSet, out *appsv1beta2.ReplicaSet, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	if len(in.Status.Conditions) > 0 {
+		conditionsEnc, err := json.Marshal(in.Status.Conditions)
+		if err != nil {
+			return err
+		}
+		if out.Annotations == nil {
+			out.Annotations = make(map[string]string)
+		}
+		out.Annotations[appsv1beta2.DeprecatedReplicaSetConditionAnnotation] = string(conditionsEnc)
+	}
+	return nil
+}
+
+func Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *appsv1beta2.ReplicaSetStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	out.ObservedGeneration = in.ObservedGeneration
+	return nil
+}
+
+func Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *extensions.ReplicaSetStatus, out *appsv1beta2.ReplicaSetStatus, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
