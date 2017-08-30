@@ -31,6 +31,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -252,6 +253,80 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		})
 	})
 
+	Context("when pod using local volume with non-existant path", func() {
+		ep := &eventPatterns{
+			reason:  "FailedMount",
+			pattern: make([]string, 2)}
+		ep.pattern = append(ep.pattern, "MountVolume.SetUp failed")
+		ep.pattern = append(ep.pattern, "does not exist")
+
+		It("should not be able to mount", func() {
+			for _, testVolType := range LocalVolumeTypes {
+				By(fmt.Sprintf("local-volume-type: %s", testVolType))
+				testVol := &localTestVolume{
+					node:            config.node0,
+					hostDir:         "/non-existent/location/nowhere",
+					localVolumeType: testVolType,
+				}
+				By("Creating local PVC and PV")
+				createLocalPVCPV(config, testVol)
+				pod, err := createLocalPod(config, testVol)
+				Expect(err).To(HaveOccurred())
+				checkPodEvents(config, pod.Name, ep)
+			}
+		})
+	})
+
+	Context("when pod's node is different from PV's NodeAffinity", func() {
+
+		BeforeEach(func() {
+			if len(config.nodes.Items) < 2 {
+				framework.Skipf("Runs only when number of nodes >= 2")
+			}
+		})
+
+		ep := &eventPatterns{
+			reason:  "FailedScheduling",
+			pattern: make([]string, 2)}
+		ep.pattern = append(ep.pattern, "MatchNodeSelector")
+		ep.pattern = append(ep.pattern, "No nodes are available")
+		for _, testVolType := range LocalVolumeTypes {
+
+			It("should not be able to mount due to different NodeAffinity", func() {
+
+				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeAffinity)
+			})
+
+			It("should not be able to mount due to different NodeSelector", func() {
+
+				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeSelector)
+			})
+
+		}
+	})
+
+	Context("when pod's node is different from PV's NodeName", func() {
+
+		BeforeEach(func() {
+			if len(config.nodes.Items) < 2 {
+				framework.Skipf("Runs only when number of nodes >= 2")
+			}
+		})
+
+		ep := &eventPatterns{
+			reason:  "FailedMount",
+			pattern: make([]string, 2)}
+		ep.pattern = append(ep.pattern, "NodeSelectorTerm")
+		ep.pattern = append(ep.pattern, "Storage node affinity check failed")
+		for _, testVolType := range LocalVolumeTypes {
+
+			It("should not be able to mount due to different NodeName", func() {
+
+				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeName)
+			})
+		}
+	})
+
 	Context("when using local volume provisioner", func() {
 		var (
 			volumePath string
@@ -312,6 +387,44 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		})
 	})
 })
+
+type makeLocalPodWith func(config *localTestConfig, volume *localTestVolume, nodeName string) *v1.Pod
+
+func testPodWithNodeName(config *localTestConfig, testVolType LocalVolumeType, ep *eventPatterns, nodeName string, makeLocalPodFunc makeLocalPodWith) {
+	var testVol *localTestVolume
+	By(fmt.Sprintf("local-volume-type: %s", testVolType))
+	testVol = setupLocalVolumePVCPV(config, testVolType)
+
+	pod := makeLocalPodFunc(config, testVol, nodeName)
+	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForPodRunningInNamespace(config.client, pod)
+	Expect(err).To(HaveOccurred())
+	checkPodEvents(config, pod.Name, ep)
+	cleanupLocalVolume(config, testVol)
+}
+
+type eventPatterns struct {
+	reason  string
+	pattern []string
+}
+
+func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) {
+	var events *v1.EventList
+	selector := fields.Set{
+		"involvedObject.kind":      "Pod",
+		"involvedObject.name":      podName,
+		"involvedObject.namespace": config.ns,
+		"reason":                   ep.reason,
+	}.AsSelector().String()
+	options := metav1.ListOptions{FieldSelector: selector}
+	events, err := config.client.Core().Events(config.ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(events.Items)).NotTo(Equal(0))
+	for _, p := range ep.pattern {
+		Expect(events.Items[0].Message).To(ContainSubstring(p))
+	}
+}
 
 // The tests below are run against multiple mount point types
 
@@ -502,6 +615,53 @@ func createLocalPVCPV(config *localTestConfig, volume *localTestVolume) {
 
 func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) *v1.Pod {
 	return framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, cmd, false, false, selinuxLabel)
+}
+
+func makeLocalPodWithNodeAffinity(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
+	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel)
+	if pod == nil {
+		return
+	}
+	affinity := &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{nodeName},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	pod.Spec.Affinity = affinity
+	return
+}
+
+func makeLocalPodWithNodeSelector(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
+	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel)
+	if pod == nil {
+		return
+	}
+	ns := map[string]string{
+		"kubernetes.io/hostname": nodeName,
+	}
+	pod.Spec.NodeSelector = ns
+	return
+}
+
+func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
+	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel)
+	if pod == nil {
+		return
+	}
+	pod.Spec.NodeName = nodeName
+	return
 }
 
 // createSecPod should be used when Pod requires non default SELinux labels
