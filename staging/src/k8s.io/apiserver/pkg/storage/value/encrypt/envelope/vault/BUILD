@@ -15,6 +15,7 @@ go_test(
         "vault_test.go",
     ],
     data = glob(["testdata/**"]),
+    importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/vault",
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -30,6 +31,7 @@ go_library(
         "client.go",
         "vault.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/vault",
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/ghodss/yaml:go_default_library",

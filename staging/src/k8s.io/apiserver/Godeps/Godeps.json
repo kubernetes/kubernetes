@@ -327,6 +327,10 @@
 			"Rev": "944e07253867aacae43c04b2e6a239005443f33a"
 		},
 		{
+			"ImportPath": "github.com/fatih/structs",
+			"Rev": "7e5a8eef611ee84dd359503f3969f80df4c50723"
+		},
+		{
 			"ImportPath": "github.com/ghodss/yaml",
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
@@ -381,6 +385,10 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
 			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+		},
+		{
+			"ImportPath": "github.com/golang/snappy",
+			"Rev": "553a641470496b2327abcac10b36396bd98e45c9"
 		},
 		{
 			"ImportPath": "github.com/google/btree",
@@ -455,12 +463,80 @@
 			"Rev": "84398b94e188ee336f307779b57b3aa91af7063c"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/errwrap",
+			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-cleanhttp",
+			"Rev": "3573b8b52aa7b37b9358d966a898feb387f62437"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-multierror",
+			"Rev": "83588e72410abfbe4df460eeb6f30841ae47d4c4"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-rootcerts",
+			"Rev": "6bb64b370b90e7ef1fa532be9e591a81c3493e00"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/hcl/ast",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/hcl/parser",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/hcl/scanner",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/hcl/strconv",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/hcl/token",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/json/parser",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/json/scanner",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/hcl/json/token",
+			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/vault/api",
+			"Rev": "52401fd0e5d983e44112c81d933553d2c03f612a"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/vault/helper/compressutil",
+			"Rev": "52401fd0e5d983e44112c81d933553d2c03f612a"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/vault/helper/jsonutil",
+			"Rev": "52401fd0e5d983e44112c81d933553d2c03f612a"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/vault/helper/parseutil",
+			"Rev": "52401fd0e5d983e44112c81d933553d2c03f612a"
 		},
 		{
 			"ImportPath": "github.com/howeyc/gopass",
@@ -501,6 +577,14 @@
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/go-homedir",
+			"Rev": "b8bc1bf767474819792c23f32d8286a45736f1c6"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "53818660ed4955e899c0bcafa97299a388bd7c8e"
 		},
 		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
@@ -549,6 +633,10 @@
 		{
 			"ImportPath": "github.com/prometheus/procfs/xfs",
 			"Rev": "65c1f6f8f0fc1e2185eb9863a3bc751496404259"
+		},
+		{
+			"ImportPath": "github.com/sethgrid/pester",
+			"Rev": "a86a2d88f4dc3c7dbf3a6a6bbbfb095690b834b6"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
