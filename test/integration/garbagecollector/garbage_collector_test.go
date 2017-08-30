@@ -264,6 +264,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 	}
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
+		go sharedInformers.Start(stopCh)
 		go gc.Run(workers, stopCh)
 		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
 	}

@@ -12,6 +12,7 @@ go_library(
         "generic.go",
     ],
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions:go_default_library",

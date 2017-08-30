@@ -94,29 +94,29 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		},
-		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		expectations:   controller.NewControllerExpectations(),
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
+		recorder:       eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		jobLister:      jobInformer.Lister(),
+		jobStoreSynced: jobInformer.Informer().HasSynced,
+		podStore:       podInformer.Lister(),
+		podStoreSynced: podInformer.Informer().HasSynced,
 	}
+	jm.updateHandler = jm.updateJobStatus
+	jm.syncHandler = jm.syncJob
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.enqueueController,
 		UpdateFunc: jm.updateJob,
 		DeleteFunc: jm.enqueueController,
 	})
-	jm.jobLister = jobInformer.Lister()
-	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
 		UpdateFunc: jm.updatePod,
 		DeleteFunc: jm.deletePod,
 	})
-	jm.podStore = podInformer.Lister()
-	jm.podStoreSynced = podInformer.Informer().HasSynced
 
-	jm.updateHandler = jm.updateJobStatus
-	jm.syncHandler = jm.syncJob
 	return jm
 }
 

@@ -73,6 +73,8 @@ func NewNamespaceController(
 	namespaceController := &NamespaceController{
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, kubeClient.Core(), discoverResourcesFn, finalizerToken, true),
+		lister:       namespaceInformer.Lister(),
+		listerSynced: namespaceInformer.Informer().HasSynced,
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -93,8 +95,6 @@ func NewNamespaceController(
 		},
 		resyncPeriod,
 	)
-	namespaceController.lister = namespaceInformer.Lister()
-	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
 
 	return namespaceController
 }

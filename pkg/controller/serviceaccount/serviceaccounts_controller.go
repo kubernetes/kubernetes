@@ -65,8 +65,14 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
+		saLister:       saInformer.Lister(),
+		saListerSynced: saInformer.Informer().HasSynced,
+		nsLister:       nsInformer.Lister(),
+		nsListerSynced: nsInformer.Informer().HasSynced,
 	}
+	e.syncHandler = e.syncNamespace
+
 	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
 	}
@@ -74,17 +80,11 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
 	})
-	e.saLister = saInformer.Lister()
-	e.saListerSynced = saInformer.Informer().HasSynced
 
 	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	})
-	e.nsLister = nsInformer.Lister()
-	e.nsListerSynced = nsInformer.Informer().HasSynced
-
-	e.syncHandler = e.syncNamespace
 
 	return e
 }

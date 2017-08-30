@@ -121,7 +121,9 @@ func NewHorizontalController(
 		hpaNamespacer:            hpaNamespacer,
 		upscaleForbiddenWindow:   upscaleForbiddenWindow,
 		downscaleForbiddenWindow: downscaleForbiddenWindow,
-		queue: workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		hpaLister:       hpaInformer.Lister(),
+		hpaListerSynced: hpaInformer.Informer().HasSynced,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -132,8 +134,6 @@ func NewHorizontalController(
 		},
 		resyncPeriod,
 	)
-	hpaController.hpaLister = hpaInformer.Lister()
-	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
 
 	return hpaController
 }

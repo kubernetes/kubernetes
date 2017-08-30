@@ -152,7 +152,18 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		expectations:        controller.NewControllerExpectations(),
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
 		suspendedDaemonPods: map[string]sets.String{},
+		dsLister:            daemonSetInformer.Lister(),
+		dsStoreSynced:       daemonSetInformer.Informer().HasSynced,
+		historyLister:       historyInformer.Lister(),
+		historyStoreSynced:  historyInformer.Informer().HasSynced,
+		podLister:           podInformer.Lister(),
+		podStoreSynced:      podInformer.Informer().HasSynced,
+		nodeStoreSynced:     nodeInformer.Informer().HasSynced,
+		nodeLister:          nodeInformer.Lister(),
 	}
+	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.enqueueDaemonSet = dsc.enqueue
+	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -168,16 +179,12 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		},
 		DeleteFunc: dsc.deleteDaemonset,
 	})
-	dsc.dsLister = daemonSetInformer.Lister()
-	dsc.dsStoreSynced = daemonSetInformer.Informer().HasSynced
 
 	historyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addHistory,
 		UpdateFunc: dsc.updateHistory,
 		DeleteFunc: dsc.deleteHistory,
 	})
-	dsc.historyLister = historyInformer.Lister()
-	dsc.historyStoreSynced = historyInformer.Informer().HasSynced
 
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
@@ -186,20 +193,12 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		UpdateFunc: dsc.updatePod,
 		DeleteFunc: dsc.deletePod,
 	})
-	dsc.podLister = podInformer.Lister()
-	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dsc.addNode,
 		UpdateFunc: dsc.updateNode,
-	},
-	)
-	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
-	dsc.nodeLister = nodeInformer.Lister()
+	})
 
-	dsc.syncHandler = dsc.syncDaemonSet
-	dsc.enqueueDaemonSet = dsc.enqueue
-	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
 	return dsc
 }
 

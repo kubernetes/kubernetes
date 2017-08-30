@@ -103,10 +103,15 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"}),
 		},
-		burstReplicas: burstReplicas,
-		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
+		burstReplicas:   burstReplicas,
+		expectations:    controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
+		rcLister:        rcInformer.Lister(),
+		rcListerSynced:  rcInformer.Informer().HasSynced,
+		podLister:       podInformer.Lister(),
+		podListerSynced: podInformer.Informer().HasSynced,
 	}
+	rm.syncHandler = rm.syncReplicationController
 
 	rcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    rm.enqueueController,
@@ -116,8 +121,6 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 		// way of achieving this is by performing a `stop` operation on the controller.
 		DeleteFunc: rm.enqueueController,
 	})
-	rm.rcLister = rcInformer.Lister()
-	rm.rcListerSynced = rcInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rm.addPod,
@@ -127,10 +130,7 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 		UpdateFunc: rm.updatePod,
 		DeleteFunc: rm.deletePod,
 	})
-	rm.podLister = podInformer.Lister()
-	rm.podListerSynced = podInformer.Informer().HasSynced
 
-	rm.syncHandler = rm.syncReplicationController
 	return rm
 }
 

@@ -107,14 +107,22 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 		metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.Core().RESTClient().GetRateLimiter())
 	}
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		client:          client,
+		eventRecorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		dLister:         dInformer.Lister(),
+		rsLister:        rsInformer.Lister(),
+		podLister:       podInformer.Lister(),
+		dListerSynced:   dInformer.Informer().HasSynced,
+		rsListerSynced:  rsInformer.Informer().HasSynced,
+		podListerSynced: podInformer.Informer().HasSynced,
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
 		Recorder:   dc.eventRecorder,
 	}
+	dc.syncHandler = dc.syncDeployment
+	dc.enqueueDeployment = dc.enqueue
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addDeployment,
@@ -122,24 +130,17 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 		// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
 		DeleteFunc: dc.deleteDeployment,
 	})
+
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addReplicaSet,
 		UpdateFunc: dc.updateReplicaSet,
 		DeleteFunc: dc.deleteReplicaSet,
 	})
+
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: dc.deletePod,
 	})
 
-	dc.syncHandler = dc.syncDeployment
-	dc.enqueueDeployment = dc.enqueue
-
-	dc.dLister = dInformer.Lister()
-	dc.rsLister = rsInformer.Lister()
-	dc.podLister = podInformer.Lister()
-	dc.dListerSynced = dInformer.Informer().HasSynced
-	dc.rsListerSynced = rsInformer.Informer().HasSynced
-	dc.podListerSynced = podInformer.Informer().HasSynced
 	return dc
 }
 

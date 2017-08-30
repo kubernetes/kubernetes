@@ -88,6 +88,12 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
+		volumeLister:                  p.VolumeInformer.Lister(),
+		volumeListerSynced:            p.VolumeInformer.Informer().HasSynced,
+		claimLister:                   p.ClaimInformer.Lister(),
+		claimListerSynced:             p.ClaimInformer.Informer().HasSynced,
+		classLister:                   p.ClassInformer.Lister(),
+		classListerSynced:             p.ClassInformer.Informer().HasSynced,
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -102,8 +108,6 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 		},
 	)
-	controller.volumeLister = p.VolumeInformer.Lister()
-	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
 	p.ClaimInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -112,11 +116,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 		},
 	)
-	controller.claimLister = p.ClaimInformer.Lister()
-	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
 
-	controller.classLister = p.ClassInformer.Lister()
-	controller.classListerSynced = p.ClassInformer.Informer().HasSynced
 	return controller, nil
 }
 

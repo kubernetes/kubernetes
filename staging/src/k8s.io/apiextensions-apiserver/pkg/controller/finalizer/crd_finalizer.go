@@ -81,13 +81,12 @@ func NewCRDFinalizer(
 		crClientGetter: crClientGetter,
 		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
 	}
+	c.syncFn = c.sync
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 	})
-
-	c.syncFn = c.sync
 
 	return c
 }
