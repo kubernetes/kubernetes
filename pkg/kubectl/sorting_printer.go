@@ -36,18 +36,21 @@ import (
 	"vbom.ml/util/sortorder"
 )
 
-// Sorting printer sorts list types before delegating to another printer.
-// Non-list types are simply passed through
+// SortingPrinter sorts list types before delegating to another printer.
+// Non-list types are simply passed through to the Delegate.
+// Implements the printers.ResourcePrinter interface.
 type SortingPrinter struct {
 	SortField string
 	Delegate  printers.ResourcePrinter
 	Decoder   runtime.Decoder
 }
 
+// AfterPrint prints any post printing messages.
 func (s *SortingPrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
+// PrintObj formats obj and prints it to out. Sorts obj fist if obj is a list.
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	if !meta.IsListType(obj) {
 		return s.Delegate.PrintObj(obj, out)
@@ -59,11 +62,13 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return s.Delegate.PrintObj(obj, out)
 }
 
+// HandledResources not implemented.
 // TODO: implement HandledResources()
 func (s *SortingPrinter) HandledResources() []string {
 	return []string{}
 }
 
+// IsGeneric returns true if Delegate is generic printer.
 func (s *SortingPrinter) IsGeneric() bool {
 	return s.Delegate.IsGeneric()
 }
@@ -94,6 +99,7 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	return meta.SetList(obj, objs)
 }
 
+// SortObjects decodes and sorts objs in ascending order.
 func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
 	for ix := range objs {
 		item := objs[ix]
@@ -155,6 +161,7 @@ type RuntimeSort struct {
 	origPosition []int
 }
 
+// NewRuntimeSort creates a new RuntimeSort structure.
 func NewRuntimeSort(field string, objs []runtime.Object) *RuntimeSort {
 	sorter := &RuntimeSort{field: field, objs: objs, origPosition: make([]int, len(objs))}
 	for ix := range objs {
@@ -163,10 +170,12 @@ func NewRuntimeSort(field string, objs []runtime.Object) *RuntimeSort {
 	return sorter
 }
 
+// Len returns the length of r (number of objects).
 func (r *RuntimeSort) Len() int {
 	return len(r.objs)
 }
 
+// Swap swaps objects at index i and j.
 func (r *RuntimeSort) Swap(i, j int) {
 	r.objs[i], r.objs[j] = r.objs[j], r.objs[i]
 	r.origPosition[i], r.origPosition[j] = r.origPosition[j], r.origPosition[i]
@@ -273,6 +282,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 	}
 }
 
+// Less returns true if object at index i is less that object at index j.
 func (r *RuntimeSort) Less(i, j int) bool {
 	iObj := r.objs[i]
 	jObj := r.objs[j]
@@ -318,8 +328,9 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	return less
 }
 
-// Returns the starting (original) position of a particular index.  e.g. If OriginalPosition(0) returns 5 than the
-// the item currently at position 0 was at position 5 in the original unsorted array.
+// OriginalPosition returns the starting (original) position of object at index ix.
+// e.g. If OriginalPosition(0) returns 5 then the item currently at position 0
+// was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {
 		return -1
