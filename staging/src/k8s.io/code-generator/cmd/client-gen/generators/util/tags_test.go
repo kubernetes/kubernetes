@@ -82,3 +82,67 @@ func TestParseTags(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTagsExtension(t *testing.T) {
+	testCases := map[string]struct {
+		lines              []string
+		expectedExtensions []extension
+		expectError        bool
+	}{
+		"simplest extension": {
+			lines:              []string{`+genclient:method=Foo,verb=create`},
+			expectedExtensions: []extension{{VerbName: "Foo", VerbType: "create"}},
+		},
+		"multiple extensions": {
+			lines:              []string{`+genclient:method=Foo,verb=create`, `+genclient:method=Bar,verb=get`},
+			expectedExtensions: []extension{{VerbName: "Foo", VerbType: "create"}, {VerbName: "Bar", VerbType: "get"}},
+		},
+		"extension without verb": {
+			lines:       []string{`+genclient:method`},
+			expectError: true,
+		},
+		"extension without verb type": {
+			lines:       []string{`+genclient:method=Foo`},
+			expectError: true,
+		},
+		"sub-resource extension": {
+			lines:              []string{`+genclient:method=Foo,verb=create,subresource=bar`},
+			expectedExtensions: []extension{{VerbName: "Foo", VerbType: "create", SubResourcePath: "bar"}},
+		},
+		"output type extension": {
+			lines:              []string{`+genclient:method=Foos,verb=list,result=Bars`},
+			expectedExtensions: []extension{{VerbName: "Foos", VerbType: "list", ResultTypeOverride: "Bars"}},
+		},
+		"input type extension": {
+			lines:              []string{`+genclient:method=Foo,verb=update,input=Bar`},
+			expectedExtensions: []extension{{VerbName: "Foo", VerbType: "update", InputTypeOverride: "Bar"}},
+		},
+		"unknown verb type extension": {
+			lines:              []string{`+genclient:method=Foo,verb=explode`},
+			expectedExtensions: nil,
+			expectError:        true,
+		},
+		"invalid verb extension": {
+			lines:              []string{`+genclient:method=Foo,unknown=bar`},
+			expectedExtensions: nil,
+			expectError:        true,
+		},
+		"empty verb extension subresource": {
+			lines:              []string{`+genclient:method=Foo,verb=get,subresource=`},
+			expectedExtensions: nil,
+			expectError:        true,
+		},
+	}
+	for key, c := range testCases {
+		result, err := ParseClientGenTags(c.lines)
+		if err != nil && !c.expectError {
+			t.Fatalf("[%s] unexpected error: %v", key, err)
+		}
+		if err != nil && c.expectError {
+			t.Logf("[%s] got expected error: %+v", key, err)
+		}
+		if !c.expectError && !reflect.DeepEqual(result.Extensions, c.expectedExtensions) {
+			t.Errorf("[%s] expected %#+v to be %#+v", key, result.Extensions, c.expectedExtensions)
+		}
+	}
+}
