@@ -3524,7 +3524,7 @@ func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.
 	if isLocalStorageResource(value) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"))
 	}
-	if len(strings.Split(value, "/")) == 1 {
+	if len(strings.Split(value, "/")) == 1 || strings.Contains(strings.ToLower(value), "kubernetes.io/") {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
 		}
