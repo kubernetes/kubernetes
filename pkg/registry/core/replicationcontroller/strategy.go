@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -102,6 +103,11 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s rcStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (rcStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	oldRc := old.(*api.ReplicationController)
@@ -175,6 +181,12 @@ func (rcStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old
 	oldRc := old.(*api.ReplicationController)
 	// update is not allowed to set spec
 	newRc.Spec = oldRc.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s rcStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (rcStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

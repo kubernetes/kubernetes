@@ -73,6 +73,11 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s strategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, newObj, oldObj runtime.Object) field.ErrorList {
 	oldRevision, newRevision := oldObj.(*apps.ControllerRevision), newObj.(*apps.ControllerRevision)
 	return validation.ValidateControllerRevisionUpdate(newRevision, oldRevision)

@@ -65,6 +65,11 @@ func (podTemplateStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 	_ = obj.(*api.PodTemplate)
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s podTemplateStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (podTemplateStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))

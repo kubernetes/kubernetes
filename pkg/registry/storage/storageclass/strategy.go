@@ -64,6 +64,11 @@ func (storageClassStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj,
 	_ = old.(*storage.StorageClass)
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s storageClassStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (storageClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
 	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)

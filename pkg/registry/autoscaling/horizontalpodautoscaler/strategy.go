@@ -17,6 +17,7 @@ limitations under the License.
 package horizontalpodautoscaler
 
 import (
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -72,6 +73,11 @@ func (autoscalerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	newHPA.Status = oldHPA.Status
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s autoscalerStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (autoscalerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
@@ -92,6 +98,12 @@ func (autoscalerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 	oldAutoscaler := old.(*autoscaling.HorizontalPodAutoscaler)
 	// status changes are not allowed to update spec
 	newAutoscaler.Spec = oldAutoscaler.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s autoscalerStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (autoscalerStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

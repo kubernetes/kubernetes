@@ -18,6 +18,7 @@ package deployment
 
 import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -86,6 +87,11 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	}
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s deploymentStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (deploymentStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDeploymentUpdate(obj.(*extensions.Deployment), old.(*extensions.Deployment))
@@ -107,6 +113,12 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Spec = oldDeployment.Spec
 	newDeployment.Labels = oldDeployment.Labels
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s deploymentStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 // ValidateUpdate is the default update validation for an end user updating status

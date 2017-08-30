@@ -62,6 +62,11 @@ func (limitrangeStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s limitrangeStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (limitrangeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)

@@ -83,6 +83,11 @@ func (customResourceDefinitionStorageStrategy) AllowUnconditionalUpdate() bool {
 func (customResourceDefinitionStorageStrategy) Canonicalize(obj runtime.Object) {
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s customResourceDefinitionStorageStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (a customResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return a.validator.ValidateUpdate(ctx, obj, old)
 }
@@ -150,6 +155,11 @@ func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj run
 	}
 
 	return validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s customResourceValidator) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
 }
 
 func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

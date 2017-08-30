@@ -19,6 +19,7 @@ package namespace
 import (
 	"fmt"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,6 +95,11 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s namespaceStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (namespaceStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNamespace(obj.(*api.Namespace))
@@ -116,6 +122,12 @@ func (namespaceStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, o
 	newNamespace.Spec = oldNamespace.Spec
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s namespaceStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
+}
+
 func (namespaceStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
@@ -125,6 +137,11 @@ type namespaceFinalizeStrategy struct {
 }
 
 var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s namespaceFinalizeStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))

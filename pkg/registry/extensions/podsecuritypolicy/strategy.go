@@ -66,6 +66,11 @@ func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) fiel
 	return validation.ValidatePodSecurityPolicy(obj.(*extensions.PodSecurityPolicy))
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s strategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodSecurityPolicyUpdate(old.(*extensions.PodSecurityPolicy), obj.(*extensions.PodSecurityPolicy))
 }

@@ -76,6 +76,11 @@ func (externaladmissionhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s externaladmissionhookConfigurationStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (externaladmissionhookConfigurationStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateExternalAdmissionHookConfiguration(obj.(*admissionregistration.ExternalAdmissionHookConfiguration))

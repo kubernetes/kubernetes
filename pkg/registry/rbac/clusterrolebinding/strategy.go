@@ -78,6 +78,11 @@ func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*rbac.ClusterRoleBinding)
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s strategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*rbac.ClusterRoleBinding)

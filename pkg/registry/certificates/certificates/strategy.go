@@ -19,6 +19,7 @@ package certificates
 import (
 	"fmt"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -95,6 +96,11 @@ func (csrStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) f
 // Canonicalize normalizes the object after validation (which includes a signature check).
 func (csrStrategy) Canonicalize(obj runtime.Object) {}
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s csrStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (csrStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	oldCSR := old.(*certificates.CertificateSigningRequest)
@@ -144,6 +150,12 @@ func (csrStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newCSR.Status.Conditions = oldCSR.Status.Conditions
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s csrStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
+}
+
 func (csrStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCertificateSigningRequestUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest))
 }
@@ -167,6 +179,11 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 	newCSR.Spec = oldCSR.Spec
 	oldCSR.Status.Conditions = newCSR.Status.Conditions
 	newCSR.Status = oldCSR.Status
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s csrApprovalStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
 }
 
 func (csrApprovalStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

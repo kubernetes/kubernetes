@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,6 +88,11 @@ func (podStrategy) Canonicalize(obj runtime.Object) {
 // AllowCreateOnUpdate is false for pods.
 func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s podStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -157,6 +163,12 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
 	// that breaks garbage collection
 	newPod.OwnerReferences = oldPod.OwnerReferences
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s podStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
