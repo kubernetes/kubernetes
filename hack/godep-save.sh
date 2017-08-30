@@ -34,7 +34,6 @@ fi
 # Some things we want in godeps aren't code dependencies, so ./...
 # won't pick them up.
 REQUIRED_BINS=(
-  "github.com/ugorji/go/codec/codecgen"
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
   "./..."
