@@ -29,6 +29,7 @@ import (
 type Registry interface {
 	ListEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error)
+	CreateEndpoints(ctx genericapirequest.Context, e *api.Endpoints) (*api.Endpoints, error)
 	WatchEndpoints(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	UpdateEndpoints(ctx genericapirequest.Context, e *api.Endpoints) error
 	DeleteEndpoints(ctx genericapirequest.Context, name string) error
@@ -59,6 +60,14 @@ func (s *storage) WatchEndpoints(ctx genericapirequest.Context, options *metaint
 
 func (s *storage) GetEndpoints(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Endpoints, error) {
 	obj, err := s.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Endpoints), nil
+}
+
+func (s *storage) CreateEndpoints(ctx genericapirequest.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
+	obj, err := s.Create(ctx, endpoints, false)
 	if err != nil {
 		return nil, err
 	}
