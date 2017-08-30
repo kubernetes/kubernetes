@@ -283,7 +283,7 @@ message LabelSelectorRequirement {
   optional string key = 1;
 
   // operator represents a key's relationship to a set of values.
-  // Valid operators ard In, NotIn, Exists and DoesNotExist.
+  // Valid operators are In, NotIn, Exists and DoesNotExist.
   optional string operator = 2;
 
   // values is an array of string values. If the operator is In or NotIn,
