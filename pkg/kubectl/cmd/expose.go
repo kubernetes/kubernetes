@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -140,8 +141,8 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := f.Generators("expose")
-	generator, found := generators[generatorName]
+	gs := f.Generators("expose")
+	generator, found := gs[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
 	}
@@ -157,7 +158,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			return err
 		}
 
-		params := kubectl.MakeParams(cmd, names)
+		params := generators.MakeParams(cmd, names)
 		name := info.Name
 		if len(name) > validation.DNS1035LabelMaxLength {
 			name = name[:validation.DNS1035LabelMaxLength]
@@ -166,7 +167,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
-		if s, found := params["selector"]; found && kubectl.IsZero(s) {
+		if s, found := params["selector"]; found && generators.IsZero(s) {
 			s, err := f.MapBasedSelectorForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
@@ -178,7 +179,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
-		if port, found := params["port"]; found && kubectl.IsZero(port) {
+		if port, found := params["port"]; found && generators.IsZero(port) {
 			ports, err := f.PortsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
@@ -202,23 +203,23 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
-			if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
+			if protocols := generators.MakeProtocols(protocolsMap); !generators.IsZero(protocols) {
 				params["protocols"] = protocols
 			}
 		}
 
-		if kubectl.IsZero(params["labels"]) {
+		if generators.IsZero(params["labels"]) {
 			labels, err := f.LabelsForObject(info.Object)
 			if err != nil {
 				return err
 			}
-			params["labels"] = kubectl.MakeLabels(labels)
+			params["labels"] = generators.MakeLabels(labels)
 		}
-		if err = kubectl.ValidateParams(names, params); err != nil {
+		if err = generators.ValidateParams(names, params); err != nil {
 			return err
 		}
 		// Check for invalid flags used against the present generator.
-		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+		if err := generators.EnsureFlagsValid(cmd, gs, generatorName); err != nil {
 			return err
 		}
 

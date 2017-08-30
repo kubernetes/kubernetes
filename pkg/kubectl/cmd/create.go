@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -235,7 +236,7 @@ type CreateSubcommandOptions struct {
 	// Name of resource being created
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
-	StructuredGenerator kubectl.StructuredGenerator
+	StructuredGenerator generators.StructuredGenerator
 	// DryRun is true if the command should be simulated but not run against the server
 	DryRun       bool
 	OutputFormat string

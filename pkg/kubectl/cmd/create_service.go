@@ -22,9 +22,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -92,10 +92,10 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceClusterIPGeneratorV1Name:
-		generator = &kubectl.ServiceCommonGeneratorV1{
+		generator = &generators.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeClusterIP,
@@ -148,10 +148,10 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceNodePortGeneratorV1Name:
-		generator = &kubectl.ServiceCommonGeneratorV1{
+		generator = &generators.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeNodePort,
@@ -204,10 +204,10 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceLoadBalancerGeneratorV1Name:
-		generator = &kubectl.ServiceCommonGeneratorV1{
+		generator = &generators.ServiceCommonGeneratorV1{
 			Name:      name,
 			TCP:       cmdutil.GetFlagStringSlice(cmd, "tcp"),
 			Type:      api.ServiceTypeLoadBalancer,
@@ -265,10 +265,10 @@ func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceExternalNameGeneratorV1Name:
-		generator = &kubectl.ServiceCommonGeneratorV1{
+		generator = &generators.ServiceCommonGeneratorV1{
 			Name:         name,
 			Type:         api.ServiceTypeExternalName,
 			ExternalName: cmdutil.GetFlagString(cmd, "external-name"),

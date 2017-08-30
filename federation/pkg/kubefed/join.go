@@ -34,10 +34,10 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubectl"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -404,7 +404,7 @@ func createConfigMap(hostClientSet internalclientset.Interface, config util.Admi
 // clusterGenerator extracts the cluster information from the supplied
 // kubeconfig and builds a StructuredGenerator for the
 // `federation/cluster` API resource.
-func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secretName, serviceAccountName, clusterRoleName string) (kubectl.StructuredGenerator, error) {
+func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secretName, serviceAccountName, clusterRoleName string) (generators.StructuredGenerator, error) {
 	// Get the context from the config.
 	ctx, found := clientConfig.Contexts[contextName]
 	if !found {
@@ -427,7 +427,7 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secr
 		serverAddress = strings.Join([]string{scheme, serverAddress}, "://")
 	}
 
-	generator := &kubectl.ClusterGeneratorV1Beta1{
+	generator := &generators.ClusterGeneratorV1Beta1{
 		Name:               name,
 		ClientCIDR:         defaultClientCIDR,
 		ServerAddress:      serverAddress,

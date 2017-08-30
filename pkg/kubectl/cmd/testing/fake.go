@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
@@ -431,12 +432,12 @@ func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
-func (f *FakeFactory) Generators(cmdName string) map[string]kubectl.Generator {
-	var generator map[string]kubectl.Generator
+func (f *FakeFactory) Generators(cmdName string) map[string]generators.Generator {
+	var generator map[string]generators.Generator
 	switch cmdName {
 	case "run":
-		generator = map[string]kubectl.Generator{
-			cmdutil.DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
+		generator = map[string]generators.Generator{
+			cmdutil.DeploymentV1Beta1GeneratorName: generators.DeploymentV1Beta1{},
 		}
 	}
 	return generator
@@ -730,7 +731,7 @@ func (f *fakeAPIFactory) Command(*cobra.Command, bool) string {
 	return f.tf.Command
 }
 
-func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
+func (f *fakeAPIFactory) Generators(cmdName string) map[string]generators.Generator {
 	return cmdutil.DefaultGenerators(cmdName)
 }
 

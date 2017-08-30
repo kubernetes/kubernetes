@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -68,10 +68,10 @@ func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ResourceQuotaV1GeneratorName:
-		generator = &kubectl.ResourceQuotaGeneratorV1{
+		generator = &generators.ResourceQuotaGeneratorV1{
 			Name:   name,
 			Hard:   cmdutil.GetFlagString(cmd, "hard"),
 			Scopes: cmdutil.GetFlagString(cmd, "scopes"),

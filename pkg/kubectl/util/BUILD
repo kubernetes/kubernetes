@@ -1,11 +1,13 @@
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "env_file.go",
         "umask.go",
         "util.go",
     ] + select({
@@ -19,6 +21,7 @@ go_library(
         "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
     ],
 )
 
@@ -42,4 +45,10 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["env_file_test.go"],
+    library = ":go_default_library",
 )

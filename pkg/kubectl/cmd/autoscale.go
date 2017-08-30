@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
@@ -104,8 +105,8 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 	// Get the generator, setup and validate all required parameters
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generators := f.Generators("autoscale")
-	generator, found := generators[generatorName]
+	gs := f.Generators("autoscale")
+	generator, found := gs[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
 	}
@@ -123,18 +124,18 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		}
 
 		name := info.Name
-		params := kubectl.MakeParams(cmd, names)
+		params := generators.MakeParams(cmd, names)
 		params["default-name"] = name
 
 		params["scaleRef-kind"] = mapping.GroupVersionKind.Kind
 		params["scaleRef-name"] = name
 		params["scaleRef-apiVersion"] = mapping.GroupVersionKind.GroupVersion().String()
 
-		if err = kubectl.ValidateParams(names, params); err != nil {
+		if err = generators.ValidateParams(names, params); err != nil {
 			return err
 		}
 		// Check for invalid flags used against the present generator.
-		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+		if err := generators.EnsureFlagsValid(cmd, gs, generatorName); err != nil {
 			return err
 		}
 

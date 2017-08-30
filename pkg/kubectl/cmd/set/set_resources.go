@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -179,7 +179,7 @@ func (o *ResourcesOptions) Validate() error {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
-	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
+	o.ResourceRequirements, err = generators.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
 	if err != nil {
 		return err
 	}

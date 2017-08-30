@@ -27,9 +27,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 )
 
 func Test_generatorFromName(t *testing.T) {
@@ -49,8 +49,8 @@ func Test_generatorFromName(t *testing.T) {
 	assert.True(t, ok)
 
 	{
-		expectedGenerator := &kubectl.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		expectedGenerator := &generators.DeploymentBasicGeneratorV1{
+			BaseDeploymentGenerator: generators.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},
@@ -62,8 +62,8 @@ func Test_generatorFromName(t *testing.T) {
 	assert.True(t, ok)
 
 	{
-		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		expectedGenerator := &generators.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: generators.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},

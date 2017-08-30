@@ -145,7 +145,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	// In tests, the validatePatchApplication() gets called in PATCH request
 	// handler in fake round tripper. validatePatchApplication call
 	// checks that this DELETE_ME label was deleted by the apply implementation in
-	// kubectl.
+	// generators.
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)

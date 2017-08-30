@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -65,10 +65,10 @@ func CreateClusterRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ClusterRoleBindingV1GeneratorName:
-		generator = &kubectl.ClusterRoleBindingGeneratorV1{
+		generator = &generators.ClusterRoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Users:           cmdutil.GetFlagStringArray(cmd, "user"),
