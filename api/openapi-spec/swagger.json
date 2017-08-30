@@ -55873,35 +55873,6 @@
      }
     ]
    },
-   "io.k8s.api.apps.v1beta2.ReplicaSetCondition": {
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
-    "required": [
-     "type",
-     "status"
-    ],
-    "properties": {
-     "lastTransitionTime": {
-      "description": "The last time the condition transitioned from one status to another.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-     },
-     "message": {
-      "description": "A human readable message indicating details about the transition.",
-      "type": "string"
-     },
-     "reason": {
-      "description": "The reason for the condition's last transition.",
-      "type": "string"
-     },
-     "status": {
-      "description": "Status of the condition, one of True, False, Unknown.",
-      "type": "string"
-     },
-     "type": {
-      "description": "Type of replica set condition.",
-      "type": "string"
-     }
-    }
-   },
    "io.k8s.api.apps.v1beta2.ReplicaSetList": {
     "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
@@ -55969,15 +55940,6 @@
       "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
       "type": "integer",
       "format": "int32"
-     },
-     "conditions": {
-      "description": "Represents the latest available observations of a replica set's current state.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSetCondition"
-      },
-      "x-kubernetes-patch-merge-key": "type",
-      "x-kubernetes-patch-strategy": "merge"
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset.",

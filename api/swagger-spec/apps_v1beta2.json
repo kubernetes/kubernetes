@@ -8435,43 +8435,6 @@
       "type": "integer",
       "format": "int64",
       "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
-     },
-     "conditions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1beta2.ReplicaSetCondition"
-      },
-      "description": "Represents the latest available observations of a replica set's current state."
-     }
-    }
-   },
-   "v1beta2.ReplicaSetCondition": {
-    "id": "v1beta2.ReplicaSetCondition",
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
-    "required": [
-     "type",
-     "status"
-    ],
-    "properties": {
-     "type": {
-      "type": "string",
-      "description": "Type of replica set condition."
-     },
-     "status": {
-      "type": "string",
-      "description": "Status of the condition, one of True, False, Unknown."
-     },
-     "lastTransitionTime": {
-      "type": "string",
-      "description": "The last time the condition transitioned from one status to another."
-     },
-     "reason": {
-      "type": "string",
-      "description": "The reason for the condition's last transition."
-     },
-     "message": {
-      "type": "string",
-      "description": "A human readable message indicating details about the transition."
      }
     }
    },
