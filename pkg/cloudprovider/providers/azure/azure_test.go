@@ -779,7 +779,7 @@ func TestSplitProviderID(t *testing.T) {
 	}{
 		{
 			providerID: CloudProviderName + ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
-			name:       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "k8s-agent-AAAAAAAA-0",
 			fail:       false,
 		},
 		{

@@ -46,7 +46,7 @@ const (
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
 )
 
-var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(.+)$`)
+var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 
 // returns the full identifier of a machine
 func (az *Cloud) getMachineID(machineName string) string {
