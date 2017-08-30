@@ -487,6 +487,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "reason",
+        "description": "",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "name",
         "description": "name of the ClusterRoleBinding",
@@ -1081,6 +1089,14 @@
         "paramType": "query",
         "name": "propagationPolicy",
         "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "reason",
+        "description": "",
         "required": false,
         "allowMultiple": false
        },
@@ -1736,6 +1752,14 @@
         "paramType": "query",
         "name": "propagationPolicy",
         "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "reason",
+        "description": "",
         "required": false,
         "allowMultiple": false
        },
@@ -2586,6 +2610,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "reason",
+        "description": "",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -3071,6 +3103,9 @@
      "clusterName": {
       "type": "string",
       "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
+     },
+     "deletionReason": {
+      "type": "string"
      }
     }
    },
@@ -3331,6 +3366,9 @@
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy."
+     },
+     "reason": {
+      "type": "string"
      }
     }
    },

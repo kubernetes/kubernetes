@@ -559,6 +559,14 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "reason",
+        "description": "",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -1202,6 +1210,9 @@
      "clusterName": {
       "type": "string",
       "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
+     },
+     "deletionReason": {
+      "type": "string"
      }
     }
    },
@@ -3051,7 +3062,7 @@
       "description": "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
      },
      "preStop": {
-      "$ref": "v1.Handler",
+      "$ref": "v1.PreStopHandler",
       "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
      }
     }
@@ -3071,6 +3082,71 @@
      "tcpSocket": {
       "$ref": "v1.TCPSocketAction",
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
+     }
+    }
+   },
+   "v1.PreStopHandler": {
+    "id": "v1.PreStopHandler",
+    "properties": {
+     "exec": {
+      "$ref": "v1.DeleteExecAction"
+     },
+     "httpGet": {
+      "$ref": "v1.DeleteHTTPGetAction"
+     },
+     "tcpSocket": {
+      "$ref": "v1.TCPSocketAction"
+     }
+    }
+   },
+   "v1.DeleteExecAction": {
+    "id": "v1.DeleteExecAction",
+    "description": "ExecAction describes a \"run in container\" action.",
+    "properties": {
+     "command": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy."
+     },
+     "reasonEnv": {
+      "type": "string"
+     }
+    }
+   },
+   "v1.DeleteHTTPGetAction": {
+    "id": "v1.DeleteHTTPGetAction",
+    "description": "HTTPGetAction describes an action based on HTTP Get requests.",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path to access on the HTTP server."
+     },
+     "port": {
+      "type": "string",
+      "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+     },
+     "host": {
+      "type": "string",
+      "description": "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead."
+     },
+     "scheme": {
+      "type": "string",
+      "description": "Scheme to use for connecting to the host. Defaults to HTTP."
+     },
+     "httpHeaders": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.HTTPHeader"
+      },
+      "description": "Custom headers to set in the request. HTTP allows repeated headers."
+     },
+     "reasonHeader": {
+      "type": "string"
      }
     }
    },
@@ -3539,6 +3615,9 @@
      "propagationPolicy": {
       "$ref": "v1.DeletionPropagation",
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy."
+     },
+     "reason": {
+      "type": "string"
      }
     }
    },
