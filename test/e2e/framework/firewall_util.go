@@ -154,7 +154,7 @@ func GetClusterName(instancePrefix string) string {
 // Warning: this MUST be consistent with the CLUSTER_IP_RANGE set in
 // gce/config-test.sh.
 func GetClusterIpRange() string {
-	return "10.100.0.0/14"
+	return "10.64.0.0/14"
 }
 
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
