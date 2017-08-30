@@ -403,7 +403,7 @@ function set_service_accounts {
 
 function start_apiserver {
     security_admission=""
-    if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
+    if [[ -n "${ALLOW_SECURITY_CONTEXT}" ]]; then
       security_admission=",SecurityContextDeny"
     fi
     if [[ -n "${PSP_ADMISSION}" ]]; then
