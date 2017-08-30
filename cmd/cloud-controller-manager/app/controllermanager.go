@@ -107,32 +107,9 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 	leaderElectionClient := kubernetes.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
 
 	// Start the external controller manager server
-	go func() {
-		mux := http.NewServeMux()
-		healthz.InstallHandler(mux)
-		if s.EnableProfiling {
-			mux.HandleFunc("/debug/pprof/", pprof.Index)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-			if s.EnableContentionProfiling {
-				goruntime.SetBlockProfileRate(1)
-			}
-		}
-		configz.InstallHandler(mux)
-		mux.Handle("/metrics", prometheus.Handler())
+	go startHTTP(s)
 
-		server := &http.Server{
-			Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
-			Handler: mux,
-		}
-		glog.Fatal(server.ListenAndServe())
-	}()
-
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "cloud-controller-manager"})
+	recorder := createRecorder(kubeClient)
 
 	run := func(stop <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
@@ -272,4 +249,33 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	sharedInformers.Start(stop)
 
 	select {}
+}
+
+func startHTTP(s *options.CloudControllerManagerServer) {
+	mux := http.NewServeMux()
+	healthz.InstallHandler(mux)
+	if s.EnableProfiling {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		if s.EnableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
+	}
+	configz.InstallHandler(mux)
+	mux.Handle("/metrics", prometheus.Handler())
+
+	server := &http.Server{
+		Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
+		Handler: mux,
+	}
+	glog.Fatal(server.ListenAndServe())
+}
+
+func createRecorder(kubeClient *clientset.Clientset) record.EventRecorder {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	return eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "cloud-controller-manager"})
 }
