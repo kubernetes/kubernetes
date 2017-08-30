@@ -174,6 +174,9 @@ func (d *simpleDecDriver) uncacheRead() {
 }
 
 func (d *simpleDecDriver) ContainerType() (vt valueType) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	if d.bd == simpleVdNil {
 		return valueTypeNil
 	} else if d.bd == simpleVdByteArray || d.bd == simpleVdByteArray+1 ||
@@ -315,11 +318,17 @@ func (d *simpleDecDriver) DecodeBool() (b bool) {
 }
 
 func (d *simpleDecDriver) ReadMapStart() (length int) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	d.bdRead = false
 	return d.decLen()
 }
 
 func (d *simpleDecDriver) ReadArrayStart() (length int) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	d.bdRead = false
 	return d.decLen()
 }
@@ -372,7 +381,7 @@ func (d *simpleDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut
 			bs = d.b[:]
 		}
 	}
-	return decByteSlice(d.r, clen, bs)
+	return decByteSlice(d.r, clen, d.d.h.MaxInitLen, bs)
 }
 
 func (d *simpleDecDriver) DecodeExt(rv interface{}, xtag uint64, ext Ext) (realxtag uint64) {
@@ -510,7 +519,7 @@ func (h *SimpleHandle) newEncDriver(e *Encoder) encDriver {
 }
 
 func (h *SimpleHandle) newDecDriver(d *Decoder) decDriver {
-	return &simpleDecDriver{d: d, r: d.r, h: h, br: d.bytes}
+	return &simpleDecDriver{d: d, h: h, r: d.r, br: d.bytes}
 }
 
 func (e *simpleEncDriver) reset() {
@@ -518,7 +527,7 @@ func (e *simpleEncDriver) reset() {
 }
 
 func (d *simpleDecDriver) reset() {
-	d.r = d.d.r
+	d.r, d.br = d.d.r, d.d.bytes
 	d.bd, d.bdRead = 0, false
 }
 

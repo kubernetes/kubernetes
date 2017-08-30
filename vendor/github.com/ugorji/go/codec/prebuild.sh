@@ -38,7 +38,7 @@ _build() {
         return 0
     fi 
 
-   # echo "Running prebuild"
+    # echo "Running prebuild"
     if [ "${zbak}" == "1" ] 
     then
         # echo "Backing up old generated files"
@@ -46,12 +46,13 @@ _build() {
         _gg=".generated.go"
         [ -e "gen-helper${_gg}" ] && mv gen-helper${_gg} gen-helper${_gg}__${_zts}.bak
         [ -e "fast-path${_gg}" ] && mv fast-path${_gg} fast-path${_gg}__${_zts}.bak
+        [ -e "gen${_gg}" ] && mv gen${_gg} gen${_gg}__${_zts}.bak
         # [ -e "safe${_gg}" ] && mv safe${_gg} safe${_gg}__${_zts}.bak
         # [ -e "unsafe${_gg}" ] && mv unsafe${_gg} unsafe${_gg}__${_zts}.bak
-    else 
-        rm -f fast-path.generated.go gen.generated.go gen-helper.generated.go \
-           *safe.generated.go *_generated_test.go *.generated_ffjson_expose.go
-    fi
+    fi 
+    rm -f gen-helper.generated.go fast-path.generated.go \
+       gen.generated.go \
+       *safe.generated.go *_generated_test.go *.generated_ffjson_expose.go
 
     cat > gen.generated.go <<EOF
 // Copyright (c) 2012-2015 Ugorji Nwoke. All rights reserved.
@@ -93,7 +94,7 @@ EOF
 package main
 
 //import "flag"
-import "ugorji.net/codec"
+import "${zpkg}"
 import "os"
 
 func run(fnameIn, fnameOut string, safe bool) {
@@ -145,17 +146,17 @@ _codegenerators() {
         fi
         
         echo "codecgen - !unsafe ... " && \
-            codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 19780 $zfin &
+            $zgobase/bin/codecgen -rt codecgen -t 'x,codecgen,!unsafe' -o values_codecgen${zsfx} -d 19780 $zfin &
         zzzIdC=$!
         echo "codecgen - unsafe ... " && \
-            codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 19781 $zfin &
+            $zgobase/bin/codecgen  -u -rt codecgen -t 'x,codecgen,unsafe' -o values_codecgen_unsafe${zsfx} -d 19781 $zfin &
         zzzIdCU=$!
         wait $zzzIdC $zzzIdCU $zzzIdMsgp $zzzIdFF && \
             # remove (M|Unm)arshalJSON implementations, so they don't conflict with encoding/json bench \
             if [[ $zexternal == "1" ]]
             then
-                sed -i 's+ MarshalJSON(+ _MarshalJSON(+g' values_ffjson${zsfx} && \
-                    sed -i 's+ UnmarshalJSON(+ _UnmarshalJSON(+g' values_ffjson${zsfx}
+                sed -i '' -e 's+ MarshalJSON(+ _MarshalJSON(+g' values_ffjson${zsfx} && \
+                    sed -i '' -e 's+ UnmarshalJSON(+ _UnmarshalJSON(+g' values_ffjson${zsfx}
             fi && \
             echo "generators done!" && \
             true
@@ -165,13 +166,14 @@ _codegenerators() {
 # _init reads the arguments and sets up the flags
 _init() {
 OPTIND=1
-while getopts "fbx" flag
+while getopts "fbxp:" flag
 do
     case "x$flag" in 
         'xf') zforce=1;;
         'xb') zbak=1;;
         'xx') zexternal=1;;
-        *) echo "prebuild.sh accepts [-fbx] only"; return 1;;
+        'xp') zpkg="${OPTARG}" ;;
+        *) echo "prebuild.sh accepts [-fbx] [-p basepkgname] only"; return 1;;
     esac
 done
 shift $((OPTIND-1))
@@ -180,11 +182,15 @@ OPTIND=1
 
 # main script.
 # First ensure that this is being run from the basedir (i.e. dirname of script is .)
+# Sample usage:
 if [ "." = `dirname $0` ]
 then
     zmydir=`pwd`
     zfin="test_values.generated.go"
     zsfx="_generated_test.go"
+    # zpkg="ugorji.net/codec"
+    zpkg=${zmydir##*/src/}
+    zgobase=${zmydir%%/src/*}
     # rm -f *_generated_test.go 
     rm -f codecgen-*.go && \
         _init "$@" && \

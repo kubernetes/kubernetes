@@ -310,6 +310,8 @@ func (e *jsonEncDriver) quoteStr(s string) {
 	w.writen1('"')
 	start := 0
 	for i := 0; i < len(s); {
+		// encode all bytes < 0x20 (except \r, \n).
+		// also encode < > & to prevent security holes when served to some browsers.
 		if b := s[i]; b < utf8.RuneSelf {
 			if 0x20 <= b && b != '\\' && b != '"' && b != '<' && b != '>' && b != '&' {
 				i++
@@ -331,9 +333,14 @@ func (e *jsonEncDriver) quoteStr(s string) {
 				w.writen2('\\', 'f')
 			case '\t':
 				w.writen2('\\', 't')
+			case '<', '>', '&':
+				if e.h.HTMLCharsAsIs {
+					w.writen1(b)
+				} else {
+					w.writestr(`\u00`)
+					w.writen2(hex[b>>4], hex[b&0xF])
+				}
 			default:
-				// encode all bytes < 0x20 (except \r, \n).
-				// also encode < > & to prevent security holes when served to some browsers.
 				w.writestr(`\u00`)
 				w.writen2(hex[b>>4], hex[b&0xF])
 			}
@@ -352,7 +359,7 @@ func (e *jsonEncDriver) quoteStr(s string) {
 			continue
 		}
 		// U+2028 is LINE SEPARATOR. U+2029 is PARAGRAPH SEPARATOR.
-		// Both technically valid JSON, but bomb on JSONP, so fix here.
+		// Both technically valid JSON, but bomb on JSONP, so fix here unconditionally.
 		if c == '\u2028' || c == '\u2029' {
 			if start < i {
 				w.writestr(s[start:i])
@@ -695,7 +702,9 @@ LOOP:
 			switch state {
 			case 0:
 				state = 2
-				// do not add sign to the slice ...
+				if storeBytes {
+					d.bs = append(d.bs, b)
+				}
 				b, eof = r.readn1eof()
 				continue
 			case 6: // typ = jsonNumFloat
@@ -708,7 +717,9 @@ LOOP:
 			case 0:
 				state = 2
 				n.neg = true
-				// do not add sign to the slice ...
+				if storeBytes {
+					d.bs = append(d.bs, b)
+				}
 				b, eof = r.readn1eof()
 				continue
 			case 6: // typ = jsonNumFloat
@@ -974,16 +985,28 @@ func (d *jsonDecDriver) appendStringAsBytes() {
 		d.tok = b
 	}
 
-	// handle null as a string
-	if d.tok == 'n' {
-		d.readStrIdx(10, 13) // ull
-		d.bs = d.bs[:0]
+	if d.tok != '"' {
+		// d.d.errorf("json: expect char '%c' but got char '%c'", '"', d.tok)
+		// handle non-string scalar: null, true, false or a number
+		switch d.tok {
+		case 'n':
+			d.readStrIdx(10, 13) // ull
+			d.bs = d.bs[:0]
+		case 'f':
+			d.readStrIdx(5, 9) // alse
+			d.bs = d.bs[:5]
+			copy(d.bs, "false")
+		case 't':
+			d.readStrIdx(1, 4) // rue
+			d.bs = d.bs[:4]
+			copy(d.bs, "true")
+		default:
+			// try to parse a valid number
+			d.decNum(true)
+		}
 		return
 	}
 
-	if d.tok != '"' {
-		d.d.errorf("json: expect char '%c' but got char '%c'", '"', d.tok)
-	}
 	d.tok = 0
 
 	v := d.bs[:0]
@@ -1152,6 +1175,7 @@ func (d *jsonDecDriver) DecodeNaked() {
 type JsonHandle struct {
 	textEncodingType
 	BasicHandle
+
 	// RawBytesExt, if configured, is used to encode and decode raw bytes in a custom way.
 	// If not configured, raw bytes are encoded to/from base64 text.
 	RawBytesExt InterfaceExt
@@ -1173,6 +1197,12 @@ type JsonHandle struct {
 	//             containing the exact integer representation as a decimal.
 	//   - else    encode all integers as a json number (default)
 	IntegerAsString uint8
+
+	// HTMLCharsAsIs controls how to encode some special characters to html: < > &
+	//
+	// By default, we encode them as \uXXX
+	// to prevent security holes when served from some browsers.
+	HTMLCharsAsIs bool
 }
 
 func (h *JsonHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
