@@ -143,7 +143,7 @@ func getResourceHandler(e rest.Exporter, scope RequestScope, getter getterFunc) 
 		}
 
 		trace.Step("About to write a response")
-		transformResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
+		writeResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -393,7 +393,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope Request
 			}
 		}
 
-		transformResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
+		writeResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -503,7 +503,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			status.Code = int32(code)
 		}
 
-		transformResponseObject(ctx, nil, scope, req, w, code, result)
+		writeResponseObject(ctx, nil, scope, req, w, code, result)
 	}
 }
 
@@ -603,7 +603,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		transformResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
+		writeResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -933,7 +933,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			status = http.StatusCreated
 		}
 
-		transformResponseObject(ctx, nil, scope, req, w, status, result)
+		writeResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1056,7 +1056,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, nil, scope, req, w, status, result)
+		writeResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1163,7 +1163,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
+		writeResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 

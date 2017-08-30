@@ -19,6 +19,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,54 +33,34 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
-// transformResponseObject takes an object loaded from storage and performs any necessary transformations.
-// Will write the complete response object.
-func transformResponseObject(ctx request.Context, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
-	// TODO: fetch the media type much earlier in request processing and pass it into this method.
-	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
-	if err != nil {
-		status := responsewriters.ErrorToAPIStatus(err)
-		responsewriters.WriteRawJSON(int(status.Code), status, w)
-		return
-	}
+// transformResponseObject takes an object loaded from storage and performs any necessary transformations,
+// and returns the resulting object. Caller is expected to write the response as appropriate.
+func transformResponseObject(ctx request.Context, e rest.Exporter, exportOptions metav1.ExportOptions,
+	scope RequestScope, params url.Values, mediaType negotiation.MediaTypeOptions, result runtime.Object) (runtime.Object, error) {
 
-	// Check for legacy "export=true" query parameter:
-	exportOptions := metav1.ExportOptions{}
-	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &exportOptions); err != nil {
-		err = errors.NewBadRequest(err.Error())
-		scope.err(err, w, req)
-		return
-	}
-
-	// Media type is the preferred path to trigger export but we need to maintain backward
-	// compatability with the export query parameter.
-	if mediaType.Export || exportOptions.Export {
-		exportOptions.Export = true
+	var err error
+	if exportOptions.Export {
 		if e == nil {
 			err = errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
-			scope.err(err, w, req)
-			return
+			return result, err
 		}
 
 		// Apply export logic to every item of a list:
 		if meta.IsListType(result) {
 			items, err := meta.ExtractList(result)
 			if err != nil {
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 			for i := range items {
 				items[i], err = e.Export(ctx, items[i], exportOptions)
 				if err != nil {
-					scope.err(err, w, req)
-					return
+					return result, err
 				}
 			}
 		} else {
 			result, err = e.Export(ctx, result, exportOptions)
 			if err != nil {
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 		}
 	}
@@ -92,33 +73,21 @@ func transformResponseObject(ctx request.Context, e rest.Exporter, scope Request
 			if meta.IsListType(result) {
 				// TODO: this should be calculated earlier
 				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadata, but the requested object is a list (%T)", result))
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 			m, err := meta.Accessor(result)
 			if err != nil {
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
-
-			// renegotiate under the internal version
-			_, info, err := negotiation.NegotiateOutputMediaType(req, metainternalversion.Codecs, &scope)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
-			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, partial)
-			return
+			return partial, nil
 
 		case target.Kind == "PartialObjectMetadataList" && target.GroupVersion() == metav1alpha1.SchemeGroupVersion:
 			if !meta.IsListType(result) {
 				// TODO: this should be calculated earlier
 				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 			list := &metav1alpha1.PartialObjectMetadataList{}
 			err := meta.EachListItem(result, func(obj runtime.Object) error {
@@ -132,34 +101,23 @@ func transformResponseObject(ctx request.Context, e rest.Exporter, scope Request
 				return nil
 			})
 			if err != nil {
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 
-			// renegotiate under the internal version
-			_, info, err := negotiation.NegotiateOutputMediaType(req, metainternalversion.Codecs, &scope)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
-			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, list)
-			return
+			return list, nil
 
 		case target.Kind == "Table" && target.GroupVersion() == metav1alpha1.SchemeGroupVersion:
 			// TODO: relax the version abstraction
 			// TODO: skip if this is a status response (delete without body)?
 
 			opts := &metav1alpha1.TableOptions{}
-			if err := metav1alpha1.ParameterCodec.DecodeParameters(req.URL.Query(), metav1alpha1.SchemeGroupVersion, opts); err != nil {
-				scope.err(err, w, req)
-				return
+			if err := metav1alpha1.ParameterCodec.DecodeParameters(params, metav1alpha1.SchemeGroupVersion, opts); err != nil {
+				return result, err
 			}
 
 			table, err := scope.TableConvertor.ConvertToTable(ctx, result, opts)
 			if err != nil {
-				scope.err(err, w, req)
-				return
+				return result, err
 			}
 
 			for i := range table.Rows {
@@ -168,15 +126,13 @@ func transformResponseObject(ctx request.Context, e rest.Exporter, scope Request
 				case metav1alpha1.IncludeObject:
 					item.Object.Object, err = scope.Convertor.ConvertToVersion(item.Object.Object, scope.Kind.GroupVersion())
 					if err != nil {
-						scope.err(err, w, req)
-						return
+						return result, err
 					}
 				// TODO: rely on defaulting for the value here?
 				case metav1alpha1.IncludeMetadata, "":
 					m, err := meta.Accessor(item.Object.Object)
 					if err != nil {
-						scope.err(err, w, req)
-						return
+						return result, err
 					}
 					// TODO: turn this into an internal type and do conversion in order to get object kind automatically set?
 					partial := meta.AsPartialObjectMetadata(m)
@@ -187,31 +143,84 @@ func transformResponseObject(ctx request.Context, e rest.Exporter, scope Request
 				default:
 					// TODO: move this to validation on the table options?
 					err = errors.NewBadRequest(fmt.Sprintf("unrecognized includeObject value: %q", opts.IncludeObject))
-					scope.err(err, w, req)
+					return table, err
 				}
 			}
 
-			// renegotiate under the internal version
-			_, info, err := negotiation.NegotiateOutputMediaType(req, metainternalversion.Codecs, &scope)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
-			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, table)
-			return
+			return table, nil
 
 		default:
 			// this block should only be hit if scope AllowsConversion is incorrect
 			accepted, _ := negotiation.MediaTypesForSerializer(metainternalversion.Codecs)
 			err := negotiation.NewNotAcceptableError(accepted)
+			return result, err
+		}
+	}
+
+	return result, nil
+}
+
+// buildExportOptions handles the two paths by which export can be triggered
+// today (export=true query parameter, and export=1 in Accept header), and
+// returns an ExportOptions that can be used throughout response
+// transformations. An error here should indicate a bad request.
+func buildExportOptions(scope RequestScope, req *http.Request, mediaType negotiation.MediaTypeOptions,
+	e rest.Exporter) (metav1.ExportOptions, error) {
+	exportOptions := metav1.ExportOptions{}
+	if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &exportOptions); err != nil {
+		return exportOptions, err
+	}
+	if mediaType.Export {
+		exportOptions.Export = true
+	}
+
+	if exportOptions.Export && e == nil {
+		err := errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+		return exportOptions, err
+	}
+	return exportOptions, nil
+}
+
+// TODO: transformAndWriteResponseObject
+// writeResponseObject applies object transformations, and writes the response.
+func writeResponseObject(ctx request.Context, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
+
+	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+	if err != nil {
+		status := responsewriters.ErrorToAPIStatus(err)
+		responsewriters.WriteRawJSON(int(status.Code), status, w)
+		return
+	}
+
+	exportOptions, err := buildExportOptions(scope, req, mediaType, e)
+	if err != nil {
+		status := responsewriters.ErrorToAPIStatus(err)
+		responsewriters.WriteRawJSON(int(status.Code), status, w)
+		return
+	}
+
+	transformedResult, err := transformResponseObject(ctx, e, exportOptions, scope, req.URL.Query(),
+		mediaType, result)
+	if err != nil {
+		status := responsewriters.ErrorToAPIStatus(err)
+		responsewriters.WriteRawJSON(int(status.Code), status, w)
+		return
+	}
+
+	if target := mediaType.Convert; target != nil {
+		// renegotiate under the internal version
+		_, info, err := negotiation.NegotiateOutputMediaType(req, metainternalversion.Codecs, &scope)
+		if err != nil {
 			status := responsewriters.ErrorToAPIStatus(err)
 			responsewriters.WriteRawJSON(int(status.Code), status, w)
 			return
 		}
+		encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
+		responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, transformedResult)
+		return
 	}
 
-	responsewriters.WriteObject(ctx, statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+	responsewriters.WriteObject(ctx, statusCode, scope.Kind.GroupVersion(), scope.Serializer, transformedResult, w, req)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed
