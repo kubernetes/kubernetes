@@ -104,6 +104,7 @@ func TestTarUntar(t *testing.T) {
 		t.Errorf("unexpected error: %v | %v", err, err2)
 		t.FailNow()
 	}
+	dir = dir + "/"
 	defer func() {
 		if err := os.RemoveAll(dir); err != nil {
 			t.Errorf("Unexpected error cleaning up: %v", err)
