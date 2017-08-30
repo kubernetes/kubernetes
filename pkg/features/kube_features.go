@@ -146,7 +146,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletClientCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
