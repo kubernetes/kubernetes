@@ -34,7 +34,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 		original *batchv1beta1.CronJob
 		expected *batchv1beta1.CronJob
 	}{
-		"empty batchv2alpha1.CronJob should default batchv2alpha1.ConcurrencyPolicy and Suspend": {
+		"empty batchv1beta1.CronJob should default batchv1beta1.ConcurrencyPolicy and Suspend": {
 			original: &batchv1beta1.CronJob{},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{

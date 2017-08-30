@@ -51,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	//aggregatorinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
@@ -557,9 +556,8 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
-		// FIXME: this GroupVersionResource override should be configurable
-		// TODO we need to update this to batch/v1beta1 when it's enabled by default
-		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
+		// FIXME (soltysh): this GroupVersionResource override should be configurable
+		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v1beta1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)

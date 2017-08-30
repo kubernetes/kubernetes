@@ -29,7 +29,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -160,10 +160,10 @@ func AddHandlers(h printers.PrintHandler) {
 
 	cronJobColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Schedule", Type: "string", Description: batchv2alpha1.CronJobSpec{}.SwaggerDoc()["schedule"]},
-		{Name: "Suspend", Type: "boolean", Description: batchv2alpha1.CronJobSpec{}.SwaggerDoc()["suspend"]},
-		{Name: "Active", Type: "integer", Description: batchv2alpha1.CronJobStatus{}.SwaggerDoc()["active"]},
-		{Name: "Last Schedule", Type: "string", Description: batchv2alpha1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
+		{Name: "Schedule", Type: "string", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["schedule"]},
+		{Name: "Suspend", Type: "boolean", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["suspend"]},
+		{Name: "Active", Type: "integer", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["active"]},
+		{Name: "Last Schedule", Type: "string", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
