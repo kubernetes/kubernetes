@@ -301,28 +301,6 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 	return nil
 }
 
-func (adc *attachDetachController) getNodeVolumeDevicePath(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName) (string, error) {
-	var devicePath string
-	var found bool
-	node, err := adc.nodeLister.Get(string(nodeName))
-	if err != nil {
-		return devicePath, err
-	}
-	for _, attachedVolume := range node.Status.VolumesAttached {
-		if volumeName == attachedVolume.Name {
-			devicePath = attachedVolume.DevicePath
-			found = true
-			break
-		}
-	}
-	if !found {
-		err = fmt.Errorf("Volume %s not found on node %s", volumeName, nodeName)
-	}
-
-	return devicePath, err
-}
-
 func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 	glog.V(5).Infof("Populating DesiredStateOfworld")
 
@@ -331,55 +309,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 		return err
 	}
 	for _, pod := range pods {
-		podToAdd := pod
-		adc.podAdd(&podToAdd)
-		for _, podVolume := range podToAdd.Spec.Volumes {
-			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
-			// with the correct ones found on pods. The present in the ASW with no corresponding
-			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd.Namespace, adc.pvcLister, adc.pvLister)
-			if err != nil {
-				glog.Errorf(
-					"Error creating spec for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
-				continue
-			}
-			nodeName := types.NodeName(podToAdd.Spec.NodeName)
-			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-			if err != nil || plugin == nil {
-				glog.V(10).Infof(
-					"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
-				continue
-			}
-			volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
-			if err != nil {
-				glog.Errorf(
-					"Failed to find unique name for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
-				continue
-			}
-			if adc.actualStateOfWorld.VolumeNodeExists(volumeName, nodeName) {
-				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
-				if err != nil {
-					glog.Errorf("Failed to find device path: %v", err)
-					continue
-				}
-				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
-				if err != nil {
-					glog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
-				}
-			}
-		}
+		adc.podAdd(&pod)
 	}
 
 	return nil
