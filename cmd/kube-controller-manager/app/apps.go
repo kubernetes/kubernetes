@@ -22,8 +22,22 @@ package app
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
+
+func startReplicaSetController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "replicasets"}] {
+		return false, nil
+	}
+	go replicaset.NewReplicaSetController(
+		ctx.InformerFactory.Apps().V1beta2().ReplicaSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
+		replicaset.BurstReplicas,
+	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
+	return true, nil
+}
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}] {

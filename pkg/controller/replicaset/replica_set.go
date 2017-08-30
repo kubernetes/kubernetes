@@ -26,21 +26,20 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	appsinformers "k8s.io/client-go/informers/apps/v1beta2"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	appslisters "k8s.io/client-go/listers/apps/v1beta2"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -59,7 +58,7 @@ const (
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
+var controllerKind = apps.SchemeGroupVersion.WithKind("ReplicaSet")
 
 // ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
@@ -77,7 +76,7 @@ type ReplicaSetController struct {
 	expectations *controller.UIDTrackingControllerExpectations
 
 	// A store of ReplicaSets, populated by the shared informer passed to NewReplicaSetController
-	rsLister extensionslisters.ReplicaSetLister
+	rsLister appslisters.ReplicaSetLister
 	// rsListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	rsListerSynced cache.InformerSynced
@@ -93,7 +92,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("replicaset_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
@@ -167,7 +166,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
-func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.ReplicaSet {
+func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaSet {
 	rss, err := rsc.rsLister.GetPodReplicaSets(pod)
 	if err != nil {
 		return nil
@@ -183,7 +182,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.Re
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.ReplicaSet {
+func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.ReplicaSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -203,8 +202,8 @@ func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controll
 
 // callback when RS is updated
 func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
-	oldRS := old.(*extensions.ReplicaSet)
-	curRS := cur.(*extensions.ReplicaSet)
+	oldRS := old.(*apps.ReplicaSet)
+	curRS := cur.(*apps.ReplicaSet)
 
 	// You might imagine that we only really need to enqueue the
 	// replica set when Spec changes, but it is safer to sync any
@@ -380,7 +379,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 	rsc.enqueueReplicaSet(rs)
 }
 
-// obj could be an *extensions.ReplicaSet, or a DeletionFinalStateUnknown marker item.
+// obj could be an *apps.ReplicaSet, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -390,7 +389,7 @@ func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
 	rsc.queue.Add(key)
 }
 
-// obj could be an *extensions.ReplicaSet, or a DeletionFinalStateUnknown marker item.
+// obj could be an *apps.ReplicaSet, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) enqueueReplicaSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
@@ -429,7 +428,7 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <filteredPods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *extensions.ReplicaSet) error {
+func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
@@ -584,7 +583,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := rsc.kubeClient.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		fresh, err := rsc.kubeClient.AppsV1beta2().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -610,12 +609,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if err != nil {
 		return err
 	}
-	rs = copy.(*extensions.ReplicaSet)
+	rs = copy.(*apps.ReplicaSet)
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, newStatus)
+	updatedRS, err := updateReplicaSetStatus(rsc.kubeClient.Apps().ReplicaSets(rs.Namespace), rs, newStatus)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop

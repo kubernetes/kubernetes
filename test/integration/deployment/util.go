@@ -107,7 +107,7 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
 	)
 	rm := replicaset.NewReplicaSetController(
-		informers.Extensions().V1beta1().ReplicaSets(),
+		informers.Apps().V1beta2().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
