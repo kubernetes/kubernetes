@@ -1312,6 +1312,9 @@ function start-kube-addons {
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
     update-prometheus-to-sd-parameters ${controller_yaml}
   fi
+  if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "metrics-server"
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r dns_controller_file="${dst_dir}/dns/kubedns-controller.yaml"

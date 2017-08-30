@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metrics-server
+  namespace: kube-system
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+  labels:
+    k8s-app: metrics-server
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  template:
+    metadata:
+      name: metrics-server
+      labels:
+        k8s-app: metrics-server
+    spec:
+      serviceAccountName: metrics-server
+      containers:
+      - name: metrics-server
+        image: gcr.io/google_containers/metrics-server-amd64:dev
+        imagePullPolicy: Always
+        # TODO(piosz): revisit resources
+        resources:
+          requests:
+            memory: 100Mi
+        command:
+        - /metrics-server
+        - --source=kubernetes.summary_api:''
+        ports:
+        - containerPort: 443
+          name: https
+          protocol: TCP
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"

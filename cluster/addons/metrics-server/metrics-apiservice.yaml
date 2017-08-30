@@ -1,0 +1,13 @@
+apiVersion: apiregistration.k8s.io/v1beta1
+kind: APIService
+metadata:
+  name: v1alpha1.metrics
+spec:
+  service:
+    name: metrics-server
+    namespace: kube-system
+  group: metrics
+  version: v1alpha1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
