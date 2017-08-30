@@ -44,6 +44,7 @@ import (
 )
 
 const (
+	// ChangeCauseAnnotation change-cause annotation.
 	ChangeCauseAnnotation = "kubernetes.io/change-cause"
 )
 
@@ -52,6 +53,7 @@ type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
+// HistoryViewerFor returns a HistoryViewer for a resource specified by kind.
 func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
@@ -64,6 +66,7 @@ func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryView
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
 }
 
+// DeploymentHistoryViewer implements the HistoryViewer interface.
 type DeploymentHistoryViewer struct {
 	c clientset.Interface
 }
@@ -146,6 +149,7 @@ func printTemplate(template *v1.PodTemplateSpec) (string, error) {
 	return buf.String(), nil
 }
 
+// DaemonSetHistoryViewer implements the HistoryViewer interface.
 type DaemonSetHistoryViewer struct {
 	c clientset.Interface
 }
@@ -210,6 +214,7 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	})
 }
 
+// StatefulSetHistoryViewer implements the HistoryViewer interface.
 type StatefulSetHistoryViewer struct {
 	c clientset.Interface
 }
