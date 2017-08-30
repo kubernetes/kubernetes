@@ -181,9 +181,8 @@ func buildExportOptions(scope RequestScope, req *http.Request, mediaType negotia
 	return exportOptions, nil
 }
 
-// TODO: transformAndWriteResponseObject
-// writeResponseObject applies object transformations, and writes the response.
-func writeResponseObject(ctx request.Context, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
+// transformAndWriteResponseObject applies object transformations, and writes the response.
+func transformAndWriteResponseObject(ctx request.Context, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, result runtime.Object) {
 
 	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
 	if err != nil {

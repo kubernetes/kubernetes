@@ -48,7 +48,6 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 	var got metav1.WatchEvent
 	res, _, err := d.decoder.Decode(nil, &got)
 	if err != nil {
-		fmt.Println("problem here")
 		return "", nil, err
 	}
 	if res != &got {
