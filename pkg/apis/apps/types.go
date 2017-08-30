@@ -61,6 +61,18 @@ const (
 	// replica count is changed, and will not wait for pods to be ready or complete
 	// termination.
 	ParallelPodManagement = "Parallel"
+	// RollingUpdateStatefulSetStrategyType indicates that update will be
+	// applied to all Pods in the StatefulSet with respect to the StatefulSet
+	// ordering constraints. When a scale operation is performed with this
+	// strategy, new Pods will be created from the specification version indicated
+	// by the StatefulSet's updateRevision.
+	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
+	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
+	// tracking and ordered rolling restarts are disabled. Pods are recreated
+	// from the StatefulSetSpec when they are manually deleted. When a scale
+	// operation is performed with this strategy,specification version indicated
+	// by the StatefulSet's currentRevision.
+	OnDeleteStatefulSetStrategyType = "OnDelete"
 )
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
@@ -76,21 +88,6 @@ type StatefulSetUpdateStrategy struct {
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the StatefulSet controller.
 type StatefulSetUpdateStrategyType string
-
-const (
-	// RollingUpdateStatefulSetStrategyType indicates that update will be
-	// applied to all Pods in the StatefulSet with respect to the StatefulSet
-	// ordering constraints. When a scale operation is performed with this
-	// strategy, new Pods will be created from the specification version indicated
-	// by the StatefulSet's updateRevision.
-	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
-	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
-	// tracking and ordered rolling restarts are disabled. Pods are recreated
-	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
-	// by the StatefulSet's currentRevision.
-	OnDeleteStatefulSetStrategyType = "OnDelete"
-)
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
