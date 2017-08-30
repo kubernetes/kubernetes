@@ -241,7 +241,6 @@ type Volume struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// VolumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
-	// This implied behavior is deprecated and will be removed in a future version.
 	VolumeSource `json:",inline" protobuf:"bytes,2,opt,name=volumeSource"`
 }
 
@@ -2555,11 +2554,6 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
-	// DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
-	// Deprecated: Use serviceAccountName instead.
-	// +k8s:conversion-gen=false
-	// +optional
-	DeprecatedServiceAccount string `json:"serviceAccount,omitempty" protobuf:"bytes,9,opt,name=serviceAccount"`
 	// AutomountServiceAccountToken indicates whether a service account token should be automatically mounted.
 	// +optional
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty" protobuf:"varint,21,opt,name=automountServiceAccountToken"`
@@ -2635,6 +2629,8 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32 `json:"priority,omitempty" protobuf:"bytes,25,opt,name=priority"`
+
+	// +k8s:protobuf-deprecated=serviceAccount,9
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the

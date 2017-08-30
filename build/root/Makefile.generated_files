@@ -158,8 +158,14 @@ $(foreach dir, $(ALL_GO_DIRS),  \
 	FILES=$$(ls $</*.go | grep --color=never -v $(GENERATED_FILE_PREFIX));  \
 	mkdir -p $(@D);                                           \
 	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
-	cmp -s $@.tmp $@ || touch $@.stamp;                       \
+	if ! cmp -s $@.tmp $@; then                               \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                  \
+	        echo "DBG: gofiles changed for $@";               \
+	    fi;                                                   \
+	    touch $@.stamp;                                       \
+	fi;                                                       \
 	mv $@.tmp $@
+
 # This is required to fill in the DAG, since some cases (e.g. 'make clean all')
 # will reference the .stamp file when it doesn't exist.  We don't need to
 # rebuild it in that case, just keep make happy.
@@ -215,18 +221,22 @@ DEEPCOPY_DIRS := $(shell                                             \
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
 # Shell function for reuse in rules.
-RUN_GEN_DEEPCOPY =                                                          \
-    function run_gen_deepcopy() {                                           \
-        if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
-            ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
-                --v $(KUBE_VERBOSE)                                         \
-                --logtostderr                                               \
-                -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-                --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"                \
-                -O $(DEEPCOPY_BASENAME)                                     \
-                "$$@";                                                      \
-        fi                                                                  \
-    };                                                                      \
+RUN_GEN_DEEPCOPY =                                                         \
+    function run_gen_deepcopy() {                                          \
+        if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                 \
+            pkgs=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -);  \
+            if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
+                echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
+            fi;                                                            \
+            ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                        \
+                --v $(KUBE_VERBOSE)                                        \
+                --logtostderr                                              \
+                -i "$$pkgs"                                                \
+                --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"               \
+                -O $(DEEPCOPY_BASENAME)                                    \
+                "$$@";                                                     \
+        fi                                                                 \
+    };                                                                     \
     run_gen_deepcopy
 
 # This rule aggregates the set of files to generate and then generates them all
@@ -263,6 +273,10 @@ $(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN)*.todo)
 # it up and trigger the batch from the 'generated_files' target.
 $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 	mkdir -p $$(dirname $(META_DIR)/$(DEEPCOPY_GEN))
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then        \
+	    echo "DBG: deepcopy needed $(@D): $?";  \
+	    ls -lf --full-time $@ $? || true;       \
+	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
@@ -274,7 +288,7 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	(echo -n "$(DEEPCOPY_GEN): ";                                         \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./vendor/k8s.io/code-generator/cmd/deepcopy-gen                                   \
+	     ./vendor/k8s.io/code-generator/cmd/deepcopy-gen                  \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -283,7 +297,13 @@ $(META_DIR)/$(DEEPCOPY_GEN).mk:
 	     | tr '=,' '\n\t'                                                 \
 	     | sed "s|$$(pwd -P)/||";                                         \
 	) > $@.tmp;                                                           \
-	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+	if ! cmp -s $@.tmp $@; then                                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
+	        echo "DBG: $(DEEPCOPY_GEN).mk changed";                       \
+	    fi;                                                               \
+	    cat $@.tmp > $@;                                                  \
+	    rm -f $@.tmp;                                                     \
+	fi
 
 # Include dependency info for the generator tool.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart.
@@ -339,18 +359,22 @@ DEFAULTER_DIRS := $(shell                                            \
 
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 
-RUN_GEN_DEFAULTER :=                                                         \
-    function run_gen_defaulter() {                                           \
-        if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                  \
-            ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                         \
-                --v $(KUBE_VERBOSE)                                          \
-                --logtostderr                                                \
-                -i $$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -)  \
+RUN_GEN_DEFAULTER :=                                                        \
+    function run_gen_defaulter() {                                          \
+        if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                 \
+            pkgs=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -);  \
+            if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
+                echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
+            fi;                                                             \
+            ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                        \
+                --v $(KUBE_VERBOSE)                                         \
+                --logtostderr                                               \
+                -i "$$pkgs"                                                 \
                 --extra-peer-dirs $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS)) | sed 's/ /,/g') \
-                -O $(DEFAULTER_BASENAME)                                     \
-                "$$@";                                                       \
-        fi                                                                   \
-    };                                                                       \
+                -O $(DEFAULTER_BASENAME)                                    \
+                "$$@";                                                      \
+        fi                                                                  \
+    };                                                                      \
     run_gen_defaulter
 
 # This rule aggregates the set of files to generate and then generates them all
@@ -413,6 +437,10 @@ $(shell rm -f $(META_DIR)/$(DEFAULTER_GEN)*.todo)
 # it up and trigger the batch from the 'generated_files' target.
 $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 	mkdir -p $$(dirname $(META_DIR)/$(DEFAULTER_GEN))
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then         \
+	    echo "DBG: defaulter needed $(@D): $?";  \
+	    ls -lf --full-time $@ $? || true;        \
+	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEFAULTER_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
@@ -424,7 +452,7 @@ $(META_DIR)/$(DEFAULTER_GEN).mk:
 	(echo -n "$(DEFAULTER_GEN): ";                                        \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./vendor/k8s.io/code-generator/cmd/defaulter-gen                                  \
+	     ./vendor/k8s.io/code-generator/cmd/defaulter-gen                 \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -433,7 +461,13 @@ $(META_DIR)/$(DEFAULTER_GEN).mk:
 	     | tr '=,' '\n\t'                                                 \
 	     | sed "s|$$(pwd -P)/||";                                         \
 	) > $@.tmp;                                                           \
-	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+	if ! cmp -s $@.tmp $@; then                                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
+	        echo "DBG: $(DEFAULTER_GEN).mk changed";                      \
+	    fi;                                                               \
+	    cat $@.tmp > $@;                                                  \
+	    rm -f $@.tmp;                                                     \
+	fi
 
 # Include dependency info for the generator tool.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart.
@@ -522,7 +556,7 @@ $(META_DIR)/$(OPENAPI_GEN).mk:
 	(echo -n "$(OPENAPI_GEN): ";                                          \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./vendor/k8s.io/code-generator/cmd/openapi-gen                                    \
+	     ./vendor/k8s.io/code-generator/cmd/openapi-gen                   \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -531,7 +565,13 @@ $(META_DIR)/$(OPENAPI_GEN).mk:
 	     | tr '=,' '\n\t'                                                 \
 	     | sed "s|$$(pwd -P)/||";                                         \
 	) > $@.tmp;                                                           \
-	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+	if ! cmp -s $@.tmp $@; then                                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
+	        echo "DBG: $(OPENAPI_GEN).mk changed";                        \
+	    fi;                                                               \
+	    cat $@.tmp > $@;                                                  \
+	    rm -f $@.tmp;                                                     \
+	fi
 
 # Include dependency info for the generator tool.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart.
@@ -590,17 +630,21 @@ CONVERSION_DIRS := $(shell                                              \
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 
 # Shell function for reuse in rules.
-RUN_GEN_CONVERSION =                                                          \
-    function run_gen_conversion() {                                           \
-        if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
-            ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
-                --v $(KUBE_VERBOSE)                                           \
-                --logtostderr                                                 \
-                -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
-                -O $(CONVERSION_BASENAME)                                     \
-                "$$@";                                                        \
-        fi                                                                    \
-    };                                                                        \
+RUN_GEN_CONVERSION =                                                         \
+    function run_gen_conversion() {                                          \
+        if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
+            pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
+            if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
+                echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
+            fi;                                                              \
+            ./hack/run-in-gopath.sh $(CONVERSION_GEN)                        \
+                --v $(KUBE_VERBOSE)                                          \
+                --logtostderr                                                \
+                -i "$$pkgs"                                                  \
+                -O $(CONVERSION_BASENAME)                                    \
+                "$$@";                                                       \
+        fi                                                                   \
+    };                                                                       \
     run_gen_conversion
 
 # This rule aggregates the set of files to generate and then generates them all
@@ -644,7 +688,12 @@ $(foreach dir, $(CONVERSION_DIRS),  \
 	    | sed 's|$(PRJ_SRC_PATH)/||');                                  \
 	mkdir -p $(@D);                                                     \
 	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                \
-	cmp -s $@.tmp $@ || touch $@.stamp;                                 \
+	if ! cmp -s $@.tmp $@; then                                         \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
+	        echo "DBG: conversions changed for $@";                     \
+	    fi;                                                             \
+	    touch $@.stamp;                                                 \
+	fi;                                                                 \
 	mv $@.tmp $@
 
 # Include any deps files as additional Makefile rules.  This triggers make to
@@ -705,6 +754,10 @@ $(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
 # it up and trigger the batch from the 'generated_files' target.
 $(CONVERSION_FILES): $(CONVERSION_GEN)
 	mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN))
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
+	    echo "DBG: conversion needed $(@D): $?";  \
+	    ls -lf --full-time $@ $? || true;         \
+	fi
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
@@ -716,7 +769,7 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	(echo -n "$(CONVERSION_GEN): ";                                       \
 	 ./hack/run-in-gopath.sh go list                                      \
 	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
-	     ./vendor/k8s.io/code-generator/cmd/conversion-gen                                 \
+	     ./vendor/k8s.io/code-generator/cmd/conversion-gen                \
 	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
 	     | xargs ./hack/run-in-gopath.sh go list                          \
 	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
@@ -725,7 +778,13 @@ $(META_DIR)/$(CONVERSION_GEN).mk:
 	     | tr '=,' '\n\t'                                                 \
 	     | sed "s|$$(pwd -P)/||";                                         \
 	) > $@.tmp;                                                           \
-	cmp -s $@.tmp $@ || cat $@.tmp > $@ && rm -f $@.tmp
+	if ! cmp -s $@.tmp $@; then                                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
+	        echo "DBG: $(CONVERSION_GEN).mk changed";                     \
+	    fi;                                                               \
+	    cat $@.tmp > $@;                                                  \
+	    rm -f $@.tmp;                                                     \
+	fi
 
 # Include dependency info for the generator tool.  This will cause the rule of
 # the same name to be considered and if it is updated, make will restart.

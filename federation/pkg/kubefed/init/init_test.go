@@ -1067,7 +1067,6 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	}
 	if isRBACAPIAvailable {
 		cm.Spec.Template.Spec.ServiceAccountName = "federation-controller-manager"
-		cm.Spec.Template.Spec.DeprecatedServiceAccount = "federation-controller-manager"
 	}
 	if dnsProviderConfig != "" {
 		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
