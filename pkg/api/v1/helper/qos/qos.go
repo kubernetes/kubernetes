@@ -26,9 +26,8 @@ import (
 // QOSList is a set of (resource name, QoS class) pairs.
 type QOSList map[v1.ResourceName]v1.PodQOSClass
 
-var supportedQoSComputeResources = sets.NewString(string(v1.ResourceCPU), string(v1.ResourceMemory))
-
 func isSupportedQoSComputeResource(name v1.ResourceName) bool {
+	supportedQoSComputeResources := sets.NewString(string(v1.ResourceCPU), string(v1.ResourceMemory))
 	return supportedQoSComputeResources.Has(string(name)) || v1helper.IsHugePageResourceName(name)
 }
 
@@ -75,7 +74,7 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 			}
 		}
 
-		if len(qosLimitsFound) != len(supportedQoSComputeResources) {
+		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}

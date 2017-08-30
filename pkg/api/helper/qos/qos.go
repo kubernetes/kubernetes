@@ -25,10 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper"
 )
 
-// supportedComputeResources is the list of compute resources for with QoS is supported.
-var supportedQoSComputeResources = sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
-
 func isSupportedQoSComputeResource(name api.ResourceName) bool {
+	supportedQoSComputeResources := sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
 	return supportedQoSComputeResources.Has(string(name)) || helper.IsHugePageResourceName(name)
 }
 
@@ -75,7 +73,7 @@ func GetPodQOS(pod *api.Pod) api.PodQOSClass {
 			}
 		}
 
-		if len(qosLimitsFound) != len(supportedQoSComputeResources) {
+		if !qosLimitsFound.HasAll(string(api.ResourceMemory), string(api.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}

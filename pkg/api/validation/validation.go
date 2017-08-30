@@ -3482,7 +3482,10 @@ func ValidateNode(node *api.Node) field.ErrorList {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
 
-	// Only validate spec. All status fields are optional and can be updated later.
+	// Only validate spec.
+	// All status fields are optional and can be updated later.
+	// That said, if specified, we need to ensure they are valid.
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// external ID is required.
 	if len(node.Spec.ExternalID) == 0 {
@@ -3498,6 +3501,38 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	return allErrs
 }
 
+// ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
+func ValidateNodeResources(node *api.Node) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Validate resource quantities in capacity.
+	hugePageSizes := sets.NewString()
+	for k, v := range node.Status.Capacity {
+		resPath := field.NewPath("status", "capacity", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	// Validate resource quantities in allocatable.
+	hugePageSizes = sets.NewString()
+	for k, v := range node.Status.Allocatable {
+		resPath := field.NewPath("status", "allocatable", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	return allErrs
+}
+
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -3510,16 +3545,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
-	// Validate resource quantities in capacity.
-	for k, v := range node.Status.Capacity {
-		resPath := field.NewPath("status", "capacity", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
-	// Validate resource quantities in allocatable.
-	for k, v := range node.Status.Allocatable {
-		resPath := field.NewPath("status", "allocatable", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)

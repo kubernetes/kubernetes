@@ -49,7 +49,7 @@ const (
 
 // hugePageSizeList is useful for converting to the hugetlb canonical unit
 // which is what is expected when interacting with libcontainer
-var hugePageSizeList = []string{"", "kB", "MB", "GB", "TB", "PB"}
+var hugePageSizeList = []string{"B", "kB", "MB", "GB", "TB", "PB"}
 
 // ConvertCgroupNameToSystemd converts the internal cgroup name to a systemd name.
 // For example, the name /Burstable/pod_123-456 becomes Burstable-pod_123_456.slice
