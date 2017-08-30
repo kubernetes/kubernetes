@@ -41,8 +41,11 @@ import (
 )
 
 const (
+	// Interval is the default poll interval.
 	Interval = time.Second * 1
-	Timeout  = time.Minute * 5
+
+	// Timeout is the default time to wait for termination.
+	Timeout = time.Minute * 5
 )
 
 // A Reaper terminates an object as gracefully as possible.
@@ -54,19 +57,23 @@ type Reaper interface {
 	Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error
 }
 
+// NoSuchReaperError implements the error interface.
 type NoSuchReaperError struct {
 	kind schema.GroupKind
 }
 
+// Error returns an error message string.
 func (n *NoSuchReaperError) Error() string {
 	return fmt.Sprintf("no reaper has been implemented for %v", n.kind)
 }
 
+// IsNoSuchReaperError returns true if err is of type NoSuchReaperError.
 func IsNoSuchReaperError(err error) bool {
 	_, ok := err.(*NoSuchReaperError)
 	return ok
 }
 
+// ReaperFor returns a Reaper for the resource specified by kind.
 func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
@@ -94,35 +101,49 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 	return nil, &NoSuchReaperError{kind}
 }
 
+// ReaperForReplicationController returns an ReplicationControllerReaper for rcClient.
 func ReaperForReplicationController(rcClient coreclient.ReplicationControllersGetter, timeout time.Duration) (Reaper, error) {
 	return &ReplicationControllerReaper{rcClient, Interval, timeout}, nil
 }
 
+// ReplicationControllerReaper implements the Reaper interface.
 type ReplicationControllerReaper struct {
 	client                coreclient.ReplicationControllersGetter
 	pollInterval, timeout time.Duration
 }
+
+// ReplicaSetReaper implements the Reaper interface.
 type ReplicaSetReaper struct {
 	client                extensionsclient.ReplicaSetsGetter
 	pollInterval, timeout time.Duration
 }
+
+// DaemonSetReaper implements the Reaper interface.
 type DaemonSetReaper struct {
 	client                extensionsclient.DaemonSetsGetter
 	pollInterval, timeout time.Duration
 }
+
+// JobReaper implements the Reaper interface.
 type JobReaper struct {
 	client                batchclient.JobsGetter
 	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
 }
+
+// DeploymentReaper implements the Reaper interface.
 type DeploymentReaper struct {
 	dClient               extensionsclient.DeploymentsGetter
 	rsClient              extensionsclient.ReplicaSetsGetter
 	pollInterval, timeout time.Duration
 }
+
+// PodReaper implements the Reaper interface.
 type PodReaper struct {
 	client coreclient.PodsGetter
 }
+
+// StatefulSetReaper implements the Reaper interface.
 type StatefulSetReaper struct {
 	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
@@ -146,6 +167,7 @@ func getOverlappingControllers(rcClient coreclient.ReplicationControllerInterfac
 	return matchingRCs, nil
 }
 
+// Stop a given object within a namespace.
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	rc := reaper.client.ReplicationControllers(namespace)
 	scaler := &ReplicationControllerScaler{reaper.client}
@@ -215,6 +237,7 @@ func getOverlappingReplicaSets(c extensionsclient.ReplicaSetInterface, rs *exten
 	return overlappingRSs, exactMatchRSs, nil
 }
 
+// Stop a given object within a namespace.
 func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	rsc := reaper.client.ReplicaSets(namespace)
 	scaler := &ReplicaSetScaler{reaper.client}
@@ -279,6 +302,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 	return rsc.Delete(name, deleteOptions)
 }
 
+// Stop a given object within a namespace.
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	ds, err := reaper.client.DaemonSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -316,6 +340,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	return reaper.client.DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
+// Stop a given object within a namespace.
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	statefulsets := reaper.client.StatefulSets(namespace)
 	scaler := &StatefulSetScaler{reaper.client}
@@ -344,6 +369,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	return statefulsets.Delete(name, deleteOptions)
 }
 
+// Stop a given object within a namespace.
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	jobs := reaper.client.Jobs(namespace)
 	pods := reaper.podClient.Pods(namespace)
@@ -389,6 +415,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	return jobs.Delete(name, deleteOptions)
 }
 
+// Stop a given object within a namespace.
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	deployments := reaper.dClient.Deployments(namespace)
 	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.pollInterval, reaper.timeout}
@@ -472,6 +499,7 @@ func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name stri
 	return deployment, err
 }
 
+// Stop a given object within a namespace.
 func (reaper *PodReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	pods := reaper.client.Pods(namespace)
 	_, err := pods.Get(name, metav1.GetOptions{})
