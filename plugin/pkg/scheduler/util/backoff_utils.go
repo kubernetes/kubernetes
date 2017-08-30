@@ -22,8 +22,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
 	ktypes "k8s.io/apimachinery/pkg/types"
+
+	"github.com/golang/glog"
 )
 
 type clock interface {
