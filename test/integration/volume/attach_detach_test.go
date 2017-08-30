@@ -28,7 +28,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
@@ -432,14 +431,7 @@ func TestPodAddedByDswp(t *testing.T) {
 
 	// let's stop pod events from getting triggered
 	close(podStopCh)
-	podObj, err := api.Scheme.DeepCopy(pod)
-	if err != nil {
-		t.Fatalf("Error copying pod : %v", err)
-	}
-	podNew, ok := podObj.(*v1.Pod)
-	if !ok {
-		t.Fatalf("Error converting pod : %v", err)
-	}
+	podNew := pod.DeepCopy()
 	newPodName := "newFakepod"
 	podNew.SetName(newPodName)
 	err = podInformer.GetStore().Add(podNew)
