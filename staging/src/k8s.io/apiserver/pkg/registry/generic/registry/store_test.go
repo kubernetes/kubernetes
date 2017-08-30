@@ -113,6 +113,9 @@ func (t *testRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, 
 func (t *testRESTStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
+func (t *testRESTStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return nil
+}
 func (t *testRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return nil
 }
