@@ -78,6 +78,10 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// BearerTokenSource will be used to get a token and refresh a new token, it is generated from the auth provider
+	// or the one from rest.Config
+	BearerTokenSource BearerTokenSource
 }
 
 type Serializers struct {
@@ -220,11 +224,22 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 //
 func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
-
+	var request *Request
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		request = NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	} else {
+		request = NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+
+	if c.BearerTokenSource != nil {
+		token, err := c.BearerTokenSource.Token()
+		if err != nil {
+			return request
+		}
+		//bearer tokens in the kubeconfig will override this later
+		request.SetHeader("Authorization", "Bearer "+token)
+	}
+	return request
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

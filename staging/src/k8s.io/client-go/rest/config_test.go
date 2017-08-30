@@ -205,6 +205,16 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 	return &fakeCodec{}
 }
 
+type fakeBearerTokenSource struct{}
+
+func (t *fakeBearerTokenSource) Token() (string, error) {
+	return "token", nil
+}
+
+func (t *fakeBearerTokenSource) Refresh() (bool, error) {
+	return true, nil
+}
+
 func TestAnonymousConfig(t *testing.T) {
 	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
 	f.Funcs(
@@ -235,6 +245,11 @@ func TestAnonymousConfig(t *testing.T) {
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
 		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
 			r.Config = map[string]string{}
+		},
+		func(t *BearerTokenSource, f fuzz.Continue) {
+			tokenSource := &fakeBearerTokenSource{}
+			f.Fuzz(tokenSource)
+			*t = tokenSource
 		},
 	)
 	for i := 0; i < 20; i++ {

@@ -48,6 +48,21 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+	// BearerTokenSource will be used to get a token and refresh a new token.
+	BearerTokenSource BearerTokenSource
+}
+
+// BearerTokenSource will be used to get a token and refresh a new token
+type BearerTokenSource interface {
+
+	// Token returns a bearer token for HTTP requests.
+	Token() (string, error)
+
+	// This will try to refresh a new token and bust the cache.
+	// Refresh can be called when the REST client experiences a
+	// 401, which implies that the token is invalid or has expired.
+	Refresh() (result bool, err error)
 }
 
 // ImpersonationConfig has all the available impersonation options

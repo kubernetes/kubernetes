@@ -218,6 +218,8 @@ func (*pluginA) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 
 func (*pluginA) Login() error { return nil }
 
+func (*pluginA) BearerTokenSource() BearerTokenSource { return nil }
+
 func pluginAProvider(string, map[string]string, AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginA{}, nil
 }
@@ -237,6 +239,8 @@ func (w *wrapTransportB) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 type pluginB struct{}
+
+func (*pluginB) BearerTokenSource() BearerTokenSource { return nil }
 
 func (*pluginB) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 	return &wrapTransportB{rt}
@@ -306,6 +310,9 @@ func (p *pluginPersist) Login() error {
 	return nil
 }
 
+func (p *pluginPersist) BearerTokenSource() BearerTokenSource {
+	return nil
+}
 func pluginPersistProvider(_ string, config map[string]string, persister AuthProviderConfigPersister) (AuthProvider, error) {
 	return &pluginPersist{config, persister}, nil
 }
