@@ -540,6 +540,8 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 	}
 }
 
+// Rename renames a ReplicationController. First deletes RC and its orphaned pods
+// then creates an RC with the newName.
 func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationController, newName string) error {
 	oldName := rc.Name
 	rc.Name = newName
@@ -568,6 +570,7 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	return err
 }
 
+// LoadExistingNextReplicationController gets the next RC for namespace and newName.
 func LoadExistingNextReplicationController(c coreclient.ReplicationControllersGetter, namespace, newName string) (*api.ReplicationController, error) {
 	if len(newName) == 0 {
 		return nil, nil
@@ -579,6 +582,7 @@ func LoadExistingNextReplicationController(c coreclient.ReplicationControllersGe
 	return newRc, err
 }
 
+// NewControllerConfig is the configuration for a new RC.
 type NewControllerConfig struct {
 	Namespace        string
 	OldName, NewName string
@@ -588,6 +592,8 @@ type NewControllerConfig struct {
 	PullPolicy       api.PullPolicy
 }
 
+// CreateNewControllerFromCurrentController creates a new RC from an existing RC
+// with the new configuration in cfg.
 func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationControllersGetter, codec runtime.Codec, cfg *NewControllerConfig) (*api.ReplicationController, error) {
 	containerIndex := 0
 	// load the old RC into the "new" RC
@@ -641,6 +647,7 @@ func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationCon
 	return newRc, nil
 }
 
+// AbortRollingUpdate aborts a rolling update.
 func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	// Swap the controllers
 	tmp := c.OldRc
@@ -665,11 +672,13 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	return nil
 }
 
+// GetNextControllerAnnotation gets the annotation for the next RC.
 func GetNextControllerAnnotation(rc *api.ReplicationController) (string, bool) {
 	res, found := rc.Annotations[nextControllerAnnotation]
 	return res, found
 }
 
+// SetNextControllerAnnotation sets the annotation for the next RC.
 func SetNextControllerAnnotation(rc *api.ReplicationController, name string) {
 	if rc.Annotations == nil {
 		rc.Annotations = map[string]string{}
@@ -677,6 +686,7 @@ func SetNextControllerAnnotation(rc *api.ReplicationController, name string) {
 	rc.Annotations[nextControllerAnnotation] = name
 }
 
+// UpdateExistingReplicationController updates an existing RC.
 func UpdateExistingReplicationController(rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, oldRc *api.ReplicationController, namespace, newName, deploymentKey, deploymentValue string, out io.Writer) (*api.ReplicationController, error) {
 	if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
 		SetNextControllerAnnotation(oldRc, newName)
@@ -691,6 +701,7 @@ func UpdateExistingReplicationController(rcClient coreclient.ReplicationControll
 	return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 }
 
+// AddDeploymentKeyToReplicationController adds a deployment key to an RC.
 func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, deploymentKey, deploymentValue, namespace string, out io.Writer) (*api.ReplicationController, error) {
 	var err error
 	// First, update the template label.  This ensures that any newly created pods will have the new label
@@ -822,6 +833,7 @@ func updatePodWithRetries(podClient coreclient.PodsGetter, namespace string, pod
 	return pod, err
 }
 
+// FindSourceController finds an existing RC with annotation for source ID namespace/name.
 func FindSourceController(r coreclient.ReplicationControllersGetter, namespace, name string) (*api.ReplicationController, error) {
 	list, err := r.ReplicationControllers(namespace).List(metav1.ListOptions{})
 	if err != nil {
