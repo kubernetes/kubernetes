@@ -596,15 +596,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 
 	dirty := false
 
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
-
+	claimClone := claim.DeepCopy()
 	if claim.Status.Phase != phase {
 		claimClone.Status.Phase = phase
 		dirty = true
@@ -701,15 +693,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *v1.PersistentV
 		return volume, nil
 	}
 
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
-
+	volumeClone := volume.DeepCopy()
 	volumeClone.Status.Phase = phase
 	volumeClone.Status.Message = message
 
@@ -766,14 +750,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	volumeClone := volume.DeepCopy()
 
 	// Bind the volume to the claim if it is not bound yet
 	if volume.Spec.ClaimRef == nil ||
@@ -831,14 +808,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
+	claimClone := claim.DeepCopy()
 
 	if shouldBind {
 		dirty = true
@@ -929,15 +899,8 @@ func (ctrl *PersistentVolumeController) bind(volume *v1.PersistentVolume, claim 
 func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume) error {
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
-	// Save the PV only when any modification is necessary.
-	clone, err := scheme.Scheme.DeepCopy(volume)
-	if err != nil {
-		return fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*v1.PersistentVolume)
-	if !ok {
-		return fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	// Save the PV only when any modification is neccessary.
+	volumeClone := volume.DeepCopy()
 
 	if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 		// The volume was bound by the controller.

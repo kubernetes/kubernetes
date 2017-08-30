@@ -676,13 +676,8 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
 func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
-	obj, err := scheme.Scheme.DeepCopy(pdb)
-	if err != nil {
-		return err
-	}
-	newPdb := obj.(*policy.PodDisruptionBudget)
+	newPdb := pdb.DeepCopy()
 	newPdb.Status.PodDisruptionsAllowed = 0
-
 	return dc.getUpdater()(newPdb)
 }
 
@@ -707,12 +702,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		return nil
 	}
 
-	obj, err := scheme.Scheme.DeepCopy(pdb)
-	if err != nil {
-		return err
-	}
-	newPdb := obj.(*policy.PodDisruptionBudget)
-
+	newPdb := pdb.DeepCopy()
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
 		CurrentHealthy:        currentHealthy,
 		DesiredHealthy:        desiredHealthy,

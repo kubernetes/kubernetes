@@ -20,13 +20,12 @@ import (
 	"math"
 	"sort"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller/history"
-
-	"github.com/golang/glog"
 )
 
 // StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -433,11 +432,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			continue
 		}
 		// Make a deep copy so we don't mutate the shared cache
-		copy, err := scheme.Scheme.DeepCopy(replicas[i])
-		if err != nil {
-			return &status, err
-		}
-		replica := copy.(*v1.Pod)
+		replica := replicas[i].DeepCopy()
 		if err := ssc.podControl.UpdateStatefulPod(updateSet, replica); err != nil {
 			return &status, err
 		}
@@ -543,11 +538,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	}
 
 	// copy set and update its status
-	obj, err := scheme.Scheme.Copy(set)
-	if err != nil {
-		return err
-	}
-	set = obj.(*apps.StatefulSet)
+	set = set.DeepCopy()
 	if err := ssc.statusUpdater.UpdateStatefulSetStatus(set, status); err != nil {
 		return err
 	}

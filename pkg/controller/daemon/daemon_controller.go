@@ -967,12 +967,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		return nil
 	}
 
-	clone, err := scheme.Scheme.DeepCopy(ds)
-	if err != nil {
-		return err
-	}
-
-	toUpdate := clone.(*extensions.DaemonSet)
+	toUpdate := ds.DeepCopy()
 
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {

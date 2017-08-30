@@ -559,11 +559,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	if controllerRef != nil {
 		pod.OwnerReferences = append(pod.OwnerReferences, *controllerRef)
 	}
-	clone, err := scheme.Scheme.DeepCopy(&template.Spec)
-	if err != nil {
-		return nil, err
-	}
-	pod.Spec = *clone.(*v1.PodSpec)
+	pod.Spec = *template.Spec.DeepCopy()
 	return pod, nil
 }
 
@@ -991,18 +987,11 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 	}
 
 	newTaints := newNode.Spec.Taints
-	objCopy, err := scheme.Scheme.DeepCopy(oldNode)
+	newNodeClone := oldNode.DeepCopy()
+	newNodeClone.Spec.Taints = newTaints
+	newData, err := json.Marshal(newNodeClone)
 	if err != nil {
-		return fmt.Errorf("failed to copy node object %#v: %v", oldNode, err)
-	}
-	newNode, ok := (objCopy).(*v1.Node)
-	if !ok {
-		return fmt.Errorf("failed to cast copy onto node object %#v: %v", newNode, err)
-	}
-	newNode.Spec.Taints = newTaints
-	newData, err := json.Marshal(newNode)
-	if err != nil {
-		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNode, nodeName, err)
+		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
