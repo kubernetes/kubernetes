@@ -143,8 +143,6 @@ type BlockVolumeMapper interface {
 	SetUpDeviceAt(dir string) error
 	//
 	GetVolumePath() string
-	//
-	GetVolumeMode() v1.PersistentVolumeMode
 }
 
 //

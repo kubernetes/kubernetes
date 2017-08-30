@@ -524,7 +524,7 @@ func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName 
 	return ""
 }
 
-func (adc *attachDetachController) GetPodDeviceDir(podUID types.UID, pluginName, volumeName string) string {
+func (adc *attachDetachController) GetPodVolumeDeviceDir(podUID types.UID, pluginName, volumeName string) string {
 	return ""
 }
 

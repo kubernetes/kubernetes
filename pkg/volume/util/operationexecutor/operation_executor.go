@@ -110,6 +110,9 @@ type OperationExecutor interface {
 	//
 	UnmapVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 
+	//
+	UnmapDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) error
+
 	// VerifyControllerAttachedVolume checks if the specified volume is present
 	// in the specified nodes AttachedVolumes Status field. It uses kubeClient
 	// to fetch the node object.
@@ -768,6 +771,21 @@ func (oe *operationExecutor) UnmapVolume(
 	opCompleteFunc := util.OperationCompleteHook(plugin, "unmap_volume")
 	return oe.pendingOperations.Run(
 		volumeToUnmount.VolumeName, podName, unmapFunc, opCompleteFunc)
+}
+
+func (oe *operationExecutor) UnmapDevice(
+	deviceToDetach AttachedVolume,
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	mounter mount.Interface) error {
+	unmapDeviceFunc, plugin, err :=
+		oe.operationGenerator.GenerateUnmapDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
+	if err != nil {
+		return err
+	}
+
+	opCompleteFunc := util.OperationCompleteHook(plugin, "unmap_device")
+	return oe.pendingOperations.Run(
+		deviceToDetach.VolumeName, "" /* podName */, unmapDeviceFunc, opCompleteFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(

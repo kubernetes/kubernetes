@@ -229,11 +229,11 @@ type VolumeHost interface {
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
 
-	// GetPodDeviceDir returns the absolute path a directory which
+	// GetPodVolumeDeviceDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call
 	// might not exist.
-	GetPodDeviceDir(podUID types.UID, pluginName string, volumeName string) string
+	GetPodVolumeDeviceDir(podUID types.UID, pluginName string, volumeName string) string
 
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface

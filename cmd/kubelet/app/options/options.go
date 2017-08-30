@@ -37,11 +37,11 @@ import (
 )
 
 const (
-	DefaultKubeletPodsDirName       = "pods"
-	DefaultKubeletVolumesDirName    = "volumes"
-	DefaultKubeletDevicesDirName    = "devices"
-	DefaultKubeletPluginsDirName    = "plugins"
-	DefaultKubeletContainersDirName = "containers"
+	DefaultKubeletPodsDirName          = "pods"
+	DefaultKubeletVolumesDirName       = "volumes"
+	DefaultKubeletVolumeDevicesDirName = "volumeDevices"
+	DefaultKubeletPluginsDirName       = "plugins"
+	DefaultKubeletContainersDirName    = "containers"
 )
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:

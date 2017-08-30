@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -334,6 +335,31 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		return nil
 	}
 
+	volumeModeMap, err := makeVolumeModeMap(pod, vm.kubeClient)
+	if err != nil {
+		return fmt.Errorf(
+			"Failed to create volumeMode map. pod: %q/%q",
+			pod.Namespace,
+			pod.Name)
+	}
+	for _, container := range pod.Spec.Containers {
+		if container.VolumeDevices == nil {
+			continue
+		}
+		for _, device := range container.VolumeDevices {
+			glog.Infof("#### DEBUG LOG ####: WaitForAttachAndMount: device: %v", device)
+			glog.Infof("#### DEBUG LOG ####: WaitForAttachAndMount: volumeModeMap[device.Name]: %v", volumeModeMap[device.Name])
+			if volumeModeMap[device.Name] != v1.PersistentVolumeBlock {
+				return fmt.Errorf(
+					"The 'volumeDevices' is used for Pod volumes to pass into the container's as raw block device. The volumeMode must 'Block'. pod: %q/%q, volume name: %v, volumeMode: %v",
+					pod.Namespace,
+					pod.Name,
+					device.Name,
+					volumeModeMap[device.Name])
+			}
+		}
+	}
+
 	glog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
 	uniquePodName := volumehelper.GetUniquePodName(pod)
 
@@ -343,7 +369,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 	vm.actualStateOfWorld.MarkRemountRequired(uniquePodName)
 
-	err := wait.Poll(
+	err = wait.Poll(
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
@@ -435,4 +461,22 @@ func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
 	}
 
 	return gid, true
+}
+
+//
+func makeVolumeModeMap(pod *v1.Pod, kl clientset.Interface) (map[string]v1.PersistentVolumeMode, error) {
+	volumeModeMap := make(map[string]v1.PersistentVolumeMode)
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			pvc, err := kl.Core().PersistentVolumeClaims(pod.Namespace).Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("unable to retrieve pvc %s:%s - %v", pod.Namespace, volume.PersistentVolumeClaim.ClaimName, err)
+			}
+			if pvc == nil {
+				continue
+			}
+			volumeModeMap[volume.Name] = *pvc.Spec.VolumeMode
+		}
+	}
+	return volumeModeMap, nil
 }

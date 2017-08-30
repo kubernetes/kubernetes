@@ -32,13 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -253,12 +253,12 @@ func (rc *reconciler) reconcile() {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
 
-			var pvcVolumeMode v1.PersistentVolumeMode
+			var pvVolumeMode v1.PersistentVolumeMode
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			if pv != nil {
-				pvcVolumeMode, err = volumeutil.GetVolumeModeFromPVC(volumeToMount.Pod.ObjectMeta.Namespace, rc.kubeClient, pv)
+				pvVolumeMode = v1helper.GetPersistentVolumeMode(pv)
 			}
-			if pv == nil || pvcVolumeMode != v1.PersistentVolumeBlock {
+			if pv == nil || pvVolumeMode != v1.PersistentVolumeBlock {
 				glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
 				err = rc.operationExecutor.MountVolume(
 					rc.waitForAttachTimeout,
@@ -267,9 +267,8 @@ func (rc *reconciler) reconcile() {
 					isRemount)
 				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MountVolume case")
 				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MountVolume pv: %v", pv)
-				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MountVolume pvcVolumeMode: %s", pvcVolumeMode)
 			} else {
-				glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
+				glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MapVolume", ""))
 				err = rc.operationExecutor.MapVolume(
 					rc.waitForAttachTimeout,
 					volumeToMount.VolumeToMount,
@@ -277,8 +276,6 @@ func (rc *reconciler) reconcile() {
 					rc.mounter)
 				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MapVolume case")
 				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MapVolume pv: %v", pv)
-				glog.Infof("#### DEBUG LOG ####: reconcile attached/mounted, MapVolume pvcVolumeMode: %s", pvcVolumeMode)
-
 			}
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
@@ -303,9 +300,23 @@ func (rc *reconciler) reconcile() {
 		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
 			if attachedVolume.GloballyMounted {
-				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
-				err := rc.operationExecutor.UnmountDevice(
-					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+				var err error
+				var pvVolumeMode v1.PersistentVolumeMode
+				pv := attachedVolume.VolumeSpec.PersistentVolume
+				if pv != nil {
+					pvVolumeMode = v1helper.GetPersistentVolumeMode(pv)
+				}
+				if pvVolumeMode != v1.PersistentVolumeBlock {
+					// Volume is globally mounted to device, unmount it
+					glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
+					err = rc.operationExecutor.UnmountDevice(
+						attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+				} else {
+					// Volume is globally mapped to device, unmap it
+					glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmapDevice", ""))
+					err = rc.operationExecutor.UnmapDevice(
+						attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+				}
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {

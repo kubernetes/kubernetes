@@ -116,9 +116,7 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 		if !ok || vol.BlockVolumeMapper == nil {
 			continue
 		}
-		if vol.BlockVolumeMapper.GetVolumeMode() == v1.PersistentVolumeBlock {
-			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: vol.BlockVolumeMapper.GetVolumePath(), PathInContainer: device.DevicePath, Permissions: "mrw"})
-		}
+		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: vol.BlockVolumeMapper.GetVolumePath(), PathInContainer: device.DevicePath, Permissions: "mrw"})
 	}
 	return devices, nil
 }

@@ -77,8 +77,8 @@ func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName strin
 	return kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
 }
 
-func (kvh *kubeletVolumeHost) GetPodDeviceDir(podUID types.UID, pluginName string, volumeName string) string {
-	return kvh.kubelet.getPodDeviceDir(podUID, pluginName, volumeName)
+func (kvh *kubeletVolumeHost) GetPodVolumeDeviceDir(podUID types.UID, pluginName string, volumeName string) string {
+	return kvh.kubelet.getPodVolumeDeviceDir(podUID, pluginName, volumeName)
 }
 
 func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
