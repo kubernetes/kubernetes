@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	sourceIdAnnotation         = kubectlAnnotationPrefix + "update-source-id"
+	sourceIDAnnotation         = kubectlAnnotationPrefix + "update-source-id"
 	desiredReplicasAnnotation  = kubectlAnnotationPrefix + "desired-replicas"
 	originalReplicasAnnotation = kubectlAnnotationPrefix + "original-replicas"
 	nextControllerAnnotation   = kubectlAnnotationPrefix + "next-controller-id"
@@ -122,7 +122,7 @@ type RollingUpdater struct {
 	scaleAndWait func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error)
 	//getOrCreateTargetController gets and validates an existing controller or
 	//makes a new one.
-	getOrCreateTargetController func(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error)
+	getOrCreateTargetController func(controller *api.ReplicationController, sourceID string) (*api.ReplicationController, bool, error)
 	// cleanup performs post deployment cleanup tasks for newRc and oldRc.
 	cleanup func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error
 	// getReadyPods returns the amount of old and new ready pods.
@@ -174,8 +174,8 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 
 	// Find an existing controller (for continuing an interrupted update) or
 	// create a new one if necessary.
-	sourceId := fmt.Sprintf("%s:%s", oldRc.Name, oldRc.UID)
-	newRc, existed, err := r.getOrCreateTargetController(config.NewRc, sourceId)
+	sourceID := fmt.Sprintf("%s:%s", oldRc.Name, oldRc.UID)
+	newRc, existed, err := r.getOrCreateTargetController(config.NewRc, sourceID)
 	if err != nil {
 		return err
 	}
@@ -446,14 +446,14 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 }
 
 // getOrCreateTargetControllerWithClient looks for an existing controller with
-// sourceId. If found, the existing controller is returned with true
+// sourceID. If found, the existing controller is returned with true
 // indicating that the controller already exists. If the controller isn't
 // found, a new one is created and returned along with false indicating the
 // controller was created.
 //
-// Existing controllers are validated to ensure their sourceIdAnnotation
-// matches sourceId; if there's a mismatch, an error is returned.
-func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error) {
+// Existing controllers are validated to ensure their sourceIDAnnotation
+// matches sourceID; if there's a mismatch, an error is returned.
+func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.ReplicationController, sourceID string) (*api.ReplicationController, bool, error) {
 	existingRc, err := r.existingController(controller)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -469,17 +469,17 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *api.R
 			controller.Annotations = map[string]string{}
 		}
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", controller.Spec.Replicas)
-		controller.Annotations[sourceIdAnnotation] = sourceId
+		controller.Annotations[sourceIDAnnotation] = sourceID
 		controller.Spec.Replicas = 0
 		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(controller)
 		return newRc, false, err
 	}
 	// Validate and use the existing controller.
 	annotations := existingRc.Annotations
-	source := annotations[sourceIdAnnotation]
+	source := annotations[sourceIDAnnotation]
 	_, ok := annotations[desiredReplicasAnnotation]
-	if source != sourceId || !ok {
-		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceId, annotations)
+	if source != sourceID || !ok {
+		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceID, annotations)
 	}
 	return existingRc, true, nil
 }
@@ -505,7 +505,7 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 		return err
 	}
 	applyUpdate := func(rc *api.ReplicationController) {
-		delete(rc.Annotations, sourceIdAnnotation)
+		delete(rc.Annotations, sourceIDAnnotation)
 		delete(rc.Annotations, desiredReplicasAnnotation)
 	}
 	if newRc, err = updateRcWithRetries(r.rcClient, r.ns, newRc, applyUpdate); err != nil {
@@ -650,7 +650,7 @@ func AbortRollingUpdate(c *RollingUpdaterConfig) error {
 	if c.NewRc.Annotations == nil {
 		c.NewRc.Annotations = map[string]string{}
 	}
-	c.NewRc.Annotations[sourceIdAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
+	c.NewRc.Annotations[sourceIDAnnotation] = fmt.Sprintf("%s:%s", c.OldRc.Name, c.OldRc.UID)
 
 	// Use the original value since the replica count change from old to new
 	// could be asymmetric. If we don't know the original count, we can't safely
@@ -829,9 +829,9 @@ func FindSourceController(r coreclient.ReplicationControllersGetter, namespace, 
 	}
 	for ix := range list.Items {
 		rc := &list.Items[ix]
-		if rc.Annotations != nil && strings.HasPrefix(rc.Annotations[sourceIdAnnotation], name) {
+		if rc.Annotations != nil && strings.HasPrefix(rc.Annotations[sourceIDAnnotation], name) {
 			return rc, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find a replication controller with source id == %s/%s", namespace, name)
+	return nil, fmt.Errorf("couldn't find a replication controller with source ID == %s/%s", namespace, name)
 }
