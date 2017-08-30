@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -1824,6 +1825,12 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 			newPod("matching-orphan-0-", "node-0", simpleDaemonSetLabel, nil),
 			newPod("matching-owned-1-", "node-1", simpleDaemonSetLabel, ds),
 			newPod("matching-orphan-1-", "node-1", simpleDaemonSetLabel, nil),
+			func() *v1.Pod {
+				pod := newPod("matching-owned-2-set-for-deletion-but-not-deleted", "node-1", simpleDaemonSetLabel, ds)
+				now := metav1.NewTime(time.Now().Add(30 * time.Second))
+				pod.DeletionTimestamp = &now
+				return pod
+			}(),
 		}
 		failedPod := newPod("matching-owned-failed-pod-1-", "node-1", simpleDaemonSetLabel, ds)
 		failedPod.Status = v1.PodStatus{Phase: v1.PodFailed}
