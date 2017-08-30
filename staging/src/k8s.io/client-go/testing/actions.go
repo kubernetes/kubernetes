@@ -47,6 +47,17 @@ func NewGetAction(resource schema.GroupVersionResource, namespace, name string) 
 	return action
 }
 
+func NewGetSubresourceAction(resource schema.GroupVersionResource, namespace, subresource, name string) GetActionImpl {
+	action := GetActionImpl{}
+	action.Verb = "get"
+	action.Resource = resource
+	action.Subresource = subresource
+	action.Namespace = namespace
+	action.Name = name
+
+	return action
+}
+
 func NewRootListAction(resource schema.GroupVersionResource, kind schema.GroupVersionKind, opts interface{}) ListActionImpl {
 	action := ListActionImpl{}
 	action.Verb = "list"
@@ -70,6 +81,20 @@ func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersio
 	return action
 }
 
+func NewListSubresourceAction(resource schema.GroupVersionResource, name, subresource string, kind schema.GroupVersionKind, namespace string, opts interface{}) ListActionImpl {
+	action := ListActionImpl{}
+	action.Verb = "list"
+	action.Resource = resource
+	action.Subresource = subresource
+	action.Kind = kind
+	action.Namespace = namespace
+	action.Name = name
+	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
+	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+
+	return action
+}
+
 func NewRootCreateAction(resource schema.GroupVersionResource, object runtime.Object) CreateActionImpl {
 	action := CreateActionImpl{}
 	action.Verb = "create"
@@ -84,6 +109,18 @@ func NewCreateAction(resource schema.GroupVersionResource, namespace string, obj
 	action.Verb = "create"
 	action.Resource = resource
 	action.Namespace = namespace
+	action.Object = object
+
+	return action
+}
+
+func NewCreateSubresourceAction(resource schema.GroupVersionResource, name, subresource string, namespace string, object runtime.Object) CreateActionImpl {
+	action := CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = resource
+	action.Subresource = subresource
+	action.Namespace = namespace
+	action.Name = name
 	action.Object = object
 
 	return action
@@ -389,6 +426,7 @@ func (a GetActionImpl) GetName() string {
 type ListActionImpl struct {
 	ActionImpl
 	Kind             schema.GroupVersionKind
+	Name             string
 	ListRestrictions ListRestrictions
 }
 
@@ -402,6 +440,7 @@ func (a ListActionImpl) GetListRestrictions() ListRestrictions {
 
 type CreateActionImpl struct {
 	ActionImpl
+	Name   string
 	Object runtime.Object
 }
 
