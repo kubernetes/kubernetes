@@ -228,7 +228,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 	for _, curr := range delegateAPIServer.ListedPaths() {
 		if curr == "/api/v1" {
 			apiService := makeAPIService(schema.GroupVersion{Group: "", Version: "v1"})
-			registration.AddAPIServiceToSync(apiService)
+			registration.AddAPIServiceToSyncOnStart(apiService)
 			apiServices = append(apiServices, apiService)
 			continue
 		}
@@ -246,7 +246,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 		if apiService == nil {
 			continue
 		}
-		registration.AddAPIServiceToSync(apiService)
+		registration.AddAPIServiceToSyncOnStart(apiService)
 		apiServices = append(apiServices, apiService)
 	}
 
