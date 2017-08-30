@@ -67,6 +67,10 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
 
+func (mounter *Mounter) MakeRShared(path string) error {
+	return nil
+}
+
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	return nil
 }
