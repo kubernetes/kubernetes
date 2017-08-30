@@ -370,6 +370,7 @@ func NewNodeController(
 	}
 
 	if nc.runTaintManager {
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: util.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
@@ -384,7 +385,6 @@ func NewNodeController(
 				return nil
 			}),
 		})
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
 	}
 
 	nc.nodeLister = nodeInformer.Lister()
