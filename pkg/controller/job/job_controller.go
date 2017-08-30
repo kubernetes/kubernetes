@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	batch "k8s.io/api/batch/v1"
@@ -582,7 +583,6 @@ func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
 func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *batch.Job) (int32, error) {
-	var activeLock sync.Mutex
 	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
@@ -613,15 +613,12 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					glog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
 					jm.expectations.DeletionObserved(jobKey)
-					activeLock.Lock()
-					active++
-					activeLock.Unlock()
+					atomic.AddInt32(&active, 1)
 					errCh <- err
 				}
 			}(i)
 		}
 		wait.Wait()
-
 	} else if active < parallelism {
 		wantActive := int32(0)
 		if job.Spec.Completions == nil {
@@ -672,9 +669,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
 					jm.expectations.CreationObserved(jobKey)
-					activeLock.Lock()
-					active--
-					activeLock.Unlock()
+					atomic.AddInt32(&active, -1)
 					errCh <- err
 				}
 			}()
