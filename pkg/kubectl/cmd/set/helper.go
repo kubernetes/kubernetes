@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/api"
 	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -157,4 +158,38 @@ func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn 
 		}
 	}
 	return patches
+}
+
+func findEnv(env []api.EnvVar, name string) (api.EnvVar, bool) {
+	for _, e := range env {
+		if e.Name == name {
+			return e, true
+		}
+	}
+	return api.EnvVar{}, false
+}
+
+func updateEnv(existing []api.EnvVar, env []api.EnvVar, remove []string) []api.EnvVar {
+	out := []api.EnvVar{}
+	covered := sets.NewString(remove...)
+	for _, e := range existing {
+		if covered.Has(e.Name) {
+			continue
+		}
+		newer, ok := findEnv(env, e.Name)
+		if ok {
+			covered.Insert(e.Name)
+			out = append(out, newer)
+			continue
+		}
+		out = append(out, e)
+	}
+	for _, e := range env {
+		if covered.Has(e.Name) {
+			continue
+		}
+		covered.Insert(e.Name)
+		out = append(out, e)
+	}
+	return out
 }
