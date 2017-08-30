@@ -20,6 +20,8 @@ data:
       access_log /dev/stdout;
       server {
         listen 127.0.0.1:988;
+        # When serving 301s, don't redirect to port 988.
+        port_in_redirect off;
 
         # By default, return 403. This protects us from new API versions.
         location / {
@@ -28,13 +30,13 @@ data:
 
         # Allow for REST discovery.
         location = / {
-            if ($args ~* "recursive") {
+            if ($args ~* "^(.+&)?recursive=") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location = /computeMetadata/ {
-            if ($args ~* "recursive") {
+            if ($args ~* "^(.+&)?recursive=") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
@@ -42,19 +44,19 @@ data:
 
         # By default, allow the v0.1, v1beta1, and v1 APIs.
         location /0.1/ {
-            if ($args ~* "recursive") {
+            if ($args ~* "^(.+&)?recursive=") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location /computeMetadata/v1beta1/ {
-            if ($args ~* "recursive") {
+            if ($args ~* "^(.+&)?recursive=") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
         }
         location /computeMetadata/v1/ {
-            if ($args ~* "recursive") {
+            if ($args ~* "^(.+&)?recursive=") {
                     return 403 "?recursive calls are not allowed by the metadata proxy.";
             }
             proxy_pass http://169.254.169.254;
