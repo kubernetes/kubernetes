@@ -36,6 +36,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/vault:all-srcs",
+    ],
     tags = ["automanaged"],
 )
