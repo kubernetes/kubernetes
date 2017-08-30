@@ -356,7 +356,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       else
         echo "Got error while trying to list hollow-nodes. Probably API server is down."
       fi
-      pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+      pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
       running=$(($(echo "${pods}" | grep "Running" | wc -l)))
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
