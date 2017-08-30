@@ -65,6 +65,9 @@ type manager struct {
 	sync.Mutex
 	policy Policy
 
+	// reconcilePeriod is the duration between calls to reconcileState.
+	reconcilePeriod time.Duration
+
 	// state allows pluggable CPU assignment policies while sharing a common
 	// representation of state for the system to inspect and reconcile.
 	state state.State
@@ -91,6 +94,7 @@ var _ Manager = &manager{}
 // NewManager creates new cpu manager based on provided policy
 func NewManager(
 	cpuPolicyName string,
+	reconcilePeriod time.Duration,
 	machineInfo *cadvisorapi.MachineInfo,
 	nodeAllocatableReservation v1.ResourceList,
 ) (Manager, error) {
@@ -108,6 +112,7 @@ func NewManager(
 
 	manager := &manager{
 		policy:                     policy,
+		reconcilePeriod:            reconcilePeriod,
 		state:                      state.NewMemoryState(),
 		machineInfo:                machineInfo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
@@ -117,6 +122,7 @@ func NewManager(
 
 func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
 	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
+	glog.Infof("[cpumanger] reconciling every %v", m.reconcilePeriod)
 
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
@@ -126,7 +132,7 @@ func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodS
 	if m.policy.Name() == string(PolicyNone) {
 		return
 	}
-	go wait.Until(func() { m.reconcileState() }, time.Second, wait.NeverStop)
+	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
 }
 
 func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {

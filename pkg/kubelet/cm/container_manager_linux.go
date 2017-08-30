@@ -274,6 +274,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		cm.cpuManager, err = cpumanager.NewManager(
 			nodeConfig.ExperimentalCPUManagerPolicy,
+			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
 		)

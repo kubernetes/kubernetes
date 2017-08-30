@@ -17,6 +17,8 @@ limitations under the License.
 package cm
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
@@ -82,8 +84,9 @@ type NodeConfig struct {
 	CgroupDriver          string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	ExperimentalQOSReserved      map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy string
+	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	ExperimentalCPUManagerPolicy          string
+	ExperimentalCPUManagerReconcilePeriod time.Duration
 }
 
 type NodeAllocatableConfig struct {
