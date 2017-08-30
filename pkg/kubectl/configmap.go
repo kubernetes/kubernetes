@@ -179,7 +179,7 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
-				return fmt.Errorf("cannot give a key name for a directory path.")
+				return fmt.Errorf("cannot give a key name for a directory path")
 			}
 			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {
@@ -244,7 +244,7 @@ func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))
 	}
 	if _, entryExists := configMap.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v", keyName, configMap.Data)
 	}
 	configMap.Data[keyName] = data
 	return nil
