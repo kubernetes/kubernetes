@@ -131,16 +131,36 @@ type GCECloud struct {
 
 type ServiceManager interface {
 	// Creates a new persistent disk on GCE with the given disk spec.
-	CreateDisk(project string, zone string, disk *compute.Disk) (*compute.Operation, error)
+	CreateDisk(
+		name string,
+		sizeGb int64,
+		tagsStr string,
+		diskTypeURI string,
+		zone string) (gceObject, error)
+
+	// Attach a persistent disk on GCE with the given disk spec to the specified instance.
+	AttachDisk(diskName string,
+		diskKind string,
+		diskZone string,
+		readWrite string,
+		source string,
+		diskType string,
+		instanceName string) (gceObject, error)
+
+	// Detach a persistent disk on GCE with the given disk spec from the specified instance.
+	DetachDisk(
+		instanceZone string,
+		instanceName string,
+		devicePath string) (gceObject, error)
 
 	// Gets the persistent disk from GCE with the given diskName.
-	GetDisk(project string, zone string, diskName string) (*compute.Disk, error)
+	GetDisk(project string, zone string, diskName string) (*GCEDisk, error)
 
 	// Deletes the persistent disk from GCE with the given diskName.
-	DeleteDisk(project string, zone string, disk string) (*compute.Operation, error)
+	DeleteDisk(project string, zone string, disk string) (gceObject, error)
 
 	// Waits until GCE reports the given operation in the given zone as done.
-	WaitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error
+	WaitForZoneOp(op gceObject, zone string, mc *metricContext) error
 }
 
 type GCEServiceManager struct {
@@ -717,29 +737,118 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 }
 
 func (manager *GCEServiceManager) CreateDisk(
-	project string,
-	zone string,
-	disk *compute.Disk) (*compute.Operation, error) {
+	name string,
+	sizeGb int64,
+	tagsStr string,
+	diskTypeURI string,
+	zone string) (gceObject, error) {
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		diskToCreateAlpha := &computealpha.Disk{
+			Name:        name,
+			SizeGb:      sizeGb,
+			Description: tagsStr,
+			Type:        diskTypeURI,
+		}
+		return manager.gce.serviceAlpha.Disks.Insert(manager.gce.projectID, zone, diskToCreateAlpha).Do()
+	}
 
-	return manager.gce.service.Disks.Insert(project, zone, disk).Do()
+	diskToCreateV1 := &compute.Disk{
+		Name:        name,
+		SizeGb:      sizeGb,
+		Description: tagsStr,
+		Type:        diskTypeURI,
+	}
+	return manager.gce.service.Disks.Insert(manager.gce.projectID, zone, diskToCreateV1).Do()
+}
+
+func (manager *GCEServiceManager) AttachDisk(
+	diskName string,
+	diskKind string,
+	diskZone string,
+	readWrite string,
+	source string,
+	diskType string,
+	instanceName string) (gceObject, error) {
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		attachedDiskAlpha := &computealpha.AttachedDisk{
+			DeviceName: diskName,
+			Kind:       diskKind,
+			Mode:       readWrite,
+			Source:     source,
+			Type:       diskType,
+		}
+		return manager.gce.serviceAlpha.Instances.AttachDisk(
+			manager.gce.projectID, diskZone, instanceName, attachedDiskAlpha).Do()
+	}
+
+	attachedDiskV1 := &compute.AttachedDisk{
+		DeviceName: diskName,
+		Kind:       diskKind,
+		Mode:       readWrite,
+		Source:     source,
+		Type:       diskType,
+	}
+	return manager.gce.service.Instances.AttachDisk(
+		manager.gce.projectID, diskZone, instanceName, attachedDiskV1).Do()
+}
+
+func (manager *GCEServiceManager) DetachDisk(
+	instanceZone string,
+	instanceName string,
+	devicePath string) (gceObject, error) {
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		manager.gce.serviceAlpha.Instances.DetachDisk(
+			manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
+	}
+
+	return manager.gce.service.Instances.DetachDisk(
+		manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
 }
 
 func (manager *GCEServiceManager) GetDisk(
 	project string,
 	zone string,
-	diskName string) (*compute.Disk, error) {
+	diskName string) (*GCEDisk, error) {
 
-	return manager.gce.service.Disks.Get(project, zone, diskName).Do()
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(project, zone, diskName).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		return &GCEDisk{
+			Zone: lastComponent(diskAlpha.Zone),
+			Name: diskAlpha.Name,
+			Kind: diskAlpha.Kind,
+			Type: diskAlpha.Type,
+		}, nil
+	}
+
+	diskStable, err := manager.gce.service.Disks.Get(project, zone, diskName).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	return &GCEDisk{
+		Zone: lastComponent(diskStable.Zone),
+		Name: diskStable.Name,
+		Kind: diskStable.Kind,
+		Type: diskStable.Type,
+	}, nil
 }
 
 func (manager *GCEServiceManager) DeleteDisk(
 	project string,
 	zone string,
-	diskName string) (*compute.Operation, error) {
+	diskName string) (gceObject, error) {
+
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		return manager.gce.serviceAlpha.Disks.Delete(project, zone, diskName).Do()
+	}
 
 	return manager.gce.service.Disks.Delete(project, zone, diskName).Do()
 }
 
-func (manager *GCEServiceManager) WaitForZoneOp(op *compute.Operation, zone string, mc *metricContext) error {
+func (manager *GCEServiceManager) WaitForZoneOp(op gceObject, zone string, mc *metricContext) error {
 	return manager.gce.waitForZoneOp(op, zone, mc)
 }
