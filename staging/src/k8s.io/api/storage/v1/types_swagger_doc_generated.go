@@ -33,6 +33,7 @@ var map_StorageClass = map[string]string{
 	"provisioner":   "Provisioner indicates the type of the provisioner.",
 	"parameters":    "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
 	"reclaimPolicy": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
+	"mountOptions":  "Dynamically provisioned PersistentVolumes of this storage class are created with these mountOptions, e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid.",
 }
 
 func (StorageClass) SwaggerDoc() map[string]string {

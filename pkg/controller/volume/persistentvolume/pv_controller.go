@@ -1283,11 +1283,21 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
+		MountOptions:                  storageClass.MountOptions,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
+	}
+
+	// Refuse to provision if the plugin doesn't support mount options, creation
+	// of PV would be rejected by validation anyway
+	if !plugin.SupportsMountOption() && len(options.MountOptions) > 0 {
+		strerr := fmt.Sprintf("Mount options are not supported by the provisioner but StorageClass %q has mount options %v", storageClass.Name, options.MountOptions)
+		glog.V(2).Infof("Mount options are not supported by the provisioner but claim %q's StorageClass %q has mount options %v", claimToClaimKey(claim), storageClass.Name, options.MountOptions)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+		return
 	}
 
 	// Provision the volume

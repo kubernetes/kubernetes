@@ -720,6 +720,13 @@
      "reclaimPolicy": {
       "$ref": "v1.PersistentVolumeReclaimPolicy",
       "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete."
+     },
+     "mountOptions": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with these mountOptions, e.g. [\"ro\", \"soft\"]. Not validated - mount of the PVs will simply fail if one is invalid."
      }
     }
    },

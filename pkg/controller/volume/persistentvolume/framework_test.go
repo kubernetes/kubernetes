@@ -798,12 +798,13 @@ const operationDelete = "Delete"
 const operationRecycle = "Recycle"
 
 var (
-	classGold            string = "gold"
-	classSilver          string = "silver"
-	classEmpty           string = ""
-	classNonExisting     string = "non-existing"
-	classExternal        string = "external"
-	classUnknownInternal string = "unknown-internal"
+	classGold                    string = "gold"
+	classSilver                  string = "silver"
+	classEmpty                   string = ""
+	classNonExisting             string = "non-existing"
+	classExternal                string = "external"
+	classUnknownInternal         string = "unknown-internal"
+	classUnsupportedMountOptions string = "unsupported-mountoptions"
 )
 
 // wrapTestWithPluginCalls returns a testCall that:
