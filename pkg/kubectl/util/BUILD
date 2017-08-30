@@ -1,6 +1,7 @@
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -42,4 +43,10 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["util_test.go"],
+    library = ":go_default_library",
 )
