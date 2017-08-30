@@ -104,14 +104,14 @@ func CreateScheduler(
 	)
 
 	// Rebuild the configurator with a default Create(...) method.
-	configurator = &schedulerConfigurator{
+	configurator = NewschedulerConfigurator(
 		configurator,
 		s.PolicyConfigFile,
 		s.AlgorithmProvider,
 		s.PolicyConfigMapName,
 		s.PolicyConfigMapNamespace,
 		s.UseLegacyPolicyConfig,
-	}
+	)
 
 	return scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
 		cfg.Recorder = recorder
@@ -127,6 +127,24 @@ type schedulerConfigurator struct {
 	policyConfigMap          string
 	policyConfigMapNamespace string
 	useLegacyPolicyConfig    bool
+}
+
+func NewschedulerConfigurator(
+	configurator scheduler.Configurator,
+	policyConfigFile string,
+	algorithmProvider string,
+	policyConfigMapName string,
+	policyConfigMapNamespace string,
+	useLegacyPolicyConfig bool,
+) *schedulerConfigurator {
+	return &schedulerConfigurator{
+		configurator,
+		policyConfigFile,
+		algorithmProvider,
+		policyConfigMapName,
+		policyConfigMapNamespace,
+		useLegacyPolicyConfig,
+	}
 }
 
 // getSchedulerPolicyConfig finds and decodes scheduler's policy config. If no

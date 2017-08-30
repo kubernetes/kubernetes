@@ -19,8 +19,10 @@ package benchmark
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -29,13 +31,23 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-const enableEquivalenceCache = true
+var (
+	policyConfigFile = "config/scheduler-config.json"
+)
+
+const (
+	enableEquivalenceCache = true
+	useLegacyPolicyConfig  = true
+	algorithmProvider      = "DefaultProvider"
+	defaultProviderENV     = "DEFAULT_PROVIDER"
+)
 
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
@@ -44,7 +56,7 @@ const enableEquivalenceCache = true
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroyFunc func()) {
+func mustSetupScheduler() (configurator scheduler.Configurator, destroyFunc func()) {
 
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -63,7 +75,7 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	schedulerConfigurator = factory.NewConfigFactory(
+	configurator = factory.NewConfigFactory(
 		v1.DefaultSchedulerName,
 		clientSet,
 		informerFactory.Core().V1().Nodes(),
@@ -78,10 +90,26 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		enableEquivalenceCache,
 	)
 
+	// If user specified to use default provider.
+	if isDefaultProvider() {
+		policyConfigFile = ""
+	}
+
+	// Rebuild the schedulerConfigurator with a default Create(...) method.
+	configurator = app.NewschedulerConfigurator(
+		configurator,
+		policyConfigFile,
+		algorithmProvider,
+		// We use configure file instead of configMap in test
+		"FakePolicyConfigMapName",
+		"FakePolicyConfigMapNamespace",
+		useLegacyPolicyConfig,
+	)
+
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
-	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
+	sched, err := scheduler.NewFromConfigurator(configurator, func(conf *scheduler.Config) {
 		conf.Recorder = eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "scheduler"})
 	})
 	if err != nil {
@@ -101,4 +129,15 @@ func mustSetupScheduler() (schedulerConfigurator scheduler.Configurator, destroy
 		glog.Infof("destroyed")
 	}
 	return
+}
+
+func isDefaultProvider() bool {
+	// Always use default algorithm provider
+	isDefault := true
+
+	// Unless users have their own choice
+	if os.Getenv(defaultProviderENV) == "false" {
+		isDefault = false
+	}
+	return isDefault
 }

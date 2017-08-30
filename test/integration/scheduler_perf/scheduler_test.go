@@ -17,18 +17,22 @@ limitations under the License.
 package benchmark
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	testutils "k8s.io/kubernetes/test/utils"
-	"math"
-	"strconv"
-	"testing"
-	"time"
 )
 
 const (
@@ -183,24 +187,51 @@ func schedulePods(config *testConfig) int32 {
 	}
 }
 
-// mutateNodeTemplate returns the modified node needed for creation of nodes.
-func (na nodeAffinity) mutateNodeTemplate(node *v1.Node) {
-	labels := make(map[string]string)
-	for i := 0; i < na.LabelCount; i++ {
-		value := strconv.Itoa(i)
-		key := na.nodeAffinityKey + value
-		labels[key] = value
+// mutateTemplate returns the modified node and pod needed for creation of nodes.
+func (c schedulerPerfConfig) mutateTemplate(node *v1.Node, pod *v1.Pod, config *testConfig) {
+	// If use default provider, process predicates and priorities and return
+	if isDefaultProvider() {
+		processMatchNodeSelector(node, pod)
+		return
 	}
-	node.ObjectMeta.Labels = labels
+
+	// Otherwise, process predicates and priorities based on configure file.
+	configFile, _ := ioutil.ReadFile(policyConfigFile)
+	var data map[string]interface{}
+	err := json.Unmarshal(configFile, &data)
+	if err != nil {
+		glog.Fatalf("failed to unmarshal configure file: %v", err)
+	}
+
+	predicateList := data["predicates"].([]interface{})
+
+	for _, predicate := range predicateList {
+		predicateName := predicate.(map[string]interface{})["name"]
+		// TODO(resouer): deal with more predicates & priorities
+		switch predicateName.(string) {
+		case "MatchNodeSelector":
+			processMatchNodeSelector(node, pod)
+		}
+	}
+
 	return
 }
 
-// mutatePodTemplate returns the modified pod template after applying mutations.
-func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
-	var nodeSelectorRequirements []v1.NodeSelectorRequirement
-	for i := 0; i < na.LabelCount; i++ {
+func processMatchNodeSelector(node *v1.Node, pod *v1.Pod) {
+	nodeAffinityKey := "kubernetes.io/sched-perf-node-affinity-"
+	labelCount := 10
+	labels := make(map[string]string)
+	for i := 0; i < labelCount; i++ {
 		value := strconv.Itoa(i)
-		key := na.nodeAffinityKey + value
+		key := nodeAffinityKey + value
+		labels[key] = value
+	}
+	node.ObjectMeta.Labels = labels
+
+	var nodeSelectorRequirements []v1.NodeSelectorRequirement
+	for i := 0; i < labelCount; i++ {
+		value := strconv.Itoa(i)
+		key := nodeAffinityKey + value
 		nodeSelector := v1.NodeSelectorRequirement{Key: key, Values: []string{value}, Operator: v1.NodeSelectorOpIn}
 		nodeSelectorRequirements = append(nodeSelectorRequirements, nodeSelector)
 	}
@@ -240,16 +271,13 @@ func (inputConfig *schedulerPerfConfig) generatePodAndNodeTopology(config *testC
 	if config.numNodes < inputConfig.NodeCount || config.numPods < inputConfig.PodCount {
 		return fmt.Errorf("NodeCount cannot be greater than numNodes")
 	}
-	nodeAffinity := inputConfig.NodeAffinity
 	// Node template that needs to be mutated.
 	mutatedNodeTemplate := baseNodeTemplate
 	// Pod template that needs to be mutated.
 	mutatedPodTemplate := basePodTemplate
-	if nodeAffinity != nil {
-		nodeAffinity.mutateNodeTemplate(mutatedNodeTemplate)
-		nodeAffinity.mutatePodTemplate(mutatedPodTemplate)
 
-	} // TODO: other predicates/priorities will be processed in subsequent if statements or a switch:).
+	inputConfig.mutateTemplate(mutatedNodeTemplate, mutatedPodTemplate, config)
+
 	config.mutatedPodTemplate = mutatedPodTemplate
 	config.mutatedNodeTemplate = mutatedNodeTemplate
 	inputConfig.generateNodes(config)
@@ -264,10 +292,6 @@ func writePodAndNodeTopologyToConfig(config *testConfig) error {
 	inputConfig := &schedulerPerfConfig{
 		NodeCount: 100,
 		PodCount:  3000,
-		NodeAffinity: &nodeAffinity{
-			nodeAffinityKey: "kubernetes.io/sched-perf-node-affinity-",
-			LabelCount:      10,
-		},
 	}
 	err := inputConfig.generatePodAndNodeTopology(config)
 	if err != nil {
