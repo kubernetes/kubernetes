@@ -126,7 +126,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
     ],
 )

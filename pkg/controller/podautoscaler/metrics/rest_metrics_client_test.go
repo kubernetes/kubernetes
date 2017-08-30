@@ -37,7 +37,7 @@ import (
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -185,7 +185,7 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 
 func (tc *restClientTestCase) runTest(t *testing.T) {
 	testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
 		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
