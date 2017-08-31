@@ -405,6 +405,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		requestContextMapper:   c.RequestContextMapper,
 		Serializer:             c.Serializer,
 		AuditBackend:           c.AuditBackend,
+		delegationTarget:       delegationTarget,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
