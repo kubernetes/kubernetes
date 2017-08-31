@@ -418,9 +418,10 @@ var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]
 		It("should create new pods when node is partitioned", func() {
 			parallelism := int32(2)
 			completions := int32(4)
+			backoffLimit := int32(6) // default value
 
 			job := framework.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
-				parallelism, completions, nil)
+				parallelism, completions, nil, backoffLimit)
 			job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
 			label := labels.SelectorFromSet(labels.Set(map[string]string{framework.JobSelectorKey: job.Name}))
