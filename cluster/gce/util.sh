@@ -849,38 +849,14 @@ function create-subnetworks() {
       --network ${NETWORK} \
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
-      --secondary-range "pods-default=${CLUSTER_IP_RANGE}"
+      --secondary-range "pods-default=${CLUSTER_IP_RANGE}" \
+      --secondary-range "services-default=${SERVICE_CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
     if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi
-  fi
-
-  # Services subnetwork.
-  local subnet=$(gcloud beta compute networks subnets describe \
-    --project "${PROJECT}" \
-    --region ${REGION} \
-    ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null)
-
-  if [[ -z ${subnet} ]]; then
-    if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-services ]]; then
-      echo "${color_red}Subnetwork ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK} does not exist${color_norm}"
-      exit 1
-    fi
-
-    echo "Creating subnet for reserving service cluster IPs ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
-    gcloud beta compute networks subnets create \
-      ${SERVICE_CLUSTER_IP_SUBNETWORK} \
-      --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
-      --project "${PROJECT}" \
-      --network ${NETWORK} \
-      --region ${REGION} \
-      --range ${SERVICE_CLUSTER_IP_RANGE}
-    echo "Created subnetwork ${SERVICE_CLUSTER_IP_SUBNETWORK}"
-  else
-    echo "Subnet ${SERVICE_CLUSTER_IP_SUBNETWORK} already exists"
   fi
 }
 
@@ -932,19 +908,6 @@ function delete-subnetworks() {
         --project "${PROJECT}" \
         --region ${REGION} \
         ${IP_ALIAS_SUBNETWORK}
-    fi
-  fi
-
-  if [[ ${SERVICE_CLUSTER_IP_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-services ]]; then
-    echo "Removing auto-created subnet ${NETWORK}:${SERVICE_CLUSTER_IP_SUBNETWORK}"
-    if [[ -n $(gcloud beta compute networks subnets describe \
-          --project "${PROJECT}" \
-          --region ${REGION} \
-          ${SERVICE_CLUSTER_IP_SUBNETWORK} 2>/dev/null) ]]; then
-      gcloud --quiet beta compute networks subnets delete \
-        --project "${PROJECT}" \
-        --region ${REGION} \
-        ${SERVICE_CLUSTER_IP_SUBNETWORK}
     fi
   fi
 }
