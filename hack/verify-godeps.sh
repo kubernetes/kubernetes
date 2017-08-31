@@ -25,21 +25,12 @@ export GO15VENDOREXPERIMENT=1
 # Sometimes godep just can't handle things. This lets use manually put
 # some deps in place first, so godep won't fall over.
 preload-dep() {
-  org="$1"
-  project="$2"
-  sha="$3"
-  # project_dir ($4) is optional, if unset we will generate it
-  if [[ -z ${4:-} ]]; then
-    project_dir="${GOPATH}/src/${org}/${project}.git"
-  else
-    project_dir="${4}"
-  fi
+  project="$1"
+  sha="$2"
 
-  echo "**HACK** preloading dep for ${org} ${project} at ${sha} into ${project_dir}"
-  git clone "https://${org}/${project}" "${project_dir}" > /dev/null 2>&1
-  pushd "${project_dir}" > /dev/null
-    git checkout "${sha}"
-  popd > /dev/null
+  echo "**HACK** preloading dep ${project} at ${sha}"
+  ./build/run.sh hack/run-in-gopath.sh go get "${project}"
+  ./build/run.sh hack/run-in-gopath.sh bash -c 'git checkout -C "${GOPATH}/src/${project}" "${sha}"'
 }
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
@@ -53,61 +44,25 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
-if [[ -z ${TMP_GOPATH:-} ]]; then
-  # Create a nice clean place to put our new godeps
-  _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
-else
-  # reuse what we might have saved previously
-  _tmpdir="${TMP_GOPATH}"
-fi
+export KUBE_RUN_COPY_OUTPUT=N
 
-if [[ -z ${KEEP_TMP:-} ]]; then
-    KEEP_TMP=false
-fi
-function cleanup {
-  if [ "${KEEP_TMP}" == "true" ]; then
-    echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"
-  else
-    echo "Removing ${_tmpdir}"
-    rm -rf "${_tmpdir}"
-  fi
-  export GODEP=""
-}
-trap cleanup EXIT
+# Restore the Godeps
+hack/godep-restore.sh
 
-# Copy the contents of the kube directory into the nice clean place
-_kubetmp="${_tmpdir}/src/k8s.io"
-mkdir -p "${_kubetmp}"
-# should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
-_kubetmp="${_kubetmp}/kubernetes"
-
-# Do all our work in the new GOPATH
-export GOPATH="${_tmpdir}"
-
-pushd "${_kubetmp}" 2>&1 > /dev/null
-  # Restore the Godeps into our temp directory
-  hack/godep-restore.sh
-
-  # For some reason the kube tree needs to be a git repo for the godep tool to
-  # run. Doesn't make sense.
-  git init > /dev/null 2>&1
-
-  # Recreate the Godeps using the nice clean set we just downloaded
-  hack/godep-save.sh
-popd 2>&1 > /dev/null
+# Recreate the Godeps using the nice clean set we just downloaded
+hack/godep-save.sh
 
 ret=0
 
 pushd "${KUBE_ROOT}" 2>&1 > /dev/null
   # Test for diffs
-  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+  if ! _out="$(git diff Godeps/Godeps.json)"; then
     echo "Your Godeps.json is different:"
-    echo "${_out}"
-    echo "Godeps Verify failed."
     echo "${_out}" > godepdiff.patch
+    cat godepdiff.patch
+    echo "Godeps Verify failed."
     echo "If you're seeing this locally, run the below command to fix your Godeps.json:"
-    echo "patch -p0 < godepdiff.patch"
+    echo "patch -p1 < godepdiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
     echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
@@ -118,13 +73,13 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
+  if ! _out="$(git diff vendor)"; then
     echo "Your vendored results are different:"
-    echo "${_out}"
-    echo "Godeps Verify failed."
     echo "${_out}" > vendordiff.patch
+    cat vendordiff.patch
+    echo "Godeps Verify failed."
     echo "If you're seeing this locally, run the below command to fix your directories:"
-    echo "patch -p0 < vendordiff.patch"
+    echo "patch -p1 < vendordiff.patch"
     echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
     echo "(The patch file should also be exported as a build artifact if run through CI)"
     KEEP_TMP=true
