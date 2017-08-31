@@ -27,6 +27,7 @@ import (
 // Abstract interface to disk operations.
 type diskManager interface {
 	MakeGlobalPDName(disk fcDisk) string
+	MakeGlobalVDPDName(disk fcDisk) string
 	// Attaches the disk to the kubelet's host machine.
 	AttachDisk(b fcDiskMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
