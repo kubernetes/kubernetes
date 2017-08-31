@@ -102,16 +102,16 @@ func TestGetCgroupStats(t *testing.T) {
 	checkFsStats(t, "", rootFsInfoSeed, cs.Logs)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
 
-	assert.Equal(cs.Name, cgroupName)
-	assert.Equal(cs.StartTime, metav1.NewTime(containerInfo.Spec.CreationTime))
+	assert.Equal(cgroupName, cs.Name)
+	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
 
-	assert.Equal(cs.Rootfs.Time, metav1.NewTime(containerInfo.Stats[0].Timestamp))
-	assert.Equal(*cs.Rootfs.UsedBytes, *containerInfo.Stats[0].Filesystem.BaseUsageBytes)
-	assert.Equal(*cs.Rootfs.InodesUsed, *containerInfo.Stats[0].Filesystem.InodeUsage)
+	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), cs.Rootfs.Time)
+	assert.Equal(*containerInfo.Stats[0].Filesystem.BaseUsageBytes, *cs.Rootfs.UsedBytes)
+	assert.Equal(*containerInfo.Stats[0].Filesystem.InodeUsage, *cs.Rootfs.InodesUsed)
 
-	assert.Equal(cs.Logs.Time, metav1.NewTime(containerInfo.Stats[0].Timestamp))
-	assert.Equal(*cs.Logs.UsedBytes, *containerInfo.Stats[0].Filesystem.TotalUsageBytes-*containerInfo.Stats[0].Filesystem.BaseUsageBytes)
-	assert.Equal(*cs.Logs.InodesUsed, *rootFsInfo.Inodes-*rootFsInfo.InodesFree)
+	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), cs.Logs.Time)
+	assert.Equal(*containerInfo.Stats[0].Filesystem.TotalUsageBytes-*containerInfo.Stats[0].Filesystem.BaseUsageBytes, *cs.Logs.UsedBytes)
+	assert.Equal(*rootFsInfo.Inodes-*rootFsInfo.InodesFree, *cs.Logs.InodesUsed)
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -144,9 +144,9 @@ func TestRootFsStats(t *testing.T) {
 
 	checkFsStats(t, "", rootFsInfoSeed, stats)
 
-	assert.Equal(stats.Time, metav1.NewTime(containerInfo.Stats[0].Timestamp))
-	assert.Equal(*stats.UsedBytes, rootFsInfo.Usage)
-	assert.Equal(*stats.InodesUsed, *rootFsInfo.Inodes-*rootFsInfo.InodesFree)
+	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), stats.Time)
+	assert.Equal(rootFsInfo.Usage, *stats.UsedBytes)
+	assert.Equal(*rootFsInfo.Inodes-*rootFsInfo.InodesFree, *stats.InodesUsed)
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -462,6 +462,7 @@ func getTestFsInfo(seed int) cadvisorapiv2.FsInfo {
 		inodesFree = uint64(seed + offsetFsInodesFree)
 	)
 	return cadvisorapiv2.FsInfo{
+		Timestamp:  time.Now(),
 		Device:     "test-device",
 		Mountpoint: "test-mount-point",
 		Capacity:   uint64(seed + offsetFsCapacity),
