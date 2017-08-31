@@ -129,6 +129,29 @@ func TestMatchVolume(t *testing.T) {
 				pvc.Spec.StorageClassName = &classSilver
 			}),
 		},
+		"successful-match-very-large": {
+			expectedMatch: "local-pd-very-large",
+			// we keep the pvc size less than int64 so that in case the pv overflows
+			// the pvc does not overflow equally and give us false matching signals.
+			claim: makePVC("1E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
+		},
+		"successful-match-exact-extremely-large": {
+			expectedMatch: "local-pd-extremely-large",
+			claim: makePVC("800E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
+		},
+		"successful-no-match-way-too-large": {
+			expectedMatch: "",
+			claim: makePVC("950E", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classLarge
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -143,7 +166,7 @@ func TestMatchVolume(t *testing.T) {
 			t.Errorf("Expected %s but got volume %s in scenario %s", scenario.expectedMatch, volume.UID, name)
 		}
 		if len(scenario.expectedMatch) == 0 && volume != nil {
-			t.Errorf("Unexpected match for scenario: %s", name)
+			t.Errorf("Unexpected match for scenario: %s, matched with %s instead", name, volume.UID)
 		}
 	}
 }
@@ -239,7 +262,7 @@ func TestListByAccessModes(t *testing.T) {
 	}
 	sort.Sort(byCapacity{volumes})
 
-	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10"} {
+	for i, expected := range []string{"nfs-1", "nfs-5", "nfs-10", "local-pd-very-large", "local-pd-extremely-large"} {
 		if string(volumes[i].UID) != expected {
 			t.Errorf("Incorrect ordering of persistent volumes.  Expected %s but got %s", expected, volumes[i].UID)
 		}
@@ -589,6 +612,46 @@ func createTestVolumes() []*v1.PersistentVolume {
 				StorageClassName: classGold,
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "local-pd-very-large",
+				Name: "local001",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200E"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
+				},
+				StorageClassName: classLarge,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "local-pd-extremely-large",
+				Name: "local002",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("800E"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+					v1.ReadWriteMany,
+				},
+				StorageClassName: classLarge,
+			},
+		},
 	}
 }
 
@@ -696,7 +759,5 @@ func (c byCapacity) Len() int {
 func matchStorageCapacity(pvA, pvB *v1.PersistentVolume) bool {
 	aQty := pvA.Spec.Capacity[v1.ResourceStorage]
 	bQty := pvB.Spec.Capacity[v1.ResourceStorage]
-	aSize := aQty.Value()
-	bSize := bQty.Value()
-	return aSize <= bSize
+	return aQty.Cmp(bQty) <= 0
 }
