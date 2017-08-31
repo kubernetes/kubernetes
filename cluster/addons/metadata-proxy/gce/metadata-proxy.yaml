@@ -40,13 +40,6 @@ spec:
           limits:
             memory: "32Mi"
             cpu: "50m"
-        volumeMounts:
-          - name: config-volume
-            mountPath: /etc/nginx/
       nodeSelector:
         beta.kubernetes.io/metadata-proxy-ready: "true"
       terminationGracePeriodSeconds: 30
-      volumes:
-      - name: config-volume
-        configMap:
-          name: metadata-proxy-config
