@@ -389,7 +389,7 @@ func TestAuditLegacy(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := pluginlog.NewBackend(&buf, pluginlog.FormatLegacy)
+		backend := pluginlog.NewBackend(&buf, pluginlog.FormatLegacy, auditv1beta1.SchemeGroupVersion)
 		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
 		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
 			user: &user.DefaultInfo{Name: "admin"},
@@ -859,7 +859,7 @@ func TestAuditJson(t *testing.T) {
 		},
 	} {
 		var buf bytes.Buffer
-		backend := pluginlog.NewBackend(&buf, pluginlog.FormatJson)
+		backend := pluginlog.NewBackend(&buf, pluginlog.FormatJson, auditv1beta1.SchemeGroupVersion)
 		policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse)
 		handler := WithAudit(http.HandlerFunc(test.handler), &fakeRequestContextMapper{
 			user: &user.DefaultInfo{Name: "admin"},
