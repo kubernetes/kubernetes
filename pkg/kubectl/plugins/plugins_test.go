@@ -39,11 +39,11 @@ func TestPlugin(t *testing.T) {
 					ShortDesc: "The test",
 				},
 			},
-			expectedErr: IncompletePluginError,
+			expectedErr: ErrIncompletePlugin,
 		},
 		{
 			plugin:      &Plugin{},
-			expectedErr: IncompletePluginError,
+			expectedErr: ErrIncompletePlugin,
 		},
 		{
 			plugin: &Plugin{
@@ -53,7 +53,7 @@ func TestPlugin(t *testing.T) {
 					Command:   "echo 1",
 				},
 			},
-			expectedErr: InvalidPluginNameError,
+			expectedErr: ErrInvalidPluginName,
 		},
 		{
 			plugin: &Plugin{
@@ -68,7 +68,7 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: IncompleteFlagError,
+			expectedErr: ErrIncompleteFlag,
 		},
 		{
 			plugin: &Plugin{
@@ -84,7 +84,7 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: InvalidFlagNameError,
+			expectedErr: ErrInvalidFlagName,
 		},
 		{
 			plugin: &Plugin{
@@ -101,7 +101,7 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: InvalidFlagShorthandError,
+			expectedErr: ErrInvalidFlagShorthand,
 		},
 		{
 			plugin: &Plugin{
@@ -118,7 +118,7 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: InvalidFlagShorthandError,
+			expectedErr: ErrInvalidFlagShorthand,
 		},
 		{
 			plugin: &Plugin{
