@@ -129,6 +129,9 @@ func init() {
 			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
 			eventsRule(),
+
+			// glusterfs
+			rbac.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 		},
 	})
 	addControllerRole(rbac.ClusterRole{
