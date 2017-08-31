@@ -36,7 +36,7 @@ import (
 	"github.com/golang/glog"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ import (
 // Utilities for dealing with Jobs and CronJobs and time.
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
+var controllerKind = batchv2alpha1.SchemeGroupVersion.WithKind("CronJob")
 
 type CronJobController struct {
 	kubeClient clientset.Interface
@@ -116,7 +116,7 @@ func (jm *CronJobController) syncAll() {
 	js := jl.Items
 	glog.V(4).Infof("Found %d jobs", len(js))
 
-	sjl, err := jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+	sjl, err := jm.kubeClient.BatchV2alpha1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
 		return
@@ -134,7 +134,7 @@ func (jm *CronJobController) syncAll() {
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
-func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobControlInterface,
+func cleanupFinishedJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface,
 	sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	// If neither limits are active, there is no need to do anything.
 	if sj.Spec.FailedJobsHistoryLimit == nil && sj.Spec.SuccessfulJobsHistoryLimit == nil {
@@ -179,7 +179,7 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 }
 
 // removeOldestJobs removes the oldest jobs from a list of jobs
-func removeOldestJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobControlInterface,
+func removeOldestJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface,
 	pc podControlInterface, maxJobs int32, recorder record.EventRecorder) {
 	numToDelete := len(js) - int(maxJobs)
 	if numToDelete <= 0 {
@@ -200,7 +200,7 @@ func removeOldestJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobControlI
 // All known jobs created by "sj" should be included in "js".
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
-func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+func syncOne(sj *batchv2alpha1.CronJob, js []batchv1.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	childrenJobs := make(map[types.UID]bool)
@@ -284,7 +284,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		// can see easily that there was a missed execution.
 		return
 	}
-	if sj.Spec.ConcurrencyPolicy == batchv1beta1.ForbidConcurrent && len(sj.Status.Active) > 0 {
+	if sj.Spec.ConcurrencyPolicy == batchv2alpha1.ForbidConcurrent && len(sj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
 		// there is some risk that we won't see an active job when there is one.
 		// (because we haven't seen the status update to the SJ or the created pod).
@@ -297,7 +297,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		glog.V(4).Infof("Not starting job for %s because of prior execution still running and concurrency policy is Forbid", nameForLog)
 		return
 	}
-	if sj.Spec.ConcurrencyPolicy == batchv1beta1.ReplaceConcurrent {
+	if sj.Spec.ConcurrencyPolicy == batchv2alpha1.ReplaceConcurrent {
 		for _, j := range sj.Status.Active {
 			// TODO: this should be replaced with server side job deletion
 			// currently this mimics JobReaper from pkg/kubectl/stop.go
@@ -353,7 +353,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 }
 
 // deleteJob reaps a job, deleting the job, the pobs and the reference in the active list
-func deleteJob(sj *batchv1beta1.CronJob, job *batchv1.Job, jc jobControlInterface,
+func deleteJob(sj *batchv2alpha1.CronJob, job *batchv1.Job, jc jobControlInterface,
 	pc podControlInterface, recorder record.EventRecorder, reason string) bool {
 	// TODO: this should be replaced with server side job deletion
 	// currencontinuetly this mimics JobReaper from pkg/kubectl/stop.go
