@@ -870,6 +870,20 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: api.ClaimBound,
 	})
 
+	unboundSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("12G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
@@ -934,6 +948,12 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
+			enableResize:      true,
+		},
+		"unbound-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          unboundSizeUpdate,
 			enableResize:      true,
 		},
 	}

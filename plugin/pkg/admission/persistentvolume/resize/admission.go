@@ -98,7 +98,8 @@ func (pvcr *persistentVolumeClaimResize) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	// Only dynamically provisioned pvc/pv can be resized
+	// Growing Persistent volumes is only allowed for PVCs for which their StorageClass
+	// explicitly allows it
 	if !pvcr.allowResize(pvc, oldPvc) {
 		return admission.NewForbidden(a, fmt.Errorf("only dynamically provisioned pvc can be resized and "+
 			"the storageclass that provisions the pvc must support resize"))
@@ -117,7 +118,8 @@ func (pvcr *persistentVolumeClaimResize) Admit(a admission.Attributes) error {
 	return nil
 }
 
-// allowResize checks whether the pvc is dynamically provisioned and if the storageclass allows expansion
+// Growing Persistent volumes is only allowed for PVCs for which their StorageClass
+// explicitly allows it.
 func (pvcr *persistentVolumeClaimResize) allowResize(pvc, oldPvc *api.PersistentVolumeClaim) bool {
 	pvcStorageClass := apihelper.GetPersistentVolumeClaimClass(pvc)
 	oldPvcStorageClass := apihelper.GetPersistentVolumeClaimClass(oldPvc)

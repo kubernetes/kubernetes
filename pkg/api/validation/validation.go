@@ -1558,32 +1558,23 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		newPVCSpecCopy := newPvc.Spec.DeepCopy()
+
+		// lets make sure storage values are same.
+		if newPvc.Status.Phase == api.ClaimBound {
+			newPVCSpecCopy.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"]
+		}
+
 		oldSize := oldPvc.Spec.Resources.Requests["storage"]
 		newSize := newPvc.Spec.Resources.Requests["storage"]
 
-		if (newPvc.Status.Phase != api.ClaimBound) && (newSize.Cmp(oldSize) != 0) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can only be changed for bound claims"))
+		if !apiequality.Semantic.DeepEqual(*newPVCSpecCopy, oldPvc.Spec) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "is immutable after creation except resources.requests for bound claims"))
 		}
-
 		if newSize.Cmp(oldSize) < 0 {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
 		}
 
-		if !apiequality.Semantic.DeepEqual(newPvc.Spec.AccessModes, oldPvc.Spec.AccessModes) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "accessModes"), "field is immutable after creation"))
-		}
-
-		if !apiequality.Semantic.DeepEqual(newPvc.Spec.Selector, oldPvc.Spec.Selector) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "selector"), "field is immutable after creation"))
-		}
-
-		if !apiequality.Semantic.DeepEqual(newPvc.Spec.VolumeName, oldPvc.Spec.VolumeName) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeName"), "field is immutable after creation"))
-		}
-
-		if !apiequality.Semantic.DeepEqual(newPvc.Spec.StorageClassName, oldPvc.Spec.StorageClassName) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "storageClassName"), "field is immutable after creation"))
-		}
 	} else {
 		// changes to Spec are not allowed, but updates to label/and some annotations are OK.
 		// no-op updates pass validation.

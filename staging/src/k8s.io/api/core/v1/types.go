@@ -648,7 +648,9 @@ type PersistentVolumeClaimCondition struct {
 	// Last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
-	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// Unique, this should be a short, machine understandable string that gives the reason
+	// for condition's last transition. If it reports "ResizeStarted" that means the underlying
+	// persistent volume is being resized.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	// Human-readable message indicating details about last transition.
@@ -668,7 +670,8 @@ type PersistentVolumeClaimStatus struct {
 	// Represents the actual resources of the underlying volume.
 	// +optional
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
-	// Current service state of PVC
+	// Current Condition of persistent volume claim. If underlying persistent volume is being
+	// resized then the Condition will be set to 'ResizeStarted'.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
