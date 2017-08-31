@@ -25,6 +25,8 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
@@ -65,6 +67,9 @@ type AuditLogOptions struct {
 	MaxBackups int
 	MaxSize    int
 	Format     string
+	// Preferred group version for the log output.
+	// Defaults to audit.k8s.io/v1beta1.
+	GroupVersionString string
 }
 
 // AuditWebhookOptions control the webhook configuration for audit events.
@@ -75,6 +80,9 @@ type AuditWebhookOptions struct {
 	//
 	// Defaults to asynchronous batch events.
 	Mode string
+	// Preferred group version for the webhook payload.
+	// Defaults to audit.k8s.io/v1beta1.
+	GroupVersionString string
 }
 
 func NewAuditOptions() *AuditOptions {
@@ -119,6 +127,12 @@ func (o *AuditOptions) Validate() []error {
 		if !validFormat {
 			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.LogOptions.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 		}
+		if err := validateGroupVersionString(o.LogOptions.GroupVersionString); err != nil {
+			allErrors = append(allErrors, err)
+		}
+		if err := validateGroupVersionString(o.WebhookOptions.GroupVersionString); err != nil {
+			allErrors = append(allErrors, err)
+		}
 	}
 
 	// Check validities of MaxAge, MaxBackups and MaxSize of log options
@@ -133,6 +147,17 @@ func (o *AuditOptions) Validate() []error {
 	}
 
 	return allErrors
+}
+
+func validateGroupVersionString(groupVersion string) error {
+	gv, err := schema.ParseGroupVersion(groupVersion)
+	if err != nil {
+		return err
+	}
+	if gv != auditv1beta1.SchemeGroupVersion && gv != auditv1alpha1.SchemeGroupVersion {
+		return fmt.Errorf("invalid group version, allowed versions are %q, %q", auditv1beta1.SchemeGroupVersion, auditv1alpha1.SchemeGroupVersion)
+	}
+	return nil
 }
 
 func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
@@ -192,6 +217,8 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
 			" \"json\" indicates structured json format. Requires the 'AdvancedAuditing' feature"+
 			" gate. Known formats are "+strings.Join(pluginlog.AllowedFormats, ",")+".")
+	fs.StringVar(&o.GroupVersionString, "audit-log-version", "audit.k8s.io/v1beta1",
+		"Preferred group and version for the output log. Requires the 'AdvancedAuditing' feature gate.")
 }
 
 func (o *AuditLogOptions) getWriter() io.Writer {
@@ -213,7 +240,8 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 
 func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
 	if w := o.getWriter(); w != nil {
-		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w, o.Format, auditv1beta1.SchemeGroupVersion))
+		groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
+		c.AuditBackend = appendBackend(c.AuditBackend, pluginlog.NewBackend(w, o.Format, groupVersion))
 	}
 	return nil
 }
@@ -231,6 +259,8 @@ func (o *AuditWebhookOptions) AddFlags(fs *pflag.FlagSet) {
 		"Strategy for sending audit events. Blocking indicates sending events should block"+
 			" server responses. Batch causes the webhook to buffer and send events"+
 			" asynchronously. Known modes are "+strings.Join(pluginwebhook.AllowedModes, ",")+".")
+	fs.StringVar(&o.GroupVersionString, "audit-webhook-version", "audit.k8s.io/v1beta1",
+		"Preferred group and version for the webhook payload. Requires the 'AdvancedAuditing' feature gate.")
 }
 
 func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
@@ -238,7 +268,8 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode, auditv1beta1.SchemeGroupVersion)
+	groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode, groupVersion)
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)
 	}
