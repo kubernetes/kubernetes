@@ -37,7 +37,7 @@ type Plugin struct {
 	Context RunningContext `json:"-"`
 }
 
-// PluginDescription holds everything needed to register a
+// Description holds everything needed to register a
 // plugin as a command. Usually comes from a descriptor file.
 type Description struct {
 	Name      string  `json:"name"`
@@ -49,12 +49,13 @@ type Description struct {
 	Tree      Plugins `json:"tree,omitempty"`
 }
 
-// PluginSource holds the location of a given plugin in the filesystem.
+// Source holds the location of a given plugin in the filesystem.
 type Source struct {
 	Dir            string `json:"-"`
 	DescriptorName string `json:"-"`
 }
 
+// Validate validates plugin data.
 func (p Plugin) Validate() error {
 	if len(p.Name) == 0 || len(p.ShortDesc) == 0 || (len(p.Command) == 0 && len(p.Tree) == 0) {
 		return IncompletePluginError
@@ -75,6 +76,7 @@ func (p Plugin) Validate() error {
 	return nil
 }
 
+// IsValid returns true if plugin data is valid.
 func (p Plugin) IsValid() bool {
 	return p.Validate() == nil
 }
@@ -90,6 +92,7 @@ type Flag struct {
 	DefValue  string `json:"defValue,omitempty"`
 }
 
+// Validate validates flag data.
 func (f Flag) Validate() error {
 	if len(f.Name) == 0 || len(f.Desc) == 0 {
 		return IncompleteFlagError
@@ -100,6 +103,7 @@ func (f Flag) Validate() error {
 	return f.ValidateShorthand()
 }
 
+// ValidateShorthand validates flag shorthand data.
 func (f Flag) ValidateShorthand() error {
 	length := len(f.Shorthand)
 	if length == 0 || (length == 1 && unicode.IsLetter(rune(f.Shorthand[0]))) {
@@ -108,6 +112,7 @@ func (f Flag) ValidateShorthand() error {
 	return InvalidFlagShorthandError
 }
 
+// Shorthanded returns true if flag shorthand data is valid.
 func (f Flag) Shorthanded() bool {
 	return f.ValidateShorthand() == nil
 }
