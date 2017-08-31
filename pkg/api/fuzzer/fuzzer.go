@@ -22,6 +22,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -447,6 +448,18 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(s *api.NodeStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
+		},
+		func(obj *api.DeleteExecAction, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.ReasonEnv == "" {
+				obj.ReasonEnv = v1.DefaultDeleteReasonEnv
+			}
+		},
+		func(obj *api.DeleteHTTPGetAction, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.ReasonHeader == "" {
+				obj.ReasonHeader = v1.DefaultDeleteReasonHeader
+			}
 		},
 	}
 }

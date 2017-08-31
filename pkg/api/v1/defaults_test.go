@@ -612,10 +612,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 								Scheme: v1.URISchemeHTTP,
 							},
 						},
-						PreStop: &v1.Handler{
-							HTTPGet: &v1.HTTPGetAction{
-								Path:   "/",
-								Scheme: v1.URISchemeHTTP,
+						PreStop: &v1.PreStopHandler{
+							HTTPGet: &v1.DeleteHTTPGetAction{
+								HTTPGetAction: v1.HTTPGetAction{
+									Path:   "/",
+									Scheme: v1.URISchemeHTTP,
+								},
 							},
 						},
 					},
@@ -1297,5 +1299,45 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 
 	if defaultType == nil || *defaultType != expectedType {
 		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
+	}
+}
+
+func TestSetDefaultDeleteExecAction(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.PreStopHandler{
+							Exec: &v1.DeleteExecAction{},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.Containers[0].Lifecycle.PreStop.Exec.ReasonEnv != v1.DefaultDeleteReasonEnv {
+		t.Errorf("Expected reason env name: %q, got: %q", v1.DefaultDeleteReasonEnv, output.Spec.Containers[0].Lifecycle.PreStop.Exec.ReasonEnv)
+	}
+}
+
+func TestSetDefaultDeleteHTTPGetAction(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.PreStopHandler{
+							HTTPGet: &v1.DeleteHTTPGetAction{},
+						},
+					},
+				},
+			},
+		},
+	}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.ReasonHeader != v1.DefaultDeleteReasonHeader {
+		t.Errorf("Expected reason header name: %q, got: %q", v1.DefaultDeleteReasonHeader, output.Spec.Containers[0].Lifecycle.PreStop.HTTPGet.ReasonHeader)
 	}
 }

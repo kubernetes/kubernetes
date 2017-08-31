@@ -1784,6 +1784,45 @@ type Handler struct {
 	TCPSocket *TCPSocketAction
 }
 
+// DeleteExecAction describes a "run in container" action (along with an
+// environment variable carrying the deletion reason) that will be invoked
+// inside of a container prior to sending the TERM signal to the container.
+type DeleteExecAction struct {
+	ExecAction
+
+	// ReasonEnv is the environment variable that will be populated with the
+	// reason for the Pod's termination.
+	// +optional
+	ReasonEnv string
+}
+
+// DeleteHTTPGetAction describes an action (along with an HTTP header carrying
+// the deletion reason) to take upon deletion based on HTTP GET requests.
+type DeleteHTTPGetAction struct {
+	HTTPGetAction
+
+	// ReasonHeader is the header that will be set to the reason for a
+	// deletion.
+	// +optional
+	ReasonHeader string
+}
+
+// PreStopHandler invokes either a DeleteExecAction, a DeleteHTTPGetAction, or
+// a TCPSocketAction prior to the graceful termination of a Pod. One and only
+// one of the fields may be specified.
+type PreStopHandler struct {
+	// Exec specifies the action to take.
+	// +optional
+	Exec *DeleteExecAction
+	// HTTPGet specifies the HTTP GET request to perform.
+	// +optional
+	HTTPGet *DeleteHTTPGetAction
+	// TCPSocket specifies an action involving a TCP port.
+	// TODO: implement a realistic TCP lifecycle hook
+	// +optional
+	TCPSocket *TCPSocketAction
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -1795,7 +1834,7 @@ type Lifecycle struct {
 	// PreStop is called immediately before a container is terminated.  The reason for termination is
 	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
 	// +optional
-	PreStop *Handler
+	PreStop *PreStopHandler
 }
 
 // The below types are used by kube_client and api_server.

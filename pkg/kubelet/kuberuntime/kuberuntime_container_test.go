@@ -329,18 +329,22 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	httpLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
-			HTTPGet: &v1.HTTPGetAction{
-				Host: "testHost.com",
-				Path: "/GracefulExit",
+		PreStop: &v1.PreStopHandler{
+			HTTPGet: &v1.DeleteHTTPGetAction{
+				HTTPGetAction: v1.HTTPGetAction{
+					Host: "testHost.com",
+					Path: "/GracefulExit",
+				},
 			},
 		},
 	}
 
 	cmdLifeCycle := &v1.Lifecycle{
-		PreStop: &v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"PreStopCMD"},
+		PreStop: &v1.PreStopHandler{
+			Exec: &v1.DeleteExecAction{
+				ExecAction: v1.ExecAction{
+					Command: []string{"PreStopCMD"},
+				},
 			},
 		},
 	}

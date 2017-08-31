@@ -376,3 +376,15 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
+
+func SetDefaults_DeleteExecAction(obj *v1.DeleteExecAction) {
+	if obj.ReasonEnv == "" {
+		obj.ReasonEnv = v1.DefaultDeleteReasonEnv
+	}
+}
+
+func SetDefaults_DeleteHTTPGetAction(obj *v1.DeleteHTTPGetAction) {
+	if obj.ReasonHeader == "" {
+		obj.ReasonHeader = v1.DefaultDeleteReasonHeader
+	}
+}
