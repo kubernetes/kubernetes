@@ -143,11 +143,11 @@ func KubectlPluginsPathPluginLoader() PluginLoader {
 	return PathFromEnvVarPluginLoader("KUBECTL_PLUGINS_PATH")
 }
 
-// XDGDataPluginLoader returns a PluginLoader that loads plugins from one or more
+// XDGDataDirsPluginLoader returns a PluginLoader that loads plugins from one or more
 // directories specified by the XDG system directory structure spec in the
 // XDG_DATA_DIRS env var, plus the "kubectl/plugins/" suffix. According to the
 // spec, if XDG_DATA_DIRS is not set it defaults to "/usr/local/share:/usr/share".
-func XDGDataPluginLoader() PluginLoader {
+func XDGDataDirsPluginLoader() PluginLoader {
 	envVarName := "XDG_DATA_DIRS"
 	if len(os.Getenv(envVarName)) > 0 {
 		return PathFromEnvVarPluginLoader(envVarName, "kubectl", "plugins")

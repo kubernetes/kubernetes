@@ -159,7 +159,7 @@ func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
 		return plugins.KubectlPluginsPathPluginLoader()
 	}
 	return plugins.TolerantMultiPluginLoader{
-		plugins.XDGDataPluginLoader(),
+		plugins.XDGDataDirsPluginLoader(),
 		plugins.UserDirPluginLoader(),
 	}
 }
