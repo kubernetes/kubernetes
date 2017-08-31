@@ -40,6 +40,7 @@ type ImageOptions struct {
 	All      bool
 	Local    bool
 	Selector string
+	Output   string
 }
 
 var (
@@ -54,13 +55,13 @@ var (
 
 	imageExample = templates.Examples(`
 		# View a deployment's nginx container image.
-		kubectl set image deployment/nginx
+		kubectl view image deployment/nginx
 
 		# View all deployments' and rc's image
-		kubectl set image deployments,rc --all
+		kubectl view image deployments,rc --all
 
 		# View nginx container image from local file, without hitting the server
-		kubectl set image -f path/to/file.yaml`)
+		kubectl view image -f path/to/file.yaml`)
 )
 
 // NewCmdImage new view image command
@@ -82,7 +83,7 @@ func NewCmdImage(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddNoHeadersFlags(cmd, false)
-	cmd.Flags().StringP("output", "o", "", "default name, if not name will show all informations")
+	cmd.Flags().StringVarP(&options.Output, "output", "o", "", "support name, other case will show all informations")
 	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
@@ -115,29 +116,42 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	defer w.Flush()
 
 	if !cmdutil.GetFlagBool(cmd, "no-headers") {
-		if cmdutil.GetFlagString(cmd, "output") == "name" {
+		if o.Output == "name" {
 			printHeaders(w, true)
 		} else {
 			printHeaders(w, false)
 		}
 	}
 	for _, info := range infos {
+		var resourceName string
+		if alias, ok := kubectl.ResourceShortFormFor(info.ResourceMapping().Resource); ok {
+			resourceName = alias
+		} else if resourceName == "" {
+			resourceName = "none"
+		}
+		Name := resourceName + "/" + info.Name
 		_, err := f.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+			for _, initContainer := range spec.InitContainers {
+				if o.Output == "name" {
+					_, err := fmt.Fprintln(w, initContainer.Image)
+					if err != nil {
+						return err
+					}
+					continue
+				}
+				_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", Name, initContainer.Name, initContainer.Image)
+				if err != nil {
+					return err
+				}
+			}
 			for _, container := range spec.Containers {
-				if cmdutil.GetFlagString(cmd, "output") == "name" {
+				if o.Output == "name" {
 					_, err := fmt.Fprintln(w, container.Image)
 					if err != nil {
 						return err
 					}
 					continue
 				}
-				var resourceName string
-				if alias, ok := kubectl.ResourceShortFormFor(info.ResourceMapping().Resource); ok {
-					resourceName = alias
-				} else if resourceName == "" {
-					resourceName = "none"
-				}
-				Name := resourceName + "/" + info.Name
 				_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", Name, container.Name, container.Image)
 				if err != nil {
 					return err
@@ -153,7 +167,7 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 }
 
 func printHeaders(out io.Writer, imageOnly bool) error {
-	columnNames := []string{"NAME", "CONTAINER(s)", "IMAGE(s)"}
+	columnNames := []string{"NAME", "CONTAINER", "IMAGE"}
 	if imageOnly {
 		columnNames = columnNames[2:]
 	}

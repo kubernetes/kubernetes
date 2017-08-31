@@ -48,20 +48,55 @@ func TestViewImageLocal(t *testing.T) {
 	cmd := NewCmdImage(f, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("local", "true")
-	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("no-headers", "true")
 	mapper, typer := f.Object()
 	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
 	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
-		Out:   buf,
-		Local: true}
+		Out:    buf,
+		Local:  true,
+		Output: "name"}
 	err := opts.Run(f, cmd, []string{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(buf.String(), "gcr.io/google-samples/cassandra:v12") {
-		t.Errorf("did not view image: %s", buf.String())
+		t.Errorf("did not view image:\n%s", buf.String())
+	}
+}
+
+func TestViewMultiImageLocal(t *testing.T) {
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdImage(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("local", "true")
+	cmd.Flags().Set("no-headers", "true")
+	mapper, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+
+	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/view/multi-container.yaml"}},
+		Out:    buf,
+		Local:  true,
+		Output: "name"}
+	err := opts.Run(f, cmd, []string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "busybox-2\nbusybox-3\nbusybox-1") {
+		t.Errorf("did not view image:\n%s", buf.String())
 	}
 }
