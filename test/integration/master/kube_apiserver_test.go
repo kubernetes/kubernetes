@@ -17,21 +17,25 @@ limitations under the License.
 package master
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestRun(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
-	defer result.TearDownFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client, err := kubernetes.NewForConfig(result.ClientConfig)
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -70,5 +74,67 @@ func TestRun(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create deployment: %v", err)
+	}
+}
+
+// TestOpenAPIDelegationChainPlumbing is a smoke test that checks for
+// the existence of some representative paths from the
+// apiextensions-server and the kube-aggregator server, both part of
+// the delegation chain in kube-apiserver.
+func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	kubeclient, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	result := kubeclient.RESTClient().Get().AbsPath("/swagger.json").Do()
+	status := 0
+	result.StatusCode(&status)
+	if status != 200 {
+		t.Fatalf("GET /swagger.json failed: expected status=%d, got=%d", 200, status)
+	}
+
+	raw, err := result.Raw()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	type openAPISchema struct {
+		Paths map[string]interface{} `json:"paths"`
+	}
+
+	var doc openAPISchema
+	err = json.Unmarshal(raw, &doc)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	matchedExtension := false
+	extensionsPrefix := "/apis/" + apiextensions.GroupName
+
+	matchedRegistration := false
+	registrationPrefix := "/apis/" + apiregistration.GroupName
+
+	for path := range doc.Paths {
+		if strings.HasPrefix(path, extensionsPrefix) {
+			matchedExtension = true
+		}
+		if strings.HasPrefix(path, registrationPrefix) {
+			matchedRegistration = true
+		}
+		if matchedExtension && matchedRegistration {
+			return
+		}
+	}
+
+	if !matchedExtension {
+		t.Errorf("missing path: %q", extensionsPrefix)
+	}
+
+	if !matchedRegistration {
+		t.Errorf("missing path: %q", registrationPrefix)
 	}
 }
