@@ -180,7 +180,7 @@ func (f *ring2Factory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.
 // system directory structure spec for the given platform.
 func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
 	if len(os.Getenv("KUBECTL_PLUGINS_PATH")) > 0 {
-		return plugins.PluginsEnvVarPluginLoader()
+		return plugins.KubectlPluginsPathPluginLoader()
 	}
 	return plugins.TolerantMultiPluginLoader{
 		plugins.XDGDataPluginLoader(),

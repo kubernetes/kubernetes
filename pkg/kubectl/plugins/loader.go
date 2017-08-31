@@ -137,9 +137,9 @@ func PathFromEnvVarPluginLoader(envVarName string, subdirs ...string) PluginLoad
 	return loader
 }
 
-// PluginsEnvVarPluginLoader returns a PluginLoader that loads plugins from one or more
+// KubectlPluginsPathPluginLoader returns a PluginLoader that loads plugins from one or more
 // directories specified by the KUBECTL_PLUGINS_PATH env var.
-func PluginsEnvVarPluginLoader() PluginLoader {
+func KubectlPluginsPathPluginLoader() PluginLoader {
 	return PathFromEnvVarPluginLoader("KUBECTL_PLUGINS_PATH")
 }
 
