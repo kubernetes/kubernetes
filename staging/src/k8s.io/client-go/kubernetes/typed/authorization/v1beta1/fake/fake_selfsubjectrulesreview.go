@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package fake
 
-type SelfSubjectRulesReviewExpansion interface{}
+// FakeSelfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
+type FakeSelfSubjectRulesReviews struct {
+	Fake *FakeAuthorizationV1beta1
+}

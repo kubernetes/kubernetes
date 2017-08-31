@@ -15,3 +15,5 @@ limitations under the License.
 */
 
 package v1
+
+type SelfSubjectRulesReviewExpansion interface{}
