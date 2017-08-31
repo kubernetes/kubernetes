@@ -24,6 +24,7 @@ go_library(
     }),
     deps = [
         "//vendor/github.com/google/cadvisor/events:go_default_library",
+        "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -34,7 +35,6 @@ go_library(
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
             "//vendor/github.com/google/cadvisor/container:go_default_library",
-            "//vendor/github.com/google/cadvisor/fs:go_default_library",
             "//vendor/github.com/google/cadvisor/http:go_default_library",
             "//vendor/github.com/google/cadvisor/manager:go_default_library",
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
