@@ -138,8 +138,12 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
 	}
-	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
-	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
+	go routecontroller.New(
+		routes,
+		ctx.ClientBuilder.ClientOrDie("route-controller"),
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.Options.ClusterName, clusterCIDR,
+	).Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
 	return true, nil
 }
 
@@ -262,15 +266,14 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
-	namespaceController := namespacecontroller.NewNamespaceController(
+	go namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
 		namespaceClientPool,
 		discoverResourcesFn,
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.Options.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
-	)
-	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
+	).Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
 }
