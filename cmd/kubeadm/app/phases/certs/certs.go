@@ -21,6 +21,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -395,6 +397,110 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 		fmt.Printf("[certificates] Generated %s key and public key.\n", baseName)
 	}
 
+	return nil
+}
+
+type certKeyLocation struct {
+	pkiDir     string
+	caBaseName string
+	baseName   string
+	uxName     string
+}
+
+// UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case when the CA Cert
+// is present but the CA Key is not. This allows us to, e.g., skip generating certs or not start the csr signing controller.
+func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
+
+	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
+		return false, err
+	}
+
+	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
+	if _, err := os.Stat(caKeyPath); !os.IsNotExist(err) {
+		return false, fmt.Errorf("ca.key exists")
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
+		return false, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "API server kubelet client"}); err != nil {
+		return false, err
+	}
+
+	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
+		return false, err
+	}
+
+	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
+		return false, err
+	}
+
+	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// validateCACert tries to load a x509 certificate from pkiDir and validates that it is a CA
+func validateCACert(l certKeyLocation) error {
+	// Check CA Cert
+	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
+	if err != nil {
+		return fmt.Errorf("failure loading certificate for %s: %v", l.uxName, err)
+	}
+
+	// Check if cert is a CA
+	if !caCert.IsCA {
+		return fmt.Errorf("certificate %s is not a CA", l.uxName)
+	}
+	return nil
+}
+
+// validateCACertAndKey tries to load a x509 certificate and private key from pkiDir,
+// and validates that the cert is a CA
+func validateCACertAndKey(l certKeyLocation) error {
+	if err := validateCACert(l); err != nil {
+		return err
+	}
+
+	_, err := pkiutil.TryLoadKeyFromDisk(l.pkiDir, l.caBaseName)
+	if err != nil {
+		return fmt.Errorf("failure loading key for %s: %v", l.uxName, err)
+	}
+	return nil
+}
+
+// validateSignedCert tries to load a x509 certificate and private key from pkiDir and validates
+// that the cert is signed by a given CA
+func validateSignedCert(l certKeyLocation) error {
+	// Try to load CA
+	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
+	if err != nil {
+		return fmt.Errorf("failure loading certificate authorithy for %s: %v", l.uxName, err)
+	}
+
+	// Try to load key and signed certificate
+	signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(l.pkiDir, l.baseName)
+	if err != nil {
+		return fmt.Errorf("failure loading certificate for %s: %v", l.uxName, err)
+	}
+
+	// Check if the cert is signed by the CA
+	if err := signedCert.CheckSignatureFrom(caCert); err != nil {
+		return fmt.Errorf("certificate %s is not signed by corresponding CA", l.uxName)
+	}
+	return nil
+}
+
+// validatePrivatePublicKey tries to load a private key from pkiDir
+func validatePrivatePublicKey(l certKeyLocation) error {
+	// Try to load key
+	_, _, err := pkiutil.TryLoadPrivatePublicKeyFromDisk(l.pkiDir, l.baseName)
+	if err != nil {
+		return fmt.Errorf("failure loading key for %s: %v", l.uxName, err)
+	}
 	return nil
 }
 

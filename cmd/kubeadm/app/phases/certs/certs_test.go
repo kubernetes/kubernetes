@@ -19,14 +19,15 @@ package certs
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
@@ -379,6 +380,151 @@ func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 
 	certstestutil.AssertCertificateIsSignedByCa(t, frontProxyClientCert, frontProxyCACert)
 	certstestutil.AssertCertificateHasClientAuthUsage(t, frontProxyClientCert)
+}
+
+func TestUsingExternalCA(t *testing.T) {
+
+	tests := []struct {
+		setupFuncs []func(cfg *kubeadmapi.MasterConfiguration) error
+		expected   bool
+	}{
+		{
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreatePKIAssets,
+			},
+			expected: false,
+		},
+		{
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreatePKIAssets,
+				deleteCAKey,
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		dir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(dir)
+
+		cfg := &kubeadmapi.MasterConfiguration{
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeName:        "valid-hostname",
+			CertificatesDir: dir,
+		}
+
+		for _, f := range test.setupFuncs {
+			if err := f(cfg); err != nil {
+				t.Errorf("error executing setup function: %v", err)
+			}
+		}
+
+		if val, _ := UsingExternalCA(cfg); val != test.expected {
+			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
+		}
+	}
+}
+
+func TestValidateMethods(t *testing.T) {
+
+	tests := []struct {
+		name            string
+		setupFuncs      []func(cfg *kubeadmapi.MasterConfiguration) error
+		validateFunc    func(l certKeyLocation) error
+		loc             certKeyLocation
+		expectedSuccess bool
+	}{
+		{
+			name: "validateCACert",
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreateCACertAndKeyfiles,
+			},
+			validateFunc:    validateCACert,
+			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
+			expectedSuccess: true,
+		},
+		{
+			name: "validateCACertAndKey (files present)",
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreateCACertAndKeyfiles,
+			},
+			validateFunc:    validateCACertAndKey,
+			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
+			expectedSuccess: true,
+		},
+		{
+			name: "validateCACertAndKey (key missing)",
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreatePKIAssets,
+				deleteCAKey,
+			},
+			validateFunc:    validateCACertAndKey,
+			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
+			expectedSuccess: false,
+		},
+		{
+			name: "validateSignedCert",
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreateCACertAndKeyfiles,
+				CreateAPIServerCertAndKeyFiles,
+			},
+			validateFunc:    validateSignedCert,
+			loc:             certKeyLocation{caBaseName: "ca", baseName: "apiserver", uxName: "apiserver"},
+			expectedSuccess: true,
+		},
+		{
+			name: "validatePrivatePublicKey",
+			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
+				CreateServiceAccountKeyAndPublicKeyFiles,
+			},
+			validateFunc:    validatePrivatePublicKey,
+			loc:             certKeyLocation{baseName: "sa", uxName: "service account"},
+			expectedSuccess: true,
+		},
+	}
+
+	for _, test := range tests {
+
+		dir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(dir)
+		test.loc.pkiDir = dir
+
+		cfg := &kubeadmapi.MasterConfiguration{
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+			Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			NodeName:        "valid-hostname",
+			CertificatesDir: dir,
+		}
+
+		fmt.Println("Testing", test.name)
+
+		for _, f := range test.setupFuncs {
+			if err := f(cfg); err != nil {
+				t.Errorf("error executing setup function: %v", err)
+			}
+		}
+
+		err := test.validateFunc(test.loc)
+		if test.expectedSuccess && err != nil {
+			t.Errorf("expected success, error executing validateFunc: %v, %v", test.name, err)
+		} else if !test.expectedSuccess && err == nil {
+			t.Errorf("expected failure, no error executing validateFunc: %v", test.name)
+		}
+	}
+}
+
+func deleteCAKey(cfg *kubeadmapi.MasterConfiguration) error {
+	if err := os.Remove(filepath.Join(cfg.CertificatesDir, "ca.key")); err != nil {
+		return fmt.Errorf("failed removing ca.key: %v", err)
+	}
+	return nil
+}
+
+func assertIsCa(t *testing.T, cert *x509.Certificate) {
+	if !cert.IsCA {
+		t.Error("cert is not a valida CA")
+	}
 }
 
 func TestCreateCertificateFilesMethods(t *testing.T) {
