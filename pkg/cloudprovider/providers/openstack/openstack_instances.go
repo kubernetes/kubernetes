@@ -19,33 +19,25 @@ package openstack
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"regexp"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
+	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/mitchellh/mapstructure"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
-}
-
-// Instances returns an implementation of Instances for OpenStack.
-func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
-	glog.V(4).Info("openstack.Instances() called")
-
-	compute, err := os.NewComputeV2()
-	if err != nil {
-		return nil, false
-	}
-
-	glog.V(1).Info("Claiming to support Instances")
-
-	return &Instances{compute}, true
 }
 
 // Implementation of Instances.CurrentNodeName
@@ -116,7 +108,7 @@ func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) 
 	return false, errors.New("unimplemented")
 }
 
-// InstanceID returns the kubelet's cloud provider ID.
+// InstanceID returns the kubelet's cloud provider ID(used to volume test).
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {
 		id, err := readInstanceID()
@@ -198,4 +190,176 @@ func instanceIDFromProviderID(providerID string) (instanceID string, err error) 
 		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
 	}
 	return matches[1], nil
+}
+
+func readInstanceID() (string, error) {
+	// Try to find instance ID on the local filesystem (created by cloud-init)
+	const instanceIDFile = "/var/lib/cloud/data/instance-id"
+	idBytes, err := ioutil.ReadFile(instanceIDFile)
+	if err == nil {
+		instanceID := string(idBytes)
+		instanceID = strings.TrimSpace(instanceID)
+		glog.V(3).Infof("Got instance id from %s: %s", instanceIDFile, instanceID)
+		if instanceID != "" {
+			return instanceID, nil
+		}
+		// Fall through to metadata server lookup
+	}
+
+	md, err := getMetadata()
+	if err != nil {
+		return "", err
+	}
+
+	return md.Uuid, nil
+}
+
+func foreachServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuilder, handler func(*servers.Server) (bool, error)) error {
+	pager := servers.List(client, opts)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		for _, server := range s {
+			ok, err := handler(&server)
+			if !ok || err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	})
+	return err
+}
+
+func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
+	opts := servers.ListOpts{
+		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
+		Status: "ACTIVE",
+	}
+	pager := servers.List(client, opts)
+
+	serverList := make([]servers.Server, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		serverList = append(serverList, s...)
+		if len(serverList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(serverList) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return &serverList[0], nil
+}
+
+func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
+	addrs := []v1.NodeAddress{}
+
+	type Address struct {
+		IpType string `mapstructure:"OS-EXT-IPS:type"`
+		Addr   string
+	}
+
+	var addresses map[string][]Address
+	err := mapstructure.Decode(srv.Addresses, &addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	for network, addrList := range addresses {
+		for _, props := range addrList {
+			var addressType v1.NodeAddressType
+			if props.IpType == "floating" || network == "public" {
+				addressType = v1.NodeExternalIP
+			} else {
+				addressType = v1.NodeInternalIP
+			}
+
+			v1helper.AddToNodeAddresses(&addrs,
+				v1.NodeAddress{
+					Type:    addressType,
+					Address: props.Addr,
+				},
+			)
+		}
+	}
+
+	// AccessIPs are usually duplicates of "public" addresses.
+	if srv.AccessIPv4 != "" {
+		v1helper.AddToNodeAddresses(&addrs,
+			v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: srv.AccessIPv4,
+			},
+		)
+	}
+
+	if srv.AccessIPv6 != "" {
+		v1helper.AddToNodeAddresses(&addrs,
+			v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: srv.AccessIPv6,
+			},
+		)
+	}
+
+	return addrs, nil
+}
+
+func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) ([]v1.NodeAddress, error) {
+	srv, err := getServerByName(client, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeAddresses(srv)
+}
+
+func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (string, error) {
+	addrs, err := getAddressesByName(client, name)
+	if err != nil {
+		return "", err
+	} else if len(addrs) == 0 {
+		return "", ErrNoAddressFound
+	}
+
+	for _, addr := range addrs {
+		if addr.Type == v1.NodeInternalIP {
+			return addr.Address, nil
+		}
+	}
+
+	return addrs[0].Address, nil
+}
+
+// getAttachedInterfacesByID returns the node interfaces of the specified instance.
+func getAttachedInterfacesByID(client *gophercloud.ServiceClient, serviceID string) ([]attachinterfaces.Interface, error) {
+	var interfaces []attachinterfaces.Interface
+
+	pager := attachinterfaces.List(client, serviceID)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := attachinterfaces.ExtractInterfaces(page)
+		if err != nil {
+			return false, err
+		}
+		interfaces = append(interfaces, s...)
+		return true, nil
+	})
+	if err != nil {
+		return interfaces, err
+	}
+
+	return interfaces, nil
 }

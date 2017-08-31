@@ -26,32 +26,13 @@ import (
 
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 
-	"github.com/gophercloud/gophercloud"
-	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
-	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	apiversions_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
+	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/glog"
 )
-
-type volumeService interface {
-	createVolume(opts VolumeCreateOpts) (string, string, error)
-	getVolume(volumeID string) (Volume, error)
-	deleteVolume(volumeName string) error
-}
-
-// Volumes implementation for v1
-type VolumesV1 struct {
-	blockstorage *gophercloud.ServiceClient
-	opts         BlockStorageOpts
-}
-
-// Volumes implementation for v2
-type VolumesV2 struct {
-	blockstorage *gophercloud.ServiceClient
-	opts         BlockStorageOpts
-}
 
 type Volume struct {
 	// ID of the instance, to which this volume is attached. "" if not attached
@@ -81,116 +62,68 @@ const (
 	VolumeErrorStatus     = "error"
 )
 
-func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, error) {
-	startTime := time.Now()
-
-	create_opts := volumes_v1.CreateOpts{
-		Name:             opts.Name,
-		Size:             opts.Size,
-		VolumeType:       opts.VolumeType,
-		AvailabilityZone: opts.Availability,
-		Metadata:         opts.Metadata,
-	}
-
-	vol, err := volumes_v1.Create(volumes.blockstorage, create_opts).Extract()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("create_v1_volume", timeTaken, err)
-	if err != nil {
-		return "", "", err
-	}
-	return vol.ID, vol.AvailabilityZone, nil
+type volumeService interface {
+	createVolume(opts VolumeCreateOpts) (string, string, error)
+	getVolume(volumeID string) (Volume, error)
+	deleteVolume(volumeName string) error
 }
 
-func (volumes *VolumesV2) createVolume(opts VolumeCreateOpts) (string, string, error) {
-	startTime := time.Now()
-
-	create_opts := volumes_v2.CreateOpts{
-		Name:             opts.Name,
-		Size:             opts.Size,
-		VolumeType:       opts.VolumeType,
-		AvailabilityZone: opts.Availability,
-		Metadata:         opts.Metadata,
+func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
+	bsVersion := ""
+	if forceVersion == "" {
+		bsVersion = os.bsOpts.BSVersion
+	} else {
+		bsVersion = forceVersion
 	}
 
-	vol, err := volumes_v2.Create(volumes.blockstorage, create_opts).Extract()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("create_v2_volume", timeTaken, err)
-	if err != nil {
-		return "", "", err
+	switch bsVersion {
+	case "v1":
+		sClient, err := os.NewBlockStorageV1()
+		if err != nil {
+			return nil, err
+		}
+		return &VolumesV1{sClient, os.bsOpts}, nil
+	case "v2":
+		sClient, err := os.NewBlockStorageV2()
+		if err != nil {
+			return nil, err
+		}
+		return &VolumesV2{sClient, os.bsOpts}, nil
+	case "auto":
+		sClient, err := os.NewBlockStorageV1()
+		if err != nil {
+			return nil, err
+		}
+		availableApiVersions := []apiversions_v1.APIVersion{}
+		err = apiversions_v1.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
+			// returning false from this handler stops page iteration, error is propagated to the upper function
+			apiversions, err := apiversions_v1.ExtractAPIVersions(page)
+			if err != nil {
+				glog.Errorf("Unable to extract api versions from page: %v", err)
+				return false, err
+			}
+			availableApiVersions = append(availableApiVersions, apiversions...)
+			return true, nil
+		})
+
+		if err != nil {
+			glog.Errorf("Error when retrieving list of supported blockstorage api versions: %v", err)
+			return nil, err
+		}
+		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions); autodetectedVersion != "" {
+			return os.volumeService(autodetectedVersion)
+		} else {
+			// Nothing suitable found, failed autodetection, just exit with appropriate message
+			err_txt := "BlockStorage API version autodetection failed. " +
+				"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
+			return nil, errors.New(err_txt)
+		}
+
+	default:
+		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
+		glog.Warningf(err_txt)
+		return nil, errors.New(err_txt)
 	}
-	return vol.ID, vol.AvailabilityZone, nil
-}
-
-func (volumes *VolumesV1) getVolume(volumeID string) (Volume, error) {
-	startTime := time.Now()
-	volumeV1, err := volumes_v1.Get(volumes.blockstorage, volumeID).Extract()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("get_v1_volume", timeTaken, err)
-	if err != nil {
-		glog.Errorf("Error occurred getting volume by ID: %s", volumeID)
-		return Volume{}, err
-	}
-
-	volume := Volume{
-		ID:     volumeV1.ID,
-		Name:   volumeV1.Name,
-		Status: volumeV1.Status,
-	}
-
-	if len(volumeV1.Attachments) > 0 && volumeV1.Attachments[0]["server_id"] != nil {
-		volume.AttachedServerId = volumeV1.Attachments[0]["server_id"].(string)
-		volume.AttachedDevice = volumeV1.Attachments[0]["device"].(string)
-	}
-
-	return volume, nil
-}
-
-func (volumes *VolumesV2) getVolume(volumeID string) (Volume, error) {
-	startTime := time.Now()
-	volumeV2, err := volumes_v2.Get(volumes.blockstorage, volumeID).Extract()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("get_v2_volume", timeTaken, err)
-	if err != nil {
-		glog.Errorf("Error occurred getting volume by ID: %s", volumeID)
-		return Volume{}, err
-	}
-
-	volume := Volume{
-		ID:     volumeV2.ID,
-		Name:   volumeV2.Name,
-		Status: volumeV2.Status,
-	}
-
-	if len(volumeV2.Attachments) > 0 {
-		volume.AttachedServerId = volumeV2.Attachments[0].ServerID
-		volume.AttachedDevice = volumeV2.Attachments[0].Device
-	}
-
-	return volume, nil
-}
-
-func (volumes *VolumesV1) deleteVolume(volumeID string) error {
-	startTime := time.Now()
-	err := volumes_v1.Delete(volumes.blockstorage, volumeID).ExtractErr()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("delete_v1_volume", timeTaken, err)
-	if err != nil {
-		glog.Errorf("Cannot delete volume %s: %v", volumeID, err)
-	}
-
-	return err
-}
-
-func (volumes *VolumesV2) deleteVolume(volumeID string) error {
-	startTime := time.Now()
-	err := volumes_v2.Delete(volumes.blockstorage, volumeID).ExtractErr()
-	timeTaken := time.Since(startTime).Seconds()
-	recordOpenstackOperationMetric("delete_v2_volume", timeTaken, err)
-	if err != nil {
-		glog.Errorf("Cannot delete volume %s: %v", volumeID, err)
-	}
-
-	return err
 }
 
 func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
