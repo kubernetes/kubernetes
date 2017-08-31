@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	oapi "k8s.io/apimachinery/pkg/util/openapiparsing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
@@ -38,7 +39,7 @@ var _ = Describe("When reading openAPIData", func() {
 	var err error
 	var client *fakeOpenAPIClient
 	var instance *openapi.CachingOpenAPIClient
-	var expectedData openapi.Resources
+	var expectedData oapi.Resources
 
 	BeforeEach(func() {
 		tmpDir, err = ioutil.TempDir("", "openapi_cache_test")
@@ -49,7 +50,7 @@ var _ = Describe("When reading openAPIData", func() {
 		d, err := data.OpenAPISchema()
 		Expect(err).To(BeNil())
 
-		expectedData, err = openapi.NewOpenAPIData(d)
+		expectedData, err = oapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 	})
 
@@ -147,7 +148,7 @@ var _ = Describe("Reading openAPIData", func() {
 			d, err := data.OpenAPISchema()
 			Expect(err).To(BeNil())
 
-			expectedData, err := openapi.NewOpenAPIData(d)
+			expectedData, err := oapi.NewOpenAPIData(d)
 			Expect(err).To(BeNil())
 
 			By("getting the live openapi schema")
@@ -175,7 +176,7 @@ var _ = Describe("Reading openAPIData", func() {
 			d, err := data.OpenAPISchema()
 			Expect(err).To(BeNil())
 
-			expectedData, err := openapi.NewOpenAPIData(d)
+			expectedData, err := oapi.NewOpenAPIData(d)
 			Expect(err).To(BeNil())
 
 			By("getting the live openapi schema")

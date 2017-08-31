@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	oapi "k8s.io/apimachinery/pkg/util/openapiparsing"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
@@ -459,7 +460,7 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 // schema will be cached separately for different client / server combinations.
 // Note, the cache will not be invalidated if the server changes its open API schema without
 // changing the server version.
-func (f *ring1Factory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+func (f *ring1Factory) OpenAPISchema(cacheDir string) (oapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
