@@ -61,7 +61,7 @@ func TestExecuteDelayed(t *testing.T) {
 		return nil
 	})
 	now := time.Now()
-	then := now.Add(time.Second)
+	then := now.Add(3 * time.Second)
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
 	queue.AddWork(NewWorkArgs("3", "3"), now, then)
@@ -89,7 +89,7 @@ func TestCancel(t *testing.T) {
 		return nil
 	})
 	now := time.Now()
-	then := now.Add(time.Second)
+	then := now.Add(3 * time.Second)
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
 	queue.AddWork(NewWorkArgs("3", "3"), now, then)
@@ -119,7 +119,7 @@ func TestCancelAndReadd(t *testing.T) {
 		return nil
 	})
 	now := time.Now()
-	then := now.Add(time.Second)
+	then := now.Add(3 * time.Second)
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
 	queue.AddWork(NewWorkArgs("3", "3"), now, then)
