@@ -41,11 +41,10 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
-
-	"github.com/coreos/pkg/capnslog"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func getForegroundOptions() *metav1.DeleteOptions {
@@ -201,20 +200,7 @@ type testContext struct {
 
 // if workerCount > 0, will start the GC, otherwise it's up to the caller to Run() the GC.
 func setup(t *testing.T, workerCount int) *testContext {
-	masterConfig, tearDownMaster := apitesting.StartTestServerOrDie(t)
-
-	// TODO: Disable logging here until we resolve teardown issues which result in
-	// massive log spam. Another path forward would be to refactor
-	// StartTestServerOrDie to work with the etcd instance already started by the
-	// integration test scripts.
-	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
-	if err != nil {
-		t.Fatalf("couldn't configure logging: %v", err)
-	}
-	repo.SetLogLevel(map[string]capnslog.LogLevel{
-		"etcdserver/api/v3rpc": capnslog.CRITICAL,
-	})
+	masterConfig, _, tearDownMaster := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.SharedEtcd())
 
 	clientSet, err := clientset.NewForConfig(masterConfig)
 	if err != nil {
@@ -258,9 +244,6 @@ func setup(t *testing.T, workerCount int) *testContext {
 	tearDown := func() {
 		close(stopCh)
 		tearDownMaster()
-		repo.SetLogLevel(map[string]capnslog.LogLevel{
-			"etcdserver/api/v3rpc": capnslog.ERROR,
-		})
 	}
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
