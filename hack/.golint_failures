@@ -218,7 +218,6 @@ pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/jsonmerge
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/metricsutil
-pkg/kubectl/plugins
 pkg/kubectl/resource
 pkg/kubectl/testing
 pkg/kubectl/util
