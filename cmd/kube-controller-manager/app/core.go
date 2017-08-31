@@ -189,31 +189,34 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 }
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
-	go endpointcontroller.NewEndpointController(
+	controller := endpointcontroller.NewEndpointController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
-	).Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentEndpointSyncs), ctx.Stop)
 	return true, nil
 }
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
-	go replicationcontroller.NewReplicationManager(
+	controller := replicationcontroller.NewReplicationManager(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
-	).Run(int(ctx.Options.ConcurrentRCSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentRCSyncs), ctx.Stop)
 	return true, nil
 }
 
 func startPodGCController(ctx ControllerContext) (bool, error) {
-	go podgc.NewPodGC(
+	controller := podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
 		int(ctx.Options.TerminatedPodGCThreshold),
-	).Run(ctx.Stop)
+	)
+	go controller.Run(ctx.Stop)
 	return true, nil
 }
 
@@ -241,9 +244,10 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
 	}
 
-	go resourcequotacontroller.NewResourceQuotaController(
+	controller := resourcequotacontroller.NewResourceQuotaController(
 		resourceQuotaControllerOptions,
-	).Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -276,20 +280,22 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
-	go serviceaccountcontroller.NewServiceAccountsController(
+	controller := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run(1, ctx.Stop)
+	)
+	go controller.Run(1, ctx.Stop)
 	return true, nil
 }
 
 func startTTLController(ctx ControllerContext) (bool, error) {
-	go ttlcontroller.NewTTLController(
+	controller := ttlcontroller.NewTTLController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("ttl-controller"),
-	).Run(5, ctx.Stop)
+	)
+	go controller.Run(5, ctx.Stop)
 	return true, nil
 }
 
@@ -330,6 +336,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
+		ctx.InformersStarted,
 	)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)

@@ -78,6 +78,10 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.Mutex
+	// informersStarted is closed after the initial `Start` for shared informers. After that it is safe to start them here,
+	// before that it is not.
+	informersStarted <-chan struct{}
+
 	// stopCh drives shutdown. If it is nil, it indicates that Run() has not been
 	// called yet. If it is non-nil, then when closed it indicates everything
 	// should shut down.
@@ -278,6 +282,8 @@ func (gb *GraphBuilder) startMonitors() {
 	if gb.stopCh == nil {
 		return
 	}
+
+	<-gb.informersStarted
 
 	monitors := gb.monitors
 	started := 0

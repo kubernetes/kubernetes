@@ -38,7 +38,8 @@ func startDisruptionController(ctx ControllerContext) (bool, error) {
 			resource, group+"/"+version)
 		return false, nil
 	}
-	go disruption.NewDisruptionController(
+
+	controller := disruption.NewDisruptionController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
@@ -46,6 +47,7 @@ func startDisruptionController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
 		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
 		ctx.ClientBuilder.ClientOrDie("disruption-controller"),
-	).Run(ctx.Stop)
+	)
+	go controller.Run(ctx.Stop)
 	return true, nil
 }

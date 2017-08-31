@@ -19,17 +19,19 @@ package app
 import "k8s.io/kubernetes/pkg/controller/bootstrap"
 
 func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
-	go bootstrap.NewBootstrapSigner(
+	controller := bootstrap.NewBootstrapSigner(
 		ctx.ClientBuilder.ClientGoClientOrDie("bootstrap-signer"),
 		bootstrap.DefaultBootstrapSignerOptions(),
-	).Run(ctx.Stop)
+	)
+	go controller.Run(ctx.Stop)
 	return true, nil
 }
 
 func startTokenCleanerController(ctx ControllerContext) (bool, error) {
-	go bootstrap.NewTokenCleaner(
+	controller := bootstrap.NewTokenCleaner(
 		ctx.ClientBuilder.ClientGoClientOrDie("token-cleaner"),
 		bootstrap.DefaultTokenCleanerOptions(),
-	).Run(ctx.Stop)
+	)
+	go controller.Run(ctx.Stop)
 	return true, nil
 }

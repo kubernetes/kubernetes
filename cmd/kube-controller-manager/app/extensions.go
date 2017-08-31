@@ -31,13 +31,15 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}] {
 		return false, nil
 	}
-	go daemon.NewDaemonSetsController(
+
+	controller := daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -45,12 +47,14 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
 		return false, nil
 	}
-	go deployment.NewDeploymentController(
+
+	controller := deployment.NewDeploymentController(
 		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
 		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
-	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -58,11 +62,13 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}] {
 		return false, nil
 	}
-	go replicaset.NewReplicaSetController(
+
+	controller := replicaset.NewReplicaSetController(
 		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
+	)
+	go controller.Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }
