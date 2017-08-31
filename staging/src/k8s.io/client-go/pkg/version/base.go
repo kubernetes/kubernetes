@@ -39,8 +39,8 @@ var (
 	// them irrelevant. (Next we'll take it out, which may muck with
 	// scripts consuming the kubectl version output - but most of
 	// these should be looking at gitVersion already anyways.)
-	gitMajor string = "1" // major version, always numeric
-	gitMinor string = "7" // minor version, numeric possibly followed by "+"
+	gitMajor string = "1"  // major version, always numeric
+	gitMinor string = "7+" // minor version, numeric possibly followed by "+"
 
 	// semantic version, derived by build scripts (see
 	// https://github.com/kubernetes/kubernetes/blob/master/docs/design/versioning.md
@@ -51,7 +51,7 @@ var (
 	// semantic version is a git hash, but the version itself is no
 	// longer the direct output of "git describe", but a slight
 	// translation to be semver compliant.
-	gitVersion   string = "v1.7.5+$Format:%h$"
+	gitVersion   string = "v1.7.6-beta.0+$Format:%h$"
 	gitCommit    string = "$Format:%H$"    // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
 
