@@ -40,8 +40,7 @@ func (s *serviceLister) GetPodServices(pod *api.Pod) ([]*api.Service, error) {
 	}
 
 	var services []*api.Service
-	for i := range allServices {
-		service := allServices[i]
+	for _, service := range allServices {
 		if service.Spec.Selector == nil {
 			// services with nil selectors match nothing, not everything.
 			continue
