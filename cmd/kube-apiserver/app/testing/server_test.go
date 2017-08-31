@@ -19,6 +19,7 @@ package testing
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +40,7 @@ import (
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
 func TestRun(t *testing.T) {
@@ -388,4 +391,66 @@ func crdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiexten
 		}
 	}
 	return false, nil
+}
+
+// TestOpenAPIDelegationChainPlumbing is a smoke test that checks for
+// the existence of some representative paths from the
+// apiextensions-server and the kube-aggregator server, both part of
+// the delegation chain in kube-apiserver.
+func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
+	config, tearDown := StartTestServerOrDie(t)
+	defer tearDown()
+
+	kubeclient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	result := kubeclient.RESTClient().Get().AbsPath("/swagger.json").Do()
+	status := 0
+	result.StatusCode(&status)
+	if status != 200 {
+		t.Fatalf("GET /swagger.json failed: expected status=%d, got=%d", 200, status)
+	}
+
+	raw, err := result.Raw()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	type openAPISchema struct {
+		Paths map[string]interface{} `json:"paths"`
+	}
+
+	var doc openAPISchema
+	err = json.Unmarshal(raw, &doc)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	matchedExtension := false
+	extensionsPrefix := "/apis/" + apiextensions.GroupName
+
+	matchedRegistration := false
+	registrationPrefix := "/apis/" + apiregistration.GroupName
+
+	for path := range doc.Paths {
+		if strings.HasPrefix(path, extensionsPrefix) {
+			matchedExtension = true
+		}
+		if strings.HasPrefix(path, registrationPrefix) {
+			matchedRegistration = true
+		}
+		if matchedExtension && matchedRegistration {
+			return
+		}
+	}
+
+	if !matchedExtension {
+		t.Errorf("missing path: %q", extensionsPrefix)
+	}
+
+	if !matchedRegistration {
+		t.Errorf("missing path: %q", registrationPrefix)
+	}
 }
