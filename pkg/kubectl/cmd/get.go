@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -26,11 +27,13 @@ import (
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -344,17 +347,32 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		var obj runtime.Object
 		if !singleItemImplied || len(infos) > 1 {
 			// we have more than one item, so coerce all items into a list
-			list := &unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"kind":       "List",
-					"apiVersion": "v1",
-					"metadata":   map[string]interface{}{},
+			// we have more than one item, so coerce all items into a list.
+			// we don't want an *unstructured.Unstructured list yet, as we
+			// may be dealing with non-unstructured objects. Compose all items
+			// into an api.List, and then decode using an unstructured scheme.
+			list := api.List{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
 				},
+				ListMeta: metav1.ListMeta{},
 			}
 			for _, info := range infos {
-				list.Items = append(list.Items, *info.Object.(*unstructured.Unstructured))
+				list.Items = append(list.Items, info.Object)
 			}
-			obj = list
+
+			listData, err := json.Marshal(list)
+			if err != nil {
+				return err
+			}
+
+			converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, listData)
+			if err != nil {
+				return err
+			}
+
+			obj = converted
 		} else {
 			obj = infos[0].Object
 		}
