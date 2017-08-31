@@ -21,10 +21,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	goruntime "runtime"
 	"strconv"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -524,4 +524,11 @@ func FindFreeLocalPort() (int, error) {
 		return 0, err
 	}
 	return port, nil
+}
+
+// SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
+func SharedEtcd() *storagebackend.Config {
+	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
+	cfg.ServerList = []string{GetEtcdURL()}
+	return cfg
 }

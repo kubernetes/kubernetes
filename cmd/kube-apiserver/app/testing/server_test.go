@@ -41,7 +41,7 @@ import (
 )
 
 func TestRun(t *testing.T) {
-	config, tearDown := StartTestServerOrDie(t)
+	config, _, tearDown := StartTestServerOrDie(t, nil, SharedInProcessEtcd(t))
 	defer tearDown()
 
 	client, err := kubernetes.NewForConfig(config)
@@ -87,7 +87,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestCRDShadowGroup(t *testing.T) {
-	config, tearDown := StartTestServerOrDie(t)
+	config, _, tearDown := StartTestServerOrDie(t, nil, SharedInProcessEtcd(t))
 	defer tearDown()
 
 	kubeclient, err := kubernetes.NewForConfig(config)
@@ -155,7 +155,7 @@ func TestCRDShadowGroup(t *testing.T) {
 func TestCRD(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
 
-	config, tearDown := StartTestServerOrDie(t)
+	config, _, tearDown := StartTestServerOrDie(t, []string{"--admission-control", "Initializers"}, SharedInProcessEtcd(t))
 	defer tearDown()
 
 	kubeclient, err := kubernetes.NewForConfig(config)
