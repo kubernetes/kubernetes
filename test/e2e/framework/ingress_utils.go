@@ -763,7 +763,7 @@ func gcloudComputeResourceList(resource, regex, project string, out interface{})
 	// so we only look at stdout.
 	command := []string{
 		"compute", resource, "list",
-		fmt.Sprintf("--regexp=%q", regex),
+		fmt.Sprintf("--filter='name ~ \"%q\"'", regex),
 		fmt.Sprintf("--project=%v", project),
 		"-q", "--format=json",
 	}

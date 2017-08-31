@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -31,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
@@ -108,8 +103,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubelet/cm/cpumanager:all-srcs",
         "//pkg/kubelet/cm/cpuset:all-srcs",
         "//pkg/kubelet/cm/util:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

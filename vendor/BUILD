@@ -38,6 +38,7 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/service/ec2:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/ecr:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/elb:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/service/kms:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/route53:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/sts:all-srcs",
         "//vendor/github.com/beorn7/perks/quantile:all-srcs",

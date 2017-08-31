@@ -334,8 +334,8 @@ function detect-node-names() {
   detect-project
   INSTANCE_GROUPS=()
   INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
-    --zones "${ZONE}" --project "${PROJECT}" \
-    --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+    --project "${PROJECT}" \
+    --filter "name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
     --format='value(name)' || true))
   NODE_NAMES=()
   if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
@@ -1085,7 +1085,7 @@ function add-replica-to-etcd() {
 function set-existing-master() {
   local existing_master=$(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter "name ~ '$(get-replica-name-regexp)'" \
     --format "value(name,zone)" | head -n1)
   EXISTING_MASTER_NAME="$(echo "${existing_master}" | cut -f1)"
   EXISTING_MASTER_ZONE="$(echo "${existing_master}" | cut -f2)"
@@ -1605,7 +1605,7 @@ function kube-down() {
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter="name ~ '$(get-replica-name-regexp)'" \
     --format "value(zone)" | wc -l)
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
@@ -1647,8 +1647,8 @@ function kube-down() {
     # Find out what minions are running.
     local -a minions
     minions=( $(gcloud compute instances list \
-                  --project "${PROJECT}" --zones "${ZONE}" \
-                  --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+                  --project "${PROJECT}" \
+                  --filter="name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
                   --format='value(name)') )
     # If any minions are running, delete them in batches.
     while (( "${#minions[@]}" > 0 )); do
@@ -1674,7 +1674,7 @@ function kube-down() {
     # first allows the master to cleanup routes itself.
     local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
     routes=( $(gcloud compute routes list --project "${PROJECT}" \
-      --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
+      --filter="name ~ '${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}'" \
       --format='value(name)') )
     while (( "${#routes[@]}" > 0 )); do
       echo Deleting routes "${routes[*]::${batch}}"
@@ -1740,8 +1740,7 @@ function kube-down() {
 function get-replica-name() {
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
-    --zones "${ZONE}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter="name ~ '$(get-replica-name-regexp)' AND zone:(${ZONE})" \
     --format "value(name)" | head -n1)
 }
 
@@ -1755,7 +1754,7 @@ function get-replica-name() {
 function get-all-replica-names() {
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter="name ~ '$(get-replica-name-regexp)'" \
     --format "value(name)" | tr "\n" "," | sed 's/,$//')
 }
 
@@ -1767,7 +1766,7 @@ function get-master-replicas-count() {
   detect-project
   local num_masters=$(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter="name ~ '$(get-replica-name-regexp)'" \
     --format "value(zone)" | wc -l)
   echo -n "${num_masters}"
 }
@@ -1791,7 +1790,7 @@ function get-replica-name-regexp() {
 function set-replica-name() {
   local instances=$(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "$(get-replica-name-regexp)" \
+    --filter="name ~ '$(get-replica-name-regexp)'" \
     --format "value(name)")
 
   suffix=""
@@ -1856,8 +1855,8 @@ function check-resources() {
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zones "${ZONE}" \
-                --regexp "${NODE_INSTANCE_PREFIX}-.+" \
+                --project "${PROJECT}" \
+                --filter="name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
                 --format='value(name)') )
   if (( "${#minions[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#minions[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
@@ -1876,7 +1875,7 @@ function check-resources() {
 
   local -a routes
   routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${INSTANCE_PREFIX}-minion-.{4}" --format='value(name)') )
+    --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)') )
   if (( "${#routes[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
     return 1

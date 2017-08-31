@@ -75,6 +75,7 @@ function replicate-master-instance() {
 
 function create-master-instance-internal() {
   local gcloud="gcloud"
+  local retries=5
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
     gcloud="gcloud beta"
   fi
@@ -106,19 +107,34 @@ function create-master-instance-internal() {
   disk="${disk},boot=no"
   disk="${disk},auto-delete=no"
 
-  ${gcloud} compute instances create "${master_name}" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${MASTER_IMAGE_PROJECT}" \
-    --image "${MASTER_IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
-    --metadata-from-file "${metadata}" \
-    --disk "${disk}" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
-    ${preemptible_master} \
-    ${network}
+  for attempt in $(seq 1 ${retries}); do
+    if result=$(${gcloud} compute instances create "${master_name}" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --machine-type "${MASTER_SIZE}" \
+      --image-project="${MASTER_IMAGE_PROJECT}" \
+      --image "${MASTER_IMAGE}" \
+      --tags "${MASTER_TAG}" \
+      --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+      --metadata-from-file "${metadata}" \
+      --disk "${disk}" \
+      --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
+      ${preemptible_master} \
+      ${network} 2>&1); then
+      echo "${result}" >&2
+      return 0
+    else
+      echo "${result}" >&2
+      if [[ ! "${result}" =~ "try again later" ]]; then
+        echo "Failed to create master instance due to non-retryable error" >&2
+        return 1
+      fi
+      sleep 10
+    fi
+  done
+
+  echo "Failed to create master instance despite ${retries} attempts" >&2
+  return 1
 }
 
 function get-metadata() {

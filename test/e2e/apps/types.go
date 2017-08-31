@@ -18,7 +18,6 @@ package apps
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 const (
@@ -32,5 +31,6 @@ const (
 )
 
 var (
-	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 )

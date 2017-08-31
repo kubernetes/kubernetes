@@ -62,11 +62,11 @@ func setupProviderConfig() error {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 
 	case "gce", "gke":
-		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
 		zone := framework.TestContext.CloudConfig.Zone
 		region := framework.TestContext.CloudConfig.Region
 
+		var err error
 		if region == "" {
 			region, err = gcecloud.GetGCERegion(zone)
 			if err != nil {
@@ -76,6 +76,11 @@ func setupProviderConfig() error {
 		managedZones := []string{} // Manage all zones in the region
 		if !framework.TestContext.CloudConfig.MultiZone {
 			managedZones = []string{zone}
+		}
+
+		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{})
+		if err != nil {
+			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
 		}
 
 		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
@@ -89,7 +94,8 @@ func setupProviderConfig() error {
 			NodeTags:           nil,
 			NodeInstancePrefix: "",
 			TokenSource:        nil,
-			UseMetadataServer:  false})
+			UseMetadataServer:  false,
+			AlphaFeatureGate:   gceAlphaFeatureGate})
 
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)

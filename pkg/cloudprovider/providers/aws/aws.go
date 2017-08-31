@@ -38,6 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -203,6 +204,7 @@ type Services interface {
 	LoadBalancing(region string) (ELB, error)
 	Autoscaling(region string) (ASG, error)
 	Metadata() (EC2Metadata, error)
+	KeyManagement(region string) (KMS, error)
 }
 
 // EC2 is an abstraction over AWS', to allow mocking/other implementations
@@ -271,6 +273,12 @@ type ELB interface {
 type ASG interface {
 	UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error)
 	DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+}
+
+// KMS is a simple pass-through of the Key Management Service client interface,
+// which allows for testing.
+type KMS interface {
+	DescribeKey(*kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error)
 }
 
 // EC2Metadata is an abstraction over the AWS metadata service.
@@ -370,6 +378,7 @@ type Cloud struct {
 	ec2      EC2
 	elb      ELB
 	asg      ASG
+	kms      KMS
 	metadata EC2Metadata
 	cfg      *CloudConfig
 	region   string
@@ -566,6 +575,20 @@ func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
 	client := ec2metadata.New(session.New(&aws.Config{}))
 	p.addAPILoggingHandlers(&client.Handlers)
 	return client, nil
+}
+
+func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
+	awsConfig := &aws.Config{
+		Region:      &regionName,
+		Credentials: p.creds,
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	kmsClient := kms.New(session.New(awsConfig))
+
+	p.addHandlers(regionName, &kmsClient.Handlers)
+
+	return kmsClient, nil
 }
 
 // stringPointerArray creates a slice of string pointers from a slice of strings
@@ -877,11 +900,17 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
 	}
 
+	kms, err := awsServices.KeyManagement(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS key management client: %v", err)
+	}
+
 	awsCloud := &Cloud{
 		ec2:      ec2,
 		elb:      elb,
 		asg:      asg,
 		metadata: metadata,
+		kms:      kms,
 		cfg:      cfg,
 		region:   regionName,
 
@@ -1788,6 +1817,14 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
 	if len(volumeOptions.KmsKeyId) > 0 {
+		if missing, err := c.checkEncryptionKey(volumeOptions.KmsKeyId); err != nil {
+			if missing {
+				// KSM key is missing, provisioning would fail
+				return "", err
+			}
+			// Log checkEncryptionKey error and try provisioning anyway.
+			glog.Warningf("Cannot check KSM key %s: %v", volumeOptions.KmsKeyId, err)
+		}
 		request.KmsKeyId = aws.String(volumeOptions.KmsKeyId)
 		request.Encrypted = aws.Bool(true)
 	}
@@ -1817,6 +1854,23 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	}
 
 	return volumeName, nil
+}
+
+// checkEncryptionKey tests that given encryption key exists.
+func (c *Cloud) checkEncryptionKey(keyId string) (missing bool, err error) {
+	input := &kms.DescribeKeyInput{
+		KeyId: aws.String(keyId),
+	}
+	_, err = c.kms.DescribeKey(input)
+	if err == nil {
+		return false, nil
+	}
+	if awsError, ok := err.(awserr.Error); ok {
+		if awsError.Code() == "NotFoundException" {
+			return true, fmt.Errorf("KMS key %s not found: %q", keyId, err)
+		}
+	}
+	return false, fmt.Errorf("Error checking KSM key %s: %q", keyId, err)
 }
 
 // DeleteDisk implements Volumes.DeleteDisk

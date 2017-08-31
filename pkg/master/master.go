@@ -32,6 +32,7 @@ import (
 	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	batchapiv1 "k8s.io/api/batch/v1"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -381,9 +382,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
-		// TODO: enable batch/v1beta1 by default before 1.8 release, after issues
-		// with CronJobs existing in multiple versions at once is solved
-		// batchapiv1beta1.SchemeGroupVersion,
+		batchapiv1beta1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,

@@ -747,7 +747,7 @@ message PodSecurityPolicySpec {
   optional bool readOnlyRootFilesystem = 14;
 
   // DefaultAllowPrivilegeEscalation controls the default setting for whether a
-  // process can gain more privileges than it's parent process.
+  // process can gain more privileges than its parent process.
   // +optional
   optional bool defaultAllowPrivilegeEscalation = 15;
 

@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -161,11 +160,7 @@ func runTest(f *framework.Framework) error {
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
-	clone, err := scheme.Scheme.DeepCopy(oldCfg)
-	if err != nil {
-		return err
-	}
-	newCfg := clone.(*kubeletconfig.KubeletConfiguration)
+	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.
