@@ -22,6 +22,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -67,6 +68,7 @@ var (
 	zero = int64(0)
 
 	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
+	CronJobGroupVersionResource_v2 = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
 )
 
 func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
@@ -937,6 +939,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should delete jobs and pods created by cronjob", func() {
 		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource_v2, f.Namespace.Name)
 
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
