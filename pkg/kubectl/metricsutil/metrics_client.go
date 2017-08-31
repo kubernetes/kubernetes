@@ -53,18 +53,14 @@ type HeapsterMetricsClient struct {
 	HeapsterPort      string
 }
 
-func NewHeapsterMetricsClient(svcClient coreclient.ServicesGetter, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func DefaultHeapsterMetricsClient(svcClient coreclient.ServicesGetter) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
 		SVCClient:         svcClient,
-		HeapsterNamespace: namespace,
-		HeapsterScheme:    scheme,
-		HeapsterService:   service,
-		HeapsterPort:      port,
+		HeapsterNamespace: DefaultHeapsterNamespace,
+		HeapsterScheme:    DefaultHeapsterScheme,
+		HeapsterService:   DefaultHeapsterService,
+		HeapsterPort:      DefaultHeapsterPort,
 	}
-}
-
-func DefaultHeapsterMetricsClient(svcClient coreclient.ServicesGetter) *HeapsterMetricsClient {
-	return NewHeapsterMetricsClient(svcClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 }
 
 func podMetricsUrl(namespace string, name string) (string, error) {
