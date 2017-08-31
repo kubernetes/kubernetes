@@ -17,7 +17,9 @@ limitations under the License.
 package fc
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -113,6 +115,49 @@ func diskTearDown(manager diskManager, c fcDiskUnmounter, volPath string, mounte
 	}
 	if noMnt {
 		if err := os.Remove(volPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// utility to map a device to symbolic link
+func deviceSetUp(manager diskManager, b fcDiskMapper, volPath string) error {
+	globalPDPath := manager.MakeGlobalPDName(*b.fcDisk)
+	if !filepath.IsAbs(globalPDPath) || !filepath.IsAbs(volPath) {
+		return fmt.Errorf("These paths should be absolute: globalPDPath: %s, volPath: %s", globalPDPath, volPath)
+	}
+	devicePath, err := os.Readlink(globalPDPath + "/" + "symlink")
+	if err != nil {
+		glog.Errorf("failed to readlink: %s", globalPDPath+"/"+"symlink")
+		return err
+	}
+	noMnt, err := b.mounter.IsLikelyNotMountPoint(volPath)
+	if !noMnt {
+		return fmt.Errorf("%s already mounted. This volume cant' be used as raw block volume.", volPath)
+	}
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate global mount path: %s", volPath)
+		return err
+	}
+	if err = os.MkdirAll(volPath, 0750); err != nil {
+		return fmt.Errorf("Failed to mkdir %s, error", volPath)
+	}
+	if err := os.Symlink(devicePath, volPath+"/"+"symlink"); err != nil && !os.IsExist(err) {
+		return err
+	}
+	return nil
+}
+
+// utility to tear down a device
+func deviceTearDown(manager diskManager, c fcDiskUnmapper, volPath string) error {
+	fi, err := os.Lstat(volPath + "/" + "symlink")
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		err := os.Remove(volPath + "/" + "symlink")
+		if err != nil {
 			return err
 		}
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -66,8 +67,8 @@ func (attacher *fcAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	return volumesAttachedCheck, nil
 }
 
-func (attacher *fcAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, attacher.host)
+func (attacher *fcAttacher) WaitForAttach(spec *volume.Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error) {
+	mounter, err := volumeSpecToMounter(spec, attacher.host, pod)
 	if err != nil {
 		glog.Warningf("failed to get fc mounter: %v", err)
 		return "", err
@@ -77,7 +78,7 @@ func (attacher *fcAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 
 func (attacher *fcAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, attacher.host)
+	mounter, err := volumeSpecToMounter(spec, attacher.host, nil)
 	if err != nil {
 		glog.Warningf("failed to get fc mounter: %v", err)
 		return "", err
@@ -160,7 +161,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMounter, error) {
+func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, pod *v1.Pod) (*fcDiskMounter, error) {
 	fc, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -176,7 +177,9 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 	} else {
 		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")
 	}
-
+	var volumeMode v1.PersistentVolumeMode
+	volumeMode = v1helper.GetPersistentVolumeMode(spec.PersistentVolume)
+	glog.Infof("#### DEBUG LOG ####: newBlockVolumeMapperInternal GetVolumeModeForVolume FC: %s", volumeMode)
 	return &fcDiskMounter{
 		fcDisk: &fcDisk{
 			plugin: &fcPlugin{
@@ -187,9 +190,10 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 			wwids: wwids,
 			io:    &osIOHandler{},
 		},
-		fsType:   fc.FSType,
-		readOnly: readOnly,
-		mounter:  volumehelper.NewSafeFormatAndMountFromHost(fcPluginName, host),
+		fsType:     fc.FSType,
+		volumeMode: volumeMode,
+		readOnly:   readOnly,
+		mounter:    volumehelper.NewSafeFormatAndMountFromHost(fcPluginName, host),
 	}, nil
 }
 

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -217,6 +218,14 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	} else {
 		devicePath = disk
 	}
+
+	glog.Infof("#### DEBUG LOG ####: AttachDisk devicePath: %s", devicePath)
+	glog.Infof("#### DEBUG LOG ####: AttachDisk b.volumeMode: %s", b.volumeMode)
+	glog.Infof("#### DEBUG LOG ####: AttachDisk b: %v", b)
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		return devicePath, nil
+	}
+
 	// mount it
 	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
