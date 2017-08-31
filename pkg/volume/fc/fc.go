@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -166,8 +165,6 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, pod *v1.
 	} else {
 		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mounter")
 	}
-	volumeMode := v1helper.GetPersistentVolumeMode(spec.PersistentVolume)
-	glog.Infof("#### DEBUG LOG ####: newBlockVolumeMapperInternal GetVolumeModeForVolume FC: %s", volumeMode)
 	glog.Infof("#### DEBUG LOG ####: newBlockVolumeMapperInternal devicePath: %s", devicePath)
 
 	return &fcDiskMapper{
@@ -180,7 +177,6 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, pod *v1.
 			manager: manager,
 			io:      &osIOHandler{},
 			plugin:  plugin},
-		volumeMode: volumeMode,
 		volumePath: devicePath,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
@@ -249,7 +245,7 @@ type fcDisk struct {
 
 func (fc *fcDisk) GetPath() string {
 	name := fcPluginName
-	// safe to use PodppingVolumeDir now: volume teardown occurs before pod is cleaned up
+	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
 	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name), fc.volName)
 }
 
@@ -324,7 +320,6 @@ func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 type fcDiskMapper struct {
 	*fcDisk
 	readOnly   bool
-	volumeMode v1.PersistentVolumeMode
 	volumePath string
 	mounter    mount.Interface
 }
@@ -365,10 +360,6 @@ func (b *fcDiskMapper) GetVolumePath() string {
 		devicePath = disk
 	}
 	return devicePath
-}
-
-func (b *fcDiskMapper) GetVolumeMode() v1.PersistentVolumeMode {
-	return b.volumeMode
 }
 
 type fcDiskUnmapper struct {

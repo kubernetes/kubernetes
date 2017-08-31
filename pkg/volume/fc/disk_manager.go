@@ -132,10 +132,6 @@ func deviceSetUp(manager diskManager, b fcDiskMapper, volPath string) error {
 		glog.Errorf("failed to readlink: %s", globalPDPath+"/"+"symlink")
 		return err
 	}
-	noMnt, err := b.mounter.IsLikelyNotMountPoint(volPath)
-	if !noMnt {
-		return fmt.Errorf("%s already mounted. This volume cant' be used as raw block volume.", volPath)
-	}
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate global mount path: %s", volPath)
 		return err
@@ -156,7 +152,7 @@ func deviceTearDown(manager diskManager, c fcDiskUnmapper, volPath string) error
 		return err
 	}
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-		err := os.Remove(volPath + "/" + "symlink")
+		err := os.RemoveAll(volPath)
 		if err != nil {
 			return err
 		}
