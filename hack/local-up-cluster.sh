@@ -846,6 +846,10 @@ Alternatively, you can write to the default kubeconfig:
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
+
+Don't forget to remove ~/.kube/schema directory if you have regenerated swagger schemas.
+Otherwise you can get validation errors when running kubectl create and alike commands.
+Checkout --schema-cache-dir="~/.kube/schema" flag of kubectl create.
 EOF
 else
   cat <<EOF
