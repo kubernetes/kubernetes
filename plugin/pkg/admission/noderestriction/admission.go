@@ -23,13 +23,16 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -82,6 +85,7 @@ func (p *nodePlugin) Validate() error {
 var (
 	podResource  = api.Resource("pods")
 	nodeResource = api.Resource("nodes")
+	pvcResource  = api.Resource("persistentvolumeclaims")
 )
 
 func (c *nodePlugin) Admit(a admission.Attributes) error {
@@ -112,6 +116,18 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 
 	case nodeResource:
 		return c.admitNode(nodeName, a)
+
+	case pvcResource:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q can not modify persistent volume claims", nodeName))
+		}
+
+		switch a.GetSubresource() {
+		case "status":
+			return c.admitPVCStatus(nodeName, a)
+		default:
+			return admission.NewForbidden(a, fmt.Errorf("may only update PVC status"))
+		}
 
 	default:
 		return nil
@@ -189,7 +205,7 @@ func (c *nodePlugin) admitPodStatus(nodeName string, a admission.Attributes) err
 		// require an existing pod
 		pod, ok := a.GetOldObject().(*api.Pod)
 		if !ok {
-			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
 		}
 		// only allow a node to update status of a pod bound to itself
 		if pod.Spec.NodeName != nodeName {
@@ -238,6 +254,46 @@ func (c *nodePlugin) admitPodEviction(nodeName string, a admission.Attributes) e
 
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %s", a.GetOperation()))
+	}
+}
+
+func (c *nodePlugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
+	switch a.GetOperation() {
+	case admission.Update:
+		oldPVC, ok := a.GetOldObject().(*api.PersistentVolumeClaim)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+		}
+
+		newPVC, ok := a.GetObject().(*api.PersistentVolumeClaim)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+
+		// make copies for comparison
+		oldPVC = oldPVC.DeepCopy()
+		newPVC = newPVC.DeepCopy()
+
+		// zero out fields the node is allowed to change
+		// - node can leave resourceVersion empty to indicate an unconditional update
+		// - node can change status capacity as part of reporting a resize is completed
+		// - node can change conditions as part of reporting a resize is completed
+		oldPVC.ObjectMeta.ResourceVersion = ""
+		newPVC.ObjectMeta.ResourceVersion = ""
+		oldPVC.Status.Capacity = nil
+		newPVC.Status.Capacity = nil
+		oldPVC.Status.Conditions = nil
+		newPVC.Status.Conditions = nil
+
+		// ensure no other fields changed. nodes should not be able to relabel, add finalizers/owners, etc
+		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q may not update fields other than status.capacity and status.conditions: %v", nodeName, diff.ObjectReflectDiff(oldPVC, newPVC)))
+		}
+
+		return nil
+
+	default:
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q", a.GetOperation()))
 	}
 }
 
