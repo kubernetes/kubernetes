@@ -386,13 +386,47 @@ items:
     resources:
     - persistentvolumes
     verbs:
+    - get
+    - list
+    - patch
     - update
+    - watch
   - apiGroups:
     - ""
     resources:
     - persistentvolumeclaims/status
     verbs:
+    - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    - services
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    verbs:
+    - get
   - apiGroups:
     - ""
     resources:

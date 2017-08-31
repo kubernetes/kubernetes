@@ -117,7 +117,7 @@ func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fld
 func validateAllowVolumeExpand(allowExpand *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if allowExpand != nil && !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "AllowVolumeExpand field is disabled by feature-gate ExpandPersistentVolumes"))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate ExpandPersistentVolumes"))
 	}
 	return allErrs
 }

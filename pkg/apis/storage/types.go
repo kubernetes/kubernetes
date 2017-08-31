@@ -61,6 +61,8 @@ type StorageClass struct {
 	MountOptions []string
 
 	// AllowVolumeExpand shows whether the storage class allow volume expand
+	// If the field is nil or not set, it would amount to expansion disabled
+	// for all PVs created from this storageclass.
 	// +optional
 	AllowVolumeExpand *bool
 }

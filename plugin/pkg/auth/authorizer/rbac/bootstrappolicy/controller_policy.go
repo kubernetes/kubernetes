@@ -126,8 +126,13 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "expand-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-			rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			// glusterfs
+			rbac.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+			rbac.NewRule("get").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+			rbac.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			eventsRule(),
 		},
 	})
