@@ -22,15 +22,19 @@ import (
 	"os"
 	"path"
 
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -234,4 +238,35 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
 	return pod, nil
+}
+
+func ZonesSetToLabelValue(strSet sets.String) string {
+	return strings.Join(strSet.UnsortedList(), kubeletapis.LabelMultiZoneDelimiter)
+}
+
+// ZonesToSet converts a string containing a comma separated list of zones to set
+func ZonesToSet(zonesString string) (sets.String, error) {
+	return stringToSet(zonesString, ",")
+}
+
+// LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
+func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
+	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+}
+
+// StringToSet converts a string containing list separated by specified delimiter to to a set
+func stringToSet(str, delimiter string) (sets.String, error) {
+	zonesSlice := strings.Split(str, delimiter)
+	zonesSet := make(sets.String)
+	for _, zone := range zonesSlice {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return make(sets.String), fmt.Errorf(
+				"%q separated list (%q) must not contain an empty string",
+				delimiter,
+				str)
+		}
+		zonesSet.Insert(trimmedZone)
+	}
+	return zonesSet, nil
 }

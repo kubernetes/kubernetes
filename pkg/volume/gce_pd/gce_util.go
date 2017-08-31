@@ -128,7 +128,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 
 	if !zonePresent && !zonesPresent && replicaZonesPresent {
 		// 001 - "replica-zones" specified
-		replicaZones, err := volume.ZonesToSet(configuredReplicaZones)
+		replicaZones, err := volumeutil.ZonesToSet(configuredReplicaZones)
 		if err != nil {
 			return "", 0, nil, "", err
 		}
@@ -161,7 +161,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		} else if !zonePresent && zonesPresent {
 			// 010 - "zones" specified
 			// Pick a zone randomly selected from specified set.
-			if zones, err = volume.ZonesToSet(configuredZones); err != nil {
+			if zones, err = volumeutil.ZonesToSet(configuredZones); err != nil {
 				return "", 0, nil, "", err
 			}
 		} else if zonePresent && !zonesPresent {
