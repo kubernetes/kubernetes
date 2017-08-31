@@ -218,7 +218,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 	cjNum, jobNum, podNum int) (bool, error) {
 	var ret = true
 
-	cronJobs, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
+	cronJobs, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list cronjobs: %v", err)
 	}
@@ -957,7 +957,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 
 		By("Delete the cronjob")
-		if err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Delete(cronJob.Name, getBackgroundOptions()); err != nil {
+		if err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Delete(cronJob.Name, getBackgroundOptions()); err != nil {
 			framework.Failf("Failed to delete the CronJob: %v", err)
 		}
 		By("Verify if cronjob does not leave jobs nor pods behind")

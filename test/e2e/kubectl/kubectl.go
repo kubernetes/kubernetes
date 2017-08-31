@@ -244,7 +244,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the CronJob " + cjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
+			sj, err := c.BatchV1beta1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
 			}
