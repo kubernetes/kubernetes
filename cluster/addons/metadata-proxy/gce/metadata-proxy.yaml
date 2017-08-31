@@ -49,4 +49,4 @@ spec:
       volumes:
       - name: config-volume
         configMap:
-          name: metadata-proxy-config
+          name: metadata-proxy-config-v0.1
