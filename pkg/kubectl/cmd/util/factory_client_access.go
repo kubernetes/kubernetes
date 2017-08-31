@@ -479,7 +479,6 @@ const (
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
 	JobV1GeneratorName                      = "job/v1"
 	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
-	CronJobV1Beta1GeneratorName             = "cronjob/v1beta1"
 	NamespaceV1GeneratorName                = "namespace/v1"
 	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
 	SecretV1GeneratorName                   = "secret/v1"
@@ -529,7 +528,6 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
 			JobV1GeneratorName:                 kubectl.JobV1{},
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
-			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{
