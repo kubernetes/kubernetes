@@ -51,7 +51,7 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
-// Store a map of predicate cache with maxsize
+// EquivalenceCache stores a map of predicate cache with maxsize
 type EquivalenceCache struct {
 	sync.RWMutex
 	getEquivalencePod algorithm.GetEquivalencePodFunc
@@ -179,13 +179,14 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 }
 
 // getHashEquivalencePod returns the hash of equivalence pod.
-// if no equivalence pod found, return 0
-func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) uint64 {
+// 1. equivalenceHash
+// 2. if equivalence pod is found
+func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
 	equivalencePod := ec.getEquivalencePod(pod)
 	if equivalencePod != nil {
 		hash := fnv.New32a()
 		hashutil.DeepHashObject(hash, equivalencePod)
-		return uint64(hash.Sum32())
+		return uint64(hash.Sum32()), true
 	}
-	return 0
+	return 0, false
 }

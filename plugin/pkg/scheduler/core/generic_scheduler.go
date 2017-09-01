@@ -245,8 +245,7 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 	)
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
-		equivalenceHash = ecache.getHashEquivalencePod(pod)
-		eCacheAvailable = (equivalenceHash != 0)
+		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
 	}
 	for predicateKey, predicate := range predicateFuncs {
 		// If equivalenceCache is available
