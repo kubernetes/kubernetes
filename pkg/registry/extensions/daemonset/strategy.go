@@ -18,6 +18,7 @@ package daemonset
 
 import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -107,6 +108,11 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s daemonSetStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
@@ -129,6 +135,12 @@ func (daemonSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, o
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 	newDaemonSet.Spec = oldDaemonSet.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s daemonSetStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (daemonSetStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

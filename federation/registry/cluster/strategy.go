@@ -19,6 +19,7 @@ package cluster
 import (
 	"fmt"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,6 +93,11 @@ func (clusterStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 	cluster.Status = oldCluster.Status
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s clusterStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (clusterStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateClusterUpdate(obj.(*federation.Cluster), old.(*federation.Cluster))
@@ -113,6 +119,12 @@ func (clusterStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 	cluster := obj.(*federation.Cluster)
 	oldCluster := old.(*federation.Cluster)
 	cluster.Spec = oldCluster.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s clusterStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 // ValidateUpdate is the default update validation for an end user.

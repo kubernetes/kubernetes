@@ -65,6 +65,11 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s endpointsStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (endpointsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))

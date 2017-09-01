@@ -19,6 +19,7 @@ package persistentvolumeclaim
 import (
 	"fmt"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,6 +72,11 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx genericapirequest.Cont
 	newPvc.Status = oldPvc.Status
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s persistentvolumeclaimStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
@@ -91,6 +97,12 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx genericapireques
 	newPv := obj.(*api.PersistentVolumeClaim)
 	oldPv := old.(*api.PersistentVolumeClaim)
 	newPv.Spec = oldPv.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s persistentvolumeclaimStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

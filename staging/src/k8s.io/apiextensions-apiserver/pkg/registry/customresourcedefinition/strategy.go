@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,6 +98,11 @@ func (strategy) AllowUnconditionalUpdate() bool {
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s strategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
@@ -137,6 +143,12 @@ func (statusStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func (statusStrategy) Canonicalize(obj runtime.Object) {
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s statusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (statusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

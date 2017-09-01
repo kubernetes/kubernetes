@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -141,6 +142,11 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s jobStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (jobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateJob(obj.(*batch.Job))
@@ -158,6 +164,12 @@ func (jobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s jobStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (jobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,6 +83,11 @@ func (nodeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) 
 func (nodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s nodeStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
@@ -123,6 +129,12 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s nodeStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

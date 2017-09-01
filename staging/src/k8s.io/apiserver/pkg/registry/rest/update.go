@@ -46,9 +46,15 @@ type RESTUpdateStrategy interface {
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
 	PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object)
-	// ValidateUpdate is invoked after default fields in the object have been
-	// filled in before the object is persisted.  This method should not mutate
-	// the object.
+
+	// ValidateUpdateUninitialized is invoked if the object is uninitialized. It
+	// is invoked after default fields in the object have been filled in before
+	// the object is persisted. This method should not mutate the object.
+	ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList
+
+	// ValidateUpdate is invoked if the object is initialized. It invoked after
+	// default fields in the object have been filled in before the object is
+	// persisted. This method should not mutate the object.
 	ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
@@ -118,7 +124,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 		return errors.NewInternalError(err)
 	}
 
-	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	oldInitializers := oldMeta.GetInitializers()
+	if oldInitializers != nil && len(oldInitializers.Pending) != 0 {
+		errs = append(errs, strategy.ValidateUpdateUninitialized(ctx, obj, old)...)
+	} else {
+		errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	}
 	if len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}

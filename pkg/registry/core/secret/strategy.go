@@ -68,6 +68,11 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s strategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
 }

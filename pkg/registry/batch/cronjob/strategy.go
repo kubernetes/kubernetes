@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -79,6 +80,11 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s cronJobStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (cronJobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCronJob(obj.(*batch.CronJob))
@@ -94,6 +100,12 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 	newJob := obj.(*batch.CronJob)
 	oldJob := old.(*batch.CronJob)
 	newJob.Spec = oldJob.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s cronJobStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

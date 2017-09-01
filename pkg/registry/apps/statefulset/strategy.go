@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -88,6 +89,11 @@ func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s statefulSetStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (statefulSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
@@ -112,6 +118,12 @@ func (statefulSetStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context,
 	oldStatefulSet := old.(*apps.StatefulSet)
 	// status changes are not allowed to update spec
 	newStatefulSet.Spec = oldStatefulSet.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s statefulSetStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 // ValidateUpdate is the default update validation for an end user updating status

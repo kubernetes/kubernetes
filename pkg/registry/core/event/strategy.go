@@ -68,6 +68,11 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s eventStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 func (eventStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)

@@ -18,6 +18,7 @@ package ingress
 
 import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -82,6 +83,11 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s ingressStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (ingressStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidateIngress(obj.(*extensions.Ingress))
@@ -106,6 +112,12 @@ func (ingressStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 	oldIngress := old.(*extensions.Ingress)
 	// status changes are not allowed to update spec
 	newIngress.Spec = oldIngress.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s ingressStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 // ValidateUpdate is the default update validation for an end user updating status

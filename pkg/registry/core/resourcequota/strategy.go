@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -68,6 +69,11 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s resourcequotaStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return s.Validate(ctx, obj)
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (resourcequotaStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateResourceQuota(obj.(*api.ResourceQuota))
@@ -88,6 +94,12 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Spec = oldResourcequota.Spec
+}
+
+//ValidateUpdateUninitialized is the update validation for uninitialized objects.
+func (s resourcequotaStatusStrategy) ValidateUpdateUninitialized(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var allErrs field.ErrorList
+	return append(allErrs, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
 }
 
 func (resourcequotaStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
