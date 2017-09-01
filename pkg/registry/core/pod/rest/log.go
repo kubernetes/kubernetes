@@ -87,3 +87,14 @@ func (r *LogREST) Get(ctx genericapirequest.Context, name string, opts runtime.O
 func (r *LogREST) NewGetOptions() (runtime.Object, bool, string) {
 	return &api.PodLogOptions{}, false, ""
 }
+
+// OverrideMetricsVerb override the GET verb to CONNECT for pod log resource
+func (r *LogREST) OverrideMetricsVerb(oldVerb string) (newVerb string) {
+	newVerb = oldVerb
+
+	if oldVerb == "GET" {
+		newVerb = "CONNECT"
+	}
+
+	return
+}
