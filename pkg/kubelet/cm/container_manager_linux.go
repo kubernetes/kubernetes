@@ -33,16 +33,22 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -120,6 +126,8 @@ type containerManagerImpl struct {
 	qosContainerManager QOSContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
 	devicePluginHandler DevicePluginHandler
+	// Interface for CPU affinity management.
+	cpuManager cpumanager.Manager
 }
 
 type features struct {
@@ -219,11 +227,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
-	if info, err := cadvisorInterface.MachineInfo(); err == nil {
-		capacity = cadvisor.CapacityFromMachineInfo(info)
-	} else {
+	machineInfo, err := cadvisorInterface.MachineInfo()
+	if err != nil {
 		return nil, err
 	}
+	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
 
 	cgroupRoot := nodeConfig.CgroupRoot
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
@@ -287,6 +295,20 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager, err = cpumanager.NewManager(
+			nodeConfig.ExperimentalCPUManagerPolicy,
+			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
+			machineInfo,
+			cm.GetNodeAllocatableReservation(),
+		)
+		if err != nil {
+			glog.Errorf("failed to initialize cpu manager: %v", err)
+			return nil, err
+		}
+	}
+
 	return cm, nil
 }
 
@@ -304,6 +326,36 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerNoop{
 		cgroupRoot: CgroupName(cm.cgroupRoot),
 	}
+}
+
+func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cm.cpuManager}
+}
+
+// Implements InternalContainerLifecycle interface.
+type internalContainerLifecycleImpl struct {
+	cpuManager cpumanager.Manager
+}
+
+func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.AddContainer(pod, container, containerID)
+	}
+	return nil
+}
+
+func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.RemoveContainer(containerID)
+	}
+	return nil
+}
+
+func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.RemoveContainer(containerID)
+	}
+	return nil
 }
 
 // Create a cgroup container manager.
@@ -512,7 +564,16 @@ func (cm *containerManagerImpl) Status() Status {
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) error {
+func (cm *containerManagerImpl) Start(node *v1.Node,
+	activePods ActivePodsFunc,
+	podStatusProvider status.PodStatusProvider,
+	runtimeService internalapi.RuntimeService) error {
+
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), podStatusProvider, runtimeService)
+	}
+
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
