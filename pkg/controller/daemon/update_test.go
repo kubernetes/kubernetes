@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -235,6 +236,34 @@ func TestGetUnavailableNumbers(t *testing.T) {
 			}(),
 			maxUnavailable: 1,
 			numUnavailable: 0,
+		},
+		{
+			name: "Two nodes with pods, MaxUnavailable in percents, pod terminating",
+			Manager: func() *daemonSetsController {
+				manager, _, _ := newTestController()
+				addNodes(manager.nodeStore, 0, 2, nil)
+				return manager
+			}(),
+			ds: func() *extensions.DaemonSet {
+				ds := newDaemonSet("x")
+				intStr := intstr.FromString("50%")
+				ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+				return ds
+			}(),
+			nodeToPods: func() map[string][]*v1.Pod {
+				mapping := make(map[string][]*v1.Pod)
+				pod0 := newPod("pod-0", "node-0", simpleDaemonSetLabel, nil)
+				pod1 := newPod("pod-1", "node-1", simpleDaemonSetLabel, nil)
+				now := metav1.Now()
+				markPodReady(pod0)
+				markPodReady(pod1)
+				pod1.DeletionTimestamp = &now
+				mapping["node-0"] = []*v1.Pod{pod0}
+				mapping["node-1"] = []*v1.Pod{pod1}
+				return mapping
+			}(),
+			maxUnavailable: 1,
+			numUnavailable: 1,
 		},
 	}
 

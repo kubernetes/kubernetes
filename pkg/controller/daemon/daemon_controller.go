@@ -743,7 +743,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+	dsNotDeleted := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
 		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -753,8 +753,9 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 		}
 		return fresh, nil
 	})
+
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, dsNotDeleted)
 	return cm.ClaimPods(pods)
 }
 
@@ -770,10 +771,6 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		// Skip terminating pods
-		if pod.DeletionTimestamp != nil {
-			continue
-		}
 		nodeName := pod.Spec.NodeName
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
@@ -838,6 +835,9 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 			// If there's non-daemon pods left on this node, we will create it in the next sync loop
 			var daemonPodsRunning []*v1.Pod
 			for _, pod := range daemonPods {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				if pod.Status.Phase == v1.PodFailed {
 					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
 					glog.V(2).Infof(msg)
