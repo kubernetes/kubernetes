@@ -435,8 +435,16 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
-	if _, err := startSATokenController(ctx); err != nil {
+	started, err := startSATokenController(ctx)
+	if err != nil {
+		glog.Errorf("Error starting %q", saTokenControllerName)
 		return err
+	}
+
+	if !started {
+		glog.Warningf("Skipping %q", saTokenControllerName)
+	} else {
+		glog.Infof("Started %q first", saTokenControllerName)
 	}
 
 	for controllerName, initFn := range controllers {
@@ -482,17 +490,17 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	}
 	privateKey, err := certutil.PrivateKeyFromFile(ctx.Options.ServiceAccountKeyFile)
 	if err != nil {
-		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
+		return false, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}
 
 	var rootCA []byte
 	if ctx.Options.RootCAFile != "" {
 		rootCA, err = ioutil.ReadFile(ctx.Options.RootCAFile)
 		if err != nil {
-			return true, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
+			return false, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
 		}
 		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
-			return true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
+			return false, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
 		}
 	} else {
 		rootCA = c.rootClientBuilder.ConfigOrDie("tokens-controller").CAData
