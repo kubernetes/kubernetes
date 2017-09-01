@@ -115,6 +115,20 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	return s, closeFn, rm, dc, informers, clientSet
 }
 
+// dcSimpleSetup sets up necessities for Deployment integration test, including master, apiserver,
+// and clientset, but not controllers and informers
+func dcSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+
+	config := restclient.Config{Host: s.URL}
+	clientSet, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("error in create clientset: %v", err)
+	}
+	return s, closeFn, clientSet
+}
+
 // addPodConditionReady sets given pod status to ready at given time
 func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 	pod.Status = v1.PodStatus{
