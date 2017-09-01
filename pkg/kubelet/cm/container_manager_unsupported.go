@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -75,7 +76,7 @@ func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerMana
 }
 
 func (cm *unsupportedContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
-	return nil
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
 }
 
 func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {

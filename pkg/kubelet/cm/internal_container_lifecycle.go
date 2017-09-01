@@ -18,10 +18,40 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 )
 
 type InternalContainerLifecycle interface {
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
 	PreStopContainer(containerID string) error
 	PostStopContainer(containerID string) error
+}
+
+// Implements InternalContainerLifecycle interface.
+type internalContainerLifecycleImpl struct {
+	cpuManager cpumanager.Manager
+}
+
+func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.AddContainer(pod, container, containerID)
+	}
+	return nil
+}
+
+func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.RemoveContainer(containerID)
+	}
+	return nil
+}
+
+func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		return i.cpuManager.RemoveContainer(containerID)
+	}
+	return nil
 }

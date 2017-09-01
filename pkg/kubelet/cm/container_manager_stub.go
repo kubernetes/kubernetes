@@ -21,6 +21,7 @@ import (
 	"k8s.io/api/core/v1"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -70,7 +71,7 @@ func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return nil
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
 }
 
 func NewStubContainerManager() ContainerManager {
