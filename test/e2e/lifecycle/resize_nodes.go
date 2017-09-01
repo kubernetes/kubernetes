@@ -64,7 +64,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	SIGDescribe("Resize [Slow]", func() {
+	Describe("Resize [Slow]", func() {
 		var skipped bool
 
 		BeforeEach(func() {
