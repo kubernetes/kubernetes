@@ -21,14 +21,14 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
 )
@@ -61,7 +61,7 @@ func PodReplenishmentUpdateFunc(options *ReplenishmentControllerOptions) func(ol
 	}
 }
 
-// ObjectReplenenishmentDeleteFunc will replenish on every delete
+// ObjectReplenishmentDeleteFunc will replenish on every delete
 func ObjectReplenishmentDeleteFunc(options *ReplenishmentControllerOptions) func(obj interface{}) {
 	return func(obj interface{}) {
 		metaObject, err := meta.Accessor(obj)

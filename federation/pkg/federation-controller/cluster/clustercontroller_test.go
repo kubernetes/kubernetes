@@ -22,18 +22,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	controllerutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func newCluster(clusterName string, serverUrl string) *federationv1beta1.Cluster {
@@ -125,16 +123,9 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 	}
 	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 
-	// Override KubeconfigGetterForSecret to avoid having to setup service accounts and mount files with secret tokens.
-	originalGetter := controllerutil.KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = func(s *api.Secret) clientcmd.KubeconfigGetter {
-		return func() (*clientcmdapi.Config, error) {
-			return &clientcmdapi.Config{}, nil
-		}
-	}
-
 	manager := newClusterController(federationClientSet, 5)
-	err = manager.UpdateClusterStatus()
+	manager.addToClusterSet(federationCluster)
+	err = manager.updateClusterStatus()
 	if err != nil {
 		t.Errorf("Failed to Update Cluster Status: %v", err)
 	}
@@ -146,7 +137,37 @@ func TestUpdateClusterStatusOK(t *testing.T) {
 			t.Errorf("Failed to Update Cluster Status")
 		}
 	}
+}
 
-	// Reset KubeconfigGetterForSecret
-	controllerutil.KubeconfigGetterForSecret = originalGetter
+// Test races between informer's updates and routine updates of cluster status
+// Issue https://github.com/kubernetes/kubernetes/issues/49958
+func TestUpdateClusterRace(t *testing.T) {
+	clusterName := "foobarCluster"
+	// create dummy httpserver
+	testClusterServer := httptest.NewServer(createHttptestFakeHandlerForCluster(true))
+	defer testClusterServer.Close()
+	federationCluster := newCluster(clusterName, testClusterServer.URL)
+	federationClusterList := newClusterList(federationCluster)
+
+	testFederationServer := httptest.NewServer(createHttptestFakeHandlerForFederation(federationClusterList, true))
+	defer testFederationServer.Close()
+
+	restClientCfg, err := clientcmd.BuildConfigFromFlags(testFederationServer.URL, "")
+	if err != nil {
+		t.Errorf("Failed to build client config")
+	}
+	federationClientSet := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
+
+	manager := newClusterController(federationClientSet, 1*time.Millisecond)
+
+	stop := make(chan struct{})
+	manager.Run(stop)
+
+	// try to trigger the race in UpdateClusterStatus
+	for i := 0; i < 10; i++ {
+		manager.addToClusterSet(federationCluster)
+		manager.delFromClusterSet(federationCluster)
+	}
+
+	close(stop)
 }

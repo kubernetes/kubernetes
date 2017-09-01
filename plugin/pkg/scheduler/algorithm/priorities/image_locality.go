@@ -19,12 +19,12 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// ImageLocalityPriority is a priority function that favors nodes that already have requested pod container's images.
+// ImageLocalityPriorityMap is a priority function that favors nodes that already have requested pod container's images.
 // It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
@@ -57,9 +57,9 @@ func calculateScoreFromSize(sumSize int64) int {
 		score = 0
 	// If existing images' total size is larger than max, just make it highest priority.
 	case sumSize >= maxImgSize:
-		score = 10
+		score = schedulerapi.MaxPriority
 	default:
-		score = int((10 * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
+		score = int((int64(schedulerapi.MaxPriority) * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
 	}
 	// Return which bucket the given size belongs to
 	return score

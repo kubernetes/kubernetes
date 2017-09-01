@@ -68,7 +68,7 @@ func (s *storage) GetCluster(ctx genericapirequest.Context, name string, options
 }
 
 func (s *storage) CreateCluster(ctx genericapirequest.Context, cluster *federation.Cluster) error {
-	_, err := s.Create(ctx, cluster)
+	_, err := s.Create(ctx, cluster, false)
 	return err
 }
 

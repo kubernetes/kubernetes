@@ -10,6 +10,7 @@ spec:
       labels:
         app: cassandra
     spec:
+      terminationGracePeriodSeconds: 1800
       containers:
       - name: cassandra
         image: gcr.io/google-samples/cassandra:v12
@@ -37,7 +38,7 @@ spec:
         lifecycle:
           preStop:
             exec:
-              command: ["/bin/sh", "-c", "PID=$(pidof java) && kill $PID && while ps -p $PID > /dev/null; do sleep 1; done"]
+              command: ["/bin/sh", "-c", "nodetool drain"]
         env:
           - name: MAX_HEAP_SIZE
             value: 512M

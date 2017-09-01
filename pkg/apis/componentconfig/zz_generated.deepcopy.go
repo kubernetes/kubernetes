@@ -23,7 +23,6 @@ package componentconfig
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
 	reflect "reflect"
 )
 
@@ -33,316 +32,382 @@ func init() {
 
 // RegisterDeepCopies adds deep-copy functions to the given scheme. Public
 // to allow building arbitrary schemes.
+//
+// Deprecated: deepcopy registration will go away when static deepcopy is fully implemented.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_ClientConnectionConfiguration, InType: reflect.TypeOf(&ClientConnectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_GroupResource, InType: reflect.TypeOf(&GroupResource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConntrackConfiguration, InType: reflect.TypeOf(&KubeProxyConntrackConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyIPTablesConfiguration, InType: reflect.TypeOf(&KubeProxyIPTablesConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthentication, InType: reflect.TypeOf(&KubeletAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthorization, InType: reflect.TypeOf(&KubeletAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthentication, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*ClientConnectionConfiguration).DeepCopyInto(out.(*ClientConnectionConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&ClientConnectionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*GroupResource).DeepCopyInto(out.(*GroupResource))
+			return nil
+		}, InType: reflect.TypeOf(&GroupResource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*IPVar).DeepCopyInto(out.(*IPVar))
+			return nil
+		}, InType: reflect.TypeOf(&IPVar{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeControllerManagerConfiguration).DeepCopyInto(out.(*KubeControllerManagerConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeProxyConfiguration).DeepCopyInto(out.(*KubeProxyConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeProxyConntrackConfiguration).DeepCopyInto(out.(*KubeProxyConntrackConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeProxyConntrackConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeProxyIPTablesConfiguration).DeepCopyInto(out.(*KubeProxyIPTablesConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeProxyIPTablesConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeProxyIPVSConfiguration).DeepCopyInto(out.(*KubeProxyIPVSConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeProxyIPVSConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*KubeSchedulerConfiguration).DeepCopyInto(out.(*KubeSchedulerConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*LeaderElectionConfiguration).DeepCopyInto(out.(*LeaderElectionConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PersistentVolumeRecyclerConfiguration).DeepCopyInto(out.(*PersistentVolumeRecyclerConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*PortRangeVar).DeepCopyInto(out.(*PortRangeVar))
+			return nil
+		}, InType: reflect.TypeOf(&PortRangeVar{})},
+		conversion.GeneratedDeepCopyFunc{Fn: func(in interface{}, out interface{}, c *conversion.Cloner) error {
+			in.(*VolumeConfiguration).DeepCopyInto(out.(*VolumeConfiguration))
+			return nil
+		}, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	)
 }
 
-// DeepCopy_componentconfig_ClientConnectionConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_ClientConnectionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClientConnectionConfiguration)
-		out := out.(*ClientConnectionConfiguration)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ClientConnectionConfiguration) DeepCopyInto(out *ClientConnectionConfiguration) {
+	*out = *in
+	return
 }
 
-// DeepCopy_componentconfig_GroupResource is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_GroupResource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupResource)
-		out := out.(*GroupResource)
-		*out = *in
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ClientConnectionConfiguration.
+func (in *ClientConnectionConfiguration) DeepCopy() *ClientConnectionConfiguration {
+	if in == nil {
 		return nil
 	}
+	out := new(ClientConnectionConfiguration)
+	in.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_componentconfig_IPVar is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IPVar)
-		out := out.(*IPVar)
-		*out = *in
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GroupResource) DeepCopyInto(out *GroupResource) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GroupResource.
+func (in *GroupResource) DeepCopy() *GroupResource {
+	if in == nil {
+		return nil
+	}
+	out := new(GroupResource)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IPVar) DeepCopyInto(out *IPVar) {
+	*out = *in
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(string)
 			**out = **in
 		}
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new IPVar.
+func (in *IPVar) DeepCopy() *IPVar {
+	if in == nil {
+		return nil
+	}
+	out := new(IPVar)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerManagerConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	if in.Controllers != nil {
+		in, out := &in.Controllers, &out.Controllers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	out.ServiceSyncPeriod = in.ServiceSyncPeriod
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.MinResyncPeriod = in.MinResyncPeriod
+	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
+	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.ClusterSigningDuration = in.ClusterSigningDuration
+	out.LeaderElection = in.LeaderElection
+	out.VolumeConfiguration = in.VolumeConfiguration
+	out.ControllerStartInterval = in.ControllerStartInterval
+	if in.GCIgnoredResources != nil {
+		in, out := &in.GCIgnoredResources, &out.GCIgnoredResources
+		*out = make([]GroupResource, len(*in))
+		copy(*out, *in)
+	}
+	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeControllerManagerConfiguration.
+func (in *KubeControllerManagerConfiguration) DeepCopy() *KubeControllerManagerConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeControllerManagerConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *KubeControllerManagerConfiguration) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_componentconfig_KubeControllerManagerConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeControllerManagerConfiguration)
-		out := out.(*KubeControllerManagerConfiguration)
-		*out = *in
-		if in.Controllers != nil {
-			in, out := &in.Controllers, &out.Controllers
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.GCIgnoredResources != nil {
-			in, out := &in.GCIgnoredResources, &out.GCIgnoredResources
-			*out = make([]GroupResource, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_KubeProxyConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeProxyConfiguration)
-		out := out.(*KubeProxyConfiguration)
-		*out = *in
-		if err := DeepCopy_componentconfig_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, c); err != nil {
-			return err
-		}
-		if in.OOMScoreAdj != nil {
-			in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.ClientConnection = in.ClientConnection
+	in.IPTables.DeepCopyInto(&out.IPTables)
+	out.IPVS = in.IPVS
+	if in.OOMScoreAdj != nil {
+		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
+	}
+	out.UDPIdleTimeout = in.UDPIdleTimeout
+	out.Conntrack = in.Conntrack
+	out.ConfigSyncPeriod = in.ConfigSyncPeriod
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeProxyConfiguration.
+func (in *KubeProxyConfiguration) DeepCopy() *KubeProxyConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeProxyConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *KubeProxyConfiguration) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_componentconfig_KubeProxyConntrackConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeProxyConntrackConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeProxyConntrackConfiguration)
-		out := out.(*KubeProxyConntrackConfiguration)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeProxyConntrackConfiguration) DeepCopyInto(out *KubeProxyConntrackConfiguration) {
+	*out = *in
+	out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
+	out.TCPCloseWaitTimeout = in.TCPCloseWaitTimeout
+	return
 }
 
-// DeepCopy_componentconfig_KubeProxyIPTablesConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeProxyIPTablesConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeProxyIPTablesConfiguration)
-		out := out.(*KubeProxyIPTablesConfiguration)
-		*out = *in
-		if in.MasqueradeBit != nil {
-			in, out := &in.MasqueradeBit, &out.MasqueradeBit
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeProxyConntrackConfiguration.
+func (in *KubeProxyConntrackConfiguration) DeepCopy() *KubeProxyConntrackConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeProxyConntrackConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesConfiguration) {
+	*out = *in
+	if in.MasqueradeBit != nil {
+		in, out := &in.MasqueradeBit, &out.MasqueradeBit
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(int32)
 			**out = **in
 		}
+	}
+	out.SyncPeriod = in.SyncPeriod
+	out.MinSyncPeriod = in.MinSyncPeriod
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeProxyIPTablesConfiguration.
+func (in *KubeProxyIPTablesConfiguration) DeepCopy() *KubeProxyIPTablesConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeProxyIPTablesConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeProxyIPVSConfiguration) DeepCopyInto(out *KubeProxyIPVSConfiguration) {
+	*out = *in
+	out.SyncPeriod = in.SyncPeriod
+	out.MinSyncPeriod = in.MinSyncPeriod
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeProxyIPVSConfiguration.
+func (in *KubeProxyIPVSConfiguration) DeepCopy() *KubeProxyIPVSConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeProxyIPVSConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfiguration) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	out.LeaderElection = in.LeaderElection
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new KubeSchedulerConfiguration.
+func (in *KubeSchedulerConfiguration) DeepCopy() *KubeSchedulerConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(KubeSchedulerConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *KubeSchedulerConfiguration) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-// DeepCopy_componentconfig_KubeSchedulerConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeSchedulerConfiguration)
-		out := out.(*KubeSchedulerConfiguration)
-		*out = *in
-		return nil
-	}
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *LeaderElectionConfiguration) DeepCopyInto(out *LeaderElectionConfiguration) {
+	*out = *in
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
+	return
 }
 
-// DeepCopy_componentconfig_KubeletAnonymousAuthentication is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletAnonymousAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAnonymousAuthentication)
-		out := out.(*KubeletAnonymousAuthentication)
-		*out = *in
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new LeaderElectionConfiguration.
+func (in *LeaderElectionConfiguration) DeepCopy() *LeaderElectionConfiguration {
+	if in == nil {
 		return nil
 	}
+	out := new(LeaderElectionConfiguration)
+	in.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_componentconfig_KubeletAuthentication is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthentication)
-		out := out.(*KubeletAuthentication)
-		*out = *in
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PersistentVolumeRecyclerConfiguration) DeepCopyInto(out *PersistentVolumeRecyclerConfiguration) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PersistentVolumeRecyclerConfiguration.
+func (in *PersistentVolumeRecyclerConfiguration) DeepCopy() *PersistentVolumeRecyclerConfiguration {
+	if in == nil {
 		return nil
 	}
+	out := new(PersistentVolumeRecyclerConfiguration)
+	in.DeepCopyInto(out)
+	return out
 }
 
-// DeepCopy_componentconfig_KubeletAuthorization is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthorization)
-		out := out.(*KubeletAuthorization)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_KubeletConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletConfiguration)
-		out := out.(*KubeletConfiguration)
-		*out = *in
-		if in.HostNetworkSources != nil {
-			in, out := &in.HostNetworkSources, &out.HostNetworkSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.HostPIDSources != nil {
-			in, out := &in.HostPIDSources, &out.HostPIDSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.HostIPCSources != nil {
-			in, out := &in.HostIPCSources, &out.HostIPCSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.ClusterDNS != nil {
-			in, out := &in.ClusterDNS, &out.ClusterDNS
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.RegisterWithTaints != nil {
-			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-			*out = make([]api.Taint, len(*in))
-			for i := range *in {
-				if err := api.DeepCopy_api_Taint(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		}
-		if in.NodeLabels != nil {
-			in, out := &in.NodeLabels, &out.NodeLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.ExperimentalQOSReserved != nil {
-			in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		if in.SystemReserved != nil {
-			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.KubeReserved != nil {
-			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		}
-		if in.EnforceNodeAllocatable != nil {
-			in, out := &in.EnforceNodeAllocatable, &out.EnforceNodeAllocatable
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_KubeletWebhookAuthentication is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletWebhookAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthentication)
-		out := out.(*KubeletWebhookAuthentication)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_KubeletWebhookAuthorization is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletWebhookAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthorization)
-		out := out.(*KubeletWebhookAuthorization)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_KubeletX509Authentication is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_KubeletX509Authentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletX509Authentication)
-		out := out.(*KubeletX509Authentication)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_LeaderElectionConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_LeaderElectionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LeaderElectionConfiguration)
-		out := out.(*LeaderElectionConfiguration)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeRecyclerConfiguration)
-		out := out.(*PersistentVolumeRecyclerConfiguration)
-		*out = *in
-		return nil
-	}
-}
-
-// DeepCopy_componentconfig_PortRangeVar is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_PortRangeVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PortRangeVar)
-		out := out.(*PortRangeVar)
-		*out = *in
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PortRangeVar) DeepCopyInto(out *PortRangeVar) {
+	*out = *in
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		if *in == nil {
+			*out = nil
+		} else {
 			*out = new(string)
 			**out = **in
 		}
-		return nil
 	}
+	return
 }
 
-// DeepCopy_componentconfig_VolumeConfiguration is an autogenerated deepcopy function.
-func DeepCopy_componentconfig_VolumeConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VolumeConfiguration)
-		out := out.(*VolumeConfiguration)
-		*out = *in
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PortRangeVar.
+func (in *PortRangeVar) DeepCopy() *PortRangeVar {
+	if in == nil {
 		return nil
 	}
+	out := new(PortRangeVar)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *VolumeConfiguration) DeepCopyInto(out *VolumeConfiguration) {
+	*out = *in
+	out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new VolumeConfiguration.
+func (in *VolumeConfiguration) DeepCopy() *VolumeConfiguration {
+	if in == nil {
+		return nil
+	}
+	out := new(VolumeConfiguration)
+	in.DeepCopyInto(out)
+	return out
 }

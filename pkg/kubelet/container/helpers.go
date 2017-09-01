@@ -26,14 +26,12 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/events"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
@@ -176,19 +174,13 @@ type innerEventRecorder struct {
 	recorder record.EventRecorder
 }
 
-func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*clientv1.ObjectReference, bool) {
+func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
 	if object == nil {
 		return nil, false
 	}
-	if ref, ok := object.(*clientv1.ObjectReference); ok {
-		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
-			return ref, true
-		}
-	}
-	// just in case we miss a spot, be sure that we still log something
 	if ref, ok := object.(*v1.ObjectReference); ok {
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
-			return events.ToObjectReference(ref), true
+			return ref, true
 		}
 	}
 	return nil, false

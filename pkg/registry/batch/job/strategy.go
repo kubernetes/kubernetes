@@ -174,12 +174,12 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	job, ok := obj.(*batch.Job)
 	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a job.")
+		return nil, nil, false, fmt.Errorf("given object is not a job.")
 	}
-	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
+	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), job.Initializers != nil, nil
 }
 
 // MatchJob is the filter used by the generic etcd backend to route

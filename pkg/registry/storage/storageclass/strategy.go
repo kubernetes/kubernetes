@@ -17,15 +17,9 @@ limitations under the License.
 package storageclass
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -77,27 +71,4 @@ func (storageClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, o
 
 func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	cls, ok := obj.(*storage.StorageClass)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not of type StorageClass")
-	}
-	return labels.Set(cls.ObjectMeta.Labels), StorageClassToSelectableFields(cls), nil
-}
-
-// MatchStorageClass returns a generic matcher for a given label and field selector.
-func MatchStorageClasses(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// StorageClassToSelectableFields returns a label set that represents the object
-func StorageClassToSelectableFields(storageClass *storage.StorageClass) fields.Set {
-	return generic.ObjectMetaFieldsSet(&storageClass.ObjectMeta, false)
 }

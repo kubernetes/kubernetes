@@ -25,22 +25,21 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
+	spdy "k8s.io/client-go/transport/spdy"
 )
 
 // StreamOptions holds information pertaining to the current streaming session: supported stream
 // protocols, input/output streams, if the client is requesting a TTY, and a terminal size queue to
 // support terminal resizing.
 type StreamOptions struct {
-	SupportedProtocols []string
-	Stdin              io.Reader
-	Stdout             io.Writer
-	Stderr             io.Writer
-	Tty                bool
-	TerminalSizeQueue  TerminalSizeQueue
+	Stdin             io.Reader
+	Stdout            io.Writer
+	Stderr            io.Writer
+	Tty               bool
+	TerminalSizeQueue TerminalSizeQueue
 }
 
 // Executor is an interface for transporting shell-style streams.
@@ -52,95 +51,6 @@ type Executor interface {
 	Stream(options StreamOptions) error
 }
 
-// StreamExecutor supports the ability to dial an httpstream connection and the ability to
-// run a command line stream protocol over that dialer.
-type StreamExecutor interface {
-	Executor
-	httpstream.Dialer
-}
-
-// streamExecutor handles transporting standard shell streams over an httpstream connection.
-type streamExecutor struct {
-	upgrader  httpstream.UpgradeRoundTripper
-	transport http.RoundTripper
-
-	method string
-	url    *url.URL
-}
-
-// NewExecutor connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams. The current implementation uses SPDY,
-// but this could be replaced with HTTP/2 once it's available, or something else.
-// TODO: the common code between this and portforward could be abstracted.
-func NewExecutor(config *restclient.Config, method string, url *url.URL) (StreamExecutor, error) {
-	tlsConfig, err := restclient.TLSConfigFor(config)
-	if err != nil {
-		return nil, err
-	}
-
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true)
-	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
-	if err != nil {
-		return nil, err
-	}
-
-	return &streamExecutor{
-		upgrader:  upgradeRoundTripper,
-		transport: wrapper,
-		method:    method,
-		url:       url,
-	}, nil
-}
-
-// NewStreamExecutor upgrades the request so that it supports multiplexed bidirectional
-// streams. This method takes a stream upgrader and an optional function that is invoked
-// to wrap the round tripper. This method may be used by clients that are lower level than
-// Kubernetes clients or need to provide their own upgrade round tripper.
-func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.RoundTripper) http.RoundTripper, method string, url *url.URL) (StreamExecutor, error) {
-	rt := http.RoundTripper(upgrader)
-	if fn != nil {
-		rt = fn(rt)
-	}
-	return &streamExecutor{
-		upgrader:  upgrader,
-		transport: rt,
-		method:    method,
-		url:       url,
-	}, nil
-}
-
-// Dial opens a connection to a remote server and attempts to negotiate a SPDY
-// connection. Upon success, it returns the connection and the protocol
-// selected by the server.
-func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, string, error) {
-	rt := transport.DebugWrappers(e.transport)
-
-	// TODO the client probably shouldn't be created here, as it doesn't allow
-	// flexibility to allow callers to configure it.
-	client := &http.Client{Transport: rt}
-
-	req, err := http.NewRequest(e.method, e.url.String(), nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("error creating request: %v", err)
-	}
-	for i := range protocols {
-		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	conn, err := e.upgrader.NewConnection(resp)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
-}
-
 type streamCreator interface {
 	CreateStream(headers http.Header) (httpstream.Stream, error)
 }
@@ -149,10 +59,60 @@ type streamProtocolHandler interface {
 	stream(conn streamCreator) error
 }
 
+// streamExecutor handles transporting standard shell streams over an httpstream connection.
+type streamExecutor struct {
+	upgrader  spdy.Upgrader
+	transport http.RoundTripper
+
+	method    string
+	url       *url.URL
+	protocols []string
+}
+
+// NewSPDYExecutor connects to the provided server and upgrades the connection to
+// multiplexed bidirectional streams.
+func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
+	return NewSPDYExecutorForProtocols(
+		config, method, url,
+		remotecommand.StreamProtocolV4Name,
+		remotecommand.StreamProtocolV3Name,
+		remotecommand.StreamProtocolV2Name,
+		remotecommand.StreamProtocolV1Name,
+	)
+}
+
+// NewSPDYExecutorForProtocols connects to the provided server and upgrades the connection to
+// multiplexed bidirectional streams using only the provided protocols. Exposed for testing, most
+// callers should use NewSPDYExecutor.
+func NewSPDYExecutorForProtocols(config *restclient.Config, method string, url *url.URL, protocols ...string) (Executor, error) {
+	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return nil, err
+	}
+	wrapper = transport.DebugWrappers(wrapper)
+	return &streamExecutor{
+		upgrader:  upgradeRoundTripper,
+		transport: wrapper,
+		method:    method,
+		url:       url,
+		protocols: protocols,
+	}, nil
+}
+
 // Stream opens a protocol streamer to the server and streams until a client closes
 // the connection or the server disconnects.
 func (e *streamExecutor) Stream(options StreamOptions) error {
-	conn, protocol, err := e.Dial(options.SupportedProtocols...)
+	req, err := http.NewRequest(e.method, e.url.String(), nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %v", err)
+	}
+
+	conn, protocol, err := spdy.Negotiate(
+		e.upgrader,
+		&http.Client{Transport: e.transport},
+		req,
+		e.protocols...,
+	)
 	if err != nil {
 		return err
 	}

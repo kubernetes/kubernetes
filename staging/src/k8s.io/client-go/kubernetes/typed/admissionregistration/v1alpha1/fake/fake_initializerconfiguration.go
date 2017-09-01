@@ -17,73 +17,38 @@ limitations under the License.
 package fake
 
 import (
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeInitializerConfigurations implements InitializerConfigurationInterface
 type FakeInitializerConfigurations struct {
 	Fake *FakeAdmissionregistrationV1alpha1
-	ns   string
 }
 
 var initializerconfigurationsResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Resource: "initializerconfigurations"}
 
 var initializerconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}
 
-func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(initializerconfigurationsResource, c.ns, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(initializerconfigurationsResource, c.ns, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.InitializerConfiguration), err
-}
-
-func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(initializerconfigurationsResource, c.ns, name), &v1alpha1.InitializerConfiguration{})
-
-	return err
-}
-
-func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(initializerconfigurationsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.InitializerConfigurationList{})
-	return err
-}
-
+// Get takes name of the initializerConfiguration, and returns the corresponding initializerConfiguration object, and an error if there is any.
 func (c *FakeInitializerConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(initializerconfigurationsResource, c.ns, name), &v1alpha1.InitializerConfiguration{})
-
+		Invokes(testing.NewRootGetAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}
 	return obj.(*v1alpha1.InitializerConfiguration), err
 }
 
+// List takes label and field selectors, and returns the list of InitializerConfigurations that match those selectors.
 func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alpha1.InitializerConfigurationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(initializerconfigurationsResource, initializerconfigurationsKind, c.ns, opts), &v1alpha1.InitializerConfigurationList{})
-
+		Invokes(testing.NewRootListAction(initializerconfigurationsResource, initializerconfigurationsKind, opts), &v1alpha1.InitializerConfigurationList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -104,15 +69,48 @@ func (c *FakeInitializerConfigurations) List(opts v1.ListOptions) (result *v1alp
 // Watch returns a watch.Interface that watches the requested initializerConfigurations.
 func (c *FakeInitializerConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(initializerconfigurationsResource, c.ns, opts))
+		InvokesWatch(testing.NewRootWatchAction(initializerconfigurationsResource, opts))
+}
 
+// Create takes the representation of a initializerConfiguration and creates it.  Returns the server's representation of the initializerConfiguration, and an error, if there is any.
+func (c *FakeInitializerConfigurations) Create(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.InitializerConfiguration), err
+}
+
+// Update takes the representation of a initializerConfiguration and updates it. Returns the server's representation of the initializerConfiguration, and an error, if there is any.
+func (c *FakeInitializerConfigurations) Update(initializerConfiguration *v1alpha1.InitializerConfiguration) (result *v1alpha1.InitializerConfiguration, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(initializerconfigurationsResource, initializerConfiguration), &v1alpha1.InitializerConfiguration{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.InitializerConfiguration), err
+}
+
+// Delete takes name of the initializerConfiguration and deletes it. Returns an error if one occurs.
+func (c *FakeInitializerConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(initializerconfigurationsResource, name), &v1alpha1.InitializerConfiguration{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(initializerconfigurationsResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1alpha1.InitializerConfigurationList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched initializerConfiguration.
 func (c *FakeInitializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(initializerconfigurationsResource, c.ns, name, data, subresources...), &v1alpha1.InitializerConfiguration{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(initializerconfigurationsResource, name, data, subresources...), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

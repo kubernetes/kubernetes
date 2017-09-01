@@ -120,7 +120,7 @@ ESIPP should work for type=LoadBalancer,MrHohn,1,network
 ESIPP should work for type=NodePort,MrHohn,1,network
 ESIPP should work from pods,MrHohn,1,network
 Empty starts a pod,childsb,1,
-"EmptyDir volumes should support (non-root,0644,default)",timstclair,1,node
+"EmptyDir volumes should support (non-root,0644,default)",tallclair,1,node
 "EmptyDir volumes should support (non-root,0644,tmpfs)",spxtr,1,node
 "EmptyDir volumes should support (non-root,0666,default)",dchen1107,1,node
 "EmptyDir volumes should support (non-root,0666,tmpfs)",apelisse,1,node
@@ -291,7 +291,7 @@ Loadbalancing: L7 Nginx should conform to Ingress spec,ncdc,1,network
 "Logging soak should survive logging 1KB every * seconds, for a duration of *, scaling up to * pods per node",justinsb,1,node
 "MemoryEviction when there is memory pressure should evict pods in the correct order (besteffort first, then burstable, then guaranteed)",ixdy,1,node
 Mesos applies slave attributes as labels,justinsb,1,apps
-Mesos schedules pods annotated with roles on correct slaves,timstclair,1,apps
+Mesos schedules pods annotated with roles on correct slaves,tallclair,1,apps
 Mesos starts static pods on every node in the mesos cluster,lavalamp,1,apps
 MetricsGrabber should grab all metrics from API server.,gmarek,0,instrumentation
 MetricsGrabber should grab all metrics from a ControllerManager.,gmarek,0,instrumentation
@@ -336,7 +336,6 @@ NoExecuteTaintManager doesn't evict pod with tolerations from tainted nodes,free
 NoExecuteTaintManager eventually evict pod with finite tolerations from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager evicts pods from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager removing taint cancels eviction,freehan,0,scheduling
-NodeOutOfDisk runs out of disk space,vishh,0,node
 NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0,node
 Nodes Resize should be able to add nodes,piosz,1,cluster-lifecycle
 Nodes Resize should be able to delete nodes,zmerlynn,1,cluster-lifecycle
@@ -395,7 +394,7 @@ PrivilegedPod should enable privileged commands,derekwaynecarr,0,node
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0,node
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0,node
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0,node
-Probing container should be restarted with a docker exec liveness probe with timeout,timstclair,0,node
+Probing container should be restarted with a docker exec liveness probe with timeout,tallclair,0,node
 "Probing container should be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0,node
 Probing container should have monotonically increasing restart count,Random-Liu,0,node
 Probing container with readiness probe should not be ready before initial delay and never restart,Random-Liu,0,node
@@ -424,7 +423,7 @@ Projected should provide node allocatable (memory) as default memory limit if th
 Projected should provide podname as non-root with fsgroup,fabioy,1,storage
 Projected should provide podname as non-root with fsgroup and defaultMode,gmarek,1,storage
 Projected should provide podname only,vishh,1,storage
-Projected should set DefaultMode on files,timstclair,1,storage
+Projected should set DefaultMode on files,tallclair,1,storage
 Projected should set mode on item file,gmarek,1,storage
 Projected should update annotations on modification,janetkuo,1,storage
 Projected should update labels on modification,xiang90,1,storage
@@ -442,7 +441,7 @@ Reboot each node by ordering clean reboot and ensure they function upon restart,
 Reboot each node by ordering unclean reboot and ensure they function upon restart,quinton-hoole,0,node
 Reboot each node by switching off the network interface and ensure they function upon switch on,quinton-hoole,0,node
 Reboot each node by triggering kernel panic and ensure they function upon restart,quinton-hoole,0,node
-Redis should create and stop redis servers,timstclair,1,apps
+Redis should create and stop redis servers,tallclair,1,apps
 ReplicaSet should serve a basic image on each replica with a private image,pmorie,1,apps
 ReplicaSet should serve a basic image on each replica with a public image,krousey,0,apps
 ReplicaSet should surface a failure condition on a common issue like exceeded quota,kargakis,0,apps
@@ -451,13 +450,13 @@ ReplicationController should serve a basic image on each replica with a public i
 ReplicationController should surface a failure condition on a common issue like exceeded quota,kargakis,0,apps
 Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1,apps
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1,
-ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1,api-machinery
+ResourceQuota should create a ResourceQuota and capture the life of a configMap.,tallclair,1,api-machinery
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class.,derekwaynecarr,0,api-machinery
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim.,bgrant0607,1,api-machinery
 ResourceQuota should create a ResourceQuota and capture the life of a pod.,pmorie,1,api-machinery
 ResourceQuota should create a ResourceQuota and capture the life of a replication controller.,rrati,0,api-machinery
 ResourceQuota should create a ResourceQuota and capture the life of a secret.,ncdc,1,api-machinery
-ResourceQuota should create a ResourceQuota and capture the life of a service.,timstclair,1,api-machinery
+ResourceQuota should create a ResourceQuota and capture the life of a service.,tallclair,1,api-machinery
 ResourceQuota should create a ResourceQuota and ensure its status is promptly calculated.,krousey,1,api-machinery
 ResourceQuota should verify ResourceQuota with best effort scope.,mml,1,api-machinery
 ResourceQuota should verify ResourceQuota with terminating scopes.,ncdc,1,api-machinery
@@ -587,7 +586,6 @@ k8s.io/kubernetes/cmd/kubelet/app,derekwaynecarr,0,
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0,
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0,
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1,
-k8s.io/kubernetes/cmd/mungedocs,mwielgus,1,
 k8s.io/kubernetes/examples,Random-Liu,0,
 k8s.io/kubernetes/federation/apis/federation/install,nikhiljindal,0,
 k8s.io/kubernetes/federation/apis/federation/validation,nikhiljindal,0,
@@ -599,7 +597,6 @@ k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,madhusuda
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0,
 k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/namespace,rrati,0,
 k8s.io/kubernetes/federation/pkg/federation-controller/replicaset,roberthbailey,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/secret,apelisse,1,
 k8s.io/kubernetes/federation/pkg/federation-controller/service,pmorie,1,
@@ -645,7 +642,7 @@ k8s.io/kubernetes/pkg/apis/rbac/validation,erictune,0,
 k8s.io/kubernetes/pkg/apis/storage/validation,caesarxuchao,1,
 k8s.io/kubernetes/pkg/auth/authorizer/abac,liggitt,0,
 k8s.io/kubernetes/pkg/client/chaosclient,deads2k,1,
-k8s.io/kubernetes/pkg/client/leaderelection,xiang90,1,
+k8s.io/client-go/tools/leaderelection,xiang90,1,
 k8s.io/kubernetes/pkg/client/legacylisters,jsafrane,1,
 k8s.io/kubernetes/pkg/client/listers/batch/internalversion,mqliang,0,
 k8s.io/kubernetes/pkg/client/listers/extensions/internalversion,eparis,1,
@@ -712,7 +709,7 @@ k8s.io/kubernetes/pkg/kubectl/resource,caesarxuchao,1,
 k8s.io/kubernetes/pkg/kubelet,vishh,0,
 k8s.io/kubernetes/pkg/kubelet/cadvisor,sttts,1,
 k8s.io/kubernetes/pkg/kubelet/certificate,mikedanese,1,
-k8s.io/kubernetes/pkg/kubelet/client,timstclair,1,
+k8s.io/kubernetes/pkg/kubelet/client,tallclair,1,
 k8s.io/kubernetes/pkg/kubelet/cm,vishh,0,
 k8s.io/kubernetes/pkg/kubelet/config,mikedanese,1,
 k8s.io/kubernetes/pkg/kubelet/container,yujuhong,0,
@@ -736,9 +733,9 @@ k8s.io/kubernetes/pkg/kubelet/qos,vishh,0,
 k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1,
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1,
 k8s.io/kubernetes/pkg/kubelet/secret,kevin-wangzefeng,1,
-k8s.io/kubernetes/pkg/kubelet/server,timstclair,0,
+k8s.io/kubernetes/pkg/kubelet/server,tallclair,0,
 k8s.io/kubernetes/pkg/kubelet/server/portforward,rkouj,0,
-k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0,
+k8s.io/kubernetes/pkg/kubelet/server/stats,tallclair,0,
 k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1,
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1,
 k8s.io/kubernetes/pkg/kubelet/sysctl,piosz,1,
@@ -749,7 +746,7 @@ k8s.io/kubernetes/pkg/kubelet/util/format,ncdc,1,
 k8s.io/kubernetes/pkg/kubelet/util/queue,yujuhong,0,
 k8s.io/kubernetes/pkg/kubelet/volumemanager,rrati,0,
 k8s.io/kubernetes/pkg/kubelet/volumemanager/cache,janetkuo,1,
-k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler,timstclair,1,
+k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler,tallclair,1,
 k8s.io/kubernetes/pkg/master,fabioy,1,
 k8s.io/kubernetes/pkg/master/tunneler,jsafrane,1,
 k8s.io/kubernetes/pkg/probe/exec,bgrant0607,1,
@@ -821,8 +818,6 @@ k8s.io/kubernetes/pkg/registry/extensions/deployment,dchen1107,1,
 k8s.io/kubernetes/pkg/registry/extensions/deployment/storage,timothysc,1,
 k8s.io/kubernetes/pkg/registry/extensions/ingress,apelisse,1,
 k8s.io/kubernetes/pkg/registry/extensions/ingress/storage,luxas,1,
-k8s.io/kubernetes/pkg/registry/extensions/networkpolicy,deads2k,1,
-k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/storage,lavalamp,1,
 k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage,dchen1107,1,
 k8s.io/kubernetes/pkg/registry/extensions/replicaset,rrati,0,
 k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage,wojtek-t,1,
@@ -894,7 +889,7 @@ k8s.io/kubernetes/pkg/volume/flexvolume,Q-Lee,1,
 k8s.io/kubernetes/pkg/volume/flocker,jbeda,1,
 k8s.io/kubernetes/pkg/volume/gce_pd,saad-ali,0,
 k8s.io/kubernetes/pkg/volume/git_repo,davidopp,1,
-k8s.io/kubernetes/pkg/volume/glusterfs,timstclair,1,
+k8s.io/kubernetes/pkg/volume/glusterfs,tallclair,1,
 k8s.io/kubernetes/pkg/volume/host_path,jbeda,1,
 k8s.io/kubernetes/pkg/volume/iscsi,cjcullen,1,
 k8s.io/kubernetes/pkg/volume/nfs,justinsb,1,

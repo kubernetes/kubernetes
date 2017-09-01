@@ -15,7 +15,6 @@ package prometheus
 
 import (
 	"fmt"
-	"hash/fnv"
 	"math"
 	"sort"
 	"sync/atomic"
@@ -52,11 +51,11 @@ type Histogram interface {
 // bucket of a histogram ("le" -> "less or equal").
 const bucketLabel = "le"
 
+// DefBuckets are the default Histogram buckets. The default buckets are
+// tailored to broadly measure the response time (in seconds) of a network
+// service. Most likely, however, you will be required to define buckets
+// customized to your use case.
 var (
-	// DefBuckets are the default Histogram buckets. The default buckets are
-	// tailored to broadly measure the response time (in seconds) of a
-	// network service. Most likely, however, you will be required to define
-	// buckets customized to your use case.
 	DefBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
 
 	errBucketLabelNotAllowed = fmt.Errorf(
@@ -211,7 +210,7 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 	// Finally we know the final length of h.upperBounds and can make counts.
 	h.counts = make([]uint64, len(h.upperBounds))
 
-	h.Init(h) // Init self-collection.
+	h.init(h) // Init self-collection.
 	return h
 }
 
@@ -223,7 +222,7 @@ type histogram struct {
 	sumBits uint64
 	count   uint64
 
-	SelfCollector
+	selfCollector
 	// Note that there is no mutex required.
 
 	desc *Desc
@@ -288,7 +287,7 @@ func (h *histogram) Write(out *dto.Metric) error {
 // (e.g. HTTP request latencies, partitioned by status code and method). Create
 // instances with NewHistogramVec.
 type HistogramVec struct {
-	MetricVec
+	*MetricVec
 }
 
 // NewHistogramVec creates a new HistogramVec based on the provided HistogramOpts and
@@ -302,35 +301,30 @@ func NewHistogramVec(opts HistogramOpts, labelNames []string) *HistogramVec {
 		opts.ConstLabels,
 	)
 	return &HistogramVec{
-		MetricVec: MetricVec{
-			children: map[uint64]Metric{},
-			desc:     desc,
-			hash:     fnv.New64a(),
-			newMetric: func(lvs ...string) Metric {
-				return newHistogram(desc, opts, lvs...)
-			},
-		},
+		MetricVec: newMetricVec(desc, func(lvs ...string) Metric {
+			return newHistogram(desc, opts, lvs...)
+		}),
 	}
 }
 
 // GetMetricWithLabelValues replaces the method of the same name in
-// MetricVec. The difference is that this method returns a Histogram and not a
-// Metric so that no type conversion is required.
-func (m *HistogramVec) GetMetricWithLabelValues(lvs ...string) (Histogram, error) {
+// MetricVec. The difference is that this method returns an Observer and not a
+// Metric so that no type conversion to an Observer is required.
+func (m *HistogramVec) GetMetricWithLabelValues(lvs ...string) (Observer, error) {
 	metric, err := m.MetricVec.GetMetricWithLabelValues(lvs...)
 	if metric != nil {
-		return metric.(Histogram), err
+		return metric.(Observer), err
 	}
 	return nil, err
 }
 
 // GetMetricWith replaces the method of the same name in MetricVec. The
-// difference is that this method returns a Histogram and not a Metric so that no
-// type conversion is required.
-func (m *HistogramVec) GetMetricWith(labels Labels) (Histogram, error) {
+// difference is that this method returns an Observer and not a Metric so that no
+// type conversion to an Observer is required.
+func (m *HistogramVec) GetMetricWith(labels Labels) (Observer, error) {
 	metric, err := m.MetricVec.GetMetricWith(labels)
 	if metric != nil {
-		return metric.(Histogram), err
+		return metric.(Observer), err
 	}
 	return nil, err
 }
@@ -339,15 +333,15 @@ func (m *HistogramVec) GetMetricWith(labels Labels) (Histogram, error) {
 // GetMetricWithLabelValues would have returned an error. By not returning an
 // error, WithLabelValues allows shortcuts like
 //     myVec.WithLabelValues("404", "GET").Observe(42.21)
-func (m *HistogramVec) WithLabelValues(lvs ...string) Histogram {
-	return m.MetricVec.WithLabelValues(lvs...).(Histogram)
+func (m *HistogramVec) WithLabelValues(lvs ...string) Observer {
+	return m.MetricVec.WithLabelValues(lvs...).(Observer)
 }
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. By not returning an error, With allows shortcuts like
 //     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
-func (m *HistogramVec) With(labels Labels) Histogram {
-	return m.MetricVec.With(labels).(Histogram)
+func (m *HistogramVec) With(labels Labels) Observer {
+	return m.MetricVec.With(labels).(Observer)
 }
 
 type constHistogram struct {

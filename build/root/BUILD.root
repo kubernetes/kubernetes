@@ -1,8 +1,11 @@
+# gazelle:exclude _artifacts
+# gazelle:exclude _gopath
+# gazelle:exclude _output
+# gazelle:exclude _tmp
+
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_prefix")
 load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
 
 go_prefix("k8s.io/kubernetes")
@@ -31,13 +34,6 @@ gcs_upload(
         "//build/release-tars:release-tars-and-hashes": "",
         "//cluster/gce:gcs-release-artifacts-and-hashes": "extra/gce",
     },
-)
-
-# TODO: remove this alias after 2017-05-22
-alias(
-    name = "ci-artifacts",
-    actual = "push-build",
-    deprecation = "This rule will be removed after 2017-05-22. Use //:push-build instead.",
 )
 
 filegroup(
@@ -70,6 +66,7 @@ filegroup(
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
+        "//staging:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
         "//vendor:all-srcs",
@@ -82,4 +79,27 @@ genrule(
     outs = ["version"],
     cmd = "grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt | awk '{print $$2}' >$@",
     stamp = 1,
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "generated.pb.go",
+        "types.go",
+    ],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["generated.proto"],
+    visibility = ["//visibility:public"],
 )

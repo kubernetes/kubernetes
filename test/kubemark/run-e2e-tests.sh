@@ -33,9 +33,13 @@ export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.kubemark"
 export E2E_MIN_STARTUP_PODS=0
 
 if [[ -z "$@" ]]; then
-	ARGS='--ginkgo.focus=\[Feature:Performance\]'
+	ARGS='--ginkgo.focus=[Feature:Performance]'
 else
 	ARGS=$@
+fi
+
+if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  ARGS="${ARGS} --kubemark-external-kubeconfig=${DEFAULT_KUBECONFIG}"
 fi
 
 if [[ -f /.dockerenv ]]; then
@@ -43,5 +47,6 @@ if [[ -f /.dockerenv ]]; then
 	go run ./hack/e2e.go -- -v --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS}"
 else
 	# Running locally.
+ 	ARGS=$(echo $ARGS | sed 's/\[/\\\[/g' | sed 's/\]/\\\]/g')
 	${KUBE_ROOT}/hack/ginkgo-e2e.sh "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" $ARGS
 fi

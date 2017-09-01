@@ -86,7 +86,7 @@ kube::test::find_dirs() {
     find ./staging/src/k8s.io/kube-aggregator -name '*_test.go' \
       -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
 
-    find ./staging/src/k8s.io/kube-apiextensions-server -not \( \
+    find ./staging/src/k8s.io/apiextensions-apiserver -not \( \
         \( \
           -path '*/test/integration/*' \
         \) -prune \
@@ -168,7 +168,7 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${GOFLAGS:-})"
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
@@ -274,11 +274,11 @@ runTests() {
   # separate files.
 
   # ignore paths:
-  # cmd/libs/go2idl/generator: is fragile when run under coverage, so ignore it for now.
+  # vendor/k8s.io/code-generator/cmd/generator: is fragile when run under coverage, so ignore it for now.
   #                            https://github.com/kubernetes/kubernetes/issues/24967
   # vendor/k8s.io/client-go/1.4/rest: causes cover internal errors
   #                            https://github.com/golang/go/issues/16540
-  cover_ignore_dirs="cmd/libs/go2idl/generator|vendor/k8s.io/client-go/1.4/rest"
+  cover_ignore_dirs="vendor/k8s.io/code-generator/cmd/generator|vendor/k8s.io/client-go/1.4/rest"
   for path in $(echo $cover_ignore_dirs | sed 's/|/ /g'); do
       echo -e "skipped\tk8s.io/kubernetes/$path"
   done

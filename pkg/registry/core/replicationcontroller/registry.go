@@ -74,7 +74,7 @@ func (s *storage) GetController(ctx genericapirequest.Context, controllerID stri
 }
 
 func (s *storage) CreateController(ctx genericapirequest.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := s.Create(ctx, controller)
+	obj, err := s.Create(ctx, controller, false)
 	if err != nil {
 		return nil, err
 	}

@@ -22,18 +22,17 @@ import (
 	"fmt"
 	"time"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
-	certificateslisters "k8s.io/kubernetes/pkg/client/listers/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -179,11 +178,7 @@ func (cc *CertificateController) syncFunc(key string) error {
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
-	copy, err := scheme.Scheme.DeepCopy(csr)
-	if err != nil {
-		return err
-	}
-	csr = copy.(*certificates.CertificateSigningRequest)
+	csr = csr.DeepCopy()
 
 	return cc.handler(csr)
 }

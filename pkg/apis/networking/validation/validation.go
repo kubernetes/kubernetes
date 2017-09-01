@@ -17,7 +17,7 @@ limitations under the License.
 package validation
 
 import (
-	"reflect"
+	"net"
 
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -70,7 +70,10 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 				numFroms++
 				allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(from.NamespaceSelector, fromPath.Child("namespaceSelector"))...)
 			}
-
+			if from.IPBlock != nil {
+				numFroms++
+				allErrs = append(allErrs, ValidateIPBlock(from.IPBlock, fromPath.Child("ipBlock"))...)
+			}
 			if numFroms == 0 {
 				allErrs = append(allErrs, field.Required(fromPath, "must specify a from type"))
 			} else if numFroms > 1 {
@@ -92,8 +95,42 @@ func ValidateNetworkPolicy(np *networking.NetworkPolicy) field.ErrorList {
 func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	if !reflect.DeepEqual(update.Spec, old.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
+	allErrs = append(allErrs, ValidateNetworkPolicySpec(&update.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
+func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(ipb.CIDR) == 0 || ipb.CIDR == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
+		return allErrs
+	}
+	cidrIPNet, err := validateCIDR(ipb.CIDR)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("cidr"), ipb.CIDR, "not a valid CIDR"))
+		return allErrs
+	}
+	exceptCIDR := ipb.Except
+	for i, exceptIP := range exceptCIDR {
+		exceptPath := fldPath.Child("except").Index(i)
+		exceptCIDR, err := validateCIDR(exceptIP)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(exceptPath, exceptIP, "not a valid CIDR"))
+			return allErrs
+		}
+		if !cidrIPNet.Contains(exceptCIDR.IP) {
+			allErrs = append(allErrs, field.Invalid(exceptPath, exceptCIDR.IP, "not within CIDR range"))
+		}
 	}
 	return allErrs
+}
+
+// validateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
+func validateCIDR(cidr string) (*net.IPNet, error) {
+	_, net, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	return net, nil
 }

@@ -20,13 +20,13 @@ import (
 	"errors"
 	"testing"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	fedtest "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +75,7 @@ func TestSyncToClusters(t *testing.T) {
 					}
 					return nil, nil
 				},
-				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object) ([]util.FederatedOperation, error) {
+				func(federatedtypes.FederatedTypeAdapter, []*federationapi.Cluster, []*federationapi.Cluster, pkgruntime.Object, interface{}) ([]util.FederatedOperation, error) {
 					if testCase.operationsError {
 						return nil, awfulError
 					}
@@ -91,6 +91,7 @@ func TestSyncToClusters(t *testing.T) {
 					return nil
 				},
 				adapter,
+				nil,
 				obj,
 			)
 			require.Equal(t, testCase.status, status, "Unexpected status!")
@@ -207,7 +208,8 @@ func TestClusterOperations(t *testing.T) {
 				selectedClusters = []*federationapi.Cluster{}
 				unselectedClusters = clusters
 			}
-			operations, err := clusterOperations(adapter, selectedClusters, unselectedClusters, obj, key, func(string) (interface{}, bool, error) {
+			// TODO: Tests for ScheduleObject on type adapter
+			operations, err := clusterOperations(adapter, selectedClusters, unselectedClusters, obj, key, nil, func(string) (interface{}, bool, error) {
 				if testCase.expectedErr {
 					return nil, false, awfulError
 				}

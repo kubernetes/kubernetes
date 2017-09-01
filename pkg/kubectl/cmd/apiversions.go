@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -54,6 +54,9 @@ func RunApiVersions(f cmdutil.Factory, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	// Always request fresh data from the server
+	discoveryclient.Invalidate()
 
 	groupList, err := discoveryclient.ServerGroups()
 	if err != nil {

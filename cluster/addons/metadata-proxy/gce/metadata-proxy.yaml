@@ -1,0 +1,52 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: metadata-proxy-v0.1
+  namespace: kube-system
+  labels:
+    k8s-app: metadata-proxy
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    version: v0.1
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: metadata-proxy
+        kubernetes.io/cluster-service: "true"
+        version: v0.1
+      # This annotation ensures that the proxy does not get evicted if the node
+      # supports critical pod annotation based priority scheme.
+      # Note that this does not guarantee admission on the nodes (#40573).
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      hostNetwork: true
+      dnsPolicy: Default
+      containers:
+      - name: metadata-proxy
+        image: gcr.io/google-containers/metadata-proxy:0.1.2
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        command:
+          - '/start-proxy.sh'
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
+        volumeMounts:
+          - name: config-volume
+            mountPath: /etc/nginx/
+      nodeSelector:
+        beta.kubernetes.io/metadata-proxy-ready: "true"
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: config-volume
+        configMap:
+          name: metadata-proxy-config

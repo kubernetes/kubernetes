@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/rbac"
@@ -26,18 +27,18 @@ import (
 // but we don't want an client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
 
-func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s conversion.Scope) error {
+func Convert_v1alpha1_Subject_To_rbac_Subject(in *rbacv1alpha1.Subject, out *api.Subject, s conversion.Scope) error {
 	if err := autoConvert_v1alpha1_Subject_To_rbac_Subject(in, out, s); err != nil {
 		return err
 	}
 
 	// specifically set the APIGroup for the three subjects recognized in v1alpha1
 	switch {
-	case in.Kind == ServiceAccountKind:
+	case in.Kind == rbacv1alpha1.ServiceAccountKind:
 		out.APIGroup = ""
-	case in.Kind == UserKind:
+	case in.Kind == rbacv1alpha1.UserKind:
 		out.APIGroup = GroupName
-	case in.Kind == GroupKind:
+	case in.Kind == rbacv1alpha1.GroupKind:
 		out.APIGroup = GroupName
 	default:
 		// For unrecognized kinds, use the group portion of the APIVersion if we can get it
@@ -49,27 +50,27 @@ func Convert_v1alpha1_Subject_To_rbac_Subject(in *Subject, out *api.Subject, s c
 	// User * in v1alpha1 will only match all authenticated users
 	// This is only for compatibility with old RBAC bindings
 	// Special treatment for * should not be included in v1beta1
-	if out.Kind == UserKind && out.APIGroup == GroupName && out.Name == "*" {
-		out.Kind = GroupKind
+	if out.Kind == rbacv1alpha1.UserKind && out.APIGroup == GroupName && out.Name == "*" {
+		out.Kind = rbacv1alpha1.GroupKind
 		out.Name = allAuthenticated
 	}
 
 	return nil
 }
 
-func Convert_rbac_Subject_To_v1alpha1_Subject(in *api.Subject, out *Subject, s conversion.Scope) error {
+func Convert_rbac_Subject_To_v1alpha1_Subject(in *api.Subject, out *rbacv1alpha1.Subject, s conversion.Scope) error {
 	if err := autoConvert_rbac_Subject_To_v1alpha1_Subject(in, out, s); err != nil {
 		return err
 	}
 
 	switch {
-	case in.Kind == ServiceAccountKind && in.APIGroup == "":
+	case in.Kind == rbacv1alpha1.ServiceAccountKind && in.APIGroup == "":
 		// Make service accounts v1
 		out.APIVersion = "v1"
-	case in.Kind == UserKind && in.APIGroup == GroupName:
+	case in.Kind == rbacv1alpha1.UserKind && in.APIGroup == GroupName:
 		// users in the rbac API group get v1alpha
 		out.APIVersion = SchemeGroupVersion.String()
-	case in.Kind == GroupKind && in.APIGroup == GroupName:
+	case in.Kind == rbacv1alpha1.GroupKind && in.APIGroup == GroupName:
 		// groups in the rbac API group get v1alpha
 		out.APIVersion = SchemeGroupVersion.String()
 	default:

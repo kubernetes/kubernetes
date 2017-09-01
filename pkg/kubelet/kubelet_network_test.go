@@ -24,9 +24,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
 func TestNodeIPParam(t *testing.T) {
@@ -91,6 +90,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
 		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
+		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}},
 		{"search foo", []string{}, []string{"foo"}},
 		{"search foo bar", []string{}, []string{"foo", "bar"}},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
@@ -118,7 +118,7 @@ func TestComposeDNSSearch(t *testing.T) {
 	recorder := record.NewFakeRecorder(20)
 	kubelet.recorder = recorder
 
-	pod := podWithUidNameNs("", "test_pod", "testNS")
+	pod := podWithUIDNameNs("", "test_pod", "testNS")
 	kubelet.clusterDomain = "TEST"
 
 	testCases := []struct {
@@ -138,10 +138,7 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST"},
 			[]string{"AAA", "svc.TEST", "BBB", "TEST"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB"},
-			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'svc.TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-			},
+			[]string{},
 		},
 
 		{
@@ -156,8 +153,6 @@ func TestComposeDNSSearch(t *testing.T) {
 			[]string{"AAA", "TEST", "BBB", "TEST", "CCC", "DDD"},
 			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
 			[]string{
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
-				"Found and omitted duplicated dns domain in host search line: 'TEST' during merging with cluster dns domains",
 				"Search Line limits were exceeded, some dns names have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC",
 			},
 		},
@@ -180,85 +175,6 @@ func TestComposeDNSSearch(t *testing.T) {
 			event := fetchEvent(recorder)
 			assert.Equal(t, expected, event, "test [%d]", i)
 		}
-	}
-}
-
-func TestCleanupBandwidthLimits(t *testing.T) {
-	testPod := func(name, ingress string) *v1.Pod {
-		pod := podWithUidNameNs("", name, "")
-
-		if len(ingress) != 0 {
-			pod.Annotations["kubernetes.io/ingress-bandwidth"] = ingress
-		}
-
-		return pod
-	}
-
-	// TODO(random-liu): We removed the test case for pod status not cached here. We should add a higher
-	// layer status getter function and test that function instead.
-	tests := []struct {
-		status           *v1.PodStatus
-		pods             []*v1.Pod
-		inputCIDRs       []string
-		expectResetCIDRs []string
-		name             string
-	}{
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodRunning,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", "10M"),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "pod not running",
-		},
-		{
-			status: &v1.PodStatus{
-				PodIP: "1.2.3.4",
-				Phase: v1.PodFailed,
-			},
-			pods: []*v1.Pod{
-				testPod("foo", ""),
-				testPod("bar", ""),
-			},
-			inputCIDRs:       []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			expectResetCIDRs: []string{"1.2.3.4/32", "2.3.4.5/32", "5.6.7.8/32"},
-			name:             "no bandwidth limits",
-		},
-	}
-	for _, test := range tests {
-		shaper := &bandwidth.FakeShaper{
-			CIDRs: test.inputCIDRs,
-		}
-
-		testKube := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKube.Cleanup()
-		testKube.kubelet.shaper = shaper
-
-		for _, pod := range test.pods {
-			testKube.kubelet.statusManager.SetPodStatus(pod, *test.status)
-		}
-
-		err := testKube.kubelet.cleanupBandwidthLimits(test.pods)
-		assert.NoError(t, err, "test [%s]", test.name)
-		assert.EqualValues(t, test.expectResetCIDRs, shaper.ResetCIDRs, "test[%s]", test.name)
 	}
 }
 

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,16 +8,20 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["azure_credentials.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "azure_acr_helper.go",
+        "azure_credentials.go",
+    ],
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+        "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 
@@ -27,7 +29,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_credentials_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",

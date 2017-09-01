@@ -17,16 +17,21 @@
 # A library of helper functions and constant for GCI distro
 source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
+function get-node-instance-metadata {
+  local metadata=""
+  metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
+  metadata+="user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml,"
+  metadata+="configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,"
+  metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
+  metadata+="gci-update-strategy=${KUBE_TEMP}/gci-update.txt,"
+  metadata+="gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,"
+  metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+  echo "${metadata}"
+}
+
 # $1: template name (required).
 function create-node-instance-template {
   local template_name="$1"
   ensure-gci-metadata-files
-  create-node-template "$template_name" "${scope_flags[*]}" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml" \
-    "configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh" \
-    "cluster-name=${KUBE_TEMP}/cluster-name.txt" \
-    "gci-update-strategy=${KUBE_TEMP}/gci-update.txt" \
-    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt" \
-    "gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+  create-node-template "$template_name" "${scope_flags[*]}" "$(get-node-instance-metadata)"
 }

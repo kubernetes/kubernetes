@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/authorization"
@@ -47,11 +48,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
 	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
@@ -65,6 +68,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	_ "k8s.io/kubernetes/pkg/apis/settings/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
@@ -81,9 +85,11 @@ var (
 	Federation    TestGroup
 	Rbac          TestGroup
 	Certificates  TestGroup
+	Scheduling    TestGroup
 	Settings      TestGroup
 	Storage       TestGroup
 	ImagePolicy   TestGroup
+	Admission     TestGroup
 	Networking    TestGroup
 
 	serializer        runtime.SerializerInfo
@@ -238,6 +244,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[scheduling.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: scheduling.GroupName, Version: api.Registry.GroupOrDie(scheduling.GroupName).GroupVersion.Version}
+		Groups[scheduling.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: scheduling.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(scheduling.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[settings.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: api.Registry.GroupOrDie(settings.GroupName).GroupVersion.Version}
 		Groups[settings.GroupName] = TestGroup{
@@ -292,6 +307,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[admission.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: admission.GroupName, Version: api.Registry.GroupOrDie(admission.GroupName).GroupVersion.Version}
+		Groups[admission.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: admission.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(admission.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[networking.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: api.Registry.GroupOrDie(networking.GroupName).GroupVersion.Version}
 		Groups[networking.GroupName] = TestGroup{
@@ -311,10 +335,12 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
+	Scheduling = Groups[scheduling.GroupName]
 	Settings = Groups[settings.GroupName]
 	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]
 	Authorization = Groups[authorization.GroupName]
+	Admission = Groups[admission.GroupName]
 	Networking = Groups[networking.GroupName]
 }
 
@@ -419,7 +445,7 @@ func (g TestGroup) SelfLink(resource, name string) string {
 	}
 }
 
-// Returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
+// ResourcePathWithPrefix returns the appropriate path for the given prefix (watch, proxy, redirect, etc), resource, namespace and name.
 // For ex, this is of the form:
 // /api/v1/watch/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
@@ -449,7 +475,7 @@ func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name stri
 	return path
 }
 
-// Returns the appropriate path for the given resource, namespace and name.
+// ResourcePath returns the appropriate path for the given resource, namespace and name.
 // For example, this is of the form:
 // /api/v1/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePath(resource, namespace, name string) string {
@@ -467,6 +493,7 @@ func (g TestGroup) SubResourcePath(resource, namespace, name, sub string) string
 	return path
 }
 
+// RESTMapper returns RESTMapper in api.Registry.
 func (g TestGroup) RESTMapper() meta.RESTMapper {
 	return api.Registry.RESTMapper()
 }
@@ -481,7 +508,7 @@ func ExternalGroupVersions() schema.GroupVersions {
 	return versions
 }
 
-// Get codec based on runtime.Object
+// GetCodecForObject gets codec based on runtime.Object
 func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	kinds, _, err := api.Scheme.ObjectKinds(obj)
 	if err != nil {
@@ -509,6 +536,7 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }
 
+// NewTestGroup creates a new TestGroup.
 func NewTestGroup(external, internal schema.GroupVersion, internalTypes map[string]reflect.Type, externalTypes map[string]reflect.Type) TestGroup {
 	return TestGroup{external, internal, internalTypes, externalTypes}
 }

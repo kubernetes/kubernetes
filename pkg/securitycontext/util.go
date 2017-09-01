@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
@@ -120,7 +119,7 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
+		effectiveSc.RunAsUser = new(int64)
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
@@ -132,6 +131,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	if containerSc.ReadOnlyRootFilesystem != nil {
 		effectiveSc.ReadOnlyRootFilesystem = new(bool)
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
 	return effectiveSc
@@ -149,7 +153,7 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
+		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
 	}
 
@@ -192,7 +196,7 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 	}
 
 	if containerSc.RunAsUser != nil {
-		effectiveSc.RunAsUser = new(types.UnixUserID)
+		effectiveSc.RunAsUser = new(int64)
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
@@ -204,6 +208,11 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 	if containerSc.ReadOnlyRootFilesystem != nil {
 		effectiveSc.ReadOnlyRootFilesystem = new(bool)
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
+	}
+
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
 	return effectiveSc
@@ -221,7 +230,7 @@ func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityCo
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {
-		synthesized.RunAsUser = new(types.UnixUserID)
+		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
 	}
 
@@ -231,4 +240,39 @@ func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityCo
 	}
 
 	return synthesized
+}
+
+// AddNoNewPrivileges returns if we should add the no_new_privs option. This will return true if:
+// 1) the container is not privileged
+// 2) CAP_SYS_ADMIN is not being added
+// 3) if podSecurityPolicy.DefaultAllowPrivilegeEscalation is:
+//		- nil, then return false
+//		- true, then return false
+//		- false, then return true
+func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
+	if sc == nil {
+		return false
+	}
+
+	// handle the case where the container is privileged
+	if sc.Privileged != nil && *sc.Privileged {
+		return false
+	}
+
+	// handle the case where we are adding CAP_SYS_ADMIN
+	if sc.Capabilities != nil {
+		for _, cap := range sc.Capabilities.Add {
+			if string(cap) == "CAP_SYS_ADMIN" {
+				return false
+			}
+		}
+	}
+
+	// handle the case where the user did not set the default and did not explicitly set allowPrivilegeEscalation
+	if sc.AllowPrivilegeEscalation == nil {
+		return false
+	}
+
+	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
+	return !*sc.AllowPrivilegeEscalation
 }

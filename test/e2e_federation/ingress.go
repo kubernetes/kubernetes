@@ -26,16 +26,16 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
@@ -163,7 +163,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			clusters = f.GetRegisteredClusters()
 			ns = f.FederationNamespace.Name
 			// create backend service
-			service = createServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName)
+			service = createLBServiceOrFail(f.FederationClientset, ns, FederatedIngressServiceName, clusters)
 			// create the TLS secret
 			secret = createTLSSecretOrFail(f.FederationClientset, ns, FederatedIngressTLSSecretName)
 			// wait for services objects sync
@@ -267,7 +267,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				// TODO check dns record in global dns server
 			})
 
-			PIt("should be able to connect to a federated ingress via its load balancer", func() {
+			It("should be able to connect to a federated ingress via its load balancer", func() {
 				By(fmt.Sprintf("Waiting for Federated Ingress on %v", jig.ing.Name))
 				// check the traffic on federation ingress
 				jig.waitForFederatedIngress()
@@ -327,7 +327,7 @@ func waitForIngressOrFail(clientset *kubeclientset.Clientset, namespace string, 
 	var clusterIngress *v1beta1.Ingress
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		var err error
-		clusterIngress, err = clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
+		clusterIngress, err = clientset.ExtensionsV1beta1().Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is absent", ingress.Name, namespace))
 			return true, nil // Success
@@ -367,7 +367,7 @@ func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingres
 func waitForIngressUpdateOrFail(clientset *kubeclientset.Clientset, namespace string, ingress *v1beta1.Ingress, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		clusterIngress, err := clientset.Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
+		clusterIngress, err := clientset.ExtensionsV1beta1().Ingresses(namespace).Get(ingress.Name, metav1.GetOptions{})
 		if err == nil { // We want it present, and the Get succeeded, so we're all good.
 			if equivalentIngress(*clusterIngress, *ingress) {
 				By(fmt.Sprintf("Success: shard of federated ingress %q in namespace %q in cluster is updated", ingress.Name, namespace))
@@ -394,7 +394,7 @@ func deleteIngressOrFail(clientset *fedclientset.Clientset, namespace string, in
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteIngressOrFail: clientset: %v, namespace: %v, ingress: %v", clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
+	err := clientset.ExtensionsV1beta1().Ingresses(namespace).Delete(ingressName, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 	// Wait for the ingress to be deleted.
 	err = wait.Poll(framework.Poll, FederatedIngressDeleteTimeout, func() (bool, error) {
@@ -414,7 +414,7 @@ func deleteClusterIngressOrFail(clusterName string, clientset *kubeclientset.Cli
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteClusterIngressOrFail: cluster: %q, clientset: %v, namespace: %v, ingress: %v", clusterName, clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, metav1.NewDeleteOptions(0))
+	err := clientset.ExtensionsV1beta1().Ingresses(namespace).Delete(ingressName, metav1.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting cluster ingress %q/%q from cluster %q", namespace, ingressName, clusterName)
 }
 
@@ -598,7 +598,7 @@ func waitForSecretOrFail(clientset *kubeclientset.Clientset, nsName string, secr
 	var clusterSecret *v1.Secret
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		var err error
-		clusterSecret, err = clientset.Core().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
+		clusterSecret, err = clientset.CoreV1().Secrets(nsName).Get(secret.Name, metav1.GetOptions{})
 		if (!present) && errors.IsNotFound(err) { // We want it gone, and it's gone.
 			By(fmt.Sprintf("Success: shard of federated secret %q in namespace %q in cluster is absent", secret.Name, nsName))
 			return true, nil // Success

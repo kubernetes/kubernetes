@@ -24,15 +24,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/golang/glog"
 )
 
 type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
@@ -44,7 +45,7 @@ type FitError struct {
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
-const NoNodeAvailableMsg = "No nodes are available that match all of the following predicates:"
+const NoNodeAvailableMsg = "No nodes are available that match all of the following predicates"
 
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
@@ -178,7 +179,7 @@ func findNodesThatFit(
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*v1.Node, len(nodes))
-		errs := []error{}
+		errs := errors.MessageCountMap{}
 		var predicateResultLock sync.Mutex
 		var filteredLen int32
 
@@ -189,7 +190,7 @@ func findNodesThatFit(
 			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache)
 			if err != nil {
 				predicateResultLock.Lock()
-				errs = append(errs, err)
+				errs[err.Error()]++
 				predicateResultLock.Unlock()
 				return
 			}
@@ -204,7 +205,7 @@ func findNodesThatFit(
 		workqueue.Parallelize(16, len(nodes), checkNode)
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
+			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
 		}
 	}
 
@@ -244,14 +245,13 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 	)
 	if ecache != nil {
 		// getHashEquivalencePod will return immediately if no equivalence pod found
-		equivalenceHash = ecache.getHashEquivalencePod(pod)
-		eCacheAvailable = (equivalenceHash != 0)
+		equivalenceHash, eCacheAvailable = ecache.getHashEquivalencePod(pod)
 	}
 	for predicateKey, predicate := range predicateFuncs {
 		// If equivalenceCache is available
 		if eCacheAvailable {
 			// PredicateWithECache will returns it's cached predicate results
-			fit, reasons, invalid = ecache.PredicateWithECache(pod, info.Node().GetName(), predicateKey, equivalenceHash)
+			fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivalenceHash)
 		}
 
 		if !eCacheAvailable || invalid {
@@ -264,7 +264,7 @@ func podFitsOnNode(pod *v1.Pod, meta interface{}, info *schedulercache.NodeInfo,
 			if eCacheAvailable {
 				// update equivalence cache with newly computed fit & reasons
 				// TODO(resouer) should we do this in another thread? any race?
-				ecache.UpdateCachedPredicateItem(pod, info.Node().GetName(), predicateKey, fit, reasons, equivalenceHash)
+				ecache.UpdateCachedPredicateItem(pod.GetName(), info.Node().GetName(), predicateKey, fit, reasons, equivalenceHash)
 			}
 		}
 
@@ -315,10 +315,8 @@ func PrioritizeNodes(
 		errs = append(errs, err)
 	}
 
-	results := make([]schedulerapi.HostPriorityList, 0, len(priorityConfigs))
-	for range priorityConfigs {
-		results = append(results, nil)
-	}
+	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
+
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Function != nil {
 			// DEPRECATED

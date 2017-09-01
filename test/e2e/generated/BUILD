@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,9 +8,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "bindata.go",
         "gobindata_util.go",
         "main.go",
-        ":bindata",
     ],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
@@ -23,7 +21,6 @@ genrule(
     name = "bindata",
     srcs = [
         "//examples:sources",
-        "//cluster/gce/gci/nvidia-gpus:sources",
         "//test/images:sources",
         "//test/fixtures:sources",
         "//test/e2e/testing-manifests:sources",

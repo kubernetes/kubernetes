@@ -22,19 +22,21 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/test/e2e_node/services"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 type MemberCluster struct {
-	CloseFn framework.CloseFunc
-	Config  *master.Config
-	Client  clientset.Interface
-	Host    string
+	CloseFn             framework.CloseFunc
+	Config              *master.Config
+	Client              clientset.Interface
+	Host                string
+	namespaceController *services.NamespaceController
 }
 
 // FederationFixture manages a federation api server and a set of member clusters
@@ -42,10 +44,11 @@ type FederationFixture struct {
 	APIFixture          *FederationAPIFixture
 	DesiredClusterCount int
 	Clusters            []*MemberCluster
-	ClusterClients      []clientset.Interface
-	ClusterController   *clustercontroller.ClusterController
-	fedClient           federationclientset.Interface
-	stopChan            chan struct{}
+
+	ClusterClients    []clientset.Interface
+	ClusterController *clustercontroller.ClusterController
+	fedClient         federationclientset.Interface
+	stopChan          chan struct{}
 }
 
 func (f *FederationFixture) SetUp(t *testing.T) {
@@ -60,7 +63,10 @@ func (f *FederationFixture) SetUp(t *testing.T) {
 	t.Logf("Starting a federation of %d clusters", f.DesiredClusterCount)
 
 	f.APIFixture = &FederationAPIFixture{}
-	f.APIFixture.SetUp(t)
+	runOptions := GetRunOptions()
+	// Enable all apis features for test.
+	runOptions.APIEnablement.RuntimeConfig.Set("api/all=true")
+	f.APIFixture.SetUpWithRunOptions(t, runOptions)
 
 	f.stopChan = make(chan struct{})
 	monitorPeriod := 1 * time.Second
@@ -79,12 +85,18 @@ func (f *FederationFixture) StartCluster(t *testing.T) {
 
 	clusterClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	f.ClusterClients = append(f.ClusterClients, clusterClient)
-	f.Clusters = append(f.Clusters, &MemberCluster{
-		CloseFn: closeFn,
-		Config:  config,
-		Client:  clusterClient,
-		Host:    host,
-	})
+	memberCluster := &MemberCluster{
+		CloseFn:             closeFn,
+		Config:              config,
+		Client:              clusterClient,
+		Host:                host,
+		namespaceController: services.NewNamespaceController(host),
+	}
+	f.Clusters = append(f.Clusters, memberCluster)
+	err := memberCluster.namespaceController.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clusterId := len(f.ClusterClients)
 
@@ -115,6 +127,10 @@ func (f *FederationFixture) TearDown(t *testing.T) {
 		f.stopChan = nil
 	}
 	for _, cluster := range f.Clusters {
+		// Need to close controllers with active connections to the
+		// cluster api before stopping the api or the connections will
+		// hang until tcp timeout.
+		cluster.namespaceController.Stop()
 		cluster.CloseFn()
 	}
 	f.Clusters = nil

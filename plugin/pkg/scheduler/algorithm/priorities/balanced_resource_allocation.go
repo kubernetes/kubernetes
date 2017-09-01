@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -71,7 +71,7 @@ func calculateBalancedResourceAllocation(pod *v1.Pod, podRequests *schedulercach
 		// 0-10 with 0 representing well balanced allocation and 10 poorly balanced. Subtracting it from
 		// 10 leads to the score which also scales from 0 to 10 while 10 representing well balanced.
 		diff := math.Abs(cpuFraction - memoryFraction)
-		score = int(10 - diff*10)
+		score = int((1 - diff) * float64(schedulerapi.MaxPriority))
 	}
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
@@ -98,8 +98,8 @@ func fractionOfCapacity(requested, capacity int64) float64 {
 	return float64(requested) / float64(capacity)
 }
 
-// BalancedResourceAllocation favors nodes with balanced resource usage rate.
-// BalancedResourceAllocation should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
+// BalancedResourceAllocationMap favors nodes with balanced resource usage rate.
+// BalancedResourceAllocationMap should **NOT** be used alone, and **MUST** be used together with LeastRequestedPriority.
 // It calculates the difference between the cpu and memory fracion of capacity, and prioritizes the host based on how
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:

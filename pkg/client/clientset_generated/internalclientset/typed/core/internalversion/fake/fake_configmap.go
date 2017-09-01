@@ -36,40 +36,7 @@ var configmapsResource = schema.GroupVersionResource{Group: "", Version: "", Res
 
 var configmapsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ConfigMap"}
 
-func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ConfigMap), err
-}
-
-func (c *FakeConfigMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ConfigMap), err
-}
-
-func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &api.ConfigMap{})
-
-	return err
-}
-
-func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})
-	return err
-}
-
+// Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
 func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *api.ConfigMap, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), &api.ConfigMap{})
@@ -80,6 +47,7 @@ func (c *FakeConfigMaps) Get(name string, options v1.GetOptions) (result *api.Co
 	return obj.(*api.ConfigMap), err
 }
 
+// List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
 func (c *FakeConfigMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(configmapsResource, configmapsKind, c.ns, opts), &api.ConfigMapList{})
@@ -106,6 +74,44 @@ func (c *FakeConfigMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(configmapsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
+func (c *FakeConfigMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ConfigMap), err
+}
+
+// Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
+func (c *FakeConfigMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), &api.ConfigMap{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ConfigMap), err
+}
+
+// Delete takes name of the configMap and deletes it. Returns an error if one occurs.
+func (c *FakeConfigMaps) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(configmapsResource, c.ns, name), &api.ConfigMap{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.ConfigMapList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched configMap.

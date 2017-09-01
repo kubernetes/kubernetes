@@ -17,16 +17,11 @@ limitations under the License.
 package externaladmissionhookconfiguration
 
 import (
-	"fmt"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -92,29 +87,4 @@ func (externaladmissionhookConfigurationStrategy) ValidateUpdate(ctx genericapir
 // only be allowed if version match.
 func (externaladmissionhookConfigurationStrategy) AllowUnconditionalUpdate() bool {
 	return false
-}
-
-// MatchReplicaSet is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchExternalAdmissionHookConfiguration(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	ic, ok := obj.(*admissionregistration.ExternalAdmissionHookConfiguration)
-	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a ExternalAdmissionHookConfiguration.")
-	}
-	return labels.Set(ic.ObjectMeta.Labels), ExternalAdmissionHookConfigurationToSelectableFields(ic), nil
-}
-
-// ExternalAdmissionHookConfigurationToSelectableFields returns a field set that represents the object.
-func ExternalAdmissionHookConfigurationToSelectableFields(ic *admissionregistration.ExternalAdmissionHookConfiguration) fields.Set {
-	return generic.ObjectMetaFieldsSet(&ic.ObjectMeta, true)
 }

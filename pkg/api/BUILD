@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -23,11 +21,11 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
@@ -44,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["taint_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_test(
@@ -59,22 +56,23 @@ go_test(
         "serialization_test.go",
         "unstructured_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/api:go_default_library",
+        ":go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/ugorji/go/codec:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/testing:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion/unstructured:go_default_library",
@@ -102,11 +100,11 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/endpoints:all-srcs",
-        "//pkg/api/errors:all-srcs",
         "//pkg/api/events:all-srcs",
+        "//pkg/api/fuzzer:all-srcs",
         "//pkg/api/helper:all-srcs",
         "//pkg/api/install:all-srcs",
-        "//pkg/api/meta:all-srcs",
+        "//pkg/api/persistentvolume:all-srcs",
         "//pkg/api/pod:all-srcs",
         "//pkg/api/ref:all-srcs",
         "//pkg/api/resource:all-srcs",

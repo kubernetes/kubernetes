@@ -21,6 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -29,23 +30,26 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*DaemonSet)) })
-	scheme.AddTypeDefaultingFunc(&DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*DaemonSetList)) })
-	scheme.AddTypeDefaultingFunc(&Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*Deployment)) })
-	scheme.AddTypeDefaultingFunc(&DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*NetworkPolicy)) })
-	scheme.AddTypeDefaultingFunc(&NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
-	scheme.AddTypeDefaultingFunc(&ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*ReplicaSet)) })
-	scheme.AddTypeDefaultingFunc(&ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*ReplicaSetList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*v1beta1.DaemonSet)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*v1beta1.DaemonSetList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*v1beta1.Deployment)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*v1beta1.DeploymentList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*v1beta1.NetworkPolicy)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*v1beta1.NetworkPolicyList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*v1beta1.ReplicaSet)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*v1beta1.ReplicaSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_DaemonSet(in *DaemonSet) {
+func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 	SetDefaults_DaemonSet(in)
 	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
 		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -174,19 +178,22 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 	}
 }
 
-func SetObjectDefaults_DaemonSetList(in *DaemonSetList) {
+func SetObjectDefaults_DaemonSetList(in *v1beta1.DaemonSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_DaemonSet(a)
 	}
 }
 
-func SetObjectDefaults_Deployment(in *Deployment) {
+func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 	SetDefaults_Deployment(in)
 	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
 		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -315,30 +322,33 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 	}
 }
 
-func SetObjectDefaults_DeploymentList(in *DeploymentList) {
+func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Deployment(a)
 	}
 }
 
-func SetObjectDefaults_NetworkPolicy(in *NetworkPolicy) {
+func SetObjectDefaults_NetworkPolicy(in *v1beta1.NetworkPolicy) {
 	SetDefaults_NetworkPolicy(in)
 }
 
-func SetObjectDefaults_NetworkPolicyList(in *NetworkPolicyList) {
+func SetObjectDefaults_NetworkPolicyList(in *v1beta1.NetworkPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_NetworkPolicy(a)
 	}
 }
 
-func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
+func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 	SetDefaults_ReplicaSet(in)
 	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
 		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -467,7 +477,7 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 	}
 }
 
-func SetObjectDefaults_ReplicaSetList(in *ReplicaSetList) {
+func SetObjectDefaults_ReplicaSetList(in *v1beta1.ReplicaSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicaSet(a)

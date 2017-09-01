@@ -61,12 +61,12 @@ func init() {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pod, ok := obj.(*example.Pod)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
+		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // PodToSelectableFields returns a field set that represents the object
@@ -123,12 +123,7 @@ func makeTestPod(name string) *example.Pod {
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := scheme.DeepCopy(obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*example.Pod), nil, nil
+		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
 	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
@@ -469,12 +464,12 @@ func TestFiltering(t *testing.T) {
 	pred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(labels.Set{"filter": "foo"}),
 		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
 			metadata, err := meta.Accessor(obj)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			return labels.Set(metadata.GetLabels()), nil, nil
+			return labels.Set(metadata.GetLabels()), nil, metadata.GetInitializers() != nil, nil
 		},
 	}
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, pred)
@@ -534,6 +529,70 @@ func TestStartingResourceVersion(t *testing.T) {
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timed out waiting for event")
+	}
+}
+
+func TestEmptyWatchEventCache(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	defer server.Terminate(t)
+
+	// add a few objects
+	updatePod(t, etcdStorage, makeTestPod("pod1"), nil)
+	updatePod(t, etcdStorage, makeTestPod("pod2"), nil)
+	updatePod(t, etcdStorage, makeTestPod("pod3"), nil)
+	updatePod(t, etcdStorage, makeTestPod("pod4"), nil)
+	updatePod(t, etcdStorage, makeTestPod("pod5"), nil)
+
+	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
+
+	// get rv of last pod created
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	cacher := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	// We now have a cacher with an empty cache of watch events and a resourceVersion of rv.
+	// It should support establishing watches from rv and higher, but not older.
+
+	{
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv-1)), storage.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
+		expectedGoneError := errors.NewGone("").ErrStatus
+		verifyWatchEvent(t, watcher, watch.Error, &expectedGoneError)
+	}
+
+	{
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv+1)), storage.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
+		select {
+		case e := <-watcher.ResultChan():
+			t.Errorf("unexpected event %#v", e)
+		case <-time.After(3 * time.Second):
+			// watch from rv+1 remained established successfully
+		}
+	}
+
+	{
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv)), storage.Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		defer watcher.Stop()
+		select {
+		case e := <-watcher.ResultChan():
+			t.Errorf("unexpected event %#v", e)
+		case <-time.After(3 * time.Second):
+			// watch from rv remained established successfully
+		}
 	}
 }
 

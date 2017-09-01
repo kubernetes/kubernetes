@@ -19,9 +19,9 @@ package eviction
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -53,7 +53,7 @@ type Config struct {
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, nodeProvider NodeProvider, monitoringInterval time.Duration)
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, capacityProvider CapacityProvider, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
@@ -68,10 +68,12 @@ type DiskInfoProvider interface {
 	HasDedicatedImageFs() (bool, error)
 }
 
-// NodeProvider is responsible for providing the node api object describing this node
-type NodeProvider interface {
-	// GetNode returns the node info for this node
-	GetNode() (*v1.Node, error)
+// CapacityProvider is responsible for providing the resource capacity and reservation information
+type CapacityProvider interface {
+	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
+	GetCapacity() v1.ResourceList
+	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
+	GetNodeAllocatableReservation() v1.ResourceList
 }
 
 // ImageGC is responsible for performing garbage collection of unused images.
@@ -79,6 +81,13 @@ type ImageGC interface {
 	// DeleteUnusedImages deletes unused images and returns the number of bytes freed, and an error.
 	// This returns the bytes freed even if an error is returned.
 	DeleteUnusedImages() (int64, error)
+}
+
+// ContainerGC is responsible for performing garbage collection of unused containers.
+type ContainerGC interface {
+	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
+	// It returns an error if it is unsuccessful.
+	DeleteAllUnusedContainers() error
 }
 
 // KillPodFunc kills a pod.

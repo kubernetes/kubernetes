@@ -1,0 +1,4 @@
+amd64=gcr.io/google_containers/ubuntu-slim:0.12
+arm=gcr.io/google_containers/ubuntu-slim-arm:0.12
+arm64=gcr.io/google_containers/ubuntu-slim-arm64:0.12
+ppc64le=gcr.io/google_containers/ubuntu-slim-ppc64le:0.12

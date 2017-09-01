@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	admissionregistration_v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1alpha1 "k8s.io/client-go/listers/admissionregistration/v1alpha1"
-	admissionregistration_v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,26 +41,31 @@ type initializerConfigurationInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewInitializerConfigurationInformer constructs a new informer for InitializerConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.AdmissionregistrationV1alpha1().InitializerConfigurations(v1.NamespaceAll).List(options)
+				return client.AdmissionregistrationV1alpha1().InitializerConfigurations().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.AdmissionregistrationV1alpha1().InitializerConfigurations(v1.NamespaceAll).Watch(options)
+				return client.AdmissionregistrationV1alpha1().InitializerConfigurations().Watch(options)
 			},
 		},
 		&admissionregistration_v1alpha1.InitializerConfiguration{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultInitializerConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewInitializerConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *initializerConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration_v1alpha1.InitializerConfiguration{}, newInitializerConfigurationInformer)
+	return f.factory.InformerFor(&admissionregistration_v1alpha1.InitializerConfiguration{}, defaultInitializerConfigurationInformer)
 }
 
 func (f *initializerConfigurationInformer) Lister() v1alpha1.InitializerConfigurationLister {

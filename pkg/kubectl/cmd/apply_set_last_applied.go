@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apijson "k8s.io/apimachinery/pkg/util/json"
@@ -37,7 +36,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type SetLastAppliedOptions struct {
@@ -119,21 +118,22 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	}
 
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	return err
+}
+
+func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) error {
-	r := resource.NewBuilder(o.Mapper, f.CategoryExpander(), o.Typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := builder.
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		Latest().
 		Flatten().
 		Do()
-	err := r.Err()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
 		}
 		if oringalBuf == nil && !o.CreateAnnotation {
-			return cmdutil.UsageError(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
+			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)
 		}
 
 		//only add to PatchBufferList when changed
@@ -175,10 +175,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -225,9 +222,9 @@ func (o *SetLastAppliedOptions) formatPrinter(output string, buf []byte, w io.Wr
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(w, string(jsonBuffer.Bytes()))
+		fmt.Fprintf(w, "%s\n", jsonBuffer.String())
 	case "yaml":
-		fmt.Fprintf(w, string(yamlOutput))
+		fmt.Fprintf(w, "%s\n", string(yamlOutput))
 	}
 	return nil
 }

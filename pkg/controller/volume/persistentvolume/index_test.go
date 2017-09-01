@@ -20,12 +20,13 @@ import (
 	"sort"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/ref"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
@@ -257,7 +258,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 		t.Errorf("Expected 3 arrays of modes that match RWO, but got %v", len(possibleModes))
 	}
 	for _, m := range possibleModes {
-		if !contains(m, v1.ReadWriteOnce) {
+		if !volume.AccessModesContains(m, v1.ReadWriteOnce) {
 			t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 		}
 	}
@@ -266,7 +267,7 @@ func TestAllPossibleAccessModes(t *testing.T) {
 	if len(possibleModes) != 1 {
 		t.Errorf("Expected 1 array of modes that match RWX, but got %v", len(possibleModes))
 	}
-	if !contains(possibleModes[0], v1.ReadWriteMany) {
+	if !volume.AccessModesContains(possibleModes[0], v1.ReadWriteMany) {
 		t.Errorf("AccessModes does not contain %s", v1.ReadWriteOnce)
 	}
 
@@ -617,7 +618,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi")}},
 		},
 	}
-	claimRef, err := ref.GetReference(api.Scheme, claim)
+	claimRef, err := ref.GetReference(scheme.Scheme, claim)
 	if err != nil {
 		t.Errorf("error getting claimRef: %v", err)
 	}

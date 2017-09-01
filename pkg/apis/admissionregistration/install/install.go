@@ -37,7 +37,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			GroupName:                  admissionregistration.GroupName,
 			RootScopedKinds:            sets.NewString("InitializerConfiguration", "ExternalAdmissionHookConfiguration"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/admissionregistration",
 			AddInternalObjectsToScheme: admissionregistration.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

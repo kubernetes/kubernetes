@@ -35,25 +35,17 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
 var (
-	// specialParams lists parameters that are handled specially and which users of Request
-	// are therefore not allowed to set manually.
-	specialParams = sets.NewString("timeout")
-
 	// longThrottleLatency defines threshold for logging requests. All requests being
 	// throttle for more than longThrottleLatency will be logged.
 	longThrottleLatency = 50 * time.Millisecond
@@ -269,7 +261,7 @@ func (r *Request) AbsPath(segments ...string) *Request {
 }
 
 // RequestURI overwrites existing path and parameters with the value of the provided server relative
-// URI. Some parameters (those in specialParameters) cannot be overwritten.
+// URI.
 func (r *Request) RequestURI(uri string) *Request {
 	if r.err != nil {
 		return r
@@ -291,143 +283,6 @@ func (r *Request) RequestURI(uri string) *Request {
 	return r
 }
 
-const (
-	// A constant that clients can use to refer in a field selector to the object name field.
-	// Will be automatically emitted as the correct name for the API version.
-	nodeUnschedulable = "spec.unschedulable"
-	objectNameField   = "metadata.name"
-	podHost           = "spec.nodeName"
-	podStatus         = "status.phase"
-	secretType        = "type"
-
-	eventReason                  = "reason"
-	eventSource                  = "source"
-	eventType                    = "type"
-	eventInvolvedKind            = "involvedObject.kind"
-	eventInvolvedNamespace       = "involvedObject.namespace"
-	eventInvolvedName            = "involvedObject.name"
-	eventInvolvedUID             = "involvedObject.uid"
-	eventInvolvedAPIVersion      = "involvedObject.apiVersion"
-	eventInvolvedResourceVersion = "involvedObject.resourceVersion"
-	eventInvolvedFieldPath       = "involvedObject.fieldPath"
-)
-
-type clientFieldNameToAPIVersionFieldName map[string]string
-
-func (c clientFieldNameToAPIVersionFieldName) filterField(field, value string) (newField, newValue string, err error) {
-	newFieldName, ok := c[field]
-	if !ok {
-		return "", "", fmt.Errorf("%v - %v - no field mapping defined", field, value)
-	}
-	return newFieldName, value, nil
-}
-
-type resourceTypeToFieldMapping map[string]clientFieldNameToAPIVersionFieldName
-
-func (r resourceTypeToFieldMapping) filterField(resourceType, field, value string) (newField, newValue string, err error) {
-	fMapping, ok := r[resourceType]
-	if !ok {
-		return "", "", fmt.Errorf("%v - %v - %v - no field mapping defined", resourceType, field, value)
-	}
-	return fMapping.filterField(field, value)
-}
-
-type versionToResourceToFieldMapping map[schema.GroupVersion]resourceTypeToFieldMapping
-
-// filterField transforms the given field/value selector for the given groupVersion and resource
-func (v versionToResourceToFieldMapping) filterField(groupVersion *schema.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
-	rMapping, ok := v[*groupVersion]
-	if !ok {
-		// no groupVersion overrides registered, default to identity mapping
-		return field, value, nil
-	}
-	newField, newValue, err = rMapping.filterField(resourceType, field, value)
-	if err != nil {
-		// no groupVersionResource overrides registered, default to identity mapping
-		return field, value, nil
-	}
-	return newField, newValue, nil
-}
-
-var fieldMappings = versionToResourceToFieldMapping{
-	v1.SchemeGroupVersion: resourceTypeToFieldMapping{
-		"nodes": clientFieldNameToAPIVersionFieldName{
-			objectNameField:   objectNameField,
-			nodeUnschedulable: nodeUnschedulable,
-		},
-		"pods": clientFieldNameToAPIVersionFieldName{
-			objectNameField: objectNameField,
-			podHost:         podHost,
-			podStatus:       podStatus,
-		},
-		"secrets": clientFieldNameToAPIVersionFieldName{
-			secretType: secretType,
-		},
-		"serviceAccounts": clientFieldNameToAPIVersionFieldName{
-			objectNameField: objectNameField,
-		},
-		"endpoints": clientFieldNameToAPIVersionFieldName{
-			objectNameField: objectNameField,
-		},
-		"events": clientFieldNameToAPIVersionFieldName{
-			objectNameField:              objectNameField,
-			eventReason:                  eventReason,
-			eventSource:                  eventSource,
-			eventType:                    eventType,
-			eventInvolvedKind:            eventInvolvedKind,
-			eventInvolvedNamespace:       eventInvolvedNamespace,
-			eventInvolvedName:            eventInvolvedName,
-			eventInvolvedUID:             eventInvolvedUID,
-			eventInvolvedAPIVersion:      eventInvolvedAPIVersion,
-			eventInvolvedResourceVersion: eventInvolvedResourceVersion,
-			eventInvolvedFieldPath:       eventInvolvedFieldPath,
-		},
-	},
-}
-
-// FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
-func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
-	if r.err != nil {
-		return r
-	}
-	if s == nil {
-		return r
-	}
-	if s.Empty() {
-		return r
-	}
-	s2, err := s.Transform(func(field, value string) (newField, newValue string, err error) {
-		return fieldMappings.filterField(r.content.GroupVersion, r.resource, field, value)
-	})
-	if err != nil {
-		r.err = err
-		return r
-	}
-	return r.setParam(metav1.FieldSelectorQueryParam(r.content.GroupVersion.String()), s2.String())
-}
-
-// LabelsSelectorParam adds the given selector as a query parameter
-func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
-	if r.err != nil {
-		return r
-	}
-	if s == nil {
-		return r
-	}
-	if s.Empty() {
-		return r
-	}
-	return r.setParam(metav1.LabelSelectorQueryParam(r.content.GroupVersion.String()), s.String())
-}
-
-// UintParam creates a query parameter with the given value.
-func (r *Request) UintParam(paramName string, u uint64) *Request {
-	if r.err != nil {
-		return r
-	}
-	return r.setParam(paramName, strconv.FormatUint(u, 10))
-}
-
 // Param creates a query parameter with the given string value.
 func (r *Request) Param(paramName, s string) *Request {
 	if r.err != nil {
@@ -439,6 +294,8 @@ func (r *Request) Param(paramName, s string) *Request {
 // VersionedParams will take the provided object, serialize it to a map[string][]string using the
 // implicit RESTClient API version and the default parameter codec, and then add those as parameters
 // to the request. Use this to provide versioned query parameters from client libraries.
+// VersionedParams will not write query parameters that have omitempty set and are empty. If a
+// parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
 	if r.err != nil {
 		return r
@@ -449,52 +306,15 @@ func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCod
 		return r
 	}
 	for k, v := range params {
-		for _, value := range v {
-			// TODO: Move it to setParam method, once we get rid of
-			// FieldSelectorParam & LabelSelectorParam methods.
-			if k == metav1.LabelSelectorQueryParam(r.content.GroupVersion.String()) && value == "" {
-				// Don't set an empty selector for backward compatibility.
-				// Since there is no way to get the difference between empty
-				// and unspecified string, we don't set it to avoid having
-				// labelSelector= param in every request.
-				continue
-			}
-			if k == metav1.FieldSelectorQueryParam(r.content.GroupVersion.String()) {
-				if len(value) == 0 {
-					// Don't set an empty selector for backward compatibility.
-					// Since there is no way to get the difference between empty
-					// and unspecified string, we don't set it to avoid having
-					// fieldSelector= param in every request.
-					continue
-				}
-				// TODO: Filtering should be handled somewhere else.
-				selector, err := fields.ParseSelector(value)
-				if err != nil {
-					r.err = fmt.Errorf("unparsable field selector: %v", err)
-					return r
-				}
-				filteredSelector, err := selector.Transform(
-					func(field, value string) (newField, newValue string, err error) {
-						return fieldMappings.filterField(r.content.GroupVersion, r.resource, field, value)
-					})
-				if err != nil {
-					r.err = fmt.Errorf("untransformable field selector: %v", err)
-					return r
-				}
-				value = filteredSelector.String()
-			}
-
-			r.setParam(k, value)
+		if r.params == nil {
+			r.params = make(url.Values)
 		}
+		r.params[k] = append(r.params[k], v...)
 	}
 	return r
 }
 
 func (r *Request) setParam(paramName, value string) *Request {
-	if specialParams.Has(paramName) {
-		r.err = fmt.Errorf("must set %v through the corresponding function, not directly.", paramName)
-		return r
-	}
 	if r.params == nil {
 		r.params = make(url.Values)
 	}
@@ -502,11 +322,14 @@ func (r *Request) setParam(paramName, value string) *Request {
 	return r
 }
 
-func (r *Request) SetHeader(key, value string) *Request {
+func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
-	r.headers.Set(key, value)
+	r.headers.Del(key)
+	for _, value := range values {
+		r.headers.Add(key, value)
+	}
 	return r
 }
 
@@ -609,7 +432,7 @@ func (r *Request) URL() *url.URL {
 // finalURLTemplate is similar to URL(), but will make all specific parameter values equal
 // - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
 // parameters will be reset. This creates a copy of the request so as not to change the
-// underyling object.  This means some useful request info (like the types of field
+// underlying object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
 func (r Request) finalURLTemplate() url.URL {
@@ -1069,7 +892,7 @@ func isTextResponse(resp *http.Response) bool {
 func checkWait(resp *http.Response) (int, bool) {
 	switch r := resp.StatusCode; {
 	// any 500 error code and 429 can trigger a wait
-	case r == errors.StatusTooManyRequests, r >= 500:
+	case r == http.StatusTooManyRequests, r >= 500:
 	default:
 		return 0, false
 	}
@@ -1147,6 +970,9 @@ func (r Result) Into(obj runtime.Object) error {
 	}
 	if r.decoder == nil {
 		return fmt.Errorf("serializer for %s doesn't exist", r.contentType)
+	}
+	if len(r.body) == 0 {
+		return fmt.Errorf("0-length response")
 	}
 
 	out, _, err := r.decoder.Decode(r.body, nil, obj)

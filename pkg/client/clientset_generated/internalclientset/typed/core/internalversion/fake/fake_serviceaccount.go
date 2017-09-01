@@ -36,40 +36,7 @@ var serviceaccountsResource = schema.GroupVersionResource{Group: "", Version: ""
 
 var serviceaccountsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "ServiceAccount"}
 
-func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &api.ServiceAccount{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ServiceAccount), err
-}
-
-func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &api.ServiceAccount{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.ServiceAccount), err
-}
-
-func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(serviceaccountsResource, c.ns, name), &api.ServiceAccount{})
-
-	return err
-}
-
-func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.ServiceAccountList{})
-	return err
-}
-
+// Get takes name of the serviceAccount, and returns the corresponding serviceAccount object, and an error if there is any.
 func (c *FakeServiceAccounts) Get(name string, options v1.GetOptions) (result *api.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(serviceaccountsResource, c.ns, name), &api.ServiceAccount{})
@@ -80,6 +47,7 @@ func (c *FakeServiceAccounts) Get(name string, options v1.GetOptions) (result *a
 	return obj.(*api.ServiceAccount), err
 }
 
+// List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
 func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *api.ServiceAccountList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(serviceaccountsResource, serviceaccountsKind, c.ns, opts), &api.ServiceAccountList{})
@@ -106,6 +74,44 @@ func (c *FakeServiceAccounts) Watch(opts v1.ListOptions) (watch.Interface, error
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(serviceaccountsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a serviceAccount and creates it.  Returns the server's representation of the serviceAccount, and an error, if there is any.
+func (c *FakeServiceAccounts) Create(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), &api.ServiceAccount{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ServiceAccount), err
+}
+
+// Update takes the representation of a serviceAccount and updates it. Returns the server's representation of the serviceAccount, and an error, if there is any.
+func (c *FakeServiceAccounts) Update(serviceAccount *api.ServiceAccount) (result *api.ServiceAccount, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), &api.ServiceAccount{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ServiceAccount), err
+}
+
+// Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
+func (c *FakeServiceAccounts) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(serviceaccountsResource, c.ns, name), &api.ServiceAccount{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.ServiceAccountList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched serviceAccount.

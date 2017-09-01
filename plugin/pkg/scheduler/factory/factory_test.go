@@ -23,23 +23,24 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
+
+const enableEquivalenceCache = true
 
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
@@ -63,6 +64,7 @@ func TestCreate(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	factory.Create()
 }
@@ -94,6 +96,7 @@ func TestCreateFromConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	// Pre-register some predicate and priority functions
@@ -121,6 +124,70 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 
 	factory.CreateFromConfig(policy)
+	hpa := factory.GetHardPodAffinitySymmetricWeight()
+	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
+		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
+	}
+}
+
+func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
+	var configData []byte
+	var policy schedulerapi.Policy
+
+	handler := utiltesting.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	defer server.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	factory := NewConfigFactory(
+		v1.DefaultSchedulerName,
+		client,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
+	)
+
+	// Pre-register some predicate and priority functions
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+
+	configData = []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1",
+		"predicates" : [
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
+			{"name" : "PredicateOne"},
+			{"name" : "PredicateTwo"}
+		],
+		"priorities" : [
+			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "PriorityOne", "weight" : 2},
+			{"name" : "PriorityTwo", "weight" : 1}
+		],
+		"hardPodAffinitySymmetricWeight" : 10
+	}`)
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+		t.Errorf("Invalid configuration: %v", err)
+	}
+	factory.CreateFromConfig(policy)
+	hpa := factory.GetHardPodAffinitySymmetricWeight()
+	if hpa != 10 {
+		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
+	}
 }
 
 func TestCreateFromEmptyConfig(t *testing.T) {
@@ -148,6 +215,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 
 	configData = []byte(`{}`)
@@ -181,13 +249,13 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), testPod),
+		ResponseBody: runtime.EncodeOrDie(util.Test.Codec(), testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
 
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(testapi.Default.ResourcePath("pods", "bar", "foo"), &handler)
+	mux.Handle(util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
@@ -204,6 +272,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	queue := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
@@ -219,7 +288,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, testapi.Default.ResourcePath("pods", "bar", "foo"), "GET", nil)
+		handler.ValidateRequest(t, util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -281,9 +350,9 @@ func TestBind(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.Default.Codec(), item.binding)
+		expectedBody := runtime.EncodeOrDie(util.Test.Codec(), item.binding)
 		handler.ValidateRequest(t,
-			testapi.Default.SubResourcePath("pods", metav1.NamespaceDefault, "foo", "binding"),
+			util.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
 			"POST", &expectedBody)
 	}
 }
@@ -316,6 +385,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	// factory of "foo-scheduler"
 	factoryFooScheduler := NewConfigFactory(
@@ -330,6 +400,7 @@ func TestResponsibleForPod(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
+		enableEquivalenceCache,
 	)
 	// scheduler annotations to be tested
 	schedulerFitsDefault := "default-scheduler"
@@ -399,6 +470,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		-1,
+		enableEquivalenceCache,
 	)
 	_, err := factory.Create()
 	if err == nil {
@@ -444,6 +516,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			test.hardPodAffinitySymmetricWeight,
+			enableEquivalenceCache,
 		)
 		_, err := factory.Create()
 		if err == nil {
@@ -451,47 +524,4 @@ func TestInvalidFactoryArgs(t *testing.T) {
 		}
 	}
 
-}
-
-func TestNodeConditionPredicate(t *testing.T) {
-	nodeFunc := getNodeConditionPredicate()
-	nodeList := &v1.NodeList{
-		Items: []v1.Node{
-			// node1 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
-			// node2 ignored - node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
-			// node3 ignored - node out of disk
-			{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			// node4 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-
-			// node5 ignored - node out of disk
-			{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			// node6 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			// node7 ignored - node out of disk, node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			// node8 ignored - node not Ready
-			{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-
-			// node9 ignored - node unschedulable
-			{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
-			// node10 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
-			// node11 considered
-			{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
-		},
-	}
-
-	nodeNames := []string{}
-	for _, node := range nodeList.Items {
-		if nodeFunc(&node) {
-			nodeNames = append(nodeNames, node.Name)
-		}
-	}
-	expectedNodes := []string{"node1", "node4", "node6", "node10", "node11"}
-	if !reflect.DeepEqual(expectedNodes, nodeNames) {
-		t.Errorf("expected: %v, got %v", expectedNodes, nodeNames)
-	}
 }

@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -37,11 +36,11 @@ import (
 	"github.com/golang/glog"
 )
 
-// Converter is an interface for converting between runtime.Object
+// Converter is an interface for converting between interface{}
 // and map[string]interface representation.
 type Converter interface {
-	ToUnstructured(obj runtime.Object, u *map[string]interface{}) error
-	FromUnstructured(u map[string]interface{}, obj runtime.Object) error
+	ToUnstructured(obj interface{}) (map[string]interface{}, error)
+	FromUnstructured(u map[string]interface{}, obj interface{}) error
 }
 
 type structField struct {
@@ -92,7 +91,7 @@ func parseBool(key string) bool {
 	return value
 }
 
-// ConverterImpl knows how to convert betweek runtime.Object and
+// ConverterImpl knows how to convert between interface{} and
 // Unstructured in both ways.
 type converterImpl struct {
 	// If true, we will be additionally running conversion via json
@@ -107,10 +106,15 @@ func NewConverter(mismatchDetection bool) Converter {
 	}
 }
 
-func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj runtime.Object) error {
-	err := fromUnstructured(reflect.ValueOf(u), reflect.ValueOf(obj).Elem())
+func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj interface{}) error {
+	t := reflect.TypeOf(obj)
+	value := reflect.ValueOf(obj)
+	if t.Kind() != reflect.Ptr || value.IsNil() {
+		return fmt.Errorf("FromUnstructured requires a non-nil pointer to an object, got %v", t)
+	}
+	err := fromUnstructured(reflect.ValueOf(u), value.Elem())
 	if c.mismatchDetection {
-		newObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
 			glog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
@@ -122,7 +126,7 @@ func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj runtime.O
 	return err
 }
 
-func fromUnstructuredViaJSON(u map[string]interface{}, obj runtime.Object) error {
+func fromUnstructuredViaJSON(u map[string]interface{}, obj interface{}) error {
 	data, err := json.Marshal(u)
 	if err != nil {
 		return err
@@ -384,8 +388,14 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
-func (c *converterImpl) ToUnstructured(obj runtime.Object, u *map[string]interface{}) error {
-	err := toUnstructured(reflect.ValueOf(obj).Elem(), reflect.ValueOf(u).Elem())
+func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
+	t := reflect.TypeOf(obj)
+	value := reflect.ValueOf(obj)
+	if t.Kind() != reflect.Ptr || value.IsNil() {
+		return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
+	}
+	u := &map[string]interface{}{}
+	err := toUnstructured(value.Elem(), reflect.ValueOf(u).Elem())
 	if c.mismatchDetection {
 		newUnstr := &map[string]interface{}{}
 		newErr := toUnstructuredViaJSON(obj, newUnstr)
@@ -396,16 +406,25 @@ func (c *converterImpl) ToUnstructured(obj runtime.Object, u *map[string]interfa
 			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
 		}
 	}
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return *u, nil
 }
 
-func toUnstructuredViaJSON(obj runtime.Object, u *map[string]interface{}) error {
+func toUnstructuredViaJSON(obj interface{}, u *map[string]interface{}) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
 	return json.Unmarshal(data, u)
 }
+
+var (
+	nullBytes  = []byte("null")
+	trueBytes  = []byte("true")
+	falseBytes = []byte("false")
+)
 
 func toUnstructured(sv, dv reflect.Value) error {
 	st, dt := sv.Type(), dv.Type()
@@ -422,33 +441,58 @@ func toUnstructured(sv, dv reflect.Value) error {
 		if err != nil {
 			return err
 		}
-		if bytes.Equal(data, []byte("null")) {
+		switch {
+		case len(data) == 0:
+			return fmt.Errorf("error decoding from json: empty value")
+
+		case bytes.Equal(data, nullBytes):
 			// We're done - we don't need to store anything.
-		} else {
-			switch {
-			case len(data) > 0 && data[0] == '"':
-				var result string
-				err := json.Unmarshal(data, &result)
-				if err != nil {
-					return fmt.Errorf("error decoding from json: %v", err)
-				}
-				dv.Set(reflect.ValueOf(result))
-			case len(data) > 0 && data[0] == '{':
-				result := make(map[string]interface{})
-				err := json.Unmarshal(data, &result)
-				if err != nil {
-					return fmt.Errorf("error decoding from json: %v", err)
-				}
-				dv.Set(reflect.ValueOf(result))
-			default:
-				var result int64
-				err := json.Unmarshal(data, &result)
-				if err != nil {
-					return fmt.Errorf("error decoding from json: %v", err)
-				}
-				dv.Set(reflect.ValueOf(result))
+
+		case bytes.Equal(data, trueBytes):
+			dv.Set(reflect.ValueOf(true))
+
+		case bytes.Equal(data, falseBytes):
+			dv.Set(reflect.ValueOf(false))
+
+		case data[0] == '"':
+			var result string
+			err := json.Unmarshal(data, &result)
+			if err != nil {
+				return fmt.Errorf("error decoding string from json: %v", err)
+			}
+			dv.Set(reflect.ValueOf(result))
+
+		case data[0] == '{':
+			result := make(map[string]interface{})
+			err := json.Unmarshal(data, &result)
+			if err != nil {
+				return fmt.Errorf("error decoding object from json: %v", err)
+			}
+			dv.Set(reflect.ValueOf(result))
+
+		case data[0] == '[':
+			result := make([]interface{}, 0)
+			err := json.Unmarshal(data, &result)
+			if err != nil {
+				return fmt.Errorf("error decoding array from json: %v", err)
+			}
+			dv.Set(reflect.ValueOf(result))
+
+		default:
+			var (
+				resultInt   int64
+				resultFloat float64
+				err         error
+			)
+			if err = json.Unmarshal(data, &resultInt); err == nil {
+				dv.Set(reflect.ValueOf(resultInt))
+			} else if err = json.Unmarshal(data, &resultFloat); err == nil {
+				dv.Set(reflect.ValueOf(resultFloat))
+			} else {
+				return fmt.Errorf("error decoding number from json: %v", err)
 			}
 		}
+
 		return nil
 	}
 

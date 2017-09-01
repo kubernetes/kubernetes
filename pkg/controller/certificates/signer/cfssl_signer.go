@@ -25,9 +25,9 @@ import (
 	"os"
 	"time"
 
-	capi "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	certificatesinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 
 	"github.com/cloudflare/cfssl/config"
@@ -64,16 +64,16 @@ type cfsslSigner struct {
 func newCFSSLSigner(caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*cfsslSigner, error) {
 	ca, err := ioutil.ReadFile(caFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading CA cert file %q: %v", caFile, err)
 	}
 	cakey, err := ioutil.ReadFile(caKeyFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading CA key file %q: %v", caKeyFile, err)
 	}
 
 	parsedCa, err := helpers.ParseCertificatePEM(ca)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing CA cert file %q: %v", caFile, err)
 	}
 
 	strPassword := os.Getenv("CFSSL_CA_PK_PASSWORD")

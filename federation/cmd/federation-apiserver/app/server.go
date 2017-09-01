@@ -30,18 +30,20 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	apimachineryopenapi "k8s.io/apimachinery/pkg/openapi"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	apiv1 "k8s.io/api/core/v1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	clientset "k8s.io/client-go/kubernetes"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -86,7 +88,8 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// register all admission plugins
-	registerAllAdmissionPlugins(s.Admission.Plugins)
+	RegisterAllAdmissionPlugins(s.Admission.Plugins)
+
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err
@@ -100,6 +103,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
+	s.SecureServing.ForceLoopbackConfigUsage()
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
@@ -179,6 +183,10 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
+	externalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create external clientset: %v", err)
+	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
@@ -198,7 +206,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// NOTE: we do not provide informers to the quota registry because admission level decisions
 	// do not require us to open watches for all items tracked by quota.
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, nil, quotaRegistry)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, externalClient, sharedInformers, apiAuthorizer, cloudConfig, nil, quotaRegistry)
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
@@ -278,6 +286,12 @@ func defaultResourceConfig() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+	)
+	// All apps resources except these are disabled by default.
+	rc.EnableResources(
+		appsv1beta2.SchemeGroupVersion.WithResource("daemonsets"),
+		appsv1beta2.SchemeGroupVersion.WithResource("deployments"),
+		appsv1beta2.SchemeGroupVersion.WithResource("replicasets"),
 	)
 	return rc
 }
@@ -445,7 +459,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		}
 		s.Definitions[k] = spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Ref:         spec.MustCreateRef("#/definitions/" + apimachineryopenapi.EscapeJsonPointer(v)),
+				Ref:         spec.MustCreateRef("#/definitions/" + openapicommon.EscapeJsonPointer(v)),
 				Description: fmt.Sprintf("Deprecated. Please use %s instead.", v),
 			},
 		}

@@ -17,18 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
 
 // ExternalAdmissionHookConfigurationsGetter has a method to return a ExternalAdmissionHookConfigurationInterface.
 // A group's client should implement this interface.
 type ExternalAdmissionHookConfigurationsGetter interface {
-	ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationInterface
+	ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface
 }
 
 // ExternalAdmissionHookConfigurationInterface has methods to work with ExternalAdmissionHookConfiguration resources.
@@ -47,69 +47,19 @@ type ExternalAdmissionHookConfigurationInterface interface {
 // externalAdmissionHookConfigurations implements ExternalAdmissionHookConfigurationInterface
 type externalAdmissionHookConfigurations struct {
 	client rest.Interface
-	ns     string
 }
 
 // newExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurations
-func newExternalAdmissionHookConfigurations(c *AdmissionregistrationV1alpha1Client, namespace string) *externalAdmissionHookConfigurations {
+func newExternalAdmissionHookConfigurations(c *AdmissionregistrationV1alpha1Client) *externalAdmissionHookConfigurations {
 	return &externalAdmissionHookConfigurations{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
-}
-
-// Create takes the representation of a externalAdmissionHookConfiguration and creates it.  Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
-func (c *externalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
-	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("externaladmissionhookconfigurations").
-		Body(externalAdmissionHookConfiguration).
-		Do().
-		Into(result)
-	return
-}
-
-// Update takes the representation of a externalAdmissionHookConfiguration and updates it. Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
-func (c *externalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
-	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("externaladmissionhookconfigurations").
-		Name(externalAdmissionHookConfiguration.Name).
-		Body(externalAdmissionHookConfiguration).
-		Do().
-		Into(result)
-	return
-}
-
-// Delete takes name of the externalAdmissionHookConfiguration and deletes it. Returns an error if one occurs.
-func (c *externalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("externaladmissionhookconfigurations").
-		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *externalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("externaladmissionhookconfigurations").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Body(options).
-		Do().
-		Error()
 }
 
 // Get takes name of the externalAdmissionHookConfiguration, and returns the corresponding externalAdmissionHookConfiguration object, and an error if there is any.
 func (c *externalAdmissionHookConfigurations) Get(name string, options v1.GetOptions) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -122,7 +72,6 @@ func (c *externalAdmissionHookConfigurations) Get(name string, options v1.GetOpt
 func (c *externalAdmissionHookConfigurations) List(opts v1.ListOptions) (result *v1alpha1.ExternalAdmissionHookConfigurationList, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfigurationList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -134,17 +83,58 @@ func (c *externalAdmissionHookConfigurations) List(opts v1.ListOptions) (result 
 func (c *externalAdmissionHookConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
+}
+
+// Create takes the representation of a externalAdmissionHookConfiguration and creates it.  Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
+func (c *externalAdmissionHookConfigurations) Create(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
+	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
+	err = c.client.Post().
+		Resource("externaladmissionhookconfigurations").
+		Body(externalAdmissionHookConfiguration).
+		Do().
+		Into(result)
+	return
+}
+
+// Update takes the representation of a externalAdmissionHookConfiguration and updates it. Returns the server's representation of the externalAdmissionHookConfiguration, and an error, if there is any.
+func (c *externalAdmissionHookConfigurations) Update(externalAdmissionHookConfiguration *v1alpha1.ExternalAdmissionHookConfiguration) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
+	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
+	err = c.client.Put().
+		Resource("externaladmissionhookconfigurations").
+		Name(externalAdmissionHookConfiguration.Name).
+		Body(externalAdmissionHookConfiguration).
+		Do().
+		Into(result)
+	return
+}
+
+// Delete takes name of the externalAdmissionHookConfiguration and deletes it. Returns an error if one occurs.
+func (c *externalAdmissionHookConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+	return c.client.Delete().
+		Resource("externaladmissionhookconfigurations").
+		Name(name).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *externalAdmissionHookConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	return c.client.Delete().
+		Resource("externaladmissionhookconfigurations").
+		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Body(options).
+		Do().
+		Error()
 }
 
 // Patch applies the patch and returns the patched externalAdmissionHookConfiguration.
 func (c *externalAdmissionHookConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ExternalAdmissionHookConfiguration, err error) {
 	result = &v1alpha1.ExternalAdmissionHookConfiguration{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("externaladmissionhookconfigurations").
 		SubResource(subresources...).
 		Name(name).

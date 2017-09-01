@@ -17,6 +17,10 @@
 # Script that starts kubelet on kubemark-master as a supervisord process
 # and then runs the master components as pods using kubelet.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 # Define key path variables.
 KUBE_ROOT="/home/kubernetes"
 KUBE_BINDIR="${KUBE_ROOT}/kubernetes/server/bin"
@@ -93,7 +97,6 @@ function safe-format-and-mount() {
 		mkfs.ext4 -F "${device}"
 	fi
 
-	mkdir -p "${mountpoint}"
 	echo "Mounting '${device}' at '${mountpoint}'"
 	mount -o discard,defaults "${device}" "${mountpoint}"
 }
@@ -336,8 +339,12 @@ function compute-etcd-events-params {
 function compute-kube-apiserver-params {
 	local params="${APISERVER_TEST_ARGS:-}"
 	params+=" --insecure-bind-address=0.0.0.0"
-	params+=" --etcd-servers=http://127.0.0.1:2379"
-	params+=" --etcd-servers-overrides=/events#${EVENT_STORE_URL}"
+	if [[ -z "${ETCD_SERVERS:-}" ]]; then
+		params+=" --etcd-servers=http://127.0.0.1:2379"
+		params+=" --etcd-servers-overrides=/events#${EVENT_STORE_URL}"
+	else
+		params+=" --etcd-servers=${ETCD_SERVERS}"
+	fi
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
@@ -348,7 +355,7 @@ function compute-kube-apiserver-params {
 	params+=" --storage-backend=${STORAGE_BACKEND}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
-	params+=" --authorization-mode=RBAC"
+	params+=" --authorization-mode=Node,RBAC"
 	echo "${params}"
 }
 
@@ -493,9 +500,17 @@ start-kubemaster-component "kube-controller-manager"
 start-kubemaster-component "kube-scheduler"
 start-kubemaster-component "kube-addon-manager"
 
-# Wait till apiserver is working fine.
+# Wait till apiserver is working fine or timeout.
+echo -n "Waiting for apiserver to be healthy"
+start=$(date +%s)
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
+	echo -n "."
 	sleep 1
+	now=$(date +%s)
+	if [ $((now - start)) -gt 300 ]; then
+		echo "Timeout!"
+		exit 1
+	fi
 done
 
 echo "Done for the configuration for kubermark master"

@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -221,7 +221,7 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 func TestNodeAllocatableInputValidation(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
 	highMemoryEvictionThreshold := resource.MustParse("2Gi")
-	testCases := []struct {
+	cpuMemTestCases := []struct {
 		kubeReserved         v1.ResourceList
 		systemReserved       v1.ResourceList
 		capacity             v1.ResourceList
@@ -279,7 +279,7 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 			invalidConfiguration: true,
 		},
 	}
-	for _, tc := range testCases {
+	for _, tc := range cpuMemTestCases {
 		nc := NodeConfig{
 			NodeAllocatableConfig: NodeAllocatableConfig{
 				KubeReserved:   tc.kubeReserved,
@@ -297,9 +297,74 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 			NodeConfig: nc,
 			capacity:   tc.capacity,
 		}
-		if err := cm.validateNodeAllocatable(); err != nil && !tc.invalidConfiguration {
+		err := cm.validateNodeAllocatable()
+		if err == nil && tc.invalidConfiguration {
+			t.Logf("Expected invalid node allocatable configuration")
+			t.FailNow()
+		} else if err != nil && !tc.invalidConfiguration {
 			t.Logf("Expected valid node allocatable configuration: %v", err)
 			t.FailNow()
 		}
 	}
+
+	storageEvictionThreshold := resource.MustParse("100Mi")
+	storageTestCases := []struct {
+		kubeReserved         v1.ResourceList
+		systemReserved       v1.ResourceList
+		capacity             v1.ResourceList
+		hardThreshold        evictionapi.ThresholdValue
+		invalidConfiguration bool
+	}{
+		{
+			kubeReserved:   getEphemeralStorageResourceList("100Mi"),
+			systemReserved: getEphemeralStorageResourceList("50Mi"),
+			capacity:       getEphemeralStorageResourceList("500Mi"),
+		},
+		{
+			kubeReserved:   getEphemeralStorageResourceList("10Gi"),
+			systemReserved: getEphemeralStorageResourceList("10Gi"),
+			hardThreshold: evictionapi.ThresholdValue{
+				Quantity: &storageEvictionThreshold,
+			},
+			capacity:             getEphemeralStorageResourceList("20Gi"),
+			invalidConfiguration: true,
+		},
+	}
+	for _, tc := range storageTestCases {
+		nc := NodeConfig{
+			NodeAllocatableConfig: NodeAllocatableConfig{
+				KubeReserved:   tc.kubeReserved,
+				SystemReserved: tc.systemReserved,
+				HardEvictionThresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalNodeFsAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value:    tc.hardThreshold,
+					},
+				},
+			},
+		}
+		cm := &containerManagerImpl{
+			NodeConfig: nc,
+			capacity:   tc.capacity,
+		}
+		err := cm.validateNodeAllocatable()
+		if err == nil && tc.invalidConfiguration {
+			t.Logf("Expected invalid node allocatable configuration")
+			t.FailNow()
+		} else if err != nil && !tc.invalidConfiguration {
+			t.Logf("Expected valid node allocatable configuration: %v", err)
+			t.FailNow()
+		}
+	}
+}
+
+// getEphemeralStorageResourceList returns a ResourceList with the
+// specified ephemeral storage resource values
+func getEphemeralStorageResourceList(storage string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if storage != "" {
+		res[v1.ResourceEphemeralStorage] = resource.MustParse(storage)
+	}
+	return res
 }

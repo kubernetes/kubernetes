@@ -31,7 +31,6 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -61,24 +60,27 @@ type ScaleStatus struct {
 	Selector *metav1.LabelSelector
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Dummy definition
 type ReplicationControllerDummy struct {
@@ -108,8 +110,9 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -127,6 +130,8 @@ type ThirdPartyResource struct {
 	// Versions are versions for this third party object
 	Versions []APIVersion
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ThirdPartyResourceList struct {
 	metav1.TypeMeta
@@ -146,6 +151,8 @@ type APIVersion struct {
 	Name string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // An internal object, used for versioned storage in etcd.  Not exposed to the end user.
 type ThirdPartyResourceData struct {
 	metav1.TypeMeta
@@ -158,7 +165,8 @@ type ThirdPartyResourceData struct {
 	Data []byte
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Deployment struct {
 	metav1.TypeMeta
@@ -208,6 +216,7 @@ type DeploymentSpec struct {
 	// +optional
 	Paused bool
 
+	// DEPRECATED.
 	// The config this deployment is rolling back to. Will be cleared after rollback is done.
 	// +optional
 	RollbackTo *RollbackConfig
@@ -222,6 +231,9 @@ type DeploymentSpec struct {
 	ProgressDeadlineSeconds *int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
 	metav1.TypeMeta
@@ -234,8 +246,9 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig
 }
 
+// DEPRECATED.
 type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollbck to the last revision.
+	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
 	Revision int64
 }
@@ -332,7 +345,7 @@ type DeploymentStatus struct {
 	// field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ReplicaSet.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 type DeploymentConditionType string
@@ -368,6 +381,8 @@ type DeploymentCondition struct {
 	Message string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type DeploymentList struct {
 	metav1.TypeMeta
 	// +optional
@@ -386,7 +401,7 @@ type DaemonSetUpdateStrategy struct {
 	// Rolling update config params. Present only if type = "RollingUpdate".
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
-	// to be. Same as DeploymentStrategy.RollingUpdate.
+	// to be. Same as Deployment `strategy.rollingUpdate`.
 	// See https://github.com/kubernetes/kubernetes/issues/35345
 	// +optional
 	RollingUpdate *RollingUpdateDaemonSet
@@ -449,10 +464,17 @@ type DaemonSetSpec struct {
 	// +optional
 	MinReadySeconds int32
 
+	// DEPRECATED.
 	// A sequence number representing a specific generation of the template.
 	// Populated by the system. It can be set only during the creation.
 	// +optional
 	TemplateGeneration int64
+
+	// The number of old history to retain to allow rollback.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 10.
+	// +optional
+	RevisionHistoryLimit *int32
 }
 
 // DaemonSetStatus represents the current status of a daemon set.
@@ -492,20 +514,27 @@ type DaemonSetStatus struct {
 	// (ready for at least spec.minReadySeconds)
 	// +optional
 	NumberUnavailable int32
+
+	// Count of hash collisions for the DaemonSet. The DaemonSet controller
+	// uses this field as a collision avoidance mechanism when it needs to
+	// create the name for the newest ControllerRevision.
+	// +optional
+	CollisionCount *int32
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// The desired behavior of this daemon set.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec DaemonSetSpec
 
@@ -513,23 +542,26 @@ type DaemonSet struct {
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status DaemonSetStatus
 }
 
 const (
+	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -537,17 +569,20 @@ type DaemonSetList struct {
 	Items []DaemonSet
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ThirdPartyResourceDataList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 	// Items is a list of third party objects
 	Items []ThirdPartyResourceData
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
@@ -556,26 +591,28 @@ type ThirdPartyResourceDataList struct {
 type Ingress struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the desired state of the Ingress.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Spec IngressSpec
 
 	// Status is the current state of the Ingress.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status IngressStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -713,7 +750,8 @@ type IngressBackend struct {
 	ServicePort intstr.IntOrString
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a replica set.
 type ReplicaSet struct {
@@ -730,6 +768,8 @@ type ReplicaSet struct {
 	// +optional
 	Status ReplicaSetStatus
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
@@ -819,8 +859,9 @@ type ReplicaSetCondition struct {
 	Message string
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.
@@ -884,6 +925,14 @@ type PodSecurityPolicySpec struct {
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool
+	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
+	// process can gain more privileges than its parent process.
+	// +optional
+	DefaultAllowPrivilegeEscalation *bool
+	// AllowPrivilegeEscalation determines if a pod can request to allow
+	// privilege escalation.
+	// +optional
+	AllowPrivilegeEscalation bool
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
@@ -922,6 +971,7 @@ var (
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
 	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	StorageOS             FSType = "storageos"
 	Projected             FSType = "projected"
 	PortworxVolume        FSType = "portworxVolume"
 	ScaleIO               FSType = "scaleIO"
@@ -933,7 +983,7 @@ type SELinuxStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy
 	// seLinuxOptions required to run as; required for MustRunAs
-	// More info: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/security_context.md
+	// More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
 	// +optional
 	SELinuxOptions *api.SELinuxOptions
 }
@@ -961,17 +1011,17 @@ type RunAsUserStrategyOptions struct {
 // UserIDRange provides a min/max of an allowed range of UserIDs.
 type UserIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min types.UnixUserID
+	Min int64
 	// Max is the end of the range, inclusive.
-	Max types.UnixUserID
+	Max int64
 }
 
 // GroupIDRange provides a min/max of an allowed range of GroupIDs.
 type GroupIDRange struct {
 	// Min is the start of the range, inclusive.
-	Min types.UnixGroupID
+	Min int64
 	// Max is the end of the range, inclusive.
-	Max types.UnixGroupID
+	Max int64
 }
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
@@ -1031,6 +1081,8 @@ const (
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta
@@ -1038,96 +1090,4 @@ type PodSecurityPolicyList struct {
 	metav1.ListMeta
 
 	Items []PodSecurityPolicy
-}
-
-// +genclient=true
-
-// NetworkPolicy describes what network traffic is allowed for a set of Pods
-type NetworkPolicy struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-
-	// Specification of the desired behavior for this NetworkPolicy.
-	// +optional
-	Spec NetworkPolicySpec
-}
-
-type NetworkPolicySpec struct {
-	// Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
-	// is applied to any pods selected by this field. Multiple network policies can select the
-	// same set of pods.  In this case, the ingress rules for each are combined additively.
-	// This field is NOT optional and follows standard label selector semantics.
-	// An empty podSelector matches all pods in this namespace.
-	PodSelector metav1.LabelSelector
-
-	// List of ingress rules to be applied to the selected pods.
-	// Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
-	// OR if the traffic source is the pod's local node,
-	// OR if the traffic matches at least one ingress rule across all of the NetworkPolicy
-	// objects whose podSelector matches the pod.
-	// If this field is empty then this NetworkPolicy does not allow any traffic
-	// (and serves solely to ensure that the pods it selects are isolated by default).
-	// +optional
-	Ingress []NetworkPolicyIngressRule
-}
-
-// This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
-type NetworkPolicyIngressRule struct {
-	// List of ports which should be made accessible on the pods selected for this rule.
-	// Each item in this list is combined using a logical OR.
-	// If this field is empty or missing, this rule matches all ports (traffic not restricted by port).
-	// If this field is present and contains at least one item, then this rule allows traffic
-	// only if the traffic matches at least one port in the list.
-	// +optional
-	Ports []NetworkPolicyPort
-
-	// List of sources which should be able to access the pods selected for this rule.
-	// Items in this list are combined using a logical OR operation.
-	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
-	// If this field is present and contains at least on item, this rule allows traffic only if the
-	// traffic matches at least one item in the from list.
-	// +optional
-	From []NetworkPolicyPeer
-}
-
-type NetworkPolicyPort struct {
-	// Optional.  The protocol (TCP or UDP) which traffic must match.
-	// If not specified, this field defaults to TCP.
-	// +optional
-	Protocol *api.Protocol
-
-	// If specified, the port on the given protocol.  This can
-	// either be a numerical or named port on a pod.  If this field is not provided,
-	// this matches all port names and numbers.
-	// If present, only traffic on the specified protocol AND port
-	// will be matched.
-	// +optional
-	Port *intstr.IntOrString
-}
-
-type NetworkPolicyPeer struct {
-	// Exactly one of the following must be specified.
-
-	// This is a label selector which selects Pods in this namespace.
-	// This field follows standard label selector semantics.
-	// If present but empty, this selector selects all pods in this namespace.
-	// +optional
-	PodSelector *metav1.LabelSelector
-
-	// Selects Namespaces using cluster scoped-labels.  This
-	// matches all pods in all namespaces selected by this label selector.
-	// This field follows standard label selector semantics.
-	// If present but empty, this selector selects all namespaces.
-	// +optional
-	NamespaceSelector *metav1.LabelSelector
-}
-
-// NetworkPolicyList is a list of NetworkPolicy objects.
-type NetworkPolicyList struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	Items []NetworkPolicy
 }

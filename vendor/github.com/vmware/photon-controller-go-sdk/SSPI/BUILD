@@ -1,16 +1,16 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["sspi_unsupported.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "sspi_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "sspi.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -24,4 +24,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

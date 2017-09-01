@@ -28,6 +28,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,32 +38,76 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
-func TestNewGarbageCollector(t *testing.T) {
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (_ *testRESTMapper) Reset() {}
+
+func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	tweakableRM := meta.NewDefaultRESTMapper(nil, nil)
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, api.Registry.RESTMapper()}}
+	metaOnlyClientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, rm, dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{
 		{Version: "v1", Resource: "pods"}: {},
-		// no monitor will be constructed for non-core resource, the GC construction will not fail.
+	}
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:                     {},
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
-
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource, ignoredResources, sharedInformers)
+
+	// No monitor will be constructed for the non-core resource, but the GC
+	// construction will not fail.
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure resource monitor syncing creates and stops resource monitors.
+	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
+	err = gc.resyncMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
+	}
+	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
+
+	// Make sure the syncing mechanism also works after Run() has been called
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go gc.Run(1, stopCh)
+
+	err = gc.resyncMonitors(twoResources)
+	if err != nil {
+		t.Errorf("Failed adding a monitor: %v", err)
+	}
+	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
+
+	err = gc.resyncMonitors(podResource)
+	if err != nil {
+		t.Errorf("Failed removing a monitor: %v", err)
 	}
 	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 }
@@ -131,7 +176,9 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	podResource := map[schema.GroupVersionResource]struct{}{{Version: "v1", Resource: "pods"}: {}}
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, api.Registry.RESTMapper(), podResource, ignoredResources, sharedInformers)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, &testRESTMapper{api.Registry.RESTMapper()}, podResource, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +319,7 @@ func TestProcessEvent(t *testing.T) {
 	var testScenarios = []struct {
 		name string
 		// a series of events that will be supplied to the
-		// GraphBuilder.eventQueue.
+		// GraphBuilder.graphChanges.
 		events []event
 	}{
 		{
@@ -315,9 +362,12 @@ func TestProcessEvent(t *testing.T) {
 		},
 	}
 
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		dependencyGraphBuilder := &GraphBuilder{
-			graphChanges: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			informersStarted: alwaysStarted,
+			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
 				uidToNodeLock: sync.RWMutex{},
 				uidToNode:     make(map[types.UID]*node),
@@ -584,5 +634,39 @@ func TestUnblockOwnerReference(t *testing.T) {
 		for _, ref := range got.OwnerReferences {
 			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
 		}
+	}
+}
+
+func TestOrphanDependentsFailure(t *testing.T) {
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
+				409,
+				[]byte{},
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+
+	gc := setupGC(t, clientConfig)
+	defer close(gc.stop)
+
+	dependents := []*node{
+		{
+			identity: objectReference{
+				OwnerReference: metav1.OwnerReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       "pod",
+				},
+				Namespace: "ns1",
+			},
+		},
+	}
+	err := gc.orphanDependents(objectReference{}, dependents)
+	expected := `the server reported a conflict (patch pods pod)`
+	if err == nil || !strings.Contains(err.Error(), expected) {
+		t.Errorf("expected error contains text %s, got %v", expected, err)
 	}
 }

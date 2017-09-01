@@ -60,7 +60,7 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: 50m
+            cpu: 40m
             memory: 100M
         securityContext:
           privileged: true
@@ -91,7 +91,7 @@ spec:
             cpu: {{HOLLOW_PROXY_CPU}}m
             memory: {{HOLLOW_PROXY_MEM}}Ki
       - name: hollow-node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.3.0
+        image: gcr.io/google_containers/node-problem-detector:v0.4.1
         env:
         - name: NODE_NAME
           valueFrom:

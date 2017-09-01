@@ -66,7 +66,7 @@ func (s *storage) GetDeployment(ctx genericapirequest.Context, deploymentID stri
 }
 
 func (s *storage) CreateDeployment(ctx genericapirequest.Context, deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	obj, err := s.Create(ctx, deployment)
+	obj, err := s.Create(ctx, deployment, false)
 	if err != nil {
 		return nil, err
 	}

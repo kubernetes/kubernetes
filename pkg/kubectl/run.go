@@ -21,16 +21,16 @@ import (
 	"strconv"
 	"strings"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 type DeploymentV1Beta1 struct{}
@@ -52,6 +52,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -141,6 +142,7 @@ func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -306,6 +308,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 		{"requests", false},
 		{"limits", false},
 		{"restart", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -400,6 +403,7 @@ func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 		{"limits", false},
 		{"restart", false},
 		{"schedule", true},
+		{"serviceaccount", false},
 	}
 }
 
@@ -498,6 +502,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -603,6 +608,7 @@ func makePodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 	}
 
 	spec := v1.PodSpec{
+		ServiceAccountName: params["serviceaccount"],
 		Containers: []v1.Container{
 			{
 				Name:      name,
@@ -761,6 +767,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"serviceaccount", false},
 	}
 }
 
@@ -821,6 +828,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 			Labels: labels,
 		},
 		Spec: v1.PodSpec{
+			ServiceAccountName: params["serviceaccount"],
 			Containers: []v1.Container{
 				{
 					Name:            name,
@@ -860,17 +868,11 @@ func parseEnvs(envArray []string) ([]v1.EnvVar, error) {
 		if len(name) == 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
-		if len(validation.IsCIdentifier(name)) != 0 {
+		if len(validation.IsEnvVarName(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}
 		envs = append(envs, envVar)
 	}
 	return envs, nil
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

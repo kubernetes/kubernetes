@@ -29,8 +29,8 @@ KUBE_OLD_API_VERSION=${KUBE_OLD_API_VERSION:-"v1"}
 # The new api version
 KUBE_NEW_API_VERSION=${KUBE_NEW_API_VERSION:-"v1"}
 
-KUBE_OLD_STORAGE_VERSIONS=${KUBE_OLD_STORAGE_VERSIONs:-""}
-KUBE_NEW_STORAGE_VERSIONS=${KUBE_NEW_STORAGE_VERSIONs:-""}
+KUBE_OLD_STORAGE_VERSIONS=${KUBE_OLD_STORAGE_VERSIONS:-""}
+KUBE_NEW_STORAGE_VERSIONS=${KUBE_NEW_STORAGE_VERSIONS:-""}
 
 STORAGE_BACKEND_ETCD2="etcd2"
 STORAGE_BACKEND_ETCD3="etcd3"
@@ -107,17 +107,15 @@ echo "${ETCD_VERSION}/${STORAGE_BACKEND_ETCD2}" > "${ETCD_DIR}/version.txt"
 
 ### BEGIN TEST DEFINITION CUSTOMIZATION ###
 
-# After removing HPA in v1beta1 there is basically no resource which has
-# two versions. In the future we may want to extend it.
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-test/fixtures/doc-yaml/user-guide/pod.yaml,pods,default,nginx,v1,v1
+examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1
 )
 
-KUBE_OLD_API_VERSION="v1,extensions/v1beta1"
-KUBE_NEW_API_VERSION="v1,extensions/v1beta1"
-KUBE_OLD_STORAGE_VERSIONS="v1"
-KUBE_NEW_STORAGE_VERSIONS="v1"
+KUBE_OLD_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1beta1,extensions/v1beta1"
+KUBE_NEW_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1,extensions/v1beta1"
+KUBE_OLD_STORAGE_VERSIONS="storage.k8s.io/v1beta1"
+KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 
 ### END TEST DEFINITION CUSTOMIZATION ###
 
@@ -126,8 +124,8 @@ KUBE_NEW_STORAGE_VERSIONS="v1"
 # but KUBE_OLD_API_VERSION is the latest (storage) version.
 # Additionally use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
-KUBE_API_VERSIONS="${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/${KUBE_OLD_API_VERSION}=true,api/${KUBE_NEW_API_VERSION}=true"
+KUBE_API_VERSIONS="v1,${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
+RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${STORAGE_BACKEND_ETCD2} ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 
@@ -145,15 +143,18 @@ for test in ${tests[@]}; do
   name=${test_data[3]}
   old_storage_version=${test_data[4]}
 
-  kube::log::status "Verifying ${resource}/${namespace}/${name} has storage version ${old_storage_version} in etcd"
-  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/${ETCD_PREFIX}/${resource}/${namespace}/${name} | grep ${old_storage_version}
+  if [ -n "${namespace}" ]; then
+    namespace="${namespace}/"
+  fi
+  kube::log::status "Verifying ${resource}/${namespace}${name} has storage version ${old_storage_version} in etcd"
+  curl -s http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/${ETCD_PREFIX}/${resource}/${namespace}${name} | grep ${old_storage_version}
 done
 
 killApiServer
 
 
 #######################################################
-# Step 2: Perform etcd2 -> etcd migration.
+# Step 2: Perform etcd2 -> etcd3 migration.
 # We always perform offline migration, so we need to stop etcd.
 #######################################################
 
@@ -175,8 +176,8 @@ kube::etcd::start
 # Still use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
 
-KUBE_API_VERSIONS="${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/${KUBE_OLD_API_VERSION}=true,api/${KUBE_NEW_API_VERSION}=true"
+KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
+RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${STORAGE_BACKEND_ETCD3} ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 # Update etcd objects, so that will now be stored in the new api version.
@@ -191,8 +192,11 @@ for test in ${tests[@]}; do
   name=${test_data[3]}
   new_storage_version=${test_data[5]}
 
-  kube::log::status "Verifying ${resource}/${namespace}/${name} has updated storage version ${new_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}/${name}" | grep ${new_storage_version}
+  if [ -n "${namespace}" ]; then
+    namespace="${namespace}/"
+  fi
+  kube::log::status "Verifying ${resource}/${namespace}${name} has updated storage version ${new_storage_version} in etcd"
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${new_storage_version}
 done
 
 killApiServer
@@ -203,8 +207,8 @@ killApiServer
 # However, change storage encoding to KUBE_STORAGE_MEDIA_TYPE_PROTOBUF.
 #######################################################
 
-KUBE_API_VERSIONS="${KUBE_NEW_API_VERSION}"
-RUNTIME_CONFIG="api/all=false,api/${KUBE_NEW_API_VERSION}=true"
+KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION}"
+RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_NEW_API_VERSION}=true"
 
 # This seems to reduce flakiness.
 sleep 1
@@ -215,10 +219,18 @@ for test in ${tests[@]}; do
   resource=${test_data[1]}
   namespace=${test_data[2]}
   name=${test_data[3]}
+  namespace_flag=""
 
   # Verify that the server is able to read the object.
-  kube::log::status "Verifying we can retrieve ${resource}/${namespace}/${name} via kubectl"
-  ${KUBECTL} get --namespace=${namespace} ${resource}/${name}
+  if [ -n "${namespace}" ]; then
+    namespace_flag="--namespace=${namespace}"
+    namespace="${namespace}/"
+  fi
+  kube::log::status "Verifying we can retrieve ${resource}/${namespace}${name} via kubectl"
+  # We have to remove the cached discovery information about the old version; otherwise,
+  # the 'kubectl get' will use that and fail to find the resource.
+  rm -rf ${HOME}/.kube/cache/discovery/localhost_8080/${KUBE_OLD_STORAGE_VERSIONS}
+  ${KUBECTL} get ${namespace_flag} ${resource}/${name}
 done
 
 killApiServer

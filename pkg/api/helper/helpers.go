@@ -53,6 +53,9 @@ var Semantic = conversion.EqualitiesOrDie(
 		// Uninitialized quantities are equivalent to 0 quantities.
 		return a.Cmp(b) == 0
 	},
+	func(a, b metav1.MicroTime) bool {
+		return a.UTC() == b.UTC()
+	},
 	func(a, b metav1.Time) bool {
 		return a.UTC() == b.UTC()
 	},
@@ -104,12 +107,28 @@ func IsResourceQuotaScopeValidForResource(scope api.ResourceQuotaScope, resource
 var standardContainerResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
+}
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name api.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name api.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), api.ResourceDefaultNamespacePrefix)
 }
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -128,6 +147,15 @@ func OpaqueIntResourceName(name string) api.ResourceName {
 	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceOpaqueIntPrefix, name))
 }
 
+var overcommitBlacklist = sets.NewString(string(api.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name api.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!overcommitBlacklist.Has(string(name))
+}
+
 var standardLimitRangeTypes = sets.NewString(
 	string(api.LimitTypePod),
 	string(api.LimitTypeContainer),
@@ -142,11 +170,14 @@ func IsStandardLimitRangeType(str string) bool {
 var standardQuotaResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -167,10 +198,13 @@ func IsStandardQuotaResourceName(str string) bool {
 var standardResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -180,6 +214,8 @@ var standardResources = sets.NewString(
 	string(api.ResourcePersistentVolumeClaims),
 	string(api.ResourceStorage),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceServicesNodePorts),
+	string(api.ResourceServicesLoadBalancers),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
@@ -201,7 +237,7 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsOpaqueIntResourceName(api.ResourceName(str))
+	return integerResources.Has(str) || IsExtendedResourceName(api.ResourceName(str))
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -222,6 +258,7 @@ func IsServiceIPRequested(service *api.Service) bool {
 var standardFinalizers = sets.NewString(
 	string(api.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
 )
 
 // HasAnnotation returns a bool if passed in annotation exists
@@ -518,21 +555,6 @@ func PodAnnotationsFromSysctls(sysctls []api.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-// TODO: remove when alpha support for affinity is removed
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*api.Affinity, error) {
-	if len(annotations) > 0 && annotations[api.AffinityAnnotationKey] != "" {
-		var affinity api.Affinity
-		err := json.Unmarshal([]byte(annotations[api.AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *api.PersistentVolume) string {
 	// Use beta annotation first
@@ -590,6 +612,10 @@ func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*api.N
 // Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
 // TODO: update when storage node affinity graduates to beta
 func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *api.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
 	json, err := json.Marshal(*affinity)
 	if err != nil {
 		return err

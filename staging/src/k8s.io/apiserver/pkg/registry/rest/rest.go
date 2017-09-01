@@ -23,6 +23,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -70,6 +71,12 @@ type ShortNamesProvider interface {
 	ShortNames() []string
 }
 
+// CategoriesProvider allows a resource to specify which groups of resources (categories) it's part of. Categories can
+// be used by API clients to refer to a batch of resources by using a single name (e.g. "all" could translate to "pod,rc,svc,...").
+type CategoriesProvider interface {
+	Categories() []string
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.
@@ -79,7 +86,9 @@ type Lister interface {
 	List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
-// Exporter is an object that knows how to strip a RESTful resource for export
+// Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
+// if export is generally supported for that type. Errors can still be returned during the actual Export when certain
+// instances of the type are not exportable.
 type Exporter interface {
 	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
 	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
@@ -114,6 +123,10 @@ type GetterWithOptions interface {
 	// will convert the trailing request scheme value to "path" in the map[string][]string
 	// passed to the converter.
 	NewGetOptions() (runtime.Object, bool, string)
+}
+
+type TableConvertor interface {
+	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error)
 }
 
 // Deleter is an object that can delete a named RESTful resource.
@@ -169,8 +182,9 @@ type Creater interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
 
-	// Create creates a new version of a resource.
-	Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error)
+	// Create creates a new version of a resource. If includeUninitialized is set, the object may be returned
+	// without completing initialization.
+	Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error)
 }
 
 // NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
@@ -181,8 +195,9 @@ type NamedCreater interface {
 
 	// Create creates a new version of a resource. It expects a name parameter from the path.
 	// This is needed for create operations on subresources which include the name of the parent
-	// resource in the path.
-	Create(ctx genericapirequest.Context, name string, obj runtime.Object) (runtime.Object, error)
+	// resource in the path. If includeUninitialized is set, the object may be returned without
+	// completing initialization.
+	Create(ctx genericapirequest.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error)
 }
 
 // UpdatedObjectInfo provides information about an updated object to an Updater.
@@ -306,6 +321,8 @@ type StorageMetadata interface {
 	ProducesObject(verb string) interface{}
 }
 
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // ConnectRequest is an object passed to admission control for Connect operations
 type ConnectRequest struct {
 	// Name is the name of the object on which the connect request was made

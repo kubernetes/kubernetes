@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,10 +10,19 @@ go_library(
     srcs = [
         "doc.go",
         "selinux.go",
-        "selinux_linux.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor/github.com/opencontainers/runc/libcontainer/selinux:go_default_library"],
+        "selinux_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "selinux_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/selinux:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

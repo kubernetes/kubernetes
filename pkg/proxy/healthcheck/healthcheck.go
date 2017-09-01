@@ -28,12 +28,15 @@ import (
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+var nodeHealthzRetryInterval = 60 * time.Second
 
 // Server serves HTTP endpoints for each service name, with results
 // based on the endpoints.  If there are 0 endpoints for a service, it returns a
@@ -156,12 +159,12 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
-					&clientv1.ObjectReference{
+					&v1.ObjectReference{
 						Kind:      "Service",
 						Namespace: nsn.Namespace,
 						Name:      nsn.Name,
 						UID:       types.UID(nsn.String()),
-					}, api.EventTypeWarning, "FailedToStartHealthcheck", msg)
+					}, api.EventTypeWarning, "FailedToStartServiceHealthcheck", msg)
 			}
 			glog.Error(msg)
 			continue
@@ -259,16 +262,18 @@ type HealthzServer struct {
 	addr          string
 	port          int32
 	healthTimeout time.Duration
+	recorder      record.EventRecorder
+	nodeRef       *v1.ObjectReference
 
 	lastUpdated atomic.Value
 }
 
 // NewDefaultHealthzServer returns a default healthz http server.
-func NewDefaultHealthzServer(addr string, healthTimeout time.Duration) *HealthzServer {
-	return newHealthzServer(nil, nil, nil, addr, healthTimeout)
+func NewDefaultHealthzServer(addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *HealthzServer {
+	return newHealthzServer(nil, nil, nil, addr, healthTimeout, recorder, nodeRef)
 }
 
-func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c clock.Clock, addr string, healthTimeout time.Duration) *HealthzServer {
+func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, recorder record.EventRecorder, nodeRef *v1.ObjectReference) *HealthzServer {
 	if listener == nil {
 		listener = stdNetListener{}
 	}
@@ -284,6 +289,8 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 		clock:         c,
 		addr:          addr,
 		healthTimeout: healthTimeout,
+		recorder:      recorder,
+		nodeRef:       nodeRef,
 	}
 }
 
@@ -297,19 +304,26 @@ func (hs *HealthzServer) Run() {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
 	server := hs.httpFactory.New(hs.addr, serveMux)
-	listener, err := hs.listener.Listen(hs.addr)
-	if err != nil {
-		glog.Errorf("Failed to start healthz on %s: %v", hs.addr, err)
-		return
-	}
-	go func() {
+
+	go wait.Until(func() {
 		glog.V(3).Infof("Starting goroutine for healthz on %s", hs.addr)
-		if err := server.Serve(listener); err != nil {
-			glog.Errorf("Healhz closed: %v", err)
+
+		listener, err := hs.listener.Listen(hs.addr)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to start node healthz on %s: %v", hs.addr, err)
+			if hs.recorder != nil {
+				hs.recorder.Eventf(hs.nodeRef, api.EventTypeWarning, "FailedToStartNodeHealthcheck", msg)
+			}
+			glog.Error(msg)
 			return
 		}
-		glog.Errorf("Unexpected healhz closed.")
-	}()
+
+		if err := server.Serve(listener); err != nil {
+			glog.Errorf("Healthz closed with error: %v", err)
+			return
+		}
+		glog.Errorf("Unexpected healthz closed.")
+	}, nodeHealthzRetryInterval, wait.NeverStop)
 }
 
 type healthzHandler struct {

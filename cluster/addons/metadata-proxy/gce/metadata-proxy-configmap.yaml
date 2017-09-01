@@ -1,0 +1,60 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: metadata-proxy-config
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+data:
+  nginx.conf: |-
+    user www-data;
+    worker_processes 4;
+    pid /run/nginx.pid;
+    error_log /dev/stdout;
+
+    events {
+      worker_connections 20;
+    }
+
+    http {
+      access_log /dev/stdout;
+      server {
+        listen 127.0.0.1:988;
+
+        # By default, return 403. This protects us from new API versions.
+        location / {
+            return 403;
+        }
+
+        # Allow for REST discovery.
+        location = / {
+            proxy_pass http://169.254.169.254;
+        }
+        location = /computeMetadata/ {
+            proxy_pass http://169.254.169.254;
+        }
+
+        # By default, allow the v0.1, v1beta1, and v1 APIs.
+        location /0.1/ {
+            proxy_pass http://169.254.169.254;
+        }
+        location /computeMetadata/v1beta1/ {
+            proxy_pass http://169.254.169.254;
+        }
+        location /computeMetadata/v1/ {
+            proxy_pass http://169.254.169.254;
+        }
+
+        # Return a 403 for the kube-env attribute in all allowed API versions.
+        location /0.1/meta-data/attributes/kube-env {
+            return 403;
+        }
+        location /computeMetadata/v1beta1/instance/attributes/kube-env {
+            return 403;
+        }
+        location /computeMetadata/v1/instance/attributes/kube-env {
+            return 403;
+        }
+      }
+    }
+

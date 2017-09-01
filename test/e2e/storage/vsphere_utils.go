@@ -23,16 +23,17 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -160,13 +161,13 @@ func getVSpherePersistentVolumeClaimSpec(namespace string, labels map[string]str
 }
 
 // function to create vmdk volume
-func createVSphereVolume(vsp *vsphere.VSphere, volumeOptions *vsphere.VolumeOptions) (string, error) {
+func createVSphereVolume(vsp *vsphere.VSphere, volumeOptions *vclib.VolumeOptions) (string, error) {
 	var (
 		volumePath string
 		err        error
 	)
 	if volumeOptions == nil {
-		volumeOptions = new(vsphere.VolumeOptions)
+		volumeOptions = new(vclib.VolumeOptions)
 		volumeOptions.CapacityKB = 2097152
 		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}

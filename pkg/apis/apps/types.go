@@ -22,7 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
@@ -59,6 +60,42 @@ const (
 	// termination.
 	ParallelPodManagement = "Parallel"
 )
+
+// StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
+// controller will use to perform updates. It includes any additional parameters
+// necessary to perform the update for the indicated strategy.
+type StatefulSetUpdateStrategy struct {
+	// Type indicates the type of the StatefulSetUpdateStrategy.
+	Type StatefulSetUpdateStrategyType
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.
+	RollingUpdate *RollingUpdateStatefulSetStrategy
+}
+
+// StatefulSetUpdateStrategyType is a string enumeration type that enumerates
+// all possible update strategies for the StatefulSet controller.
+type StatefulSetUpdateStrategyType string
+
+const (
+	// RollingUpdateStatefulSetStrategyType indicates that update will be
+	// applied to all Pods in the StatefulSet with respect to the StatefulSet
+	// ordering constraints. When a scale operation is performed with this
+	// strategy, new Pods will be created from the specification version indicated
+	// by the StatefulSet's updateRevision.
+	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
+	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
+	// tracking and ordered rolling restarts are disabled. Pods are recreated
+	// from the StatefulSetSpec when they are manually deleted. When a scale
+	// operation is performed with this strategy,specification version indicated
+	// by the StatefulSet's currentRevision.
+	OnDeleteStatefulSetStrategyType = "OnDelete"
+)
+
+// RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
+type RollingUpdateStatefulSetStrategy struct {
+	// Partition indicates the ordinal at which the StatefulSet should be
+	// partitioned.
+	Partition int32
+}
 
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
@@ -109,17 +146,56 @@ type StatefulSetSpec struct {
 	// all pods at once.
 	// +optional
 	PodManagementPolicy PodManagementPolicyType
+
+	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the StatefulSet when a revision is made to
+	// Template.
+	UpdateStrategy StatefulSetUpdateStrategy
+
+	// revisionHistoryLimit is the maximum number of revisions that will
+	// be maintained in the StatefulSet's revision history. The revision history
+	// consists of all revisions not represented by a currently applied
+	// StatefulSetSpec version. The default value is 10.
+	RevisionHistoryLimit *int32
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
 type StatefulSetStatus struct {
-	// most recent generation observed by this StatefulSet.
+	// observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
+	// StatefulSet's generation, which is updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration *int64
 
-	// Replicas is the number of actual replicas.
+	// replicas is the number of Pods created by the StatefulSet controller.
 	Replicas int32
+
+	// readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.
+	ReadyReplicas int32
+
+	// currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+	// indicated by currentRevision.
+	CurrentReplicas int32
+
+	// updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version
+	// indicated by updateRevision.
+	UpdatedReplicas int32
+
+	// currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the
+	// sequence [0,currentReplicas).
+	CurrentRevision string
+
+	// updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence
+	// [replicas-updatedReplicas,replicas)
+	UpdateRevision string
+
+	// collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller
+	// uses this field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ControllerRevision.
+	// +optional
+	CollisionCount *int32
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSetList is a collection of StatefulSets.
 type StatefulSetList struct {
@@ -129,7 +205,8 @@ type StatefulSetList struct {
 	Items []StatefulSet
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
@@ -140,7 +217,7 @@ type StatefulSetList struct {
 type ControllerRevision struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -150,6 +227,8 @@ type ControllerRevision struct {
 	// Revision indicates the revision of the state represented by Data.
 	Revision int64
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.
 type ControllerRevisionList struct {

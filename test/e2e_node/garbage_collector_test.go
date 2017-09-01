@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	defaultDockerEndpoint = "unix:///var/run/docker.sock"
-
 	//TODO (dashpole): Once dynamic config is possible, test different values for maxPerPodContainer and maxContainers
 	// Currently using default values for maxPerPodContainer and maxTotalContainers
 	maxPerPodContainer = 1
@@ -151,19 +149,9 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			By("Making sure all containers restart the specified number of times")
 			Eventually(func() error {
 				for _, podSpec := range test.testPods {
-					updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.podName, metav1.GetOptions{})
+					err := verifyPodRestartCount(f, podSpec.podName, podSpec.numContainers, podSpec.restartCount)
 					if err != nil {
 						return err
-					}
-					if len(updatedPod.Status.ContainerStatuses) != podSpec.numContainers {
-						return fmt.Errorf("expected pod %s to have %d containers, actual: %d",
-							updatedPod.Name, podSpec.numContainers, len(updatedPod.Status.ContainerStatuses))
-					}
-					for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-						if containerStatus.RestartCount != podSpec.restartCount {
-							return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
-								updatedPod.Name, containerStatus.RestartCount, podSpec.restartCount)
-						}
 					}
 				}
 				return nil
@@ -292,7 +280,7 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 			containers = append(containers, v1.Container{
 				Image:   "gcr.io/google_containers/busybox:1.24",
 				Name:    spec.getContainerName(i),
-				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, int(spec.restartCount), ""),
+				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, spec.restartCount, ""),
 				VolumeMounts: []v1.VolumeMount{
 					{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
 				},
@@ -312,7 +300,7 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 	return
 }
 
-func getRestartingContainerCommand(path string, containerNum, restarts int, loopingCommand string) []string {
+func getRestartingContainerCommand(path string, containerNum int, restarts int32, loopingCommand string) []string {
 	return []string{
 		"sh",
 		"-c",
@@ -322,7 +310,25 @@ func getRestartingContainerCommand(path string, containerNum, restarts int, loop
 			if [ $count -lt %d ]; then
 				exit 0
 			fi
-			while true; do %s sleep 10; done`,
+			while true; do %s sleep 1; done`,
 			path, strconv.Itoa(containerNum), restarts+1, loopingCommand),
 	}
+}
+
+func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
+	updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if len(updatedPod.Status.ContainerStatuses) != expectedNumContainers {
+		return fmt.Errorf("expected pod %s to have %d containers, actual: %d",
+			updatedPod.Name, expectedNumContainers, len(updatedPod.Status.ContainerStatuses))
+	}
+	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+		if containerStatus.RestartCount != expectedRestartCount {
+			return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
+				updatedPod.Name, containerStatus.RestartCount, expectedRestartCount)
+		}
+	}
+	return nil
 }

@@ -22,13 +22,13 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestGroupVersions(t *testing.T) {
@@ -73,6 +73,7 @@ func TestTypeTags(t *testing.T) {
 var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(intstr.IntOrString{}):          true,
 	reflect.TypeOf(metav1.Time{}):                 true,
+	reflect.TypeOf(metav1.MicroTime{}):            true,
 	reflect.TypeOf(metav1.Duration{}):             true,
 	reflect.TypeOf(metav1.TypeMeta{}):             true,
 	reflect.TypeOf(metav1.ListMeta{}):             true,
@@ -85,6 +86,7 @@ var typesAllowedTags = map[reflect.Type]bool{
 	reflect.TypeOf(metav1.DeleteOptions{}):        true,
 	reflect.TypeOf(metav1.GroupVersionKind{}):     true,
 	reflect.TypeOf(metav1.GroupVersionResource{}): true,
+	reflect.TypeOf(metav1.Status{}):               true,
 }
 
 func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type) {

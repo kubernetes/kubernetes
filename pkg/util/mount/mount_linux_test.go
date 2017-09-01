@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -75,20 +76,8 @@ func TestReadProcMountsFrom(t *testing.T) {
 }
 
 func mountPointsEqual(a, b *MountPoint) bool {
-	if a.Device != b.Device || a.Path != b.Path || a.Type != b.Type || !slicesEqual(a.Opts, b.Opts) || a.Pass != b.Pass || a.Freq != b.Freq {
+	if a.Device != b.Device || a.Path != b.Path || a.Type != b.Type || !reflect.DeepEqual(a.Opts, b.Opts) || a.Pass != b.Pass || a.Freq != b.Freq {
 		return false
-	}
-	return true
-}
-
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
 	}
 	return true
 }
@@ -178,6 +167,44 @@ func TestGetDeviceNameFromMount(t *testing.T) {
 	for i, test := range tests {
 		if device, refs, err := GetDeviceNameFromMount(fm, test.mountPath); err != nil || test.expectedRefs != refs || test.expectedDevice != device {
 			t.Errorf("%d. GetDeviceNameFromMount(%s) = (%s, %d), %v; expected (%s,%d), nil", i, test.mountPath, device, refs, err, test.expectedDevice, test.expectedRefs)
+		}
+	}
+}
+
+func TestGetMountRefsByDev(t *testing.T) {
+	fm := &FakeMounter{
+		MountPoints: []MountPoint{
+			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
+			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1"},
+			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2"},
+		},
+	}
+
+	tests := []struct {
+		mountPath    string
+		expectedRefs []string
+	}{
+		{
+			"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd",
+			[]string{
+				"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod",
+			},
+		},
+		{
+			"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2",
+			[]string{
+				"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod1",
+				"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2",
+			},
+		},
+	}
+
+	for i, test := range tests {
+
+		if refs, err := GetMountRefsByDev(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
+			t.Errorf("%d. getMountRefsByDev(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
 	}
 }

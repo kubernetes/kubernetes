@@ -31,8 +31,8 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -134,6 +134,11 @@ func (v *OVirtCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (v *OVirtCloud) HasClusterID() bool {
+	return true
+}
+
 // LoadBalancer returns an implementation of LoadBalancer for oVirt cloud
 func (v *OVirtCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
@@ -204,6 +209,12 @@ func (v *OVirtCloud) ExternalID(nodeName types.NodeName) (string, error) {
 		return "", err
 	}
 	return instance.UUID, nil
+}
+
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (v *OVirtCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.

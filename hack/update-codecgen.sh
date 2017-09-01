@@ -40,36 +40,35 @@ generated_files=($(
       \) -prune \
     \) -name '*.generated.go' | LC_ALL=C sort -r
 
-  find ./vendor/k8s.io/kube-aggregator/ -not \( \
+  find ./staging/src -not \( \
       \( \
         -wholename './output' \
         -o -wholename './_output' \
-        -o -wholename './staging' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/codecgen-*-1234.generated.go' \
       \) -prune \
-    \) -name '*.generated.go' | LC_ALL=C sort -r
-
-  find ./vendor/k8s.io/metrics/ \
-    -name '*.generated.go' | LC_ALL=C sort -r
-
-  find ./vendor/k8s.io/apiserver/ -not \( \
-      \( \
-        -wholename './output' \
-        -o -wholename './_output' \
-        -o -wholename './staging' \
-        -o -wholename './release' \
-        -o -wholename './target' \
-        -o -wholename '*/third_party/*' \
-        -o -wholename '*/codecgen-*-1234.generated.go' \
-      \) -prune \
-    \) -name '*.generated.go' | LC_ALL=C sort -r
+    \) -name '*.generated.go' | sed 's,staging/src,vendor,' | LC_ALL=C sort -r
 ))
+number=${#generated_files[@]}
+###for f in $(echo "${generated_files[@]}" | LC_ALL=C sort); do
+###    echo "DBG: generated_files:   $f"
+###done
 
-# We only work for deps within this prefix.
-my_prefix="k8s.io/kubernetes"
+function package () {
+    dirname "${1}" | sed 's,\./,k8s.io/kubernetes/,'
+}
+
+# extract package list we care about.
+dep_packages=($(
+    for f in "${generated_files[@]}"; do
+        package "${f}"
+    done | LC_ALL=C sort -u
+))
+###for f in $(echo "${dep_packages[@]}"); do
+###    echo "DBG: dep_packages:   $f"
+###done
 
 # Register function to be called on EXIT to remove codecgen
 # binary and also to touch the files that should be regenerated
@@ -78,8 +77,8 @@ my_prefix="k8s.io/kubernetes"
 function cleanup {
   rm -f "${CODECGEN:-}"
   pushd "${KUBE_ROOT}" > /dev/null
-  for (( i=0; i < number; i++ )); do
-    touch "${generated_files[${i}]}" || true
+  for f in "${generated_files[@]}"; do
+    touch "${f}" || true
   done
   popd > /dev/null
 }
@@ -87,23 +86,19 @@ trap cleanup EXIT
 
 # Precompute dependencies for all directories.
 # Then sort all files in the dependency order.
-number=${#generated_files[@]}
 result=""
+dep_packages_grep_pattern=$(echo ${dep_packages[@]} | tr " " '|')
+###echo "DBG: dep_packages_grep_pattern: ${dep_packages_grep_pattern}"
 for (( i=0; i<number; i++ )); do
   visited[${i}]=false
   file="${generated_files[${i}]/\.generated\.go/.go}"
-  deps[${i}]=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep "^${my_prefix}")
+  deps[${i}]=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ${file} | grep -Eow "^\\(${dep_packages_grep_pattern}\\)\$" | tr $"\n" ' ' || true)
+  ###echo "DBG: deps[$file]:   ${deps[$i]}"
 done
-###echo "DBG: found $number generated files"
-###for f in $(echo "${generated_files[@]}" | LC_ALL=C sort); do
-###    echo "DBG:   $f"
-###done
 
-# NOTE: depends function assumes that the whole repository is under
-# $my_prefix - it will NOT work if that is not true.
 function depends {
-  rhs="$(dirname ${generated_files[$2]/#./${my_prefix}})"
-  ###echo "DBG: does ${file} depend on ${rhs}?"
+  rhs="$(package ${generated_files[$2]})"
+  ####echo "DBG: does generated_files[$1] depend on ${rhs}?"
   for dep in ${deps[$1]}; do
     ###echo "DBG:   checking against $dep"
     if [[ "${dep}" == "${rhs}" ]]; then

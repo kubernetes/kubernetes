@@ -22,13 +22,13 @@ import (
 	"path/filepath"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
-	dockercontainer "github.com/docker/engine-api/types/container"
-	dockerfilters "github.com/docker/engine-api/types/filters"
-	dockerstrslice "github.com/docker/engine-api/types/strslice"
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerfilters "github.com/docker/docker/api/types/filters"
+	dockerstrslice "github.com/docker/docker/api/types/strslice"
 	"github.com/golang/glog"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -36,8 +36,8 @@ import (
 func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	opts := dockertypes.ContainerListOptions{All: true}
 
-	opts.Filter = dockerfilters.NewArgs()
-	f := newDockerFilter(&opts.Filter)
+	opts.Filters = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filters)
 	// Add filter to get *only* (non-sandbox) containers.
 	f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 
@@ -131,48 +131,19 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 			OpenStdin: config.Stdin,
 			StdinOnce: config.StdinOnce,
 			Tty:       config.Tty,
+			// Disable Docker's health check until we officially support it
+			// (https://github.com/kubernetes/kubernetes/issues/25829).
+			Healthcheck: &dockercontainer.HealthConfig{
+				Test: []string{"NONE"},
+			},
+		},
+		HostConfig: &dockercontainer.HostConfig{
+			Binds: generateMountBindings(config.GetMounts()),
 		},
 	}
 
-	// Fill the HostConfig.
-	hc := &dockercontainer.HostConfig{
-		Binds: generateMountBindings(config.GetMounts()),
-	}
-
-	// Apply Linux-specific options if applicable.
-	if lc := config.GetLinux(); lc != nil {
-		// TODO: Check if the units are correct.
-		// TODO: Can we assume the defaults are sane?
-		rOpts := lc.GetResources()
-		if rOpts != nil {
-			hc.Resources = dockercontainer.Resources{
-				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: DefaultMemorySwap(),
-				CPUShares:  rOpts.CpuShares,
-				CPUQuota:   rOpts.CpuQuota,
-				CPUPeriod:  rOpts.CpuPeriod,
-			}
-			hc.OomScoreAdj = int(rOpts.OomScoreAdj)
-		}
-		// Note: ShmSize is handled in kube_docker_client.go
-
-		// Apply security context.
-		if err = applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc, securityOptSep); err != nil {
-			return "", fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
-		}
-		modifyPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, hc)
-	}
-
-	// Apply cgroupsParent derived from the sandbox config.
-	if lc := sandboxConfig.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		cgroupParent, err := ds.GenerateExpectedCgroupParent(lc.CgroupParent)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate cgroup parent in expected syntax for container %q: %v", config.Metadata.Name, err)
-		}
-		hc.CgroupParent = cgroupParent
-	}
-
+	hc := createConfig.HostConfig
+	ds.updateCreateConfig(&createConfig, config, sandboxConfig, podSandboxID, securityOptSep, apiVersion)
 	// Set devices for container.
 	devices := make([]dockercontainer.DeviceMapping, len(config.Devices))
 	for i, device := range config.Devices {
@@ -184,14 +155,13 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 	}
 	hc.Resources.Devices = devices
 
-	// Apply seccomp options.
-	seccompSecurityOpts, err := getSeccompSecurityOpts(config.Metadata.Name, sandboxConfig, ds.seccompProfileRoot, securityOptSep)
+	securityOpts, err := ds.getSecurityOpts(config.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSep)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate seccomp security options for container %q: %v", config.Metadata.Name, err)
+		return "", fmt.Errorf("failed to generate security options for container %q: %v", config.Metadata.Name, err)
 	}
-	hc.SecurityOpt = append(hc.SecurityOpt, seccompSecurityOpts...)
 
-	createConfig.HostConfig = hc
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
+
 	createResp, err := ds.client.CreateContainer(createConfig)
 	if err != nil {
 		createResp, err = recoverFromCreationConflictIfNeeded(ds.client, createConfig, err)
@@ -227,6 +197,10 @@ func (ds *dockerService) createContainerLogSymlink(containerID string) error {
 
 	if realPath != "" {
 		// Only create the symlink when container log path is specified and log file exists.
+		// Delete possibly existing file first
+		if err = ds.os.Remove(path); err == nil {
+			glog.Warningf("Deleted previously existing symlink file: %q", path)
+		}
 		if err = ds.os.Symlink(realPath, path); err != nil {
 			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
 				path, realPath, containerID, err)
@@ -268,6 +242,7 @@ func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 func (ds *dockerService) StartContainer(containerID string) error {
 	err := ds.client.StartContainer(containerID)
 	if err != nil {
+		err = transformStartContainerError(err)
 		return fmt.Errorf("failed to start container %q: %v", containerID, err)
 	}
 	// Create container log symlink.
@@ -283,7 +258,7 @@ func (ds *dockerService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (ds *dockerService) StopContainer(containerID string, timeout int64) error {
-	return ds.client.StopContainer(containerID, int(timeout))
+	return ds.client.StopContainer(containerID, time.Duration(timeout)*time.Second)
 }
 
 // RemoveContainer removes the container.
@@ -342,7 +317,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	imageID := toPullableImageID(r.Image, ir)
 
 	// Convert the mounts.
-	mounts := []*runtimeapi.Mount{}
+	mounts := make([]*runtimeapi.Mount, 0, len(r.Mounts))
 	for i := range r.Mounts {
 		m := r.Mounts[i]
 		readonly := !m.RW
@@ -431,4 +406,23 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 		Annotations: annotations,
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
 	}, nil
+}
+
+func (ds *dockerService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	updateConfig := dockercontainer.UpdateConfig{
+		Resources: dockercontainer.Resources{
+			CPUPeriod:  resources.CpuPeriod,
+			CPUQuota:   resources.CpuQuota,
+			CPUShares:  resources.CpuShares,
+			Memory:     resources.MemoryLimitInBytes,
+			CpusetCpus: resources.CpusetCpus,
+			CpusetMems: resources.CpusetMems,
+		},
+	}
+
+	err := ds.client.UpdateContainerResources(containerID, updateConfig)
+	if err != nil {
+		return fmt.Errorf("failed to update container %q: %v", containerID, err)
+	}
+	return nil
 }

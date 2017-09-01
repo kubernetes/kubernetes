@@ -32,7 +32,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  custom_metrics.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/metrics/pkg/apis/custom_metrics",
 			AddInternalObjectsToScheme: custom_metrics.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

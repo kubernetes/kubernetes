@@ -17,9 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -34,12 +34,12 @@ type AdmissionregistrationV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *AdmissionregistrationV1alpha1Client) ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationInterface {
-	return newExternalAdmissionHookConfigurations(c, namespace)
+func (c *AdmissionregistrationV1alpha1Client) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInterface {
+	return newExternalAdmissionHookConfigurations(c)
 }
 
-func (c *AdmissionregistrationV1alpha1Client) InitializerConfigurations(namespace string) InitializerConfigurationInterface {
-	return newInitializerConfigurations(c, namespace)
+func (c *AdmissionregistrationV1alpha1Client) InitializerConfigurations() InitializerConfigurationInterface {
+	return newInitializerConfigurations(c)
 }
 
 // NewForConfig creates a new AdmissionregistrationV1alpha1Client for the given config.

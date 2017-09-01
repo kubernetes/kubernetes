@@ -20,14 +20,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -59,35 +58,45 @@ func (m *mockDiskInfoProvider) HasDedicatedImageFs() (bool, error) {
 	return m.dedicatedImageFs, nil
 }
 
-func newMockNodeProvider(allocatableCapacity v1.ResourceList) *mockNodeProvider {
-	return &mockNodeProvider{
-		node: v1.Node{
-			Status: v1.NodeStatus{
-				Allocatable: allocatableCapacity,
-			},
-		},
+func newMockCapacityProvider(capacity, reservation v1.ResourceList) *mockCapacityProvider {
+	return &mockCapacityProvider{
+		capacity:    capacity,
+		reservation: reservation,
 	}
 }
 
-type mockNodeProvider struct {
-	node v1.Node
+type mockCapacityProvider struct {
+	capacity    v1.ResourceList
+	reservation v1.ResourceList
 }
 
-func (m *mockNodeProvider) GetNode() (*v1.Node, error) {
-	return &m.node, nil
+func (m *mockCapacityProvider) GetCapacity() v1.ResourceList {
+	return m.capacity
+
 }
 
-// mockImageGC is used to simulate invoking image garbage collection.
-type mockImageGC struct {
-	err     error
-	freed   int64
-	invoked bool
+func (m *mockCapacityProvider) GetNodeAllocatableReservation() v1.ResourceList {
+	return m.reservation
+}
+
+// mockDiskGC is used to simulate invoking image and container garbage collection.
+type mockDiskGC struct {
+	err                error
+	imageBytesFreed    int64
+	imageGCInvoked     bool
+	containerGCInvoked bool
 }
 
 // DeleteUnusedImages returns the mocked values.
-func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
-	m.invoked = true
-	return m.freed, m.err
+func (m *mockDiskGC) DeleteUnusedImages() (int64, error) {
+	m.imageGCInvoked = true
+	return m.imageBytesFreed, m.err
+}
+
+// DeleteAllUnusedContainers returns the mocked value
+func (m *mockDiskGC) DeleteAllUnusedContainers() error {
+	m.containerGCInvoked = true
+	return m.err
 }
 
 func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
@@ -193,9 +202,9 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	imageGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -236,7 +245,7 @@ func TestMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure
 	if manager.IsUnderMemoryPressure() {
@@ -254,7 +263,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -269,7 +278,7 @@ func TestMemoryPressure(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -294,7 +303,7 @@ func TestMemoryPressure(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure
 	if manager.IsUnderMemoryPressure() {
@@ -304,7 +313,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -332,7 +341,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure (because transition period not yet met)
 	if !manager.IsUnderMemoryPressure() {
@@ -356,7 +365,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure (because transition period met)
 	if manager.IsUnderMemoryPressure() {
@@ -411,9 +420,9 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -440,7 +449,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -453,7 +463,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	podToAdmit, _ := podMaker("pod-to-admit", newResourceList("", ""), newResourceList("", ""), "0Gi", "0Gi", "0Gi")
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -468,7 +478,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.5Gi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -483,7 +493,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.5Gi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -508,7 +518,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// remove disk pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -518,7 +528,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// induce disk pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -543,7 +553,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure (because transition period not yet met)
 	if !manager.IsUnderDiskPressure() {
@@ -564,7 +574,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure (because transition period met)
 	if manager.IsUnderDiskPressure() {
@@ -609,9 +619,9 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -633,7 +643,8 @@ func TestMinReclaim(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -643,7 +654,7 @@ func TestMinReclaim(t *testing.T) {
 	}
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure
 	if manager.IsUnderMemoryPressure() {
@@ -653,7 +664,7 @@ func TestMinReclaim(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -673,7 +684,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.2Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure (because transition period not yet met)
 	if !manager.IsUnderMemoryPressure() {
@@ -693,7 +704,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure (because transition period not yet met)
 	if !manager.IsUnderMemoryPressure() {
@@ -709,7 +720,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure (because transition period met)
 	if manager.IsUnderMemoryPressure() {
@@ -748,10 +759,10 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
 	imageGcFree := resource.MustParse("700Mi")
-	imageGC := &mockImageGC{freed: imageGcFree.Value(), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	diskGC := &mockDiskGC{imageBytesFreed: imageGcFree.Value(), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -773,7 +784,8 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -783,7 +795,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -793,7 +805,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// induce hard threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker(".9Gi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -801,7 +813,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// verify image gc was invoked
-	if !imageGC.invoked {
+	if !diskGC.imageGCInvoked || !diskGC.containerGCInvoked {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
@@ -811,12 +823,13 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// reset state
-	imageGC.invoked = false
+	diskGC.imageGCInvoked = false
+	diskGC.containerGCInvoked = false
 
 	// remove disk pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -826,15 +839,15 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// induce disk pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("400Mi", "200Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should report disk pressure")
 	}
 
-	// ensure image gc was invoked
-	if !imageGC.invoked {
+	// ensure disk gc was invoked
+	if !diskGC.imageGCInvoked || !diskGC.containerGCInvoked {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
@@ -850,9 +863,10 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// reduce disk pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	diskGC.imageGCInvoked = false     // reset state
+	diskGC.containerGCInvoked = false // reset state
+	podKiller.pod = nil               // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure (because transition period not yet met)
 	if !manager.IsUnderDiskPressure() {
@@ -860,7 +874,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// no image gc should have occurred
-	if imageGC.invoked {
+	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
 	}
 
@@ -872,9 +886,10 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// move the clock past transition period to ensure that we stop reporting pressure
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	diskGC.imageGCInvoked = false     // reset state
+	diskGC.containerGCInvoked = false // reset state
+	podKiller.pod = nil               // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure (because transition period met)
 	if manager.IsUnderDiskPressure() {
@@ -882,7 +897,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	}
 
 	// no image gc should have occurred
-	if imageGC.invoked {
+	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
 	}
 
@@ -942,9 +957,9 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -971,7 +986,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -984,7 +1000,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podToAdmit, _ := podMaker("pod-to-admit", newResourceList("", ""), newResourceList("", ""), "0", "0", "0")
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -999,7 +1015,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -1014,7 +1030,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -1039,7 +1055,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	// remove inode pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure
 	if manager.IsUnderDiskPressure() {
@@ -1049,7 +1065,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	// induce inode pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("0.5Mi", "4Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure
 	if !manager.IsUnderDiskPressure() {
@@ -1074,7 +1090,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have disk pressure (because transition period not yet met)
 	if !manager.IsUnderDiskPressure() {
@@ -1095,7 +1111,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have disk pressure (because transition period met)
 	if manager.IsUnderDiskPressure() {
@@ -1143,9 +1159,9 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{
 		Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: "",
 	}
 
@@ -1174,7 +1190,8 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -1188,7 +1205,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -1203,7 +1220,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -1221,7 +1238,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure
 	if manager.IsUnderMemoryPressure() {
@@ -1234,7 +1251,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -1275,9 +1292,9 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
-	nodeProvider := newMockNodeProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("2Gi")})
-	imageGC := &mockImageGC{freed: int64(0), err: nil}
-	nodeRef := &clientv1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("3Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("1Gi")})
+	diskGC := &mockDiskGC{imageBytesFreed: int64(0), err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
 		MaxPodGracePeriodSeconds: 5,
@@ -1296,7 +1313,8 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
-		imageGC:         imageGC,
+		imageGC:         diskGC,
+		containerGC:     diskGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -1310,7 +1328,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
 
 	// synchronize
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure
 	if manager.IsUnderMemoryPressure() {
@@ -1330,7 +1348,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	pod, podStat := podMaker("guaranteed-high-2", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi"), "1Gi")
 	podStats[pod] = podStat
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure
 	if !manager.IsUnderMemoryPressure() {
@@ -1366,7 +1384,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	}
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should have memory pressure (because transition period not yet met)
 	if !manager.IsUnderMemoryPressure() {
@@ -1390,7 +1408,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
 	podKiller.pod = nil // reset state
-	manager.synchronize(diskInfoProvider, activePodsFunc, nodeProvider)
+	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
 
 	// we should not have memory pressure (because transition period met)
 	if manager.IsUnderMemoryPressure() {

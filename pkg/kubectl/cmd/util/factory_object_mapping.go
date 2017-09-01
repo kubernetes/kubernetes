@@ -27,8 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful-swagger12"
+	swagger "github.com/emicklei/go-restful-swagger12"
+	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,8 +41,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -48,7 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -402,8 +404,20 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	return pod, err
 }
 
-func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
+func (f *ring1Factory) Validator(validate, openapi bool, cacheDir string) (validation.Schema, error) {
 	if validate {
+		if openapi {
+			resources, err := f.OpenAPISchema()
+			if err == nil {
+				return validation.ConjunctiveSchema{
+					openapivalidation.NewSchemaValidation(resources),
+					validation.NoDoubleKeySchema{},
+				}, nil
+			}
+
+			glog.Warningf("Failed to download OpenAPI (%v), falling back to swagger", err)
+		}
+
 		discovery, err := f.clientAccessFactory.DiscoveryClient()
 		if err != nil {
 			return nil, err
@@ -439,13 +453,7 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 }
 
 // OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
-// Will try to cache the data to a local file.  Cache is written and read from a
-// file created with ioutil.TempFile and obeys the expiration semantics of that file.
-// The cache location is a function of the client and server versions so that the open API
-// schema will be cached separately for different client / server combinations.
-// Note, the cache will not be invalidated if the server changes its open API schema without
-// changing the server version.
-func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error) {
+func (f *ring1Factory) OpenAPISchema() (openapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -453,23 +461,8 @@ func (f *ring1Factory) OpenAPISchema(cacheDir string) (*openapi.Resources, error
 
 	// Lazily initialize the OpenAPIGetter once
 	f.openAPIGetter.once.Do(func() {
-		// Get the server version for caching the openapi spec
-		versionString := ""
-		version, err := discovery.ServerVersion()
-		if err != nil {
-			// Cache the result under the server version
-			versionString = version.String()
-		}
-
-		// Get the cache directory for caching the openapi spec
-		cacheDir, err = substituteUserHome(cacheDir)
-		if err != nil {
-			// Don't cache the result if we couldn't substitute the home directory
-			cacheDir = ""
-		}
-
 		// Create the caching OpenAPIGetter
-		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(cacheDir, versionString, discovery)
+		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
 	})
 
 	// Delegate to the OpenAPIGetter

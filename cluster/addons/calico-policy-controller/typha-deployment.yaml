@@ -1,0 +1,58 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: calico-typha
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: calico-typha
+spec:
+  replicas: __CALICO_TYPHA_REPLICAS__
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-typha
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      hostNetwork: true
+      containers:
+      - image: calico/typha:v0.2.3
+        name: calico-typha
+        ports:
+        - containerPort: 5473
+          name: calico-typha
+          protocol: TCP
+        env:
+          - name: TYPHA_LOGFILEPATH
+            value: "none"
+          - name: TYPHA_LOGSEVERITYSYS
+            value: "none"
+          - name: TYPHA_LOGSEVERITYSCREEN
+            value: "info"
+          - name: TYPHA_PROMETHEUSMETRICSENABLED
+            value: "true"
+          - name: TYPHA_CONNECTIONREBALANCINGMODE
+            value: "kubernetes"
+          - name: TYPHA_PROMETHEUSMETRICSPORT
+            value: "9093"
+          - name: TYPHA_DATASTORETYPE
+            value: "kubernetes"
+          - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
+            value: "1"
+        volumeMounts:
+        - mountPath: /etc/calico
+          name: etc-calico
+          readOnly: true
+        resources:
+          requests:
+            cpu: __CALICO_TYPHA_CPU__
+      volumes:
+      - name: etc-calico
+        hostPath:
+          path: /etc/calico

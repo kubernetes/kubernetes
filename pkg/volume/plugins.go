@@ -23,15 +23,23 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
+)
+
+const (
+	// Common parameter which can be specified in StorageClass to specify the desired FSType
+	// Provisioners SHOULD implement support for this if they are block device based
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Default value depends on the provisioner
+	VolumeParameterFSType = "fstype"
 )
 
 // VolumeOptions contains option information about a volume.
@@ -42,6 +50,8 @@ type VolumeOptions struct {
 
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
+	// Mount options for a persistent volume
+	MountOptions []string
 	// Suggested PV.Name of the PersistentVolume to provision.
 	// This is a generated name guaranteed to be unique in Kubernetes cluster.
 	// If you choose not to use it as volume name, ensure uniqueness by either
@@ -58,6 +68,19 @@ type VolumeOptions struct {
 	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
+	// This flag helps identify whether kubelet is running in a container
+	Containerized bool
+}
+
+type DynamicPluginProber interface {
+	Init() error
+
+	// If an update has occurred since the last probe, updated = true
+	// and the list of probed plugins is returned.
+	// Otherwise, update = false and probedPlugins = nil.
+	//
+	// If an error occurs, updated and probedPlugins are undefined.
+	Probe() (updated bool, probedPlugins []VolumePlugin, err error)
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a
@@ -216,7 +239,7 @@ type VolumeHost interface {
 	GetCloudProvider() cloudprovider.Interface
 
 	// Get mounter interface.
-	GetMounter() mount.Interface
+	GetMounter(pluginName string) mount.Interface
 
 	// Get writer interface for writing data to disk.
 	GetWriter() io.Writer
@@ -232,12 +255,24 @@ type VolumeHost interface {
 
 	// Returns a function that returns a secret.
 	GetSecretFunc() func(namespace, name string) (*v1.Secret, error)
+
+	// Returns a function that returns a configmap.
+	GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error)
+
+	// Returns an interface that should be used to execute any utilities in volume plugins
+	GetExec(pluginName string) mount.Exec
+
+	// Returns the labels on the node
+	GetNodeLabels() (map[string]string, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
-	mutex   sync.Mutex
-	plugins map[string]VolumePlugin
+	mutex         sync.Mutex
+	plugins       map[string]VolumePlugin
+	prober        DynamicPluginProber
+	probedPlugins []VolumePlugin
+	Host          VolumeHost
 }
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
@@ -332,9 +367,23 @@ func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 // InitPlugins initializes each plugin.  All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
-func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
+func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPluginProber, host VolumeHost) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
+
+	pm.Host = host
+
+	if prober == nil {
+		// Use a dummy prober to prevent nil deference.
+		pm.prober = &dummyPluginProber{}
+	} else {
+		pm.prober = prober
+	}
+	if err := pm.prober.Init(); err != nil {
+		// Prober init failure should not affect the initialization of other plugins.
+		glog.Errorf("Error initializing dynamic plugin prober: %s", err)
+		pm.prober = &dummyPluginProber{}
+	}
 
 	if pm.plugins == nil {
 		pm.plugins = map[string]VolumePlugin{}
@@ -354,7 +403,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 		}
 		err := plugin.Init(host)
 		if err != nil {
-			glog.Errorf("Failed to load volume plugin %s, error: %s", plugin, err.Error())
+			glog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 			allErrs = append(allErrs, err)
 			continue
 		}
@@ -364,6 +413,21 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 	return utilerrors.NewAggregate(allErrs)
 }
 
+func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
+	name := probedPlugin.GetPluginName()
+	if errs := validation.IsQualifiedName(name); len(errs) != 0 {
+		return fmt.Errorf("volume plugin has invalid name: %q: %s", name, strings.Join(errs, ";"))
+	}
+
+	err := probedPlugin.Init(pm.Host)
+	if err != nil {
+		return fmt.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
+	}
+
+	glog.V(1).Infof("Loaded volume plugin %q", name)
+	return nil
+}
+
 // FindPluginBySpec looks for a plugin that can support a given volume
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
@@ -371,19 +435,34 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
-	matches := []string{}
+	if spec == nil {
+		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
+	}
+
+	matchedPluginNames := []string{}
+	matches := []VolumePlugin{}
 	for k, v := range pm.plugins {
 		if v.CanSupport(spec) {
-			matches = append(matches, k)
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
 		}
 	}
+
+	pm.refreshProbedPlugins()
+	for _, plugin := range pm.probedPlugins {
+		if plugin.CanSupport(spec) {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+			matches = append(matches, plugin)
+		}
+	}
+
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
 	if len(matches) > 1 {
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matches, ","))
+		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
-	return pm.plugins[matches[0]], nil
+	return matches[0], nil
 }
 
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
@@ -393,19 +472,52 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	defer pm.mutex.Unlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matches := []string{}
+	matchedPluginNames := []string{}
+	matches := []VolumePlugin{}
 	for k, v := range pm.plugins {
 		if v.GetPluginName() == name {
-			matches = append(matches, k)
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
 		}
 	}
+
+	pm.refreshProbedPlugins()
+	for _, plugin := range pm.probedPlugins {
+		if plugin.GetPluginName() == name {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+			matches = append(matches, plugin)
+		}
+	}
+
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
 	if len(matches) > 1 {
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matches, ","))
+		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
-	return pm.plugins[matches[0]], nil
+	return matches[0], nil
+}
+
+// Check if probedPlugin cache update is required.
+// If it is, initialize all probed plugins and replace the cache with them.
+func (pm *VolumePluginMgr) refreshProbedPlugins() {
+	updated, plugins, err := pm.prober.Probe()
+	if err != nil {
+		glog.Errorf("Error dynamically probing plugins: %s", err)
+		return // Use cached plugins upon failure.
+	}
+
+	if updated {
+		pm.probedPlugins = []VolumePlugin{}
+		for _, plugin := range plugins {
+			if err := pm.initProbedPlugin(plugin); err != nil {
+				glog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
+					plugin.GetPluginName(), err)
+				continue
+			}
+			pm.probedPlugins = append(pm.probedPlugins, plugin)
+		}
+	}
 }
 
 // FindPersistentPluginBySpec looks for a persistent volume plugin that can
@@ -593,3 +705,8 @@ func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
 	}
 	return nil
 }
+
+type dummyPluginProber struct{}
+
+func (*dummyPluginProber) Init() error                          { return nil }
+func (*dummyPluginProber) Probe() (bool, []VolumePlugin, error) { return false, nil, nil }

@@ -28,6 +28,9 @@ const (
 // TODO: fix the returned errors to be introspectable.
 func LookupPatchMetadata(t reflect.Type, jsonField string) (
 	elemType reflect.Type, patchStrategies []string, patchMergeKey string, e error) {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
 	if t.Kind() == reflect.Map {
 		elemType = t.Elem()
 		return

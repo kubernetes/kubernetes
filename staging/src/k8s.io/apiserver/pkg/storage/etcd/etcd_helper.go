@@ -128,6 +128,9 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion may not be set on objects to be created")
 	}
+	if err := h.versioner.PrepareObjectForStorage(obj); err != nil {
+		return fmt.Errorf("PrepareObjectForStorage returned an error: %v", err)
+	}
 	trace.Step("Version checked")
 
 	startTime := time.Now()
@@ -530,7 +533,7 @@ func (h *etcdHelper) GuaranteedUpdate(
 		}
 
 		// Since update object may have a resourceVersion set, we need to clear it here.
-		if err := h.versioner.UpdateObject(ret, 0); err != nil {
+		if err := h.versioner.PrepareObjectForStorage(ret); err != nil {
 			return errors.New("resourceVersion cannot be set on objects store in etcd")
 		}
 
@@ -609,12 +612,7 @@ func (h *etcdHelper) getFromCache(index uint64, filter storage.FilterFunc) (runt
 		}
 		// We should not return the object itself to avoid polluting the cache if someone
 		// modifies returned values.
-		objCopy, err := h.copier.Copy(obj.(runtime.Object))
-		if err != nil {
-			glog.Errorf("Error during DeepCopy of cached object: %q", err)
-			// We can't return a copy, thus we report the object as not found.
-			return nil, false
-		}
+		objCopy := obj.(runtime.Object).DeepCopyObject()
 		metrics.ObserveCacheHit()
 		return objCopy.(runtime.Object), true
 	}
@@ -627,11 +625,7 @@ func (h *etcdHelper) addToCache(index uint64, obj runtime.Object) {
 	defer func() {
 		metrics.ObserveAddCache(startTime)
 	}()
-	objCopy, err := h.copier.Copy(obj)
-	if err != nil {
-		glog.Errorf("Error during DeepCopy of cached object: %q", err)
-		return
-	}
+	objCopy := obj.DeepCopyObject()
 	isOverwrite := h.cache.Add(index, objCopy)
 	if !isOverwrite {
 		metrics.ObserveNewEntry()

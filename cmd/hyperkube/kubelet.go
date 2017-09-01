@@ -23,8 +23,12 @@ import (
 
 // NewKubelet creates a new hyperkube Server object that includes the
 // description and flags.
-func NewKubelet() *Server {
-	s := options.NewKubeletServer()
+func NewKubelet() (*Server, error) {
+	s, err := options.NewKubeletServer()
+	if err != nil {
+		return nil, err
+	}
+
 	hks := Server{
 		name:        "kubelet",
 		SimpleUsage: "kubelet",
@@ -34,10 +38,10 @@ func NewKubelet() *Server {
 		queries Docker to see what is currently running.  It synchronizes the
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
-		Run: func(_ *Server, _ []string) error {
+		Run: func(_ *Server, _ []string, stopCh <-chan struct{}) error {
 			return app.Run(s, nil)
 		},
 	}
 	s.AddFlags(hks.Flags())
-	return &hks
+	return &hks, nil
 }

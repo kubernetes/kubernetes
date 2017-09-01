@@ -21,17 +21,17 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -66,11 +66,11 @@ type manager struct {
 	podStatusChannel chan podStatusSyncRequest
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
-	apiStatusVersions map[types.UID]uint64
+	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
 }
 
-// PodStatusProvider knows how to provide status for a pod.  It's intended to be used by other components
+// PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
 // that need to introspect status.
 type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
@@ -78,7 +78,7 @@ type PodStatusProvider interface {
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
-// An object which provides guarantees that a pod can be saftely deleted.
+// An object which provides guarantees that a pod can be safely deleted.
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
@@ -116,7 +116,7 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podD
 		podManager:        podManager,
 		podStatuses:       make(map[types.UID]versionedPodStatus),
 		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
-		apiStatusVersions: make(map[types.UID]uint64),
+		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety: podDeletionSafety,
 	}
 }
@@ -155,7 +155,7 @@ func (m *manager) Start() {
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	status, ok := m.podStatuses[m.podManager.TranslatePodUID(uid)]
+	status, ok := m.podStatuses[types.UID(m.podManager.TranslatePodUID(uid))]
 	return status.status, ok
 }
 
@@ -342,7 +342,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	default:
 		// Let the periodic syncBatch handle the update if the channel is full.
 		// We can't block, since we hold the mutex lock.
-		glog.V(4).Infof("Skpping the status update for pod %q for now because the channel is full; status: %+v",
+		glog.V(4).Infof("Skipping the status update for pod %q for now because the channel is full; status: %+v",
 			format.Pod(pod), status)
 		return false
 	}
@@ -377,7 +377,7 @@ func (m *manager) syncBatch() {
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
-			_, hasPod := m.podStatuses[uid]
+			_, hasPod := m.podStatuses[types.UID(uid)]
 			_, hasMirror := mirrorToPod[uid]
 			if !hasPod && !hasMirror {
 				delete(m.apiStatusVersions, uid)
@@ -385,15 +385,15 @@ func (m *manager) syncBatch() {
 		}
 
 		for uid, status := range m.podStatuses {
-			syncedUID := uid
-			if mirrorUID, ok := podToMirror[uid]; ok {
+			syncedUID := kubetypes.MirrorPodUID(uid)
+			if mirrorUID, ok := podToMirror[kubetypes.ResolvedPodUID(uid)]; ok {
 				if mirrorUID == "" {
 					glog.V(5).Infof("Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", uid, status.podName, status.podNamespace)
 					continue
 				}
 				syncedUID = mirrorUID
 			}
-			if m.needsUpdate(syncedUID, status) {
+			if m.needsUpdate(types.UID(syncedUID), status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
 			} else if m.needsReconcile(uid, status.status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
@@ -433,7 +433,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
-	if len(translatedUID) > 0 && translatedUID != uid {
+	// Type convert original uid just for the purpose of comparison.
+	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
 		glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
 		m.deletePodStatus(uid)
 		return
@@ -451,7 +452,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	pod = newPod
 
 	glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
-	m.apiStatusVersions[pod.UID] = status.version
+	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
 
 	// We don't handle graceful deletion of mirror pods.
 	if m.canBeDeleted(pod, status.status) {
@@ -469,9 +470,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 }
 
 // needsUpdate returns whether the status is stale for the given pod UID.
-// This method is not thread safe, and most only be accessed by the sync thread.
+// This method is not thread safe, and must only be accessed by the sync thread.
 func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
-	latest, ok := m.apiStatusVersions[uid]
+	latest, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(uid)]
 	if !ok || latest < status.version {
 		return true
 	}
@@ -483,7 +484,10 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 }
 
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
-	return !kubepod.IsMirrorPod(pod) && m.podDeletionSafety.PodResourcesAreReclaimed(pod, status) && pod.DeletionTimestamp != nil
+	if pod.DeletionTimestamp == nil || kubepod.IsMirrorPod(pod) {
+		return false
+	}
+	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
 
 // needsReconcile compares the given status with the status in the pod manager (which
@@ -587,7 +591,7 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 }
 
 func copyStatus(source *v1.PodStatus) (v1.PodStatus, error) {
-	clone, err := api.Scheme.DeepCopy(source)
+	clone, err := scheme.Scheme.DeepCopy(source)
 	if err != nil {
 		glog.Errorf("Failed to clone status %+v: %v", source, err)
 		return v1.PodStatus{}, err

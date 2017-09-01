@@ -50,10 +50,6 @@ const GroupName = ""
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Unversioned is group version for unversioned API objects
-// TODO: this should be v1 probably
-var Unversioned = schema.GroupVersion{Group: "", Version: "v1"}
-
 // ParameterCodec handles versioning of objects that are converted to query parameters.
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
@@ -89,6 +85,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ServiceProxyOptions{},
 		&NodeList{},
 		&Node{},
+		&NodeConfigSource{},
 		&NodeProxyOptions{},
 		&Endpoints{},
 		&EndpointsList{},
@@ -123,13 +120,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ConfigMapList{},
 	)
 
-	// Register Unversioned types under their own special group
-	scheme.AddUnversionedTypes(Unversioned,
-		&metav1.Status{},
-		&metav1.APIVersions{},
-		&metav1.APIGroupList{},
-		&metav1.APIGroup{},
-		&metav1.APIResourceList{},
-	)
 	return nil
 }

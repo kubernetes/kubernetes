@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -36,50 +36,7 @@ var replicasetsResource = schema.GroupVersionResource{Group: "extensions", Versi
 
 var replicasetsKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}
 
-func (c *FakeReplicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ReplicaSet), err
-}
-
-func (c *FakeReplicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ReplicaSet), err
-}
-
-func (c *FakeReplicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (*v1beta1.ReplicaSet, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &v1beta1.ReplicaSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ReplicaSet), err
-}
-
-func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &v1beta1.ReplicaSet{})
-
-	return err
-}
-
-func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.ReplicaSetList{})
-	return err
-}
-
+// Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
 func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), &v1beta1.ReplicaSet{})
@@ -90,6 +47,7 @@ func (c *FakeReplicaSets) Get(name string, options v1.GetOptions) (result *v1bet
 	return obj.(*v1beta1.ReplicaSet), err
 }
 
+// List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
 func (c *FakeReplicaSets) List(opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), &v1beta1.ReplicaSetList{})
@@ -116,6 +74,56 @@ func (c *FakeReplicaSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
+func (c *FakeReplicaSets) Create(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ReplicaSet), err
+}
+
+// Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
+func (c *FakeReplicaSets) Update(replicaSet *v1beta1.ReplicaSet) (result *v1beta1.ReplicaSet, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), &v1beta1.ReplicaSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ReplicaSet), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeReplicaSets) UpdateStatus(replicaSet *v1beta1.ReplicaSet) (*v1beta1.ReplicaSet, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), &v1beta1.ReplicaSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ReplicaSet), err
+}
+
+// Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
+func (c *FakeReplicaSets) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(replicasetsResource, c.ns, name), &v1beta1.ReplicaSet{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.ReplicaSetList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched replicaSet.

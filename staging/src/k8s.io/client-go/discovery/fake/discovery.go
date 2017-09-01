@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/emicklei/go-restful-swagger12"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/pkg/api/v1"
 	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
@@ -93,7 +93,9 @@ func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.Api
 	return &swagger.ApiDeclaration{}, nil
 }
 
-func (c *FakeDiscovery) OpenAPISchema() (*spec.Swagger, error) { return &spec.Swagger{}, nil }
+func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
+	return &openapi_v2.Document{}, nil
+}
 
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil

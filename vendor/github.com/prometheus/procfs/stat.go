@@ -3,6 +3,7 @@ package procfs
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -25,7 +26,7 @@ func NewStat() (Stat, error) {
 
 // NewStat returns an information about current kernel/system statistics.
 func (fs FS) NewStat() (Stat, error) {
-	f, err := fs.open("stat")
+	f, err := os.Open(fs.Path("stat"))
 	if err != nil {
 		return Stat{}, err
 	}

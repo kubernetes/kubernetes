@@ -18,32 +18,19 @@ package v1alpha1
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
-	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 const (
-	defaultRootDir = "/var/lib/kubelet"
-
-	// When these values are updated, also update test/e2e/framework/util.go
-	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	defaultPodInfraContainerImageVersion = "3.0"
-	defaultPodInfraContainerImage        = defaultPodInfraContainerImageName +
-		"-" + runtime.GOARCH + ":" +
-		defaultPodInfraContainerImageVersion
-
-	// From pkg/kubelet/rkt/rkt.go to avoid circular import
-	defaultRktAPIServiceEndpoint = "localhost:15441"
+	DefaultRootDir = "/var/lib/kubelet"
 
 	AutoDetectCloudProvider = "auto-detect"
 
@@ -53,7 +40,7 @@ const (
 
 var (
 	zeroDuration = metav1.Duration{}
-	// Refer to [Node Allocatable](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node-allocatable.md) doc for more information.
+	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node-allocatable.md) doc for more information.
 	defaultNodeAllocatableEnforcement = []string{"pods"}
 )
 
@@ -170,7 +157,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
 	}
 	if obj.FailureDomains == "" {
-		obj.FailureDomains = api.DefaultFailureDomains
+		obj.FailureDomains = kubeletapis.DefaultFailureDomains
 	}
 	if obj.LockObjectNamespace == "" {
 		obj.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
@@ -195,262 +182,11 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
 	}
 	if obj.ResourceLock == "" {
-		obj.ResourceLock = rl.EndpointsResourceLock
-	}
-}
-
-func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
-	if obj.Authentication.Anonymous.Enabled == nil {
-		obj.Authentication.Anonymous.Enabled = boolVar(true)
-	}
-	if obj.Authentication.Webhook.Enabled == nil {
-		obj.Authentication.Webhook.Enabled = boolVar(false)
-	}
-	if obj.Authentication.Webhook.CacheTTL == zeroDuration {
-		obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
-	}
-	if obj.Authorization.Mode == "" {
-		obj.Authorization.Mode = KubeletAuthorizationModeAlwaysAllow
-	}
-	if obj.Authorization.Webhook.CacheAuthorizedTTL == zeroDuration {
-		obj.Authorization.Webhook.CacheAuthorizedTTL = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.Authorization.Webhook.CacheUnauthorizedTTL == zeroDuration {
-		obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
-	}
-
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.CloudProvider == "" {
-		obj.CloudProvider = AutoDetectCloudProvider
-	}
-	if obj.CAdvisorPort == 0 {
-		obj.CAdvisorPort = 4194
-	}
-	if obj.VolumeStatsAggPeriod == zeroDuration {
-		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
-	}
-	if obj.CertDirectory == "" {
-		obj.CertDirectory = "/var/run/kubernetes"
-	}
-	if obj.ContainerRuntime == "" {
-		obj.ContainerRuntime = "docker"
-	}
-	if obj.RuntimeRequestTimeout == zeroDuration {
-		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
-	}
-	if obj.ImagePullProgressDeadline == zeroDuration {
-		obj.ImagePullProgressDeadline = metav1.Duration{Duration: 1 * time.Minute}
-	}
-	if obj.CPUCFSQuota == nil {
-		obj.CPUCFSQuota = boolVar(true)
-	}
-	if obj.DockerExecHandlerName == "" {
-		obj.DockerExecHandlerName = "native"
-	}
-	if obj.DockerEndpoint == "" && runtime.GOOS != "windows" {
-		obj.DockerEndpoint = "unix:///var/run/docker.sock"
-	}
-	if obj.EventBurst == 0 {
-		obj.EventBurst = 10
-	}
-	if obj.EventRecordQPS == nil {
-		temp := int32(5)
-		obj.EventRecordQPS = &temp
-	}
-	if obj.EnableControllerAttachDetach == nil {
-		obj.EnableControllerAttachDetach = boolVar(true)
-	}
-	if obj.EnableDebuggingHandlers == nil {
-		obj.EnableDebuggingHandlers = boolVar(true)
-	}
-	if obj.EnableServer == nil {
-		obj.EnableServer = boolVar(true)
-	}
-	if obj.FileCheckFrequency == zeroDuration {
-		obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
-	}
-	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
-	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10248
-	}
-	if obj.HostNetworkSources == nil {
-		obj.HostNetworkSources = []string{kubetypes.AllSource}
-	}
-	if obj.HostPIDSources == nil {
-		obj.HostPIDSources = []string{kubetypes.AllSource}
-	}
-	if obj.HostIPCSources == nil {
-		obj.HostIPCSources = []string{kubetypes.AllSource}
-	}
-	if obj.HTTPCheckFrequency == zeroDuration {
-		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
-	}
-	if obj.ImageMinimumGCAge == zeroDuration {
-		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
-	}
-	if obj.ImageGCHighThresholdPercent == nil {
-		// default is below docker's default dm.min_free_space of 90%
-		temp := int32(85)
-		obj.ImageGCHighThresholdPercent = &temp
-	}
-	if obj.ImageGCLowThresholdPercent == nil {
-		temp := int32(80)
-		obj.ImageGCLowThresholdPercent = &temp
-	}
-	if obj.LowDiskSpaceThresholdMB == 0 {
-		obj.LowDiskSpaceThresholdMB = 256
-	}
-	if obj.MasterServiceNamespace == "" {
-		obj.MasterServiceNamespace = metav1.NamespaceDefault
-	}
-	if obj.MaxContainerCount == nil {
-		temp := int32(-1)
-		obj.MaxContainerCount = &temp
-	}
-	if obj.MaxPerPodContainerCount == 0 {
-		obj.MaxPerPodContainerCount = 1
-	}
-	if obj.MaxOpenFiles == 0 {
-		obj.MaxOpenFiles = 1000000
-	}
-	if obj.MaxPods == 0 {
-		obj.MaxPods = 110
-	}
-	if obj.MinimumGCAge == zeroDuration {
-		obj.MinimumGCAge = metav1.Duration{Duration: 0}
-	}
-	if obj.NonMasqueradeCIDR == "" {
-		obj.NonMasqueradeCIDR = "10.0.0.0/8"
-	}
-	if obj.VolumePluginDir == "" {
-		obj.VolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
-	}
-	if obj.NodeStatusUpdateFrequency == zeroDuration {
-		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
-	}
-	if obj.OOMScoreAdj == nil {
-		temp := int32(qos.KubeletOOMScoreAdj)
-		obj.OOMScoreAdj = &temp
-	}
-	if obj.PodInfraContainerImage == "" {
-		obj.PodInfraContainerImage = defaultPodInfraContainerImage
-	}
-	if obj.Port == 0 {
-		obj.Port = ports.KubeletPort
-	}
-	if obj.ReadOnlyPort == 0 {
-		obj.ReadOnlyPort = ports.KubeletReadOnlyPort
-	}
-	if obj.RegisterNode == nil {
-		obj.RegisterNode = boolVar(true)
-	}
-	if obj.RegisterSchedulable == nil {
-		obj.RegisterSchedulable = boolVar(true)
-	}
-	if obj.RegistryBurst == 0 {
-		obj.RegistryBurst = 10
-	}
-	if obj.RegistryPullQPS == nil {
-		temp := int32(5)
-		obj.RegistryPullQPS = &temp
-	}
-	if obj.ResolverConfig == "" {
-		obj.ResolverConfig = kubetypes.ResolvConfDefault
-	}
-	if obj.RktAPIEndpoint == "" {
-		obj.RktAPIEndpoint = defaultRktAPIServiceEndpoint
-	}
-	if obj.RootDirectory == "" {
-		obj.RootDirectory = defaultRootDir
-	}
-	if obj.SerializeImagePulls == nil {
-		obj.SerializeImagePulls = boolVar(true)
-	}
-	if obj.SeccompProfileRoot == "" {
-		obj.SeccompProfileRoot = filepath.Join(defaultRootDir, "seccomp")
-	}
-	if obj.StreamingConnectionIdleTimeout == zeroDuration {
-		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
-	}
-	if obj.SyncFrequency == zeroDuration {
-		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
-	}
-	if obj.ContentType == "" {
-		obj.ContentType = "application/vnd.kubernetes.protobuf"
-	}
-	if obj.KubeAPIQPS == nil {
-		temp := int32(5)
-		obj.KubeAPIQPS = &temp
-	}
-	if obj.KubeAPIBurst == 0 {
-		obj.KubeAPIBurst = 10
-	}
-	if obj.OutOfDiskTransitionFrequency == zeroDuration {
-		obj.OutOfDiskTransitionFrequency = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if string(obj.HairpinMode) == "" {
-		obj.HairpinMode = PromiscuousBridge
-	}
-	if obj.EvictionHard == nil {
-		temp := "memory.available<100Mi"
-		obj.EvictionHard = &temp
-	}
-	if obj.EvictionPressureTransitionPeriod == zeroDuration {
-		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.ExperimentalKernelMemcgNotification == nil {
-		obj.ExperimentalKernelMemcgNotification = boolVar(false)
-	}
-	if obj.SystemReserved == nil {
-		obj.SystemReserved = make(map[string]string)
-	}
-	if obj.KubeReserved == nil {
-		obj.KubeReserved = make(map[string]string)
-	}
-	if obj.ExperimentalQOSReserved == nil {
-		obj.ExperimentalQOSReserved = make(map[string]string)
-	}
-	if obj.MakeIPTablesUtilChains == nil {
-		obj.MakeIPTablesUtilChains = boolVar(true)
-	}
-	if obj.IPTablesMasqueradeBit == nil {
-		temp := int32(defaultIPTablesMasqueradeBit)
-		obj.IPTablesMasqueradeBit = &temp
-	}
-	if obj.IPTablesDropBit == nil {
-		temp := int32(defaultIPTablesDropBit)
-		obj.IPTablesDropBit = &temp
-	}
-	if obj.CgroupsPerQOS == nil {
-		temp := true
-		obj.CgroupsPerQOS = &temp
-	}
-	if obj.CgroupDriver == "" {
-		obj.CgroupDriver = "cgroupfs"
-	}
-	if obj.EnforceNodeAllocatable == nil {
-		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
-	}
-	if obj.ExperimentalDockershim == nil {
-		obj.ExperimentalDockershim = boolVar(false)
-	}
-	if obj.RemoteRuntimeEndpoint == "" {
-		if runtime.GOOS == "linux" {
-			obj.RemoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
-		} else if runtime.GOOS == "windows" {
-			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
-		}
+		// obj.ResourceLock = rl.EndpointsResourceLock
+		obj.ResourceLock = "endpoints"
 	}
 }
 
 func boolVar(b bool) *bool {
 	return &b
 }
-
-var (
-	defaultCfg = KubeletConfiguration{}
-)

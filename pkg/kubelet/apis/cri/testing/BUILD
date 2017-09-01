@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,9 +12,8 @@ go_library(
         "fake_runtime_service.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
     deps = [
-        "//pkg/kubelet/apis/cri/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],

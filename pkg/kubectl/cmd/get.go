@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -33,9 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
@@ -49,7 +51,7 @@ type GetOptions struct {
 }
 
 var (
-	get_long = templates.LongDesc(`
+	getLong = templates.LongDesc(`
 		Display one or many resources.
 
 		` + validResources + `
@@ -61,7 +63,7 @@ var (
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
 
-	get_example = templates.Examples(i18n.T(`
+	getExample = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
 		kubectl get pods
 
@@ -90,6 +92,10 @@ var (
 		kubectl get all`))
 )
 
+const (
+	useOpenAPIPrintColumnFlagLabel = "experimental-use-openapi-print-columns"
+)
+
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
@@ -109,8 +115,8 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   i18n.T("Display one or many resources"),
-		Long:    get_long,
-		Example: get_example,
+		Long:    getLong,
+		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
@@ -120,7 +126,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
@@ -128,10 +134,10 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful retrieval.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
+	addOpenAPIPrintColumnFlags(cmd)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmdutil.AddOpenAPIFlags(cmd)
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
@@ -161,10 +167,11 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
-	mapper, typer, err := f.UnstructuredObject()
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -174,7 +181,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		enforceNamespace = false
 	}
 
-	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
 
 		fullCmdName := cmd.Parent().CommandPath()
@@ -183,7 +190,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			usageString = fmt.Sprintf("%s\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[2]s explain pods).", usageString, fullCmdName)
 		}
 
-		return cmdutil.UsageError(cmd, usageString)
+		return cmdutil.UsageErrorf(cmd, usageString)
 	}
 
 	export := cmdutil.GetFlagBool(cmd, "export")
@@ -194,7 +201,12 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+		builder, err := f.NewUnstructuredBuilder(true)
+		if err != nil {
+			return err
+		}
+
+		r := builder.
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
@@ -203,7 +215,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			SingleResourceType().
 			Latest().
 			Do()
-		err := r.Err()
+		err = r.Err()
 		if err != nil {
 			return err
 		}
@@ -219,7 +231,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, mapping, allNamespaces)
+		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, allNamespaces)
 		if err != nil {
 			return err
 		}
@@ -276,18 +288,14 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					first = false
 					return false, nil
 				}
-				err := printer.PrintObj(e.Object, out)
-				if err != nil {
-					return false, err
-				}
-				return false, nil
+				return false, printer.PrintObj(e.Object, out)
 			})
 			return err
 		})
 		return nil
 	}
 
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+	r := builder.
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
@@ -302,7 +310,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return err
 	}
 
-	printer, generic, err := f.PrinterForCommand(cmd)
+	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
@@ -313,7 +321,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
 
-	if generic {
+	if printer.IsGeneric() {
 		// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 		// 1. if there is more than one item, combine them all into a single list
 		// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -421,6 +429,8 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	var lastMapping *meta.RESTMapping
 	w := printers.GetNewTabWriter(out)
 
+	useOpenAPIPrintColumns := cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
+
 	if resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
 	}
@@ -429,6 +439,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var original runtime.Object
+
 		if sorter != nil {
 			mapping = infos[sorter.OriginalPosition(ix)].Mapping
 			original = infos[sorter.OriginalPosition(ix)].Object
@@ -436,11 +447,19 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			mapping = infos[ix].Mapping
 			original = infos[ix].Object
 		}
-		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
 			if printer != nil {
 				w.Flush()
 			}
-			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
+
+			var outputOpts *printers.OutputOptions
+			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
+			// then get the default output options for this mapping from OpenAPI schema.
+			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
+				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
+			}
+
+			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -501,7 +520,13 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			continue
 		}
-		if err := printer.PrintObj(decodedObj, w); err != nil {
+		objToPrint := decodedObj
+		if printer.IsGeneric() {
+			// use raw object as recieved from the builder when using generic
+			// printer instead of decodedObj
+			objToPrint = original
+		}
+		if err := printer.PrintObj(objToPrint, w); err != nil {
 			if !errs.Has(err.Error()) {
 				errs.Insert(err.Error())
 				allErrs = append(allErrs, err)
@@ -512,4 +537,61 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	w.Flush()
 	cmdutil.PrintFilterCount(errOut, len(objs), filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from openapi schema for displaying a resource.")
+	// marking it deprecated so that it is hidden from usage/help text.
+	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "It's an experimental feature.")
+}
+
+func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
+	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
+}
+
+func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
+	return cmdutil.GetFlagString(cmd, "output") != ""
+}
+
+// outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
+// openapi schema and returns the output options for the mapping if found.
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
+
+	// user has not specified any output format, check if OpenAPI has
+	// default specification to print this resource type
+	api, err := f.OpenAPISchema()
+	if err != nil {
+		// Error getting schema
+		return nil, false
+	}
+	// Found openapi metadata for this resource
+	schema := api.LookupResource(mapping.GroupVersionKind)
+	if schema == nil {
+		// Schema not found, return empty columns
+		return nil, false
+	}
+
+	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
+	if !found {
+		// Extension not found, return empty columns
+		return nil, false
+	}
+
+	return outputOptsFromStr(columns)
+}
+
+// outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
+func outputOptsFromStr(columnStr string) (*printers.OutputOptions, bool) {
+	if columnStr == "" {
+		return nil, false
+	}
+	parts := strings.SplitN(columnStr, "=", 2)
+	if len(parts) < 2 {
+		return nil, false
+	}
+	return &printers.OutputOptions{
+		FmtType:          parts[0],
+		FmtArg:           parts[1],
+		AllowMissingKeys: true,
+	}, true
 }

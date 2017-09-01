@@ -30,10 +30,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -50,6 +50,15 @@ const (
 	// portion of CPU and basically stop all the real work.
 	// Increasing threshold to 1s is within our SLO and should solve this problem.
 	apiCallLatencyThreshold time.Duration = 1 * time.Second
+
+	// We use a higher threshold for list apicalls if the cluster is big (i.e having > 500 nodes)
+	// as list response sizes are bigger in general for big clusters.
+	apiListCallLatencyThreshold  time.Duration = 5 * time.Second
+	bigClusterNodeCountThreshold               = 500
+
+	// Cluster Autoscaler metrics names
+	caFunctionMetric      = "cluster_autoscaler_function_duration_seconds_bucket"
+	caFunctionMetricLabel = "function"
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -62,6 +71,10 @@ func (m *MetricsForE2E) filterMetrics() {
 	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
 	for _, metric := range InterestingControllerManagerMetrics {
 		interestingControllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
+	}
+	interestingClusterAutoscalerMetrics := make(metrics.ClusterAutoscalerMetrics)
+	for _, metric := range InterestingClusterAutoscalerMetrics {
+		interestingClusterAutoscalerMetrics[metric] = (*m).ClusterAutoscalerMetrics[metric]
 	}
 	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
 	for kubelet, grabbed := range (*m).KubeletMetrics {
@@ -86,6 +99,12 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 	for _, interestingMetric := range InterestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for _, interestingMetric := range InterestingClusterAutoscalerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
 			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
 		}
 	}
@@ -122,9 +141,23 @@ var InterestingApiServerMetrics = []string{
 }
 
 var InterestingControllerManagerMetrics = []string{
-	"garbage_collector_event_queue_latency",
-	"garbage_collector_dirty_queue_latency",
-	"garbage_collector_orhan_queue_latency",
+	"garbage_collector_attempt_to_delete_queue_latency",
+	"garbage_collector_attempt_to_delete_work_duration",
+	"garbage_collector_attempt_to_orphan_queue_latency",
+	"garbage_collector_attempt_to_orphan_work_duration",
+	"garbage_collector_dirty_processing_latency_microseconds",
+	"garbage_collector_event_processing_latency_microseconds",
+	"garbage_collector_graph_changes_queue_latency",
+	"garbage_collector_graph_changes_work_duration",
+	"garbage_collector_orphan_processing_latency_microseconds",
+
+	"namespace_queue_latency",
+	"namespace_queue_latency_sum",
+	"namespace_queue_latency_count",
+	"namespace_retries",
+	"namespace_work_duration",
+	"namespace_work_duration_sum",
+	"namespace_work_duration_count",
 }
 
 var InterestingKubeletMetrics = []string{
@@ -136,6 +169,12 @@ var InterestingKubeletMetrics = []string{
 	"kubelet_pod_worker_latency_microseconds",
 	"kubelet_pod_worker_start_latency_microseconds",
 	"kubelet_sync_pods_latency_microseconds",
+}
+
+var InterestingClusterAutoscalerMetrics = []string{
+	"function_duration_seconds",
+	"errors_total",
+	"evicted_pods_total",
 }
 
 // Dashboard metrics
@@ -181,7 +220,7 @@ func (l *SchedulingLatency) PrintJSON() string {
 }
 
 type SaturationTime struct {
-	TimeToSaturate time.Duration `json:"timeToStaturate"`
+	TimeToSaturate time.Duration `json:"timeToSaturate"`
 	NumberOfNodes  int           `json:"numberOfNodes"`
 	NumberOfPods   int           `json:"numberOfPods"`
 	Throughput     float32       `json:"throughput"`
@@ -224,7 +263,7 @@ func (a *APIResponsiveness) Less(i, j int) bool {
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
 func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
@@ -255,7 +294,7 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 // Add request count to the APICall metric entry (creating one if necessary).
 func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb string, count int) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
 			a.APICalls[i].Count += count
 			return
 		}
@@ -316,8 +355,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 }
 
 // Prints top five summary metrics for request types with latency and returns
-// number of such request types above threshold.
-func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error) {
+// number of such request types above threshold. We use a higher threshold for
+// list calls if nodeCount is above a given threshold (i.e. cluster is big).
+func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIResponsiveness, error) {
+	isBigCluster := (nodeCount > bigClusterNodeCountThreshold)
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, metrics, err
@@ -326,10 +367,14 @@ func HighLatencyRequests(c clientset.Interface) (int, *APIResponsiveness, error)
 	badMetrics := 0
 	top := 5
 	for i := range metrics.APICalls {
+		latency := metrics.APICalls[i].Latency.Perc99
+		isListCall := (metrics.APICalls[i].Verb == "LIST")
 		isBad := false
-		if metrics.APICalls[i].Latency.Perc99 > apiCallLatencyThreshold {
-			badMetrics++
-			isBad = true
+		if latency > apiCallLatencyThreshold {
+			if !isListCall || !isBigCluster || (latency > apiListCallLatencyThreshold) {
+				isBad = true
+				badMetrics++
+			}
 		}
 		if top > 0 || isBad {
 			top--
@@ -429,6 +474,10 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingLatency, error) {
 		data = string(rawData)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
+		if TestContext.Provider == "gke" {
+			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+			return nil, nil
+		}
 		cmd := "curl http://localhost:10251/metrics"
 		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
@@ -554,4 +603,25 @@ func PrintLatencies(latencies []PodLatencyData, header string) {
 	metrics := ExtractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
 	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+}
+
+func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.MetricsCollection) {
+	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
+		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
+			beforeSamplesMap := make(map[string]*model.Sample)
+			for _, bSample := range beforeSamples {
+				beforeSamplesMap[makeKey(bSample.Metric[caFunctionMetricLabel], bSample.Metric["le"])] = bSample
+			}
+			for _, aSample := range afterSamples {
+				if bSample, found := beforeSamplesMap[makeKey(aSample.Metric[caFunctionMetricLabel], aSample.Metric["le"])]; found {
+					aSample.Value = aSample.Value - bSample.Value
+				}
+
+			}
+		}
+	}
+}
+
+func makeKey(a, b model.LabelValue) string {
+	return string(a) + "___" + string(b)
 }

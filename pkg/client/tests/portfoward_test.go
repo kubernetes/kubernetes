@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	. "k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 )
 
@@ -131,16 +131,17 @@ func TestForwardPorts(t *testing.T) {
 	for testName, test := range tests {
 		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
 
-		url, _ := url.Parse(server.URL)
-		exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
+		transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
 		if err != nil {
 			t.Fatal(err)
 		}
+		url, _ := url.Parse(server.URL)
+		dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", url)
 
 		stopChan := make(chan struct{}, 1)
 		readyChan := make(chan struct{})
 
-		pf, err := New(exec, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
+		pf, err := New(dialer, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -201,17 +202,18 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	server := httptest.NewServer(fakePortForwardServer(t, "allBindsFailed", nil, nil))
 	defer server.Close()
 
-	url, _ := url.Parse(server.URL)
-	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", url)
+	transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	url, _ := url.Parse(server.URL)
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", url)
 
 	stopChan1 := make(chan struct{}, 1)
 	defer close(stopChan1)
 	readyChan1 := make(chan struct{})
 
-	pf1, err := New(exec, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
+	pf1, err := New(dialer, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -220,7 +222,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 
 	stopChan2 := make(chan struct{}, 1)
 	readyChan2 := make(chan struct{})
-	pf2, err := New(exec, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
+	pf2, err := New(dialer, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}

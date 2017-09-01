@@ -20,14 +20,12 @@ import (
 	"fmt"
 	"path"
 
+	. "github.com/onsi/ginkgo"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/ginkgo"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -41,84 +39,84 @@ var _ = framework.KubeDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
 	Context("when FSGroup is specified [Feature:FSGroup]", func() {
-		It("new files should be created with FSGroup ownership when container is root [Volume]", func() {
+		It("new files should be created with FSGroup ownership when container is root [sig-storage]", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("new files should be created with FSGroup ownership when container is non-root [Volume]", func() {
+		It("new files should be created with FSGroup ownership when container is non-root [sig-storage]", func() {
 			doTestSetgidFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("nonexistent volume subPath should have the correct mode and owner using FSGroup [Volume]", func() {
+		It("nonexistent volume subPath should have the correct mode and owner using FSGroup [sig-storage]", func() {
 			doTestSubPathFSGroup(f, testImageNonRootUid, v1.StorageMediumMemory)
 		})
 
-		It("files with FSGroup ownership should support (root,0644,tmpfs) [Volume]", func() {
+		It("files with FSGroup ownership should support (root,0644,tmpfs) [sig-storage]", func() {
 			doTest0644FSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 
-		It("volume on default medium should have the correct mode using FSGroup [Volume]", func() {
+		It("volume on default medium should have the correct mode using FSGroup [sig-storage]", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumDefault)
 		})
 
-		It("volume on tmpfs should have the correct mode using FSGroup [Volume]", func() {
+		It("volume on tmpfs should have the correct mode using FSGroup [sig-storage]", func() {
 			doTestVolumeModeFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
 	})
 
-	It("volume on tmpfs should have the correct mode [Conformance] [Volume]", func() {
+	It("volume on tmpfs should have the correct mode [Conformance] [sig-storage]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0644,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0644,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0666,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0666,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (root,0777,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (root,0777,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0644,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0644,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0666,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0666,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("should support (non-root,0777,tmpfs) [Conformance] [Volume]", func() {
+	It("should support (non-root,0777,tmpfs) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
-	It("volume on default medium should have the correct mode [Conformance] [Volume]", func() {
+	It("volume on default medium should have the correct mode [Conformance] [sig-storage]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0644,default) [Conformance] [Volume]", func() {
+	It("should support (root,0644,default) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0666,default) [Conformance] [Volume]", func() {
+	It("should support (root,0666,default) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (root,0777,default) [Conformance] [Volume]", func() {
+	It("should support (root,0777,default) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0644,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0644,default) [Conformance] [sig-storage]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0666,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0666,default) [Conformance] [sig-storage]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("should support (non-root,0777,default) [Conformance] [Volume]", func() {
+	It("should support (non-root,0777,default) [Conformance] [sig-storage]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 })
@@ -142,7 +140,7 @@ func doTestSetgidFSGroup(f *framework.Framework, image string, medium v1.Storage
 		fmt.Sprintf("--file_owner=%v", filePath),
 	}
 
-	fsGroup := types.UnixGroupID(123)
+	fsGroup := int64(123)
 	pod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	msg := fmt.Sprintf("emptydir 0644 on %v", formatMedium(medium))
@@ -172,7 +170,7 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 
 	pod.Spec.Containers[0].VolumeMounts[0].SubPath = subPath
 
-	fsGroup := types.UnixGroupID(123)
+	fsGroup := int64(123)
 	pod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	msg := fmt.Sprintf("emptydir subpath on %v", formatMedium(medium))
@@ -198,7 +196,7 @@ func doTestVolumeModeFSGroup(f *framework.Framework, image string, medium v1.Sto
 		fmt.Sprintf("--file_perm=%v", volumePath),
 	}
 
-	fsGroup := types.UnixGroupID(1001)
+	fsGroup := int64(1001)
 	pod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	msg := fmt.Sprintf("emptydir volume type on %v", formatMedium(medium))
@@ -224,7 +222,7 @@ func doTest0644FSGroup(f *framework.Framework, image string, medium v1.StorageMe
 		fmt.Sprintf("--file_perm=%v", filePath),
 	}
 
-	fsGroup := types.UnixGroupID(123)
+	fsGroup := int64(123)
 	pod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	msg := fmt.Sprintf("emptydir 0644 on %v", formatMedium(medium))
@@ -344,7 +342,7 @@ func testPodWithVolume(image, path string, source *v1.EmptyDirVolumeSource) *v1.
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,

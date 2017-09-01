@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -54,6 +54,38 @@ func newThirdPartyResources(c *ExtensionsV1beta1Client) *thirdPartyResources {
 	return &thirdPartyResources{
 		client: c.RESTClient(),
 	}
+}
+
+// Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
+func (c *thirdPartyResources) Get(name string, options v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
+	result = &v1beta1.ThirdPartyResource{}
+	err = c.client.Get().
+		Resource("thirdpartyresources").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
+func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
+	result = &v1beta1.ThirdPartyResourceList{}
+	err = c.client.Get().
+		Resource("thirdpartyresources").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested thirdPartyResources.
+func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("thirdpartyresources").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
 }
 
 // Create takes the representation of a thirdPartyResource and creates it.  Returns the server's representation of the thirdPartyResource, and an error, if there is any.
@@ -97,38 +129,6 @@ func (c *thirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOp
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
-func (c *thirdPartyResources) Get(name string, options v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
-	result = &v1beta1.ThirdPartyResource{}
-	err = c.client.Get().
-		Resource("thirdpartyresources").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
-func (c *thirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
-	result = &v1beta1.ThirdPartyResourceList{}
-	err = c.client.Get().
-		Resource("thirdpartyresources").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested thirdPartyResources.
-func (c *thirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("thirdpartyresources").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.

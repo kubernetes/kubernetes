@@ -33,11 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/model"
 )
@@ -68,7 +68,7 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.
 	if c == nil {
 		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
 	}
-	grabber, err := metrics.NewMetricsGrabber(c, true, false, false, false)
+	grabber, err := metrics.NewMetricsGrabber(c, nil, true, false, false, false, false)
 	if err != nil {
 		return metrics.KubeletMetrics{}, err
 	}
@@ -618,7 +618,7 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.Container
 		}
 
 		if oldStats, ok := oldStatsMap[name]; ok {
-			if oldStats.CPU.Time.Equal(cStats.CPU.Time) {
+			if oldStats.CPU.Time.Equal(&cStats.CPU.Time) {
 				// No change -> skip this stat.
 				continue
 			}

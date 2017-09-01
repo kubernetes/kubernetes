@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -340,13 +341,21 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		storage, server := newStorage(t)
 		rollbackStorage := storage.Rollback
 
-		if _, err := storage.Deployment.Create(ctx, validNewDeployment()); err != nil {
+		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := rollbackStorage.Create(ctx, &test.rollback); !test.errOK(err) {
+		rollbackRespStatus, err := rollbackStorage.Create(ctx, &test.rollback, false)
+		if !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
-			// If rollback succeeded, verify Rollback field of deployment
+			// If rollback succeeded, verify Rollback response and Rollback field of deployment
+			status, ok := rollbackRespStatus.(*metav1.Status)
+			if !ok {
+				t.Errorf("%s: unexpected response format", k)
+			}
+			if status.Code != http.StatusOK || status.Status != metav1.StatusSuccess {
+				t.Errorf("%s: unexpected response, code: %d, status: %s", k, status.Code, status.Status)
+			}
 			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
@@ -372,7 +381,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 		Name:               name,
 		UpdatedAnnotations: map[string]string{},
 		RollbackTo:         extensions.RollbackConfig{Revision: 1},
-	})
+	}, false)
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -395,4 +404,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	expected := []string{"deploy"}
 	registrytest.AssertShortNames(t, storage.Deployment, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Deployment, expected)
 }

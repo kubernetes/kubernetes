@@ -42,7 +42,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 // createPodDisruptionBudget is a helper function that returns a PodDisruptionBudget with the updated resource version.
 func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t *testing.T) (policy.PodDisruptionBudget, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pdb.Namespace)
-	obj, err := storage.Create(ctx, &pdb)
+	obj, err := storage.Create(ctx, &pdb, false)
 	if err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget, %v", err)
 	}

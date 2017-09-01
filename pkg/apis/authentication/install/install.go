@@ -39,7 +39,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authentication.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/authentication",
 			RootScopedKinds:            sets.NewString("TokenReview"),
 			AddInternalObjectsToScheme: authentication.AddToScheme,
 		},

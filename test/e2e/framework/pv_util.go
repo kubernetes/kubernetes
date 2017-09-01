@@ -27,15 +27,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	"google.golang.org/api/googleapi"
+	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -73,11 +74,13 @@ type PVCMap map[types.NamespacedName]pvcval
 //	 	},
 //	 }
 type PersistentVolumeConfig struct {
-	PVSource      v1.PersistentVolumeSource
-	Prebind       *v1.PersistentVolumeClaim
-	ReclaimPolicy v1.PersistentVolumeReclaimPolicy
-	NamePrefix    string
-	Labels        labels.Set
+	PVSource         v1.PersistentVolumeSource
+	Prebind          *v1.PersistentVolumeClaim
+	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
+	NamePrefix       string
+	Labels           labels.Set
+	StorageClassName string
+	NodeAffinity     *v1.NodeAffinity
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
@@ -85,9 +88,10 @@ type PersistentVolumeConfig struct {
 // (+optional) Annotations defines the PVC's annotations
 
 type PersistentVolumeClaimConfig struct {
-	AccessModes []v1.PersistentVolumeAccessMode
-	Annotations map[string]string
-	Selector    *metav1.LabelSelector
+	AccessModes      []v1.PersistentVolumeAccessMode
+	Annotations      map[string]string
+	Selector         *metav1.LabelSelector
+	StorageClassName *string
 }
 
 // Clean up a pv and pvc in a single pv/pvc test case.
@@ -561,7 +565,7 @@ func makePvcKey(ns, name string) types.NamespacedName {
 // is assigned, assumes "Retain". Specs are expected to match the test's PVC.
 // Note: the passed-in claim does not have a name until it is created and thus the PV's
 //   ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
-//   is added later in createPVCPV.
+//   is added later in CreatePVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
@@ -575,7 +579,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Namespace: pvConfig.Prebind.Namespace,
 		}
 	}
-	return &v1.PersistentVolume{
+	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
@@ -594,9 +598,16 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 				v1.ReadOnlyMany,
 				v1.ReadWriteMany,
 			},
-			ClaimRef: claimRef,
+			ClaimRef:         claimRef,
+			StorageClassName: pvConfig.StorageClassName,
 		},
 	}
+	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, pvConfig.NodeAffinity)
+	if err != nil {
+		Logf("Setting storage node affinity failed: %v", err)
+		return nil
+	}
+	return pv
 }
 
 // Returns a PVC definition based on the namespace.
@@ -625,14 +636,15 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
 				},
 			},
+			StorageClassName: cfg.StorageClassName,
 		},
 	}
 }
 
-func CreatePDWithRetry() (string, error) {
+func createPDWithRetry(zone string) (string, error) {
 	var err error
 	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
-		newDiskName, err := createPD()
+		newDiskName, err := createPD(zone)
 		if err != nil {
 			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
@@ -641,6 +653,14 @@ func CreatePDWithRetry() (string, error) {
 		return newDiskName, nil
 	}
 	return "", err
+}
+
+func CreatePDWithRetry() (string, error) {
+	return createPDWithRetry("")
+}
+
+func CreatePDWithRetryAndZone(zone string) (string, error) {
+	return createPDWithRetry(zone)
 }
 
 func DeletePDWithRetry(diskName string) error {
@@ -657,7 +677,11 @@ func DeletePDWithRetry(diskName string) error {
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
-func createPD() (string, error) {
+func createPD(zone string) (string, error) {
+	if zone == "" {
+		zone = TestContext.CloudConfig.Zone
+	}
+
 	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
 		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
 
@@ -667,7 +691,7 @@ func createPD() (string, error) {
 		}
 
 		tags := map[string]string{}
-		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, TestContext.CloudConfig.Zone, 10 /* sizeGb */, tags)
+		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}
@@ -676,7 +700,7 @@ func createPD() (string, error) {
 		client := ec2.New(session.New())
 
 		request := &ec2.CreateVolumeInput{}
-		request.AvailabilityZone = aws.String(TestContext.CloudConfig.Zone)
+		request.AvailabilityZone = aws.String(zone)
 		request.Size = aws.Int64(10)
 		request.VolumeType = aws.String(awscloud.DefaultVolumeType)
 		response, err := client.CreateVolume(request)
@@ -692,16 +716,21 @@ func createPD() (string, error) {
 	} else if TestContext.Provider == "azure" {
 		pdName := fmt.Sprintf("%s-%s", TestContext.Prefix, string(uuid.NewUUID()))
 		azureCloud, err := GetAzureCloud()
+
 		if err != nil {
 			return "", err
 		}
 
-		_, diskUri, _, err := azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
+		if azureCloud.BlobDiskController == nil {
+			return "", fmt.Errorf("BlobDiskController is nil, it's not expected.")
+		}
+
+		diskUri, err := azureCloud.BlobDiskController.CreateBlobDisk(pdName, "standard_lrs", 1, false)
 		if err != nil {
 			return "", err
 		}
+
 		return diskUri, nil
-
 	} else {
 		return "", fmt.Errorf("provider does not support volume creation")
 	}
@@ -746,8 +775,11 @@ func deletePD(pdName string) error {
 		if err != nil {
 			return err
 		}
+		if azureCloud.BlobDiskController == nil {
+			return fmt.Errorf("BlobDiskController is nil, it's not expected.")
+		}
 		diskName := pdName[(strings.LastIndex(pdName, "/") + 1):]
-		err = azureCloud.DeleteVolume(diskName, pdName)
+		err = azureCloud.BlobDiskController.DeleteBlobDisk(diskName, false)
 		if err != nil {
 			Logf("failed to delete Azure volume %q: %v", pdName, err)
 			return err
@@ -773,7 +805,7 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-tester-",
@@ -806,9 +838,80 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 	return podSpec
 }
 
+// Returns a pod definition based on the namespace. The pod references the PVC's
+// name.  A slice of BASH commands can be supplied as args to be run by the pod.
+// SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
+func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) *v1.Pod {
+	if len(command) == 0 {
+		command = "while true; do sleep 1; done"
+	}
+	podName := "security-context-" + string(uuid.NewUUID())
+	fsGroup := int64(1000)
+	podSpec := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: ns,
+		},
+		Spec: v1.PodSpec{
+			HostIPC: hostIPC,
+			HostPID: hostPID,
+			SecurityContext: &v1.PodSecurityContext{
+				FSGroup: &fsGroup,
+			},
+			Containers: []v1.Container{
+				{
+					Name:    "write-pod",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", command},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &isPrivileged,
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyOnFailure,
+		},
+	}
+	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
+	var volumes = make([]v1.Volume, len(pvclaims))
+	for index, pvclaim := range pvclaims {
+		volumename := fmt.Sprintf("volume%v", index+1)
+		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+	}
+	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Spec.Volumes = volumes
+	podSpec.Spec.SecurityContext.SELinuxOptions = seLinuxLabel
+	return podSpec
+}
+
 // create pod with given claims
 func CreatePod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, pvclaims, isPrivileged, command)
+	pod, err := client.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("pod Create API error: %v", err)
+	}
+	// Waiting for pod to be running
+	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	if err != nil {
+		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+	}
+	// get fresh pod info
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return pod, fmt.Errorf("pod Get API error: %v", err)
+	}
+	return pod, nil
+}
+
+// create security pod with given claims
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
+	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -852,4 +955,40 @@ func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 		}
 	}
 	return persistentvolumes, nil
+}
+
+func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
+	diskName, err := CreatePDWithRetryAndZone(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		return &v1.PersistentVolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   diskName,
+				FSType:   "ext3",
+				ReadOnly: false,
+			},
+		}, nil
+	} else if TestContext.Provider == "aws" {
+		return &v1.PersistentVolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: diskName,
+				FSType:   "ext3",
+			},
+		}, nil
+	} else {
+		return nil, fmt.Errorf("Provider not supported")
+	}
+}
+
+func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
+		return DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	} else if TestContext.Provider == "aws" {
+		return DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
+	} else {
+		return fmt.Errorf("Provider not supported")
+	}
 }

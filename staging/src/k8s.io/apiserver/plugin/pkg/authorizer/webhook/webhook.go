@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	authorization "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
 )
 
 var (
@@ -144,6 +144,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
 			User:   user.GetName(),
+			UID:    user.GetUID(),
 			Groups: user.GetGroups(),
 			Extra:  convertToSARExtra(user.GetExtra()),
 		}

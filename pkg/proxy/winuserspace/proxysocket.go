@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/ipconfig"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -281,7 +281,7 @@ func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) 
 	msg.Question[0].Name = origName
 
 	if err != nil {
-		glog.Warning("Unable to pack DNS packet. Error is: %v", err)
+		glog.Warningf("Unable to pack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -308,7 +308,7 @@ func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int
 	mbuf, err := msg.PackBuffer(buffer)
 
 	if err != nil {
-		glog.Warning("Unable to pack DNS packet. Error is: %v", err)
+		glog.Warningf("Unable to pack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -419,7 +419,7 @@ func processDNSQueryPacket(
 	dnsSearch []string) (int, error) {
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
-		glog.Warning("Unable to unpack DNS packet. Error is: %v", err)
+		glog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
 		return length, err
 	}
 
@@ -466,7 +466,7 @@ func processDNSResponsePacket(
 	var drop bool
 	msg := &dns.Msg{}
 	if err := msg.Unpack(buffer[:length]); err != nil {
-		glog.Warning("Unable to unpack DNS packet. Error is: %v", err)
+		glog.Warningf("Unable to unpack DNS packet. Error is: %v", err)
 		return drop, length, err
 	}
 

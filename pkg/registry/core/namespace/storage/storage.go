@@ -54,12 +54,12 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.Namespace{} },
-		NewListFunc:       func() runtime.Object { return &api.NamespaceList{} },
-		PredicateFunc:     namespace.MatchNamespace,
-		QualifiedResource: api.Resource("namespaces"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("namespaces"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
+		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
+		PredicateFunc:            namespace.MatchNamespace,
+		DefaultQualifiedResource: api.Resource("namespaces"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("namespaces"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
@@ -92,8 +92,8 @@ func (r *REST) List(ctx genericapirequest.Context, options *metainternalversion.
 	return r.store.List(ctx, options)
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.store.Create(ctx, obj)
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+	return r.store.Create(ctx, obj, includeUninitialized)
 }
 
 func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {

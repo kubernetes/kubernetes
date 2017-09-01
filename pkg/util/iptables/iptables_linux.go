@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -33,13 +34,19 @@ type locker struct {
 	lock14 *net.UnixListener
 }
 
-func (l *locker) Close() {
+func (l *locker) Close() error {
+	errList := []error{}
 	if l.lock16 != nil {
-		l.lock16.Close()
+		if err := l.lock16.Close(); err != nil {
+			errList = append(errList, err)
+		}
 	}
 	if l.lock14 != nil {
-		l.lock14.Close()
+		if err := l.lock14.Close(); err != nil {
+			errList = append(errList, err)
+		}
 	}
+	return utilerrors.NewAggregate(errList)
 }
 
 func grabIptablesLocks(lockfilePath string) (iptablesLocker, error) {

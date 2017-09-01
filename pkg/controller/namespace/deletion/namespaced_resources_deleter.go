@@ -24,16 +24,17 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // Interface to delete a namespace with all resources in it.
@@ -165,7 +166,10 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
-		glog.Fatalf("Failed to get supported resources: %v", err)
+		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+	}
+	if len(resources) == 0 {
+		glog.Fatalf("Unable to get any supported resources from server: %v", err)
 	}
 	deletableGroupVersionResources := []schema.GroupVersionResource{}
 	for _, rl := range resources {
@@ -325,7 +329,7 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 // it returns true if the operation was supported on the server.
 // it returns an error if the operation was supported on the server but was unable to complete.
 func (d *namespacedResourcesDeleter) deleteCollection(
-	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource,
+	dynamicClient dynamic.Interface, gvr schema.GroupVersionResource,
 	namespace string) (bool, error) {
 	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
@@ -340,8 +344,9 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 	// namespace controller does not want the garbage collector to insert the orphan finalizer since it calls
 	// resource deletions generically.  it will ensure all resources in the namespace are purged prior to releasing
 	// namespace itself.
-	orphanDependents := false
-	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(&metav1.DeleteOptions{OrphanDependents: &orphanDependents}, metav1.ListOptions{})
+	background := metav1.DeletePropagationBackground
+	opts := &metav1.DeleteOptions{PropagationPolicy: &background}
+	err := dynamicClient.Resource(&apiResource, namespace).DeleteCollection(opts, metav1.ListOptions{})
 
 	if err == nil {
 		return true, nil
@@ -369,7 +374,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 //  a boolean if the operation is supported
 //  an error if the operation is supported but could not be completed.
 func (d *namespacedResourcesDeleter) listCollection(
-	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
+	dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationList, gvr: gvr}
@@ -379,7 +384,7 @@ func (d *namespacedResourcesDeleter) listCollection(
 	}
 
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
-	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
+	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{IncludeUninitialized: true})
 	if err == nil {
 		unstructuredList, ok := obj.(*unstructured.UnstructuredList)
 		if !ok {
@@ -405,7 +410,7 @@ func (d *namespacedResourcesDeleter) listCollection(
 
 // deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
 func (d *namespacedResourcesDeleter) deleteEachItem(
-	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) error {
+	dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) error {
 	glog.V(5).Infof("namespace controller - deleteEachItem - namespace: %s, gvr: %v", namespace, gvr)
 
 	unstructuredList, listSupported, err := d.listCollection(dynamicClient, gvr, namespace)
@@ -417,7 +422,9 @@ func (d *namespacedResourcesDeleter) deleteEachItem(
 	}
 	apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 	for _, item := range unstructuredList.Items {
-		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), nil); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		background := metav1.DeletePropagationBackground
+		opts := &metav1.DeleteOptions{PropagationPolicy: &background}
+		if err = dynamicClient.Resource(&apiResource, namespace).Delete(item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
@@ -553,7 +560,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
 		return estimate, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
 	}
-	items, err := podsGetter.Pods(ns).List(metav1.ListOptions{})
+	items, err := podsGetter.Pods(ns).List(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return estimate, err
 	}

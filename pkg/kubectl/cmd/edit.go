@@ -19,7 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	gruntime "runtime"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -107,8 +107,11 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddValidateOptionFlags(cmd, &options.ValidateOptions)
 	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVarP(&options.OutputPatch, "output-patch", "", false, "Output the patch if the resource is edited.")
 
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", gruntime.GOOS == "windows", "Use Windows line-endings (default Unix line-endings)")
+	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
+		"Defaults to the line ending native to your platform.")
+
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &options.ApplyAnnotation)
 	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)

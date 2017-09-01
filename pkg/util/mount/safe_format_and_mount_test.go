@@ -21,7 +21,7 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type ErrorMounter struct {
@@ -74,7 +74,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 4",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 4}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 4}},
 			},
 			expectedError: fmt.Errorf("'fsck' found errors on device /dev/foo but could not correct them: ."),
 		},
@@ -82,14 +82,14 @@ func TestSafeFormatAndMount(t *testing.T) {
 			description: "Test 'fsck' fails with exit status 1 (errors found and corrected)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 1}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 1}},
 			},
 		},
 		{
 			description: "Test 'fsck' fails with exit status other than 1 and 4 (likely unformatted device)",
 			fstype:      "ext4",
 			execScripts: []ExecArgs{
-				{"fsck", []string{"-a", "/dev/foo"}, "", &exec.FakeExitError{Status: 8}},
+				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 8}},
 			},
 		},
 		{
@@ -180,40 +180,30 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		commandScripts := []exec.FakeCommandAction{}
-		for _, expected := range test.execScripts {
-			ecmd := expected.command
-			eargs := expected.args
-			output := expected.output
-			err := expected.err
-			commandScript := func(cmd string, args ...string) exec.Cmd {
-				if cmd != ecmd {
-					t.Errorf("Unexpected command %s. Expecting %s", cmd, ecmd)
-				}
-
-				for j := range args {
-					if args[j] != eargs[j] {
-						t.Errorf("Unexpected args %v. Expecting %v", args, eargs)
-					}
-				}
-				fake := exec.FakeCmd{
-					CombinedOutputScript: []exec.FakeCombinedOutputAction{
-						func() ([]byte, error) { return []byte(output), err },
-					},
-				}
-				return exec.InitFakeCmd(&fake, cmd, args...)
+		execCallCount := 0
+		execCallback := func(cmd string, args ...string) ([]byte, error) {
+			if len(test.execScripts) <= execCallCount {
+				t.Errorf("Unexpected command: %s %v", cmd, args)
+				return nil, nil
 			}
-			commandScripts = append(commandScripts, commandScript)
-		}
-
-		fake := exec.FakeExec{
-			CommandScript: commandScripts,
+			script := test.execScripts[execCallCount]
+			execCallCount++
+			if script.command != cmd {
+				t.Errorf("Unexpected command %s. Expecting %s", cmd, script.command)
+			}
+			for j := range args {
+				if args[j] != script.args[j] {
+					t.Errorf("Unexpected args %v. Expecting %v", args, script.args)
+				}
+			}
+			return []byte(script.output), script.err
 		}
 
 		fakeMounter := ErrorMounter{&FakeMounter{}, 0, test.mountErrs}
+		fakeExec := NewFakeExec(execCallback)
 		mounter := SafeFormatAndMount{
 			Interface: &fakeMounter,
-			Runner:    &fake,
+			Exec:      fakeExec,
 		}
 
 		device := "/dev/foo"

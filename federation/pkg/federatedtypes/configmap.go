@@ -17,15 +17,15 @@ limitations under the License.
 package federatedtypes
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -41,7 +41,7 @@ type ConfigMapAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewConfigMapAdapter(client federationclientset.Interface) FederatedTypeAdapter {
+func NewConfigMapAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &ConfigMapAdapter{client: client}
 }
 
@@ -72,9 +72,9 @@ func (a *ConfigMapAdapter) Equivalent(obj1, obj2 pkgruntime.Object) bool {
 	return util.ConfigMapEquivalent(configmap1, configmap2)
 }
 
-func (a *ConfigMapAdapter) NamespacedName(obj pkgruntime.Object) types.NamespacedName {
+func (a *ConfigMapAdapter) QualifiedName(obj pkgruntime.Object) QualifiedName {
 	configmap := obj.(*apiv1.ConfigMap)
-	return types.NamespacedName{Namespace: configmap.Namespace, Name: configmap.Name}
+	return QualifiedName{Namespace: configmap.Namespace, Name: configmap.Name}
 }
 
 func (a *ConfigMapAdapter) ObjectMeta(obj pkgruntime.Object) *metav1.ObjectMeta {
@@ -86,12 +86,12 @@ func (a *ConfigMapAdapter) FedCreate(obj pkgruntime.Object) (pkgruntime.Object, 
 	return a.client.CoreV1().ConfigMaps(configmap.Namespace).Create(configmap)
 }
 
-func (a *ConfigMapAdapter) FedDelete(namespacedName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return a.client.CoreV1().ConfigMaps(namespacedName.Namespace).Delete(namespacedName.Name, options)
+func (a *ConfigMapAdapter) FedDelete(qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return a.client.CoreV1().ConfigMaps(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *ConfigMapAdapter) FedGet(namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return a.client.CoreV1().ConfigMaps(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *ConfigMapAdapter) FedGet(qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return a.client.CoreV1().ConfigMaps(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *ConfigMapAdapter) FedList(namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -112,12 +112,12 @@ func (a *ConfigMapAdapter) ClusterCreate(client kubeclientset.Interface, obj pkg
 	return client.CoreV1().ConfigMaps(configmap.Namespace).Create(configmap)
 }
 
-func (a *ConfigMapAdapter) ClusterDelete(client kubeclientset.Interface, nsName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return client.CoreV1().ConfigMaps(nsName.Namespace).Delete(nsName.Name, options)
+func (a *ConfigMapAdapter) ClusterDelete(client kubeclientset.Interface, qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return client.CoreV1().ConfigMaps(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *ConfigMapAdapter) ClusterGet(client kubeclientset.Interface, namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return client.CoreV1().ConfigMaps(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *ConfigMapAdapter) ClusterGet(client kubeclientset.Interface, qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return client.CoreV1().ConfigMaps(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *ConfigMapAdapter) ClusterList(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -131,6 +131,10 @@ func (a *ConfigMapAdapter) ClusterUpdate(client kubeclientset.Interface, obj pkg
 
 func (a *ConfigMapAdapter) ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return client.CoreV1().ConfigMaps(namespace).Watch(options)
+}
+
+func (a *ConfigMapAdapter) IsSchedulingAdapter() bool {
+	return false
 }
 
 func (a *ConfigMapAdapter) NewTestObject(namespace string) pkgruntime.Object {

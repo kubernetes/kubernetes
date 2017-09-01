@@ -2,14 +2,12 @@ reviewers:
   - bowei
   - deads2k
   - enisoc
+  - enj # for test/integration/etcd/etcd_storage_path_test.go
   - erictune
   - fabianofranz # for test/e2e/kubectl.go
-  - fejta
   - foxish # for test/e2e/network-partition.go
   - gmarek
-  - ixdy
   - janetkuo
-  - kargakis
   - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
@@ -18,26 +16,24 @@ reviewers:
   - mikedanese
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
-  - rmmh
   - saad-ali
   - smarterclayton
   - soltysh
-  - spiffxp
-  - spxtr
+  - sig-testing-reviewers
   - sttts
+  - zmerlynn
+  - vishh
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - deads2k
   - enisoc
+  - enj # for test/integration/etcd/etcd_storage_path_test.go
   - eparis
   - erictune
   - fabianofranz # for test/e2e/kubectl.go
-  - fejta
   - foxish # for test/e2e/network-partition.go
   - gmarek
-  - ixdy
   - janetkuo
-  - kargakis
   - kow3ns # for test/e2e/statefulset.go
   - krousey
   - liggitt
@@ -47,8 +43,9 @@ approvers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - sig-testing-approvers
   - smarterclayton
   - soltysh
-  - spiffxp
-  - spxtr
   - sttts
+  - zmerlynn
+  - vishh 

@@ -19,9 +19,9 @@ package upgrades
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -33,7 +33,7 @@ type SecretUpgradeTest struct {
 	secret *v1.Secret
 }
 
-func (SecretUpgradeTest) Name() string { return "secret-upgrade" }
+func (SecretUpgradeTest) Name() string { return "secret-upgrade [sig-storage] [sig-api-machinery]" }
 
 // Setup creates a secret and then verifies that a pod can consume it.
 func (t *SecretUpgradeTest) Setup(f *framework.Framework) {
@@ -99,7 +99,7 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
+					Image: "gcr.io/google_containers/mounttest:0.8",
 					Args: []string{
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,14 +9,13 @@ load(
 go_binary(
     name = "genman",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["gen_kube_man.go"],
-    tags = ["automanaged"],
     deps = [
+        "//cmd/cloud-controller-manager/app:go_default_library",
         "//cmd/genutils:go_default_library",
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-controller-manager/app:go_default_library",

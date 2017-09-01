@@ -31,7 +31,7 @@ while IFS= read -d $'\0' -r file ; do
 done < <(find "${KUBE_ROOT}"/pkg/apis -name register.go -print0)
 
 # every register file should contain a GroupName.  Gather the different representations.
-# 1. group directory name for go2idl client gen
+# 1. group directory name for client gen
 # 2. external group versions for init.sh all APIs list
 # 3. install packages for inclusion in import_known_versions files
 group_dirnames=()
@@ -71,7 +71,7 @@ groups_without_codegen=(
 	"imagepolicy"
 	"admission"
 )
-client_gen_file="${KUBE_ROOT}/cmd/libs/go2idl/client-gen/main.go"
+client_gen_file="${KUBE_ROOT}/vendor/k8s.io/code-generator/cmd/client-gen/main.go"
 
 for group_dirname in "${group_dirnames[@]}"; do
 	if ! grep -q "${group_dirname}/" "${client_gen_file}" ; then
@@ -81,7 +81,7 @@ for group_dirname in "${group_dirnames[@]}"; do
 				found=1
 			fi
 		done
-		if [ "${found}" -ne "1" ] ; then
+		if [[ "${found}" -ne "1" && -f "${group_dirname}/types.go" ]] ; then
 			echo "need to add ${group_dirname}/ to ${client_gen_file}"
 			exit 1
 		fi

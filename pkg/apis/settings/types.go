@@ -21,7 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodPreset is a policy resource that defines additional runtime
 // requirements for a Pod.
@@ -52,6 +53,8 @@ type PodPresetSpec struct {
 	// +optional
 	VolumeMounts []api.VolumeMount
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodPresetList is a list of PodPreset objects.
 type PodPresetList struct {

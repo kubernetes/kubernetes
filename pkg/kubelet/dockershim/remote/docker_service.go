@@ -23,9 +23,9 @@ import (
 	"golang.org/x/net/context"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilexec "k8s.io/utils/exec"
 )
 
 // DockerService is the interface implement CRI remote service server.
@@ -145,6 +145,14 @@ func (d *dockerService) ContainerStatus(ctx context.Context, r *runtimeapi.Conta
 		return nil, err
 	}
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
+}
+
+func (d *dockerService) UpdateContainerResources(ctx context.Context, r *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
+	err := d.runtimeService.UpdateContainerResources(r.ContainerId, r.Linux)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
 }
 
 func (d *dockerService) ExecSync(ctx context.Context, r *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {

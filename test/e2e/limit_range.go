@@ -19,9 +19,9 @@ package e2e
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -112,10 +112,7 @@ func equalResourceRequirement(expected v1.ResourceRequirements, actual v1.Resour
 	}
 	framework.Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
 	err = equalResourceList(expected.Limits, actual.Limits)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func equalResourceList(expected v1.ResourceList, actual v1.ResourceList) error {

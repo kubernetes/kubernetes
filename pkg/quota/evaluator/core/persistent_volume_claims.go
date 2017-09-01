@@ -20,17 +20,19 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -140,8 +142,18 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 }
 
 // Handles returns true if the evaluator should handle the specified operation.
-func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
-	return admission.Create == operation
+func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
+	op := a.GetOperation()
+	if op == admission.Create {
+		return true
+	}
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		// fail closed, will try to give an evaluation.
+		return true
+	}
+	// only uninitialized pvc might be updated.
+	return updateUninitialized
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -209,7 +221,7 @@ func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.Persistent
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
-		if err := v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
 			return nil, err
 		}
 	case *api.PersistentVolumeClaim:

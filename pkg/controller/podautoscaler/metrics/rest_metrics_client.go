@@ -22,12 +22,11 @@ import (
 
 	"github.com/golang/glog"
 
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
 	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
@@ -72,7 +71,7 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		podSum := int64(0)
 		missing := len(m.Containers) == 0
 		for _, c := range m.Containers {
-			resValue, found := c.Usage[clientv1.ResourceName(resource)]
+			resValue, found := c.Usage[v1.ResourceName(resource)]
 			if !found {
 				missing = true
 				glog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)

@@ -24,12 +24,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -112,76 +112,86 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 }
 
 func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
-	// Create a pod with a security context that needs filling in
-	createPod := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Containers: []api.Container{{
-					SecurityContext: &api.SecurityContext{},
-				}},
-			},
+	untrue := false
+	tests := []struct {
+		security *api.SecurityContext
+	}{
+		{nil},
+		{&api.SecurityContext{RunAsNonRoot: &untrue}},
+	}
+
+	for _, tc := range tests {
+		// Create a pod with a security context that needs filling in
+		createPod := func() *api.Pod {
+			return &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						SecurityContext: tc.security,
+					}},
+				},
+			}
 		}
-	}
 
-	// Create a PSP with strategies that will populate a blank security context
-	createPSP := func() *extensions.PodSecurityPolicy {
-		uid := types.UnixUserID(1)
-		return &extensions.PodSecurityPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "psp-sa",
-				Annotations: map[string]string{
-					seccomp.AllowedProfilesAnnotationKey: "*",
-					seccomp.DefaultProfileAnnotationKey:  "foo",
+		// Create a PSP with strategies that will populate a blank security context
+		createPSP := func() *extensions.PodSecurityPolicy {
+			uid := int64(1)
+			return &extensions.PodSecurityPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "psp-sa",
+					Annotations: map[string]string{
+						seccomp.AllowedProfilesAnnotationKey: "*",
+						seccomp.DefaultProfileAnnotationKey:  "foo",
+					},
 				},
-			},
-			Spec: extensions.PodSecurityPolicySpec{
-				DefaultAddCapabilities:   []api.Capability{"foo"},
-				RequiredDropCapabilities: []api.Capability{"bar"},
-				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Rule:   extensions.RunAsUserStrategyMustRunAs,
-					Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
+				Spec: extensions.PodSecurityPolicySpec{
+					DefaultAddCapabilities:   []api.Capability{"foo"},
+					RequiredDropCapabilities: []api.Capability{"bar"},
+					RunAsUser: extensions.RunAsUserStrategyOptions{
+						Rule:   extensions.RunAsUserStrategyMustRunAs,
+						Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
+					},
+					SELinux: extensions.SELinuxStrategyOptions{
+						Rule:           extensions.SELinuxStrategyMustRunAs,
+						SELinuxOptions: &api.SELinuxOptions{User: "you"},
+					},
+					// these are pod mutating strategies that are tested above
+					FSGroup: extensions.FSGroupStrategyOptions{
+						Rule: extensions.FSGroupStrategyRunAsAny,
+					},
+					SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+						Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+					},
+					// mutates the container SC by defaulting to true if container sets nil
+					ReadOnlyRootFilesystem: true,
 				},
-				SELinux: extensions.SELinuxStrategyOptions{
-					Rule:           extensions.SELinuxStrategyMustRunAs,
-					SELinuxOptions: &api.SELinuxOptions{User: "you"},
-				},
-				// these are pod mutating strategies that are tested above
-				FSGroup: extensions.FSGroupStrategyOptions{
-					Rule: extensions.FSGroupStrategyRunAsAny,
-				},
-				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
-				},
-				// mutates the container SC by defaulting to true if container sets nil
-				ReadOnlyRootFilesystem: true,
-			},
+			}
 		}
-	}
 
-	pod := createPod()
-	psp := createPSP()
+		pod := createPod()
+		psp := createPSP()
 
-	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Fatalf("unable to create provider %v", err)
-	}
-	sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
-	if err != nil {
-		t.Fatalf("unable to create container security context %v", err)
-	}
+		provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+		if err != nil {
+			t.Fatalf("unable to create provider %v", err)
+		}
+		sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
+		if err != nil {
+			t.Fatalf("unable to create container security context %v", err)
+		}
 
-	// The generated security context should have filled in missing options, so they should differ
-	if reflect.DeepEqual(sc, &pod.Spec.Containers[0].SecurityContext) {
-		t.Error("expected created security context to be different than container's, but they were identical")
-	}
+		// The generated security context should have filled in missing options, so they should differ
+		if reflect.DeepEqual(sc, &pod.Spec.Containers[0].SecurityContext) {
+			t.Error("expected created security context to be different than container's, but they were identical")
+		}
 
-	// Creating the provider or the security context should not have mutated the psp or pod
-	if !reflect.DeepEqual(createPod(), pod) {
-		diffs := diff.ObjectDiff(createPod(), pod)
-		t.Errorf("pod was mutated by CreateContainerSecurityContext. diff:\n%s", diffs)
-	}
-	if !reflect.DeepEqual(createPSP(), psp) {
-		t.Error("psp was mutated by CreateContainerSecurityContext")
+		// Creating the provider or the security context should not have mutated the psp or pod
+		if !reflect.DeepEqual(createPod(), pod) {
+			diffs := diff.ObjectDiff(createPod(), pod)
+			t.Errorf("pod was mutated by CreateContainerSecurityContext. diff:\n%s", diffs)
+		}
+		if !reflect.DeepEqual(createPSP(), psp) {
+			t.Error("psp was mutated by CreateContainerSecurityContext")
+		}
 	}
 }
 
@@ -196,7 +206,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failHostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	failSupplementalGroupPod := defaultPod()
-	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{999}
+	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{999}
 	failSupplementalGroupPSP := defaultPSP()
 	failSupplementalGroupPSP.Spec.SupplementalGroups = extensions.SupplementalGroupsStrategyOptions{
 		Rule: extensions.SupplementalGroupsStrategyMustRunAs,
@@ -206,7 +216,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	}
 
 	failFSGroupPod := defaultPod()
-	fsGroup := types.UnixGroupID(999)
+	fsGroup := int64(999)
 	failFSGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
 	failFSGroupPSP := defaultPSP()
 	failFSGroupPSP.Spec.FSGroup = extensions.FSGroupStrategyOptions{
@@ -353,8 +363,8 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	// fail user strat
 	failUserPSP := defaultPSP()
-	uid := types.UnixUserID(999)
-	badUID := types.UnixUserID(1)
+	uid := int64(999)
+	badUID := int64(1)
 	failUserPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
 		Rule:   extensions.RunAsUserStrategyMustRunAs,
 		Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
@@ -379,7 +389,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 	v1FailInvalidAppArmorPod := defaultV1Pod()
 	apparmor.SetProfileName(v1FailInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
 	failInvalidAppArmorPod := &api.Pod{}
-	v1.Convert_v1_Pod_To_api_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
+	k8s_api_v1.Convert_v1_Pod_To_api_Pod(v1FailInvalidAppArmorPod, failInvalidAppArmorPod, nil)
 
 	failAppArmorPSP := defaultPSP()
 	failAppArmorPSP.Annotations = map[string]string{
@@ -453,7 +463,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failHostPortPSP": {
 			pod:           failHostPortPod,
 			psp:           defaultPSP(),
-			expectedError: "Host port 1 is not allowed to be used.  Allowed ports: []",
+			expectedError: "Host port 1 is not allowed to be used. Allowed ports: []",
 		},
 		"failReadOnlyRootFS - nil": {
 			pod:           defaultPod(),
@@ -488,7 +498,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v", k, errs)
+			t.Errorf("%s received unexpected error %v\nexpected: %s", k, errs, v.expectedError)
 		}
 	}
 }
@@ -517,7 +527,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 	}
 	supGroupPod := defaultPod()
-	supGroupPod.Spec.SecurityContext.SupplementalGroups = []types.UnixGroupID{3}
+	supGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{3}
 
 	fsGroupPSP := defaultPSP()
 	fsGroupPSP.Spec.FSGroup = extensions.FSGroupStrategyOptions{
@@ -527,7 +537,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 	}
 	fsGroupPod := defaultPod()
-	fsGroup := types.UnixGroupID(3)
+	fsGroup := int64(3)
 	fsGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
 
 	seLinuxPod := defaultPod()
@@ -650,7 +660,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 
 	// success user strat
 	userPSP := defaultPSP()
-	uid := types.UnixUserID(999)
+	uid := int64(999)
 	userPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
 		Rule:   extensions.RunAsUserStrategyMustRunAs,
 		Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
@@ -678,7 +688,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	v1AppArmorPod := defaultV1Pod()
 	apparmor.SetProfileName(v1AppArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
 	appArmorPod := &api.Pod{}
-	v1.Convert_v1_Pod_To_api_Pod(v1AppArmorPod, appArmorPod, nil)
+	k8s_api_v1.Convert_v1_Pod_To_api_Pod(v1AppArmorPod, appArmorPod, nil)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
@@ -910,6 +920,7 @@ func defaultPSP() *extensions.PodSecurityPolicy {
 			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 			},
+			AllowPrivilegeEscalation: true,
 		},
 	}
 }
@@ -1021,5 +1032,113 @@ func TestValidateAllowedVolumes(t *testing.T) {
 		if len(errs) != 0 {
 			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
+	}
+}
+
+// TestValidateAllowPrivilegeEscalation will test that when the podSecurityPolicy
+// AllowPrivilegeEscalation is false we cannot set a container's securityContext
+// to allowPrivilegeEscalation, but when it is true we can.
+func TestValidateAllowPrivilegeEscalation(t *testing.T) {
+	pod := defaultPod()
+	pe := true
+	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
+
+	// create a PSP that does not allow privilege escalation
+	psp := defaultPSP()
+	psp.Spec.AllowPrivilegeEscalation = false
+
+	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+	if err != nil {
+		t.Errorf("error creating provider: %v", err.Error())
+	}
+
+	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
+	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 1 {
+		t.Errorf("expected exactly 1 error but got %v", errs)
+	} else {
+		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
+			t.Errorf("did not find the expected error, received: %v", errs)
+		}
+	}
+
+	// now add allowPrivilegeEscalation to the podSecurityPolicy
+	psp.Spec.AllowPrivilegeEscalation = true
+	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 0 {
+		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
+	}
+}
+
+// TestValidateDefaultAllowPrivilegeEscalation will test that when the podSecurityPolicy
+// DefaultAllowPrivilegeEscalation is false we cannot set a container's
+// securityContext to allowPrivilegeEscalation but when it is true we can.
+func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
+	pod := defaultPod()
+	pe := true
+	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
+
+	// create a PSP that does not allow privilege escalation
+	psp := defaultPSP()
+	dpe := false
+	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
+	psp.Spec.AllowPrivilegeEscalation = false
+
+	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+	if err != nil {
+		t.Errorf("error creating provider: %v", err.Error())
+	}
+
+	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
+	errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 1 {
+		t.Errorf("expected exactly 1 error but got %v", errs)
+	} else {
+		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
+			t.Errorf("did not find the expected error, received: %v", errs)
+		}
+	}
+
+	// now add DefaultAllowPrivilegeEscalation to the podSecurityPolicy
+	dpe = true
+	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
+	psp.Spec.AllowPrivilegeEscalation = false
+
+	// expect a denial for this PSP because we did not allowPrivilege Escalation via the PodSecurityPolicy
+	// and test the error message to ensure it's related to allowPrivilegeEscalation
+	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 1 {
+		t.Errorf("expected exactly 1 error but got %v", errs)
+	} else {
+		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
+			t.Errorf("did not find the expected error, received: %v", errs)
+		}
+	}
+
+	// Now set AllowPrivilegeEscalation
+	psp.Spec.AllowPrivilegeEscalation = true
+	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 0 {
+		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
+	}
+
+	// Now set the psp spec to false and reset AllowPrivilegeEscalation
+	psp.Spec.AllowPrivilegeEscalation = false
+	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
+	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 1 {
+		t.Errorf("expected exactly 1 error but got %v", errs)
+	} else {
+		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
+			t.Errorf("did not find the expected error, received: %v", errs)
+		}
+	}
+
+	// Now unset both AllowPrivilegeEscalation
+	psp.Spec.AllowPrivilegeEscalation = true
+	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
+	errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+	if len(errs) != 0 {
+		t.Errorf("resetting allowing privilege escalation expected no errors but got %v", errs)
 	}
 }

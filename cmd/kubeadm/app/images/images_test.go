@@ -21,58 +21,53 @@ import (
 	"runtime"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-type getCoreImageTest struct {
-	i string
-	c *kubeadmapi.MasterConfiguration
-	o string
-}
-
 const (
-	testversion = "1"
+	testversion = "v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING"
+	expected    = "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"
 	gcrPrefix   = "gcr.io/google_containers"
 )
 
 func TestGetCoreImage(t *testing.T) {
-	var imageTest = []struct {
-		t        getCoreImageTest
-		expected string
+	var tests = []struct {
+		image, repo, version, override, expected string
 	}{
-		{getCoreImageTest{o: "override"}, "override"},
-		{getCoreImageTest{
-			i: KubeEtcdImage,
-			c: &kubeadmapi.MasterConfiguration{}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, etcdVersion),
+		{
+			override: "override",
+			expected: "override",
 		},
-		{getCoreImageTest{
-			i: KubeAPIServerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, testversion),
+		{
+			image:    constants.Etcd,
+			repo:     gcrPrefix,
+			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "etcd", runtime.GOARCH, constants.DefaultEtcdVersion),
 		},
-		{getCoreImageTest{
-			i: KubeControllerManagerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, testversion),
+		{
+			image:    constants.KubeAPIServer,
+			repo:     gcrPrefix,
+			version:  testversion,
+			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-apiserver", runtime.GOARCH, expected),
 		},
-		{getCoreImageTest{
-			i: KubeSchedulerImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, testversion),
+		{
+			image:    constants.KubeControllerManager,
+			repo:     gcrPrefix,
+			version:  testversion,
+			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-controller-manager", runtime.GOARCH, expected),
 		},
-		{getCoreImageTest{
-			i: KubeProxyImage,
-			c: &kubeadmapi.MasterConfiguration{KubernetesVersion: testversion}},
-			fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-proxy", runtime.GOARCH, testversion),
+		{
+			image:    constants.KubeScheduler,
+			repo:     gcrPrefix,
+			version:  testversion,
+			expected: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-scheduler", runtime.GOARCH, expected),
 		},
 	}
-	for _, it := range imageTest {
-		actual := GetCoreImage(it.t.i, it.t.c, it.t.o)
-		if actual != it.expected {
+	for _, rt := range tests {
+		actual := GetCoreImage(rt.image, rt.repo, rt.version, rt.override)
+		if actual != rt.expected {
 			t.Errorf(
 				"failed GetCoreImage:\n\texpected: %s\n\t  actual: %s",
-				it.expected,
+				rt.expected,
 				actual,
 			)
 		}

@@ -17,11 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/batch/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -59,6 +59,41 @@ func newJobs(c *BatchV1Client, namespace string) *jobs {
 	}
 }
 
+// Get takes name of the job, and returns the corresponding job object, and an error if there is any.
+func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err error) {
+	result = &v1.Job{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Jobs that match those selectors.
+func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
+	result = &v1.JobList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested jobs.
+func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
 func (c *jobs) Create(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
@@ -85,7 +120,7 @@ func (c *jobs) Update(job *v1.Job) (result *v1.Job, err error) {
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *jobs) UpdateStatus(job *v1.Job) (result *v1.Job, err error) {
 	result = &v1.Job{}
@@ -120,41 +155,6 @@ func (c *jobs) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string, options meta_v1.GetOptions) (result *v1.Job, err error) {
-	result = &v1.Job{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts meta_v1.ListOptions) (result *v1.JobList, err error) {
-	result = &v1.JobList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched job.

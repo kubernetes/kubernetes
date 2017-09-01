@@ -22,13 +22,15 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
@@ -39,9 +41,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -124,7 +123,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	glog.V(4).Infof("->NewIngressController V(4)")
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: UserAgentName})
 	ic := &IngressController{
 		federatedApiClient:    client,
 		ingressReviewDelay:    time.Second * 10,
@@ -608,9 +607,10 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 	clusterObj, clusterErr := api.Scheme.DeepCopy(cluster) // Make a clone so that we don't clobber our input param
 	cluster, ok := clusterObj.(*federationapi.Cluster)
 	if clusterErr != nil || !ok {
-		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, err)
-		return "", err
+		glog.Errorf("Internal error: Failed clone cluster resource while attempting to add master ingress UID annotation (%q = %q) from master cluster %q to cluster %q, will try again later: %v", uidAnnotationKey, masterUID, masterCluster.Name, cluster.Name, clusterErr)
+		return "", clusterErr
 	}
+
 	if err == nil {
 		if masterCluster.Name != cluster.Name { // We're not the master, need to get in sync
 			if cluster.ObjectMeta.Annotations == nil {
@@ -629,8 +629,9 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 			return cluster.ObjectMeta.Annotations[uidAnnotationKey], nil
 		}
 	} else {
-		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.  Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, cluster.Name, uidAnnotationKey, fallbackUID)
+		glog.V(2).Infof("No master cluster found to source an ingress UID from for cluster %q.", cluster.Name)
 		if fallbackUID != "" {
+			glog.V(2).Infof("Attempting to elect new master cluster %q with ingress UID %q = %q", cluster.Name, uidAnnotationKey, fallbackUID)
 			if cluster.ObjectMeta.Annotations == nil {
 				cluster.ObjectMeta.Annotations = map[string]string{}
 			}
@@ -643,7 +644,7 @@ func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federatio
 				return fallbackUID, nil
 			}
 		} else {
-			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is invalid (%q).  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, fallbackUID, uidKey)
+			glog.Errorf("No master cluster exists, and fallbackUID for cluster %q is nil.  This probably means that no clusters have an ingress controller configmap with key %q.  Federated Ingress currently supports clusters running Google Loadbalancer Controller (\"GLBC\")", cluster.Name, uidKey)
 			return "", err
 		}
 	}

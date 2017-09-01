@@ -178,6 +178,17 @@ addon-dir-create:
     - file_mode: 644
 {% endif %}
 
+{% if pillar.get('enable_metadata_proxy', '').lower() == 'true' %}
+/etc/kubernetes/addons/metadata-proxy/gce:
+  file.recurse:
+    - source: salt://kube-addons/metadata-proxy/gce
+    - include_pat: E@^.+\.yaml$
+    - user: root
+    - group: root
+    - dir_mode: 755
+    - file_mode: 644
+{% endif %}
+
 {% if pillar.get('enable_cluster_ui', '').lower() == 'true' %}
 /etc/kubernetes/addons/dashboard:
   file.recurse:

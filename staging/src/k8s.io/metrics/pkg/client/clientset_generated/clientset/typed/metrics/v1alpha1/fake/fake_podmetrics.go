@@ -31,10 +31,11 @@ type FakePodMetricses struct {
 	ns   string
 }
 
-var podmetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "podmetricses"}
+var podmetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1alpha1", Resource: "pods"}
 
 var podmetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1alpha1", Kind: "PodMetrics"}
 
+// Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
 func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.PodMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), &v1alpha1.PodMetrics{})
@@ -45,6 +46,7 @@ func (c *FakePodMetricses) Get(name string, options v1.GetOptions) (result *v1al
 	return obj.(*v1alpha1.PodMetrics), err
 }
 
+// List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
 func (c *FakePodMetricses) List(opts v1.ListOptions) (result *v1alpha1.PodMetricsList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), &v1alpha1.PodMetricsList{})

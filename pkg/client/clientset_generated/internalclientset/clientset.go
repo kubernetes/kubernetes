@@ -33,6 +33,7 @@ import (
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	schedulinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
 	settingsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/settings/internalversion"
 	storageinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/storage/internalversion"
 )
@@ -51,6 +52,7 @@ type Interface interface {
 	Networking() networkinginternalversion.NetworkingInterface
 	Policy() policyinternalversion.PolicyInterface
 	Rbac() rbacinternalversion.RbacInterface
+	Scheduling() schedulinginternalversion.SchedulingInterface
 	Settings() settingsinternalversion.SettingsInterface
 	Storage() storageinternalversion.StorageInterface
 }
@@ -59,132 +61,96 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*admissionregistrationinternalversion.AdmissionregistrationClient
-	*coreinternalversion.CoreClient
-	*appsinternalversion.AppsClient
-	*authenticationinternalversion.AuthenticationClient
-	*authorizationinternalversion.AuthorizationClient
-	*autoscalinginternalversion.AutoscalingClient
-	*batchinternalversion.BatchClient
-	*certificatesinternalversion.CertificatesClient
-	*extensionsinternalversion.ExtensionsClient
-	*networkinginternalversion.NetworkingClient
-	*policyinternalversion.PolicyClient
-	*rbacinternalversion.RbacClient
-	*settingsinternalversion.SettingsClient
-	*storageinternalversion.StorageClient
+	admissionregistration *admissionregistrationinternalversion.AdmissionregistrationClient
+	core                  *coreinternalversion.CoreClient
+	apps                  *appsinternalversion.AppsClient
+	authentication        *authenticationinternalversion.AuthenticationClient
+	authorization         *authorizationinternalversion.AuthorizationClient
+	autoscaling           *autoscalinginternalversion.AutoscalingClient
+	batch                 *batchinternalversion.BatchClient
+	certificates          *certificatesinternalversion.CertificatesClient
+	extensions            *extensionsinternalversion.ExtensionsClient
+	networking            *networkinginternalversion.NetworkingClient
+	policy                *policyinternalversion.PolicyClient
+	rbac                  *rbacinternalversion.RbacClient
+	scheduling            *schedulinginternalversion.SchedulingClient
+	settings              *settingsinternalversion.SettingsClient
+	storage               *storageinternalversion.StorageClient
 }
 
 // Admissionregistration retrieves the AdmissionregistrationClient
 func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
-	if c == nil {
-		return nil
-	}
-	return c.AdmissionregistrationClient
+	return c.admissionregistration
 }
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
-	if c == nil {
-		return nil
-	}
-	return c.CoreClient
+	return c.core
 }
 
 // Apps retrieves the AppsClient
 func (c *Clientset) Apps() appsinternalversion.AppsInterface {
-	if c == nil {
-		return nil
-	}
-	return c.AppsClient
+	return c.apps
 }
 
 // Authentication retrieves the AuthenticationClient
 func (c *Clientset) Authentication() authenticationinternalversion.AuthenticationInterface {
-	if c == nil {
-		return nil
-	}
-	return c.AuthenticationClient
+	return c.authentication
 }
 
 // Authorization retrieves the AuthorizationClient
 func (c *Clientset) Authorization() authorizationinternalversion.AuthorizationInterface {
-	if c == nil {
-		return nil
-	}
-	return c.AuthorizationClient
+	return c.authorization
 }
 
 // Autoscaling retrieves the AutoscalingClient
 func (c *Clientset) Autoscaling() autoscalinginternalversion.AutoscalingInterface {
-	if c == nil {
-		return nil
-	}
-	return c.AutoscalingClient
+	return c.autoscaling
 }
 
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() batchinternalversion.BatchInterface {
-	if c == nil {
-		return nil
-	}
-	return c.BatchClient
+	return c.batch
 }
 
 // Certificates retrieves the CertificatesClient
 func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInterface {
-	if c == nil {
-		return nil
-	}
-	return c.CertificatesClient
+	return c.certificates
 }
 
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
-	if c == nil {
-		return nil
-	}
-	return c.ExtensionsClient
+	return c.extensions
 }
 
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
-	if c == nil {
-		return nil
-	}
-	return c.NetworkingClient
+	return c.networking
 }
 
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() policyinternalversion.PolicyInterface {
-	if c == nil {
-		return nil
-	}
-	return c.PolicyClient
+	return c.policy
 }
 
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
-	if c == nil {
-		return nil
-	}
-	return c.RbacClient
+	return c.rbac
+}
+
+// Scheduling retrieves the SchedulingClient
+func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
+	return c.scheduling
 }
 
 // Settings retrieves the SettingsClient
 func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
-	if c == nil {
-		return nil
-	}
-	return c.SettingsClient
+	return c.settings
 }
 
 // Storage retrieves the StorageClient
 func (c *Clientset) Storage() storageinternalversion.StorageInterface {
-	if c == nil {
-		return nil
-	}
-	return c.StorageClient
+	return c.storage
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -203,59 +169,63 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.AdmissionregistrationClient, err = admissionregistrationinternalversion.NewForConfig(&configShallowCopy)
+	cs.admissionregistration, err = admissionregistrationinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.CoreClient, err = coreinternalversion.NewForConfig(&configShallowCopy)
+	cs.core, err = coreinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.AppsClient, err = appsinternalversion.NewForConfig(&configShallowCopy)
+	cs.apps, err = appsinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.AuthenticationClient, err = authenticationinternalversion.NewForConfig(&configShallowCopy)
+	cs.authentication, err = authenticationinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.AuthorizationClient, err = authorizationinternalversion.NewForConfig(&configShallowCopy)
+	cs.authorization, err = authorizationinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.AutoscalingClient, err = autoscalinginternalversion.NewForConfig(&configShallowCopy)
+	cs.autoscaling, err = autoscalinginternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.BatchClient, err = batchinternalversion.NewForConfig(&configShallowCopy)
+	cs.batch, err = batchinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.CertificatesClient, err = certificatesinternalversion.NewForConfig(&configShallowCopy)
+	cs.certificates, err = certificatesinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.ExtensionsClient, err = extensionsinternalversion.NewForConfig(&configShallowCopy)
+	cs.extensions, err = extensionsinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.NetworkingClient, err = networkinginternalversion.NewForConfig(&configShallowCopy)
+	cs.networking, err = networkinginternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.PolicyClient, err = policyinternalversion.NewForConfig(&configShallowCopy)
+	cs.policy, err = policyinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.RbacClient, err = rbacinternalversion.NewForConfig(&configShallowCopy)
+	cs.rbac, err = rbacinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.SettingsClient, err = settingsinternalversion.NewForConfig(&configShallowCopy)
+	cs.scheduling, err = schedulinginternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.StorageClient, err = storageinternalversion.NewForConfig(&configShallowCopy)
+	cs.settings, err = settingsinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.storage, err = storageinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -272,20 +242,21 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.AdmissionregistrationClient = admissionregistrationinternalversion.NewForConfigOrDie(c)
-	cs.CoreClient = coreinternalversion.NewForConfigOrDie(c)
-	cs.AppsClient = appsinternalversion.NewForConfigOrDie(c)
-	cs.AuthenticationClient = authenticationinternalversion.NewForConfigOrDie(c)
-	cs.AuthorizationClient = authorizationinternalversion.NewForConfigOrDie(c)
-	cs.AutoscalingClient = autoscalinginternalversion.NewForConfigOrDie(c)
-	cs.BatchClient = batchinternalversion.NewForConfigOrDie(c)
-	cs.CertificatesClient = certificatesinternalversion.NewForConfigOrDie(c)
-	cs.ExtensionsClient = extensionsinternalversion.NewForConfigOrDie(c)
-	cs.NetworkingClient = networkinginternalversion.NewForConfigOrDie(c)
-	cs.PolicyClient = policyinternalversion.NewForConfigOrDie(c)
-	cs.RbacClient = rbacinternalversion.NewForConfigOrDie(c)
-	cs.SettingsClient = settingsinternalversion.NewForConfigOrDie(c)
-	cs.StorageClient = storageinternalversion.NewForConfigOrDie(c)
+	cs.admissionregistration = admissionregistrationinternalversion.NewForConfigOrDie(c)
+	cs.core = coreinternalversion.NewForConfigOrDie(c)
+	cs.apps = appsinternalversion.NewForConfigOrDie(c)
+	cs.authentication = authenticationinternalversion.NewForConfigOrDie(c)
+	cs.authorization = authorizationinternalversion.NewForConfigOrDie(c)
+	cs.autoscaling = autoscalinginternalversion.NewForConfigOrDie(c)
+	cs.batch = batchinternalversion.NewForConfigOrDie(c)
+	cs.certificates = certificatesinternalversion.NewForConfigOrDie(c)
+	cs.extensions = extensionsinternalversion.NewForConfigOrDie(c)
+	cs.networking = networkinginternalversion.NewForConfigOrDie(c)
+	cs.policy = policyinternalversion.NewForConfigOrDie(c)
+	cs.rbac = rbacinternalversion.NewForConfigOrDie(c)
+	cs.scheduling = schedulinginternalversion.NewForConfigOrDie(c)
+	cs.settings = settingsinternalversion.NewForConfigOrDie(c)
+	cs.storage = storageinternalversion.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -294,20 +265,21 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.AdmissionregistrationClient = admissionregistrationinternalversion.New(c)
-	cs.CoreClient = coreinternalversion.New(c)
-	cs.AppsClient = appsinternalversion.New(c)
-	cs.AuthenticationClient = authenticationinternalversion.New(c)
-	cs.AuthorizationClient = authorizationinternalversion.New(c)
-	cs.AutoscalingClient = autoscalinginternalversion.New(c)
-	cs.BatchClient = batchinternalversion.New(c)
-	cs.CertificatesClient = certificatesinternalversion.New(c)
-	cs.ExtensionsClient = extensionsinternalversion.New(c)
-	cs.NetworkingClient = networkinginternalversion.New(c)
-	cs.PolicyClient = policyinternalversion.New(c)
-	cs.RbacClient = rbacinternalversion.New(c)
-	cs.SettingsClient = settingsinternalversion.New(c)
-	cs.StorageClient = storageinternalversion.New(c)
+	cs.admissionregistration = admissionregistrationinternalversion.New(c)
+	cs.core = coreinternalversion.New(c)
+	cs.apps = appsinternalversion.New(c)
+	cs.authentication = authenticationinternalversion.New(c)
+	cs.authorization = authorizationinternalversion.New(c)
+	cs.autoscaling = autoscalinginternalversion.New(c)
+	cs.batch = batchinternalversion.New(c)
+	cs.certificates = certificatesinternalversion.New(c)
+	cs.extensions = extensionsinternalversion.New(c)
+	cs.networking = networkinginternalversion.New(c)
+	cs.policy = policyinternalversion.New(c)
+	cs.rbac = rbacinternalversion.New(c)
+	cs.scheduling = schedulinginternalversion.New(c)
+	cs.settings = settingsinternalversion.New(c)
+	cs.storage = storageinternalversion.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

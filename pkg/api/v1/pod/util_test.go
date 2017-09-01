@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestFindPort(t *testing.T) {
@@ -260,7 +260,11 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					ISCSI: &v1.ISCSIVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.ISCSI.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					StorageOS: &v1.StorageOSVolumeSource{
+						SecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -290,6 +294,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.Secret.SecretName",
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
+		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)

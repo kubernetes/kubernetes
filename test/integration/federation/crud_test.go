@@ -104,7 +104,7 @@ func initCRUDTest(t *testing.T, fedFixture *framework.FederationFixture, adapter
 	fixture := framework.NewControllerFixture(t, kind, adapterFactory, config)
 
 	client := fedFixture.APIFixture.NewClient(fmt.Sprintf("crud-test-%s", kind))
-	adapter := adapterFactory(client)
+	adapter := adapterFactory(client, config, nil)
 
 	crudTester := framework.NewFederatedTypeCRUDTester(t, adapter, fedFixture.ClusterClients)
 

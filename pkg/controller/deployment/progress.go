@@ -23,55 +23,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
-
-// hasFailed determines if a deployment has failed or not by estimating its progress.
-// Progress for a deployment is considered when a new replica set is created or adopted,
-// and when new pods scale up or old pods scale down. Progress is not estimated for paused
-// deployments or when users don't really care about it ie. progressDeadlineSeconds is not
-// specified.
-func (dc *DeploymentController) hasFailed(d *extensions.Deployment, rsList []*extensions.ReplicaSet, podMap map[types.UID]*v1.PodList) (bool, error) {
-	if d.Spec.ProgressDeadlineSeconds == nil || d.Spec.RollbackTo != nil || d.Spec.Paused {
-		return false, nil
-	}
-
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
-	if err != nil {
-		return false, err
-	}
-
-	// There is a template change so we don't need to check for any progress right now.
-	if newRS == nil {
-		return false, nil
-	}
-
-	// Look at the status of the deployment - if there is already a NewRSAvailableReason
-	// then we don't need to estimate any progress. This is needed in order to avoid
-	// estimating progress for scaling events after a rollout has finished.
-	cond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
-	if cond != nil && cond.Reason == util.NewRSAvailableReason {
-		return false, nil
-	}
-
-	// TODO: Look for permanent failures here.
-	// See https://github.com/kubernetes/kubernetes/issues/18568
-
-	allRSs := append(oldRSs, newRS)
-	newStatus := calculateStatus(allRSs, newRS, d)
-
-	// If the deployment is complete or it is progressing, there is no need to check if it
-	// has timed out.
-	if util.DeploymentComplete(d, &newStatus) || util.DeploymentProgressing(d, &newStatus) {
-		return false, nil
-	}
-
-	// Check if the deployment has timed out.
-	return util.DeploymentTimedOut(d, &newStatus), nil
-}
 
 // syncRolloutStatus updates the status of a deployment during a rollout. There are
 // cases this helper will run that cannot be prevented from the scaling detection,

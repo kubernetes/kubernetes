@@ -311,11 +311,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection) (sets.St
 		}
 
 		relativePath := strings.TrimPrefix(path, w.targetDir)
-		if runtime.GOOS == "windows" {
-			relativePath = strings.TrimPrefix(relativePath, "\\")
-		} else {
-			relativePath = strings.TrimPrefix(relativePath, "/")
-		}
+		relativePath = strings.TrimPrefix(relativePath, string(os.PathSeparator))
 		if strings.HasPrefix(relativePath, "..") {
 			return nil
 		}
@@ -339,7 +335,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection) (sets.St
 		for subPath := file; subPath != ""; {
 			newPaths.Insert(subPath)
 			subPath, _ = filepath.Split(subPath)
-			subPath = strings.TrimSuffix(subPath, "/")
+			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
 	glog.V(5).Infof("%s: new paths:       %+v", w.targetDir, newPaths.List())
@@ -424,7 +420,7 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 			// Since filepath.Split leaves a trailing path separator, in this
 			// example, dir = "foo/".  In order to calculate the number of
 			// subdirectories, we must subtract 1 from the number returned by split.
-			subDirs = len(strings.Split(dir, "/")) - 1
+			subDirs = len(strings.Split(dir, string(os.PathSeparator))) - 1
 			err := os.MkdirAll(path.Join(w.targetDir, dir), os.ModePerm)
 			if err != nil {
 				return err

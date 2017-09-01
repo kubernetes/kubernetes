@@ -25,13 +25,13 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	algorithmpriorities "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -390,19 +390,19 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 		},
 	}
 }
 
 func TestHumanReadableFitError(t *testing.T) {
-	error := &FitError{
+	err := &FitError{
 		Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 		FailedPredicates: FailedPredicateMap{
 			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
@@ -410,12 +410,12 @@ func TestHumanReadableFitError(t *testing.T) {
 			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
-	if strings.Contains(error.Error(), "No nodes are available that match all of the following predicates") {
-		if strings.Contains(error.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(error.Error(), "NodeUnderMemoryPressure (1)") {
+	if strings.Contains(err.Error(), NoNodeAvailableMsg) {
+		if strings.Contains(err.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(err.Error(), "NodeUnderMemoryPressure (1)") {
 			return
 		}
 	}
-	t.Errorf("Error message doesn't have all the information content: [" + error.Error() + "]")
+	t.Errorf("Error message doesn't have all the information content: [" + err.Error() + "]")
 }
 
 // The point of this test is to show that you:
@@ -438,9 +438,9 @@ func TestZeroRequest(t *testing.T) {
 			{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						"cpu": resource.MustParse(
+						v1.ResourceCPU: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
-						"memory": resource.MustParse(
+						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
 					},
 				},
@@ -455,9 +455,9 @@ func TestZeroRequest(t *testing.T) {
 			{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						"cpu": resource.MustParse(
+						v1.ResourceCPU: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
-						"memory": resource.MustParse(
+						v1.ResourceMemory: resource.MustParse(
 							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
 					},
 				},

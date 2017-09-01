@@ -17,9 +17,12 @@ limitations under the License.
 package admission
 
 import (
+	"net/url"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/quota"
@@ -30,6 +33,12 @@ import (
 // WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
 type WantsInternalKubeClientSet interface {
 	SetInternalKubeClientSet(internalclientset.Interface)
+	admission.Validator
+}
+
+// WantsExternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
+type WantsExternalKubeClientSet interface {
+	SetExternalKubeClientSet(clientset.Interface)
 	admission.Validator
 }
 
@@ -61,26 +70,56 @@ type WantsQuotaRegistry interface {
 	admission.Validator
 }
 
-type pluginInitializer struct {
-	internalClient internalclientset.Interface
-	informers      informers.SharedInformerFactory
-	authorizer     authorizer.Authorizer
-	cloudConfig    []byte
-	restMapper     meta.RESTMapper
-	quotaRegistry  quota.Registry
+// WantsServiceResolver defines a fuction that accepts a ServiceResolver for
+// admission plugins that need to make calls to services.
+type WantsServiceResolver interface {
+	SetServiceResolver(ServiceResolver)
 }
 
-var _ admission.PluginInitializer = pluginInitializer{}
+// WantsClientCert defines a fuction that accepts a cert & key for admission
+// plugins that need to make calls and prove their identity.
+type WantsClientCert interface {
+	SetClientCert(cert, key []byte)
+}
+
+// ServiceResolver knows how to convert a service reference into an actual
+// location.
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
+}
+
+type PluginInitializer struct {
+	internalClient  internalclientset.Interface
+	externalClient  clientset.Interface
+	informers       informers.SharedInformerFactory
+	authorizer      authorizer.Authorizer
+	cloudConfig     []byte
+	restMapper      meta.RESTMapper
+	quotaRegistry   quota.Registry
+	serviceResolver ServiceResolver
+
+	// for proving we are apiserver in call-outs
+	clientCert []byte
+	clientKey  []byte
+}
+
+var _ admission.PluginInitializer = &PluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
-func NewPluginInitializer(internalClient internalclientset.Interface,
+// TODO: switch these parameters to use the builder pattern or just make them
+// all public, this construction method is pointless boilerplate.
+func NewPluginInitializer(
+	internalClient internalclientset.Interface,
+	externalClient clientset.Interface,
 	sharedInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
-	quotaRegistry quota.Registry) admission.PluginInitializer {
-	return pluginInitializer{
+	quotaRegistry quota.Registry,
+) *PluginInitializer {
+	return &PluginInitializer{
 		internalClient: internalClient,
+		externalClient: externalClient,
 		informers:      sharedInformers,
 		authorizer:     authz,
 		cloudConfig:    cloudConfig,
@@ -89,11 +128,29 @@ func NewPluginInitializer(internalClient internalclientset.Interface,
 	}
 }
 
+// SetServiceResolver sets the service resolver which is needed by some plugins.
+func (i *PluginInitializer) SetServiceResolver(s ServiceResolver) *PluginInitializer {
+	i.serviceResolver = s
+	return i
+}
+
+// SetClientCert sets the client cert & key (identity used for calling out to
+// web hooks) which is needed by some plugins.
+func (i *PluginInitializer) SetClientCert(cert, key []byte) *PluginInitializer {
+	i.clientCert = cert
+	i.clientKey = key
+	return i
+}
+
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
-func (i pluginInitializer) Initialize(plugin admission.Interface) {
+func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsInternalKubeClientSet); ok {
 		wants.SetInternalKubeClientSet(i.internalClient)
+	}
+
+	if wants, ok := plugin.(WantsExternalKubeClientSet); ok {
+		wants.SetExternalKubeClientSet(i.externalClient)
 	}
 
 	if wants, ok := plugin.(WantsInternalKubeInformerFactory); ok {
@@ -114,5 +171,19 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsQuotaRegistry); ok {
 		wants.SetQuotaRegistry(i.quotaRegistry)
+	}
+
+	if wants, ok := plugin.(WantsServiceResolver); ok {
+		if i.serviceResolver == nil {
+			panic("An admission plugin wants the service resolver, but it was not provided.")
+		}
+		wants.SetServiceResolver(i.serviceResolver)
+	}
+
+	if wants, ok := plugin.(WantsClientCert); ok {
+		if i.clientCert == nil || i.clientKey == nil {
+			panic("An admission plugin wants a client cert/key, but they were not provided.")
+		}
+		wants.SetClientCert(i.clientCert, i.clientKey)
 	}
 }

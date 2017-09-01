@@ -37,6 +37,9 @@ type testDecodable struct {
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) DeepCopyObject() runtime.Object {
+	panic("testDecodable does not support DeepCopy")
+}
 
 func TestDecode(t *testing.T) {
 	testCases := []struct {

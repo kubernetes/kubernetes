@@ -67,7 +67,7 @@ func (s *storage) GetNamespace(ctx genericapirequest.Context, namespaceName stri
 }
 
 func (s *storage) CreateNamespace(ctx genericapirequest.Context, namespace *api.Namespace) error {
-	_, err := s.Create(ctx, namespace)
+	_, err := s.Create(ctx, namespace, false)
 	return err
 }
 

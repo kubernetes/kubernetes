@@ -124,6 +124,38 @@ func SubjectsStrings(subjects []Subject) ([]string, []string, []string, []string
 	return users, groups, sas, others
 }
 
+func (r PolicyRule) String() string {
+	return "PolicyRule" + r.CompactString()
+}
+
+// CompactString exposes a compact string representation for use in escalation error messages
+func (r PolicyRule) CompactString() string {
+	formatStringParts := []string{}
+	formatArgs := []interface{}{}
+	if len(r.Resources) > 0 {
+		formatStringParts = append(formatStringParts, "Resources:%q")
+		formatArgs = append(formatArgs, r.Resources)
+	}
+	if len(r.NonResourceURLs) > 0 {
+		formatStringParts = append(formatStringParts, "NonResourceURLs:%q")
+		formatArgs = append(formatArgs, r.NonResourceURLs)
+	}
+	if len(r.ResourceNames) > 0 {
+		formatStringParts = append(formatStringParts, "ResourceNames:%q")
+		formatArgs = append(formatArgs, r.ResourceNames)
+	}
+	if len(r.APIGroups) > 0 {
+		formatStringParts = append(formatStringParts, "APIGroups:%q")
+		formatArgs = append(formatArgs, r.APIGroups)
+	}
+	if len(r.Verbs) > 0 {
+		formatStringParts = append(formatStringParts, "Verbs:%q")
+		formatArgs = append(formatArgs, r.Verbs)
+	}
+	formatString := "{" + strings.Join(formatStringParts, ", ") + "}"
+	return fmt.Sprintf(formatString, formatArgs...)
+}
+
 // +k8s:deepcopy-gen=false
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
@@ -183,13 +215,28 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 			return PolicyRule{}, fmt.Errorf("non-resource rule may not have apiGroups, resources, or resourceNames: %#v", r.PolicyRule)
 		}
 	case len(r.PolicyRule.Resources) > 0:
-		if len(r.PolicyRule.NonResourceURLs) != 0 {
-			return PolicyRule{}, fmt.Errorf("resource rule may not have nonResourceURLs: %#v", r.PolicyRule)
-		}
+		// resource rule may not have nonResourceURLs
+
 		if len(r.PolicyRule.APIGroups) == 0 {
 			// this a common bug
 			return PolicyRule{}, fmt.Errorf("resource rule must have apiGroups: %#v", r.PolicyRule)
 		}
+		// if resource names are set, then the verb must not be list, watch, create, or deletecollection
+		// since verbs are largely opaque, we don't want to accidentally prevent things like "impersonate", so
+		// we will backlist common mistakes, not whitelist acceptable options.
+		if len(r.PolicyRule.ResourceNames) != 0 {
+			illegalVerbs := []string{}
+			for _, verb := range r.PolicyRule.Verbs {
+				switch verb {
+				case "list", "watch", "create", "deletecollection":
+					illegalVerbs = append(illegalVerbs, verb)
+				}
+			}
+			if len(illegalVerbs) > 0 {
+				return PolicyRule{}, fmt.Errorf("verbs %v do not have names available: %#v", illegalVerbs, r.PolicyRule)
+			}
+		}
+
 	default:
 		return PolicyRule{}, fmt.Errorf("a rule must have either nonResourceURLs or resources: %#v", r.PolicyRule)
 	}
@@ -340,4 +387,12 @@ func (r *RoleBindingBuilder) Binding() (RoleBinding, error) {
 	}
 
 	return r.RoleBinding, nil
+}
+
+type SortableRuleSlice []PolicyRule
+
+func (s SortableRuleSlice) Len() int      { return len(s) }
+func (s SortableRuleSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s SortableRuleSlice) Less(i, j int) bool {
+	return strings.Compare(s[i].String(), s[j].String()) < 0
 }

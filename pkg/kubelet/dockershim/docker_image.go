@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"net/http"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
-	dockertypes "github.com/docker/engine-api/types"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -34,7 +34,7 @@ func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimea
 	opts := dockertypes.ImageListOptions{}
 	if filter != nil {
 		if imgSpec := filter.GetImage(); imgSpec != nil {
-			opts.MatchName = imgSpec.Image
+			opts.Filters.Add("reference", imgSpec.Image)
 		}
 	}
 
@@ -43,7 +43,7 @@ func (ds *dockerService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimea
 		return nil, err
 	}
 
-	result := []*runtimeapi.Image{}
+	result := make([]*runtimeapi.Image, 0, len(images))
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {

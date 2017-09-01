@@ -1,17 +1,11 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "alert.go",
         "fingerprinting.go",
+        "fnv.go",
         "labels.go",
         "labelset.go",
         "metric.go",
@@ -21,7 +15,7 @@ go_library(
         "time.go",
         "value.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -35,4 +29,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

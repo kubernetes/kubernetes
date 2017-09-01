@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/networking
-// +k8s:openapi-gen=true
+// +k8s:conversion-gen-external-types=../../../../vendor/k8s.io/api/networking/v1
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/extensions
 // +k8s:defaulter-gen=TypeMeta
+// +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/networking/v1
 // +groupName=networking.k8s.io
 package v1 // import "k8s.io/kubernetes/pkg/apis/networking/v1"

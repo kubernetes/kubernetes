@@ -21,8 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
+	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 )
@@ -32,7 +32,9 @@ var _ = framework.KubeDescribe("Federated types [Feature:Federation][Experimenta
 
 	f := fedframework.NewDefaultFederatedFramework("federated-types")
 
-	for name, fedType := range federatedtypes.FederatedTypes() {
+	fedTypes := federatedtypes.FederatedTypes()
+	for name := range fedTypes {
+		fedType := fedTypes[name]
 		Describe(fmt.Sprintf("Federated %q resources", name), func() {
 			It("should be created, read, updated and deleted successfully", func() {
 				fedframework.SkipUnlessFederated(f.ClientSet)
@@ -43,7 +45,7 @@ var _ = framework.KubeDescribe("Federated types [Feature:Federation][Experimenta
 				if clusterClients == nil {
 					clusterClients = f.GetClusterClients()
 				}
-				adapter := fedType.AdapterFactory(f.FederationClientset)
+				adapter := fedType.AdapterFactory(f.FederationClientset, f.FederationConfig, nil)
 				crudTester := fedframework.NewFederatedTypeCRUDTester(adapter, clusterClients)
 				obj := adapter.NewTestObject(f.FederationNamespace.Name)
 				crudTester.CheckLifecycle(obj)

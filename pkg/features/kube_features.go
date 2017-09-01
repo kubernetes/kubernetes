@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -28,7 +29,7 @@ const (
 	// // alpha: v1.X
 	// MyFeature utilfeature.Feature = "MyFeature"
 
-	// owner: @timstclair
+	// owner: @tallclair
 	// beta: v1.4
 	AppArmor utilfeature.Feature = "AppArmor"
 
@@ -43,13 +44,6 @@ const (
 	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
-
-	// owner: timstclair
-	// alpha: v1.5
-	//
-	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
-	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
-	StreamingProxyRedirects utilfeature.Feature = genericfeatures.StreamingProxyRedirects
 
 	// owner: @pweil-
 	// alpha: v1.5
@@ -67,13 +61,6 @@ const (
 	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
 
-	// owner: @davidopp
-	// alpha: v1.6
-	//
-	// Determines if affinity defined in annotations should be processed
-	// TODO: remove when alpha support for affinity is removed
-	AffinityInAnnotations utilfeature.Feature = "AffinityInAnnotations"
-
 	// owner: @vishh
 	// alpha: v1.6
 	//
@@ -89,11 +76,63 @@ const (
 	// to take advantage of NoExecute Taints and Tolerations.
 	TaintBasedEvictions utilfeature.Feature = "TaintBasedEvictions"
 
+	// owner: @jcbsmpsn
+	// alpha: v1.7
+	//
+	// Gets a server certificate for the kubelet from the Certificate Signing
+	// Request API instead of generating one self signed and auto rotates the
+	// certificate as expiration approaches.
+	RotateKubeletServerCertificate utilfeature.Feature = "RotateKubeletServerCertificate"
+
+	// owner: @jcbsmpsn
+	// alpha: v1.7
+	//
+	// Automatically renews the client certificate used for communicating with
+	// the API server as the certificate approaches expiration.
+	RotateKubeletClientCertificate utilfeature.Feature = "RotateKubeletClientCertificate"
+
 	// owner: @msau
 	// alpha: v1.7
 	//
 	// A new volume type that supports local disks on a node.
 	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
+
+	// owner: @jinxu
+	// alpha: v1.7
+	//
+	// New local storage types to support local storage capacity isolation
+	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
+
+	// owner: @verb
+	// alpha: v1.8
+	//
+	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
+	DebugContainers utilfeature.Feature = "DebugContainers"
+
+	// owner: @bsalamat
+	// alpha: v1.8
+	//
+	// Add priority to pods. Priority affects scheduling and preemption of pods.
+	PodPriority utilfeature.Feature = "PodPriority"
+
+	// owner: @resouer
+	// alpha: v1.8
+	//
+	// Enable equivalence class cache for scheduler.
+	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
+
+	// owner: @k82cn
+	// alpha: v1.8
+	//
+	// Taint nodes based on their condition status for 'NetworkUnavailable',
+	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
+
+	// owner: @haibinxie
+	// alpha: v1.8
+	//
+	// Implement IPVS-based in-cluster service load balancing
+	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
 )
 
 func init() {
@@ -110,13 +149,26 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	AffinityInAnnotations:                       {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
+	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
+	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
+	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
+	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.AdvancedAuditing:        {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
+
+	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
+	// unintentionally on either side:
+	apiextensionsfeatures.CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha},
+	SupportIPVSProxyMode:                           {Default: false, PreRelease: utilfeature.Alpha},
 }

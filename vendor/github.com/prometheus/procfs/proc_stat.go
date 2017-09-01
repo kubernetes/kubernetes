@@ -7,15 +7,15 @@ import (
 	"os"
 )
 
-// Originally, this USER_HZ value was dynamically retrieved via a sysconf call which
-// required cgo. However, that caused a lot of problems regarding
+// Originally, this USER_HZ value was dynamically retrieved via a sysconf call
+// which required cgo. However, that caused a lot of problems regarding
 // cross-compilation. Alternatives such as running a binary to determine the
-// value, or trying to derive it in some other way were all problematic.
-// After much research it was determined that USER_HZ is actually hardcoded to
-// 100 on all Go-supported platforms as of the time of this writing. This is
-// why we decided to hardcode it here as well. It is not impossible that there
-// could be systems with exceptions, but they should be very exotic edge cases,
-// and in that case, the worst outcome will be two misreported metrics.
+// value, or trying to derive it in some other way were all problematic.  After
+// much research it was determined that USER_HZ is actually hardcoded to 100 on
+// all Go-supported platforms as of the time of this writing. This is why we
+// decided to hardcode it here as well. It is not impossible that there could
+// be systems with exceptions, but they should be very exotic edge cases, and
+// in that case, the worst outcome will be two misreported metrics.
 //
 // See also the following discussions:
 //
@@ -91,7 +91,7 @@ type ProcStat struct {
 
 // NewStat returns the current status information of the process.
 func (p Proc) NewStat() (ProcStat, error) {
-	f, err := p.open("stat")
+	f, err := os.Open(p.path("stat"))
 	if err != nil {
 		return ProcStat{}, err
 	}

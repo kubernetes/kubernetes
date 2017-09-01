@@ -33,7 +33,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
-	openapicommon "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,6 +60,7 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
@@ -74,7 +74,7 @@ const (
 )
 
 // Config is a structure used to configure a GenericAPIServer.
-// It's members are sorted roughly in order of importance for composers.
+// Its members are sorted roughly in order of importance for composers.
 type Config struct {
 	// SecureServingInfo is required to serve https
 	SecureServingInfo *SecureServingInfo
@@ -104,7 +104,7 @@ type Config struct {
 
 	// Version will enable the /version endpoint if non-nil
 	Version *version.Info
-	// LegacyAuditWriter is the destination for audit logs.  If nil, they will not be written.
+	// LegacyAuditWriter is the destination for audit logs. If nil, they will not be written.
 	LegacyAuditWriter io.Writer
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
@@ -126,13 +126,13 @@ type Config struct {
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
-	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
 	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
 	HealthzChecks []healthz.HealthzChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
 	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
 	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
@@ -148,8 +148,11 @@ type Config struct {
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
-	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
+	// If specified, all requests except those which match the LongRunningFunc predicate will timeout
+	// after this duration.
+	RequestTimeout time.Duration
+	// If specified, long running requests such as watch will be allocated a random timeout between this value, and
+	// twice this value.  Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
@@ -159,6 +162,10 @@ type Config struct {
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
+
+	// EnableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	EnableAPIResponseCompression bool
 
 	//===========================================================================
 	// values below here are targets for removal
@@ -206,19 +213,21 @@ type SecureServingInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
-		Serializer:                  codecs,
-		ReadWritePort:               443,
-		RequestContextMapper:        apirequest.NewRequestContextMapper(),
-		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
-		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               []healthz.HealthzChecker{healthz.PingHealthz},
-		EnableIndex:                 true,
-		EnableDiscovery:             true,
-		EnableProfiling:             true,
-		MaxRequestsInFlight:         400,
-		MaxMutatingRequestsInFlight: 200,
-		MinRequestTimeout:           1800,
+		Serializer:                   codecs,
+		ReadWritePort:                443,
+		RequestContextMapper:         apirequest.NewRequestContextMapper(),
+		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
+		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
+		DisabledPostStartHooks:       sets.NewString(),
+		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
+		EnableIndex:                  true,
+		EnableDiscovery:              true,
+		EnableProfiling:              true,
+		MaxRequestsInFlight:          400,
+		MaxMutatingRequestsInFlight:  200,
+		RequestTimeout:               time.Duration(60) * time.Second,
+		MinRequestTimeout:            1800,
+		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -288,7 +297,7 @@ type completedConfig struct {
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
-// from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
+// from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
@@ -369,7 +378,7 @@ func (c *Config) SkipComplete() completedConfig {
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
-// name is used to differentiate for logging.  The handler chain in particular can be difficult as it starts delgating.
+// name is used to differentiate for logging. The handler chain in particular can be difficult as it starts delgating.
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	// The delegationTarget and the config must agree on the RequestContextMapper
 
@@ -412,6 +421,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		healthzChecks: c.HealthzChecks,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
+
+		enableAPIResponseCompression: c.EnableAPIResponseCompression,
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
@@ -460,20 +471,20 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer)
-	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
+	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer, c.Serializer)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer, c.Serializer)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
 		handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
 		handler = genericapifilters.WithLegacyAudit(handler, c.RequestContextMapper, c.LegacyAuditWriter)
 	}
-	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.SupportsBasicAuth))
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, genericapifilters.Unauthorized(c.RequestContextMapper, c.Serializer, c.SupportsBasicAuth))
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithPanicRecovery(handler)
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericapifilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }
 

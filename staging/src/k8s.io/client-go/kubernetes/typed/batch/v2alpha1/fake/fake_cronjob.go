@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v2alpha1 "k8s.io/client-go/pkg/apis/batch/v2alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -36,50 +36,7 @@ var cronjobsResource = schema.GroupVersionResource{Group: "batch", Version: "v2a
 
 var cronjobsKind = schema.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}
 
-func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2alpha1.CronJob), err
-}
-
-func (c *FakeCronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2alpha1.CronJob), err
-}
-
-func (c *FakeCronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (*v2alpha1.CronJob, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &v2alpha1.CronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v2alpha1.CronJob), err
-}
-
-func (c *FakeCronJobs) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
-
-	return err
-}
-
-func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
-	return err
-}
-
+// Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
 func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
@@ -90,6 +47,7 @@ func (c *FakeCronJobs) Get(name string, options v1.GetOptions) (result *v2alpha1
 	return obj.(*v2alpha1.CronJob), err
 }
 
+// List takes label and field selectors, and returns the list of CronJobs that match those selectors.
 func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(cronjobsResource, cronjobsKind, c.ns, opts), &v2alpha1.CronJobList{})
@@ -116,6 +74,56 @@ func (c *FakeCronJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(cronjobsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
+func (c *FakeCronJobs) Create(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.CronJob), err
+}
+
+// Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
+func (c *FakeCronJobs) Update(cronJob *v2alpha1.CronJob) (result *v2alpha1.CronJob, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(cronjobsResource, c.ns, cronJob), &v2alpha1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.CronJob), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCronJobs) UpdateStatus(cronJob *v2alpha1.CronJob) (*v2alpha1.CronJob, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &v2alpha1.CronJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2alpha1.CronJob), err
+}
+
+// Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
+func (c *FakeCronJobs) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(cronjobsResource, c.ns, name), &v2alpha1.CronJob{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(cronjobsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v2alpha1.CronJobList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched cronJob.

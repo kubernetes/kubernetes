@@ -400,7 +400,7 @@ func (self *manager) GetContainerSpec(containerName string, options v2.RequestOp
 	var errs partialFailure
 	specs := make(map[string]v2.ContainerSpec)
 	for name, cont := range conts {
-		cinfo, err := cont.GetInfo()
+		cinfo, err := cont.GetInfo(false)
 		if err != nil {
 			errs.append(name, "GetInfo", err)
 		}
@@ -449,7 +449,7 @@ func (self *manager) GetContainerInfoV2(containerName string, options v2.Request
 	infos := make(map[string]v2.ContainerInfo, len(containers))
 	for name, container := range containers {
 		result := v2.ContainerInfo{}
-		cinfo, err := container.GetInfo()
+		cinfo, err := container.GetInfo(false)
 		if err != nil {
 			errs.append(name, "GetInfo", err)
 			infos[name] = result
@@ -473,7 +473,7 @@ func (self *manager) GetContainerInfoV2(containerName string, options v2.Request
 
 func (self *manager) containerDataToContainerInfo(cont *containerData, query *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	// Get the info from the container.
-	cinfo, err := cont.GetInfo()
+	cinfo, err := cont.GetInfo(true)
 	if err != nil {
 		return nil, err
 	}
@@ -566,9 +566,24 @@ func (self *manager) getDockerContainer(containerName string) (*containerData, e
 		Namespace: docker.DockerNamespace,
 		Name:      containerName,
 	}]
+
+	// Look for container by short prefix name if no exact match found.
 	if !ok {
-		return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		for contName, c := range self.containers {
+			if contName.Namespace == docker.DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+				if cont == nil {
+					cont = c
+				} else {
+					return nil, fmt.Errorf("unable to find container. Container %q is not unique", containerName)
+				}
+			}
+		}
+
+		if cont == nil {
+			return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+		}
 	}
+
 	return cont, nil
 }
 

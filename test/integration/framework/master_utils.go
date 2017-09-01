@@ -28,14 +28,20 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
-	"github.com/golang/glog"
+	apps "k8s.io/api/apps/v1beta1"
+	autoscaling "k8s.io/api/autoscaling/v1"
+	certificates "k8s.io/api/certificates/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1alpha1"
+	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
@@ -47,32 +53,23 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/client-go/informers"
 	extinformers "k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	extclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
@@ -126,7 +123,7 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	// TODO: Allow callers to pipe through a different master url and create a client/start components using it.
 	glog.Infof("Master %+v", s.URL)
 	// TODO: caesarxuchao: remove this client when the refactoring of client libraray is done.
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}, QPS: c.QPS, Burst: c.Burst})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}, QPS: c.QPS, Burst: c.Burst})
 	rcStopCh := make(chan struct{})
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	controllerManager := replicationcontroller.NewReplicationManager(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().ReplicationControllers(), clientset, c.Burst)
@@ -289,46 +286,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		glog.Fatal(err)
 	}
 
-	// wait for services to be ready
-	if masterConfig.EnableCoreControllers {
-		// TODO Once /healthz is updated for posthooks, we'll wait for good health
-		coreClient := coreclient.NewForConfigOrDie(&cfg)
-		svcWatch, err := coreClient.Services(metav1.NamespaceDefault).Watch(metav1.ListOptions{})
-		if err != nil {
-			closeFn()
-			glog.Fatal(err)
-		}
-		_, err = watch.Until(30*time.Second, svcWatch, func(event watch.Event) (bool, error) {
-			if event.Type != watch.Added {
-				return false, nil
-			}
-			if event.Object.(*v1.Service).Name == "kubernetes" {
-				return true, nil
-			}
-			return false, nil
-		})
-		if err != nil {
-			closeFn()
-			glog.Fatal(err)
-		}
-	}
-
 	return m, s, closeFn
-}
-
-func parseCIDROrDie(cidr string) *net.IPNet {
-	_, parsed, err := net.ParseCIDR(cidr)
-	if err != nil {
-		glog.Fatalf("error while parsing CIDR: %s", cidr)
-	}
-	return parsed
-}
-
-// return the EtcdURL
-func GetEtcdURLFromEnv() string {
-	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
-	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
-	return url
 }
 
 // Returns a basic master config.
@@ -337,7 +295,7 @@ func NewMasterConfig() *master.Config {
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), api.Scheme, nil))
-	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURLFromEnv()}
+	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURL()}
 
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)

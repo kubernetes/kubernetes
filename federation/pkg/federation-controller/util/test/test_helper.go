@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	finalizersutil "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -288,6 +288,32 @@ func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *Watch
 	return objChan
 }
 
+// RegisterFakeOnDelete registers a reactor in the given fake client that passes
+// all deleted objects to the given watcher. Since we could get only name of the
+// deleted object from DeleteAction, this register function relies on the getObject
+// function passed to get the object by name and pass it watcher.
+func RegisterFakeOnDelete(resource string, client *core.Fake, watcher *WatcherDispatcher, getObject func(name, namespace string) runtime.Object) {
+	client.AddReactor("delete", resource, func(action core.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(core.DeleteAction)
+		obj := getObject(deleteAction.GetName(), deleteAction.GetNamespace())
+		glog.V(7).Infof("Deleting %s: %v", resource, obj)
+
+		operation := func() {
+			glog.V(4).Infof("Object deleted %v", obj)
+			watcher.Delete(obj)
+		}
+		select {
+		case watcher.orderExecution <- operation:
+			break
+		case <-time.After(pushTimeout):
+			glog.Errorf("Fake client execution channel blocked")
+			glog.Errorf("Tried to push %v", deleteAction)
+		}
+		return true, obj, nil
+	})
+	return
+}
+
 // Adds an update reactor to the given fake client.
 // The reactor just returns the object passed to update action.
 // This is used as a hack to workaround https://github.com/kubernetes/kubernetes/issues/40939.
@@ -419,4 +445,10 @@ func AssertHasFinalizer(t *testing.T, obj runtime.Object, finalizer string) {
 	hasFinalizer, err := finalizersutil.HasFinalizer(obj, finalizer)
 	require.Nil(t, err)
 	assert.True(t, hasFinalizer)
+}
+
+func NewInt32(val int32) *int32 {
+	p := new(int32)
+	*p = val
+	return p
 }

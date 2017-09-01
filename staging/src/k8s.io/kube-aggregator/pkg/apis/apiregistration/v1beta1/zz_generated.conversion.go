@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.
@@ -123,11 +123,7 @@ func Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *APISer
 
 func autoConvert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]APIService, 0)
-	} else {
-		out.Items = *(*[]APIService)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]APIService)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -142,7 +138,8 @@ func autoConvert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *AP
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
-	out.Priority = in.Priority
+	out.GroupPriorityMinimum = in.GroupPriorityMinimum
+	out.VersionPriority = in.VersionPriority
 	return nil
 }
 
@@ -156,12 +153,9 @@ func autoConvert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *ap
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
-	if in.CABundle == nil {
-		out.CABundle = make([]byte, 0)
-	} else {
-		out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
-	}
-	out.Priority = in.Priority
+	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	out.GroupPriorityMinimum = in.GroupPriorityMinimum
+	out.VersionPriority = in.VersionPriority
 	return nil
 }
 

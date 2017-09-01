@@ -19,13 +19,9 @@ package service
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -101,27 +97,6 @@ func (svcStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exa
 		}
 	}
 	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	service, ok := obj.(*api.Service)
-	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a service")
-	}
-	return labels.Set(service.ObjectMeta.Labels), ServiceToSelectableFields(service), nil
-}
-
-func MatchServices(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-func ServiceToSelectableFields(service *api.Service) fields.Set {
-	return generic.ObjectMetaFieldsSet(&service.ObjectMeta, true)
 }
 
 type serviceStatusStrategy struct {

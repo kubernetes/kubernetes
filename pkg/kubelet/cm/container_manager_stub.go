@@ -18,7 +18,7 @@ package cm
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 type containerManagerStub struct{}
@@ -55,6 +55,10 @@ func (cm *containerManagerStub) Status() Status {
 }
 
 func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList {
+	return nil
+}
+
+func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 	return nil
 }
 

@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -30,13 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
-	expose_resources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
+	exposeResources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
 
-	expose_long = templates.LongDesc(`
+	exposeLong = templates.LongDesc(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -48,9 +47,9 @@ var (
 
 		Possible resources include (case insensitive):
 
-		` + expose_resources)
+		` + exposeResources)
 
-	expose_example = templates.Examples(i18n.T(`
+	exposeExample = templates.Examples(i18n.T(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -77,7 +76,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
-	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
+	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
 	for _, r := range resources {
 		validArgs = append(validArgs, strings.Fields(r)[0])
 		argAliases = kubectl.ResourceAliases(validArgs)
@@ -86,8 +85,8 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		Short:   i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
-		Long:    expose_long,
-		Example: expose_example,
+		Long:    exposeLong,
+		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExpose(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
@@ -127,7 +126,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := f.NewBuilder(true).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -136,7 +135,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		Do()
 	err = r.Err()
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
 	// Get the generator, setup and validate all required parameters
@@ -144,7 +143,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	generators := f.Generators("expose")
 	generator, found := generators[generatorName]
 	if !found {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generatorName))
+		return cmdutil.UsageErrorf(cmd, "generator %q not found.", generatorName)
 	}
 	names := generator.ParamNames()
 
@@ -170,7 +169,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if s, found := params["selector"]; found && kubectl.IsZero(s) {
 			s, err := f.MapBasedSelectorForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't retrieve selectors via --selector flag or introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
 			params["selector"] = s
 		}
@@ -182,12 +181,12 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if port, found := params["port"]; found && kubectl.IsZero(port) {
 			ports, err := f.PortsForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find port via --port flag or introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
 			}
 			switch len(ports) {
 			case 0:
 				if !isHeadlessService {
-					return cmdutil.UsageError(cmd, "couldn't find port via --port flag or introspection")
+					return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection")
 				}
 			case 1:
 				params["port"] = ports[0]
@@ -201,7 +200,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if _, found := params["protocol"]; found {
 			protocolsMap, err := f.ProtocolsForObject(info.Object)
 			if err != nil {
-				return cmdutil.UsageError(cmd, fmt.Sprintf("couldn't find protocol via introspection: %s", err))
+				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
 			if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
 				params["protocols"] = protocols
@@ -255,7 +254,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, mapper, object, out)
+				return f.PrintObject(cmd, false, mapper, object, out)
 			}
 			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, true, "exposed")
 			return nil
@@ -271,7 +270,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, mapper, object, out)
+			return f.PrintObject(cmd, false, mapper, object, out)
 		}
 
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "exposed")

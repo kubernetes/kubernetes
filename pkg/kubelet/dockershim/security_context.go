@@ -22,11 +22,9 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	dockercontainer "github.com/docker/engine-api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/securitycontext"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
@@ -56,7 +54,7 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
-func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) error {
+func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) error {
 	if lc == nil {
 		return nil
 	}
@@ -65,7 +63,7 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 	if err := modifyHostConfig(lc.SecurityContext, hc, separator); err != nil {
 		return err
 	}
-	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), sandboxID, hc)
+	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), podSandboxID, hc)
 	return nil
 }
 
@@ -101,14 +99,9 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 		hostConfig.CapDrop = sc.GetCapabilities().DropCapabilities
 	}
 	if sc.SelinuxOptions != nil {
-		hostConfig.SecurityOpt = securitycontext.ModifySecurityOptions(
+		hostConfig.SecurityOpt = addSELinuxOptions(
 			hostConfig.SecurityOpt,
-			&v1.SELinuxOptions{
-				User:  sc.SelinuxOptions.User,
-				Role:  sc.SelinuxOptions.Role,
-				Type:  sc.SelinuxOptions.Type,
-				Level: sc.SelinuxOptions.Level,
-			},
+			sc.SelinuxOptions,
 			separator,
 		)
 	}
@@ -119,6 +112,10 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 		return fmt.Errorf("failed to generate apparmor security options: %v", err)
 	}
 	hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, apparmorSecurityOpts...)
+
+	if sc.NoNewPrivs {
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "no-new-privileges")
+	}
 
 	return nil
 }
@@ -134,14 +131,14 @@ func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfi
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
-func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hostConfig *dockercontainer.HostConfig) {
 	hostNetwork := false
 	if nsOpts != nil {
 		hostNetwork = nsOpts.HostNetwork
 	}
-	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", sandboxID))
+	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
+	modifyHostNetworkOptionForContainer(hostNetwork, podSandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
@@ -179,8 +176,8 @@ func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.Plugi
 }
 
 // modifyHostNetworkOptionForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc *dockercontainer.HostConfig) {
-	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
+func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
+	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""

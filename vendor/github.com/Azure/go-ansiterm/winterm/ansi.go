@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	. "github.com/Azure/go-ansiterm"
+	"github.com/Azure/go-ansiterm"
 )
 
 // Windows keyboard constants
@@ -85,17 +85,17 @@ func newAnsiCommand(command []byte) *ansiCommand {
 	if lastCharIndex != 0 {
 		start := 1
 		// skip if double char escape sequence
-		if command[0] == ANSI_ESCAPE_PRIMARY && command[1] == ANSI_ESCAPE_SECONDARY {
+		if command[0] == ansiterm.ANSI_ESCAPE_PRIMARY && command[1] == ansiterm.ANSI_ESCAPE_SECONDARY {
 			start++
 		}
 		// convert this to GetNextParam method
-		ac.Parameters = strings.Split(string(command[start:lastCharIndex]), ANSI_PARAMETER_SEP)
+		ac.Parameters = strings.Split(string(command[start:lastCharIndex]), ansiterm.ANSI_PARAMETER_SEP)
 	}
 
 	return ac
 }
 
-func (ac *ansiCommand) paramAsSHORT(index int, defaultValue SHORT) SHORT {
+func (ac *ansiCommand) paramAsSHORT(index int, defaultValue int16) int16 {
 	if index < 0 || index >= len(ac.Parameters) {
 		return defaultValue
 	}
@@ -105,7 +105,7 @@ func (ac *ansiCommand) paramAsSHORT(index int, defaultValue SHORT) SHORT {
 		return defaultValue
 	}
 
-	return SHORT(param)
+	return int16(param)
 }
 
 func (ac *ansiCommand) String() string {
@@ -119,12 +119,12 @@ func (ac *ansiCommand) String() string {
 // See http://manpages.ubuntu.com/manpages/intrepid/man4/console_codes.4.html.
 func isAnsiCommandChar(b byte) bool {
 	switch {
-	case ANSI_COMMAND_FIRST <= b && b <= ANSI_COMMAND_LAST && b != ANSI_ESCAPE_SECONDARY:
+	case ansiterm.ANSI_COMMAND_FIRST <= b && b <= ansiterm.ANSI_COMMAND_LAST && b != ansiterm.ANSI_ESCAPE_SECONDARY:
 		return true
-	case b == ANSI_CMD_G1 || b == ANSI_CMD_OSC || b == ANSI_CMD_DECPAM || b == ANSI_CMD_DECPNM:
+	case b == ansiterm.ANSI_CMD_G1 || b == ansiterm.ANSI_CMD_OSC || b == ansiterm.ANSI_CMD_DECPAM || b == ansiterm.ANSI_CMD_DECPNM:
 		// non-CSI escape sequence terminator
 		return true
-	case b == ANSI_CMD_STR_TERM || b == ANSI_BEL:
+	case b == ansiterm.ANSI_CMD_STR_TERM || b == ansiterm.ANSI_BEL:
 		// String escape sequence terminator
 		return true
 	}
@@ -132,11 +132,11 @@ func isAnsiCommandChar(b byte) bool {
 }
 
 func isXtermOscSequence(command []byte, current byte) bool {
-	return (len(command) >= 2 && command[0] == ANSI_ESCAPE_PRIMARY && command[1] == ANSI_CMD_OSC && current != ANSI_BEL)
+	return (len(command) >= 2 && command[0] == ansiterm.ANSI_ESCAPE_PRIMARY && command[1] == ansiterm.ANSI_CMD_OSC && current != ansiterm.ANSI_BEL)
 }
 
 func isCharacterSelectionCmdChar(b byte) bool {
-	return (b == ANSI_CMD_G0 || b == ANSI_CMD_G1 || b == ANSI_CMD_G2 || b == ANSI_CMD_G3)
+	return (b == ansiterm.ANSI_CMD_G0 || b == ansiterm.ANSI_CMD_G1 || b == ansiterm.ANSI_CMD_G2 || b == ansiterm.ANSI_CMD_G3)
 }
 
 // bytesToHex converts a slice of bytes to a human-readable string.
@@ -150,7 +150,7 @@ func bytesToHex(b []byte) string {
 
 // ensureInRange adjusts the passed value, if necessary, to ensure it is within
 // the passed min / max range.
-func ensureInRange(n SHORT, min SHORT, max SHORT) SHORT {
+func ensureInRange(n int16, min int16, max int16) int16 {
 	if n < min {
 		return min
 	} else if n > max {

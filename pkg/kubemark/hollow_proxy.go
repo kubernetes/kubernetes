@@ -21,10 +21,10 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/api"
@@ -32,11 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
-	"k8s.io/kubernetes/pkg/util"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilexec "k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
@@ -106,7 +106,7 @@ func NewHollowProxyOrDie(
 	}
 
 	// Create a Hollow Proxy instance.
-	nodeRef := &clientv1.ObjectReference{
+	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),
@@ -122,7 +122,7 @@ func NewHollowProxyOrDie(
 			Recorder:              recorder,
 			ProxyMode:             "fake",
 			NodeRef:               nodeRef,
-			OOMScoreAdj:           util.Int32Ptr(0),
+			OOMScoreAdj:           utilpointer.Int32Ptr(0),
 			ResourceContainer:     "",
 			ConfigSyncPeriod:      30 * time.Second,
 			ServiceEventHandler:   serviceHandler,
@@ -144,7 +144,7 @@ func getNodeIP(client clientset.Interface, hostname string) net.IP {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
-	nodeIP, err = nodeutil.InternalGetNodeHostIP(node)
+	nodeIP, err = utilnode.InternalGetNodeHostIP(node)
 	if err != nil {
 		glog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil

@@ -27,11 +27,12 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/util/exec"
+	clientset "k8s.io/client-go/kubernetes"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
 )
 
 type CinderDiskUtil struct{}
@@ -149,7 +150,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[metav1.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -157,10 +158,10 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	return zones, nil
 }
 
-func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, err error) {
+func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, nil, "", err
 	}
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -178,13 +179,15 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 			vtype = v
 		case "availability":
 			availability = v
+		case volume.VolumeParameterFSType:
+			fstype = v
 		default:
-			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
+			return "", 0, nil, "", fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
 		}
 	}
 	// TODO: implement PVC.Selector parsing
 	if c.options.PVC.Spec.Selector != nil {
-		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
+		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Cinder")
 	}
 
 	if availability == "" {
@@ -192,7 +195,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		zones, err := getZonesFromNodes(c.plugin.host.GetKubeClient())
 		if err != nil {
 			glog.V(2).Infof("error getting zone information: %v", err)
-			return "", 0, nil, err
+			return "", 0, nil, "", err
 		}
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
@@ -204,15 +207,15 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 	volumeID, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if errr != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", errr)
-		return "", 0, nil, errr
+		return "", 0, nil, "", errr
 	}
 	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
-	volumeLabels[metav1.LabelZoneFailureDomain] = volumeAZ
+	volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
 
-	return volumeID, volSizeGB, volumeLabels, nil
+	return volumeID, volSizeGB, volumeLabels, fstype, nil
 }
 
 func probeAttachedVolume() error {

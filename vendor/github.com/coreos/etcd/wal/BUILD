@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -19,8 +12,13 @@ go_library(
         "util.go",
         "wal.go",
         "wal_unix.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "wal_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/fileutil:go_default_library",
@@ -48,4 +46,5 @@ filegroup(
         "//vendor/github.com/coreos/etcd/wal/walpb:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

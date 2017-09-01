@@ -19,16 +19,18 @@ package v1beta1
 import (
 	"fmt"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface {
 	GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, error)
+	GetHistoryDaemonSets(history *apps.ControllerRevision) ([]*v1beta1.DaemonSet, error)
 }
 
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
@@ -72,6 +74,40 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, e
 
 	if len(daemonSets) == 0 {
 		return nil, fmt.Errorf("could not find daemon set for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+
+	return daemonSets, nil
+}
+
+// GetHistoryDaemonSets returns a list of DaemonSets that potentially
+// match a ControllerRevision. Only the one specified in the ControllerRevision's ControllerRef
+// will actually manage it.
+// Returns an error only if no matching DaemonSets are found.
+func (s *daemonSetLister) GetHistoryDaemonSets(history *apps.ControllerRevision) ([]*v1beta1.DaemonSet, error) {
+	if len(history.Labels) == 0 {
+		return nil, fmt.Errorf("no DaemonSet found for ControllerRevision %s because it has no labels", history.Name)
+	}
+
+	list, err := s.DaemonSets(history.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	var daemonSets []*v1beta1.DaemonSet
+	for _, ds := range list {
+		selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+		// If a DaemonSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(history.Labels)) {
+			continue
+		}
+		daemonSets = append(daemonSets, ds)
+	}
+
+	if len(daemonSets) == 0 {
+		return nil, fmt.Errorf("could not find DaemonSets for ControllerRevision %s in namespace %s with labels: %v", history.Name, history.Namespace, history.Labels)
 	}
 
 	return daemonSets, nil

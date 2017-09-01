@@ -1,3 +1,6 @@
+# Please keep kube-proxy configuration in-sync with:
+# cluster/addons/kube-proxy/kube-proxy-ds.yaml
+
 {% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
 {% if grains.api_servers is defined -%}
   {% set api_servers = "--master=https://" + grains.api_servers -%}
@@ -35,6 +38,8 @@
 {% set params = log_level + " " + throttles + " " + feature_gates + " " + test_args -%}
 
 {% set container_env = "" -%}
+{% set kube_cache_mutation_detector_env_name = "" -%}
+{% set kube_cache_mutation_detector_env_value = "" -%}
 
 # kube-proxy podspec
 apiVersion: v1
@@ -54,6 +59,16 @@ metadata:
     component: kube-proxy
 spec:
   hostNetwork: true
+  initContainers:
+  - name: touch-lock
+    image: busybox
+    command: ['/bin/touch', '/run/xtables.lock']
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /run
+      name: run
+      readOnly: false
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -65,6 +80,8 @@ spec:
     - -c
     - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
     {{container_env}}
+    {{kube_cache_mutation_detector_env_name}}
+      {{kube_cache_mutation_detector_env_value}}
     securityContext:
       privileged: true
     volumeMounts:
@@ -80,6 +97,9 @@ spec:
     - mountPath: /var/lib/kube-proxy/kubeconfig
       name: kubeconfig
       readOnly: false
+    - mountPath: /run/xtables.lock
+      name: iptableslock
+      readOnly: false
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -89,7 +109,15 @@ spec:
     name: etc-ssl-certs
   - hostPath:
       path: /var/lib/kube-proxy/kubeconfig
+      type: FileOrCreate
     name: kubeconfig
   - hostPath:
       path: /var/log
     name: varlog
+  - hostPath:
+      path: /run
+    name: run
+  - hostPath:
+      path: /run/xtables.lock
+      type: FileOrCreate
+    name: iptableslock

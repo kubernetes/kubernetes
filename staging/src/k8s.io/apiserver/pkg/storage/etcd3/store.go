@@ -147,6 +147,9 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
+	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
+		return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+	}
 	data, err := runtime.Encode(s.codec, obj)
 	if err != nil {
 		return err
@@ -264,11 +267,13 @@ func (s *store) GuaranteedUpdate(
 	key = path.Join(s.pathPrefix, key)
 
 	var origState *objState
+	var mustCheckData bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
 		origState, err = s.getStateFromObject(suggestion[0])
 		if err != nil {
 			return err
 		}
+		mustCheckData = true
 	} else {
 		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
 		if err != nil {
@@ -297,6 +302,21 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 		if !origState.stale && bytes.Equal(data, origState.data) {
+			// if we skipped the original Get in this loop, we must refresh from
+			// etcd in order to be sure the data in the store is equivalent to
+			// our desired serialization
+			if mustCheckData {
+				getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+				if err != nil {
+					return err
+				}
+				origState, err = s.getState(getResp, key, v, ignoreNotFound)
+				if err != nil {
+					return err
+				}
+				mustCheckData = false
+				continue
+			}
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
@@ -330,6 +350,7 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 			trace.Step("Retry value restored")
+			mustCheckData = false
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
@@ -388,7 +409,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
 	for _, kv := range getResp.Kvs {
-		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
+		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
 			continue
@@ -468,8 +489,8 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 
 	// Compute the serialized form - for that we need to temporarily clean
 	// its resource version field (those are not stored in etcd).
-	if err := s.versioner.UpdateObject(obj, 0); err != nil {
-		return nil, errors.New("resourceVersion cannot be set on objects store in etcd")
+	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
+		return nil, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
 	state.data, err = runtime.Encode(s.codec, obj)
 	if err != nil {
@@ -485,15 +506,8 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 		return nil, 0, err
 	}
 
-	version, err := s.versioner.ObjectResourceVersion(ret)
-	if err != nil {
-		return nil, 0, err
-	}
-	if version != 0 {
-		// We cannot store object with resourceVersion in etcd. We need to reset it.
-		if err := s.versioner.UpdateObject(ret, 0); err != nil {
-			return nil, 0, fmt.Errorf("UpdateObject failed: %v", err)
-		}
+	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
+		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
 	var ttl uint64
 	if ttlPtr != nil {

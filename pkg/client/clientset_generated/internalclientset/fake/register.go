@@ -33,6 +33,7 @@ import (
 	networkinginternalversion "k8s.io/kubernetes/pkg/apis/networking"
 	policyinternalversion "k8s.io/kubernetes/pkg/apis/policy"
 	rbacinternalversion "k8s.io/kubernetes/pkg/apis/rbac"
+	schedulinginternalversion "k8s.io/kubernetes/pkg/apis/scheduling"
 	settingsinternalversion "k8s.io/kubernetes/pkg/apis/settings"
 	storageinternalversion "k8s.io/kubernetes/pkg/apis/storage"
 )
@@ -73,6 +74,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	networkinginternalversion.AddToScheme(scheme)
 	policyinternalversion.AddToScheme(scheme)
 	rbacinternalversion.AddToScheme(scheme)
+	schedulinginternalversion.AddToScheme(scheme)
 	settingsinternalversion.AddToScheme(scheme)
 	storageinternalversion.AddToScheme(scheme)
 

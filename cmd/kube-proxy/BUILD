@@ -1,12 +1,11 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
     "go_library",
 )
+load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kube-proxy",
@@ -17,14 +16,12 @@ go_binary(
         "-static",
     ],
     library = ":go_default_library",
-    linkstamp = "k8s.io/kubernetes/pkg/version",
-    tags = ["automanaged"],
+    x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["proxy.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",

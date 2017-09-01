@@ -22,13 +22,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
-	dockerfilters "github.com/docker/engine-api/types/filters"
+	dockertypes "github.com/docker/docker/api/types"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
@@ -155,9 +155,9 @@ func (ds *dockerService) checkLegacyCleanup() (bool, error) {
 // ListLegacyPodSandbox only lists all legacy pod sandboxes.
 func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	// By default, list all containers whether they are running or not.
-	opts := dockertypes.ContainerListOptions{All: true, Filter: dockerfilters.NewArgs()}
+	opts := dockertypes.ContainerListOptions{All: true, Filters: dockerfilters.NewArgs()}
 	filterOutReadySandboxes := false
-	f := newDockerFilter(&opts.Filter)
+	f := newDockerFilter(&opts.Filters)
 	if filter != nil {
 		if filter.Id != "" {
 			f.Add("id", filter.Id)
@@ -187,7 +187,7 @@ func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilte
 	}
 
 	// Convert docker containers to runtime api sandboxes.
-	result := []*runtimeapi.PodSandbox{}
+	result := make([]*runtimeapi.PodSandbox, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.
@@ -218,8 +218,8 @@ func (ds *dockerService) ListLegacyPodSandbox(filter *runtimeapi.PodSandboxFilte
 
 // ListLegacyPodSandbox only lists all legacy containers.
 func (ds *dockerService) ListLegacyContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
-	opts := dockertypes.ContainerListOptions{All: true, Filter: dockerfilters.NewArgs()}
-	f := newDockerFilter(&opts.Filter)
+	opts := dockertypes.ContainerListOptions{All: true, Filters: dockerfilters.NewArgs()}
+	f := newDockerFilter(&opts.Filters)
 
 	if filter != nil {
 		if filter.Id != "" {
@@ -242,7 +242,7 @@ func (ds *dockerService) ListLegacyContainers(filter *runtimeapi.ContainerFilter
 	}
 
 	// Convert docker to runtime api containers.
-	result := []*runtimeapi.Container{}
+	result := make([]*runtimeapi.Container, 0, len(containers))
 	for i := range containers {
 		c := containers[i]
 		// Skip new containers with containerTypeLabelKey label.

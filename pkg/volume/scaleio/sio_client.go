@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 
 	sio "github.com/codedellemc/goscaleio"
 	siotypes "github.com/codedellemc/goscaleio/types/v1"
@@ -45,7 +46,7 @@ type sioInterface interface {
 	FindVolume(name string) (*siotypes.Volume, error)
 	Volume(sioVolumeID) (*siotypes.Volume, error)
 	CreateVolume(name string, sizeGB int64) (*siotypes.Volume, error)
-	AttachVolume(sioVolumeID) error
+	AttachVolume(sioVolumeID, bool) error
 	DetachVolume(sioVolumeID) error
 	DeleteVolume(sioVolumeID) error
 	IID() (string, error)
@@ -77,13 +78,15 @@ type sioClient struct {
 	inited           bool
 	diskRegex        *regexp.Regexp
 	mtx              sync.Mutex
+	exec             mount.Exec
 }
 
-func newSioClient(gateway, username, password string, sslEnabled bool) (*sioClient, error) {
+func newSioClient(gateway, username, password string, sslEnabled bool, exec mount.Exec) (*sioClient, error) {
 	client := new(sioClient)
 	client.gateway = gateway
 	client.username = username
 	client.password = password
+	client.exec = exec
 	if sslEnabled {
 		client.insecure = false
 		client.certsEnabled = true
@@ -217,8 +220,9 @@ func (c *sioClient) CreateVolume(name string, sizeGB int64) (*siotypes.Volume, e
 	return c.Volume(sioVolumeID(createResponse.ID))
 }
 
-// AttachVolume maps the scaleio volume to an sdc node.
-func (c *sioClient) AttachVolume(id sioVolumeID) error {
+// AttachVolume maps the scaleio volume to an sdc node.  If the multipleMappings flag
+// is true, ScaleIO will allow other SDC to map to that volume.
+func (c *sioClient) AttachVolume(id sioVolumeID, multipleMappings bool) error {
 	if err := c.init(); err != nil {
 		glog.Error(log("failed to init'd client in attach volume: %v", err))
 		return err
@@ -232,7 +236,7 @@ func (c *sioClient) AttachVolume(id sioVolumeID) error {
 
 	params := &siotypes.MapVolumeSdcParam{
 		SdcID: iid,
-		AllowMultipleMappings: "false",
+		AllowMultipleMappings: strconv.FormatBool(multipleMappings),
 		AllSdcs:               "",
 	}
 	volClient := sio.NewVolume(c.client)
@@ -295,7 +299,7 @@ func (c *sioClient) IID() (string, error) {
 
 	if c.instanceID == "" {
 		cmd := c.getSdcCmd()
-		output, err := exec.Command(cmd, "--query_guid").Output()
+		output, err := c.exec.Run(cmd, "--query_guid")
 		if err != nil {
 			glog.Error(log("drv_cfg --query_guid failed: %v", err))
 			return "", err
@@ -354,7 +358,7 @@ func (c *sioClient) Devs() (map[string]string, error) {
 	volumeMap := make(map[string]string)
 
 	// grab the sdc tool output
-	out, err := exec.Command(c.getSdcCmd(), "--query_vols").Output()
+	out, err := c.exec.Run(c.getSdcCmd(), "--query_vols")
 	if err != nil {
 		glog.Error(log("sdc --query_vols failed: %v", err))
 		return nil, err

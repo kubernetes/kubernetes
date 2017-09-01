@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/exp/inotify"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -62,9 +62,9 @@ func (s *sourceFile) watch() error {
 		return fmt.Errorf("unable to create inotify for path %q: %v", s.path, err)
 	}
 
-	// Reset store with config files already existing when starting
+	// Reset store with manifest files already existing when starting
 	if err := s.resetStoreFromPath(); err != nil {
-		return fmt.Errorf("unable to read config path %q: %v", s.path, err)
+		return fmt.Errorf("unable to read manifest path %q: %v", s.path, err)
 	}
 
 	for {
@@ -89,7 +89,7 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 	var eventType podEventType
 	switch {
 	case (e.Mask & inotify.IN_ISDIR) > 0:
-		glog.V(1).Infof("Not recursing into config path %q", s.path)
+		glog.Errorf("Not recursing into manifest path %q", s.path)
 		return nil
 	case (e.Mask & inotify.IN_CREATE) > 0:
 		eventType = podAdd
@@ -111,7 +111,7 @@ func (s *sourceFile) processEvent(e *inotify.Event) error {
 	switch eventType {
 	case podAdd, podModify:
 		if pod, err := s.extractFromFile(e.Name); err != nil {
-			glog.Errorf("can't process config file %q: %v", e.Name, err)
+			glog.Errorf("Can't process manifest file %q: %v", e.Name, err)
 		} else {
 			return s.store.Add(pod)
 		}

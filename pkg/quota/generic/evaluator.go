@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/api"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
@@ -150,8 +150,9 @@ func (o *ObjectCountEvaluator) GroupKind() schema.GroupKind {
 	return o.InternalGroupKind
 }
 
-// Handles returns true if the object count evaluator needs to track this operation.
-func (o *ObjectCountEvaluator) Handles(operation admission.Operation) bool {
+// Handles returns true if the object count evaluator needs to track this attributes.
+func (o *ObjectCountEvaluator) Handles(a admission.Attributes) bool {
+	operation := a.GetOperation()
 	return operation == admission.Create || (o.AllowCreateOnUpdate && operation == admission.Update)
 }
 

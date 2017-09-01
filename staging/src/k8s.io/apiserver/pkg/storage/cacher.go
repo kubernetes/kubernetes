@@ -62,8 +62,8 @@ type CacherConfig struct {
 	// KeyFunc is used to get a key in the underlying storage for a given object.
 	KeyFunc func(runtime.Object) (string, error)
 
-	// GetAttrsFunc is used to get object labels and fields.
-	GetAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
+	// GetAttrsFunc is used to get object labels, fields, and the uninitialized bool
+	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error)
 
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -131,7 +131,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
-type watchFilterFunc func(string, labels.Set, fields.Set) bool
+type watchFilterFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -196,6 +196,7 @@ type Cacher struct {
 func NewCacherFromConfig(config CacherConfig) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
@@ -212,7 +213,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		copier:      config.Copier,
 		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
-		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
+		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,
@@ -368,6 +369,12 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		return err
 	}
 
+	if getRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.Get(ctx, key, resourceVersion, objPtr, ignoreNotFound)
+	}
+
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
 	c.ready.wait()
@@ -411,6 +418,12 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	listRV, err := ParseListResourceVersion(resourceVersion)
 	if err != nil {
 		return err
+	}
+
+	if listRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
@@ -469,6 +482,12 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 
+	if listRV == 0 && !c.ready.check() {
+		// If Cacher is not yet initialized and we don't require any specific
+		// minimal resource version, simply forward the request to storage.
+		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
+	}
+
 	trace := utiltrace.New(fmt.Sprintf("cacher %v: List", c.objectType.String()))
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -524,11 +543,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		glog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
-		currObj, copyErr := c.copier.Copy(elem.(*storeElement).Object)
-		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
-		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
@@ -639,6 +655,11 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 		if lock {
 			c.Lock()
 			defer c.Unlock()
+		} else {
+			// false is currently passed only if we are forcing watcher to close due
+			// to its unresponsiveness and blocking other watchers.
+			// TODO: Get this information in cleaner way.
+			glog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		}
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simulaneous Stop() and terminateAllWatchers(), but it doesn't break anything.
@@ -658,11 +679,11 @@ func filterFunction(key string, p SelectionPredicate) func(string, runtime.Objec
 }
 
 func watchFilterFunction(key string, p SelectionPredicate) watchFilterFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesLabelsAndFields(label, field)
+		return p.MatchesObjectAttributes(label, field, uninitialized)
 	}
 	return filterFunc
 }
@@ -840,10 +861,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent, budget *timeBudget) {
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.ObjLabels, event.ObjFields, event.ObjUninitialized)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields)
+		oldObjPasses = c.filter(event.Key, event.PrevObjLabels, event.PrevObjFields, event.PrevObjUninitialized)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
@@ -853,26 +874,11 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Added, Object: object}
+		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
 	case curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.Object)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Modified, Object: object}
+		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
 	case !curObjPasses && oldObjPasses:
-		object, err := c.copier.Copy(event.PrevObject)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unexpected copy error: %v", err))
-			return
-		}
-		watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+		watchEvent = watch.Event{Type: watch.Deleted, Object: event.PrevObject.DeepCopyObject()}
 	}
 
 	// We need to ensure that if we put event X to the c.result, all
@@ -958,6 +964,14 @@ func (r *ready) wait() {
 		r.c.Wait()
 	}
 	r.c.L.Unlock()
+}
+
+// TODO: Make check() function more sophisticated, in particular
+// allow it to behave as "waitWithTimeout".
+func (r *ready) check() bool {
+	r.c.L.Lock()
+	defer r.c.L.Unlock()
+	return r.ok
 }
 
 func (r *ready) set(ok bool) {

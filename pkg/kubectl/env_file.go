@@ -28,6 +28,47 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
+var utf8bom = []byte{0xEF, 0xBB, 0xBF}
+
+// proccessEnvFileLine returns a blank key if the line is empty or a comment.
+// The value will be retrieved from the environment if necessary.
+func proccessEnvFileLine(line []byte, filePath string,
+	currentLine int) (key, value string, err error) {
+
+	if !utf8.Valid(line) {
+		return ``, ``, fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v",
+			filePath, currentLine+1, line)
+	}
+
+	// We trim UTF8 BOM from the first line of the file but no others
+	if currentLine == 0 {
+		line = bytes.TrimPrefix(line, utf8bom)
+	}
+
+	// trim the line from all leading whitespace first
+	line = bytes.TrimLeftFunc(line, unicode.IsSpace)
+
+	// If the line is empty or a comment, we return a blank key/value pair.
+	if len(line) == 0 || line[0] == '#' {
+		return ``, ``, nil
+	}
+
+	data := strings.SplitN(string(line), "=", 2)
+	key = data[0]
+	if errs := validation.IsEnvVarName(key); len(errs) != 0 {
+		return ``, ``, fmt.Errorf("%q is not a valid key name: %s", key, strings.Join(errs, ";"))
+	}
+
+	if len(data) == 2 {
+		value = data[1]
+	} else {
+		// No value (no `=` in the line) is a signal to obtain the value
+		// from the environment.
+		value = os.Getenv(key)
+	}
+	return
+}
+
 // addFromEnvFile processes an env file allows a generic addTo to handle the
 // collection of key value pairs or returns an error.
 func addFromEnvFile(filePath string, addTo func(key, value string) error) error {
@@ -39,38 +80,23 @@ func addFromEnvFile(filePath string, addTo func(key, value string) error) error 
 
 	scanner := bufio.NewScanner(f)
 	currentLine := 0
-	utf8bom := []byte{0xEF, 0xBB, 0xBF}
 	for scanner.Scan() {
+		// Proccess the current line, retrieving a key/value pair if
+		// possible.
 		scannedBytes := scanner.Bytes()
-		if !utf8.Valid(scannedBytes) {
-			return fmt.Errorf("env file %s contains invalid utf8 bytes at line %d: %v", filePath, currentLine+1, scannedBytes)
+		key, value, err := proccessEnvFileLine(scannedBytes, filePath, currentLine)
+		if err != nil {
+			return err
 		}
-		// We trim UTF8 BOM
-		if currentLine == 0 {
-			scannedBytes = bytes.TrimPrefix(scannedBytes, utf8bom)
-		}
-		// trim the line from all leading whitespace first
-		line := strings.TrimLeftFunc(string(scannedBytes), unicode.IsSpace)
 		currentLine++
-		// line is not empty, and not starting with '#'
-		if len(line) > 0 && !strings.HasPrefix(line, "#") {
-			data := strings.SplitN(line, "=", 2)
-			key := data[0]
-			if errs := validation.IsCIdentifier(key); len(errs) != 0 {
-				return fmt.Errorf("%q is not a valid key name: %s", key, strings.Join(errs, ";"))
-			}
 
-			value := ""
-			if len(data) > 1 {
-				// pass the value through, no trimming
-				value = data[1]
-			} else {
-				// a pass-through variable is given
-				value = os.Getenv(key)
-			}
-			if err = addTo(key, value); err != nil {
-				return err
-			}
+		if len(key) == 0 {
+			// no key means line was empty or a comment
+			continue
+		}
+
+		if err = addTo(key, value); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -18,12 +18,13 @@ package e2e_node
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,22 +46,19 @@ const (
 var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flaky]", func() {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 
+	volumeMountPath := "/test-empty-dir-mnt"
 	podTestSpecs := []podTestSpec{
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
-			pod: v1.Pod{
+			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "container-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
-							Name:  "container-inode-hog-pod",
-							Command: []string{
-								"sh",
-								"-c", // Make 100 billion small files (more than we have inodes)
-								"i=0; while [[ $i -lt 100000000000 ]]; do touch smallfile$i.txt; sleep 0.001; i=$((i+=1)); done;",
-							},
+							Image:   "gcr.io/google_containers/busybox:1.24",
+							Name:    "container-inode-hog-container",
+							Command: getInodeConsumingCommand(""),
 						},
 					},
 				},
@@ -68,21 +66,17 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		},
 		{
 			evictionPriority: 1, // This pod should be evicted before the normal memory usage pod
-			pod: v1.Pod{
+			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "volume-inode-hog-pod"},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/busybox:1.24",
-							Name:  "volume-inode-hog-pod",
-							Command: []string{
-								"sh",
-								"-c", // Make 100 billion small files (more than we have inodes)
-								"i=0; while [[ $i -lt 100000000000 ]]; do touch /test-empty-dir-mnt/smallfile$i.txt; sleep 0.001; i=$((i+=1)); done;",
-							},
+							Image:   "gcr.io/google_containers/busybox:1.24",
+							Name:    "volume-inode-hog-container",
+							Command: getInodeConsumingCommand(volumeMountPath),
 							VolumeMounts: []v1.VolumeMount{
-								{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
+								{MountPath: volumeMountPath, Name: "test-empty-dir"},
 							},
 						},
 					},
@@ -94,31 +88,15 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 		},
 		{
 			evictionPriority: 0, // This pod should never be evicted
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "normal-memory-usage-pod"},
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image: "gcr.io/google_containers/busybox:1.24",
-							Name:  "normal-memory-usage-pod",
-							Command: []string{
-								"sh",
-								"-c", //make one big (5 Gb) file
-								"dd if=/dev/urandom of=largefile bs=5000000000 count=1; while true; do sleep 5; done",
-							},
-						},
-					},
-				},
-			},
+			pod:              getInnocentPod(),
 		},
 	}
 	evictionTestTimeout := 30 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
-			initialConfig.EvictionHard = "nodefs.inodesFree<50%"
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.EvictionHard = "nodefs.inodesFree<70%"
 		})
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 		Context("With kubeconfig updated", func() {
@@ -133,7 +111,7 @@ type podTestSpec struct {
 	// If two are ranked at 1, either is permitted to fail before the other.
 	// The test ends when all other than the 0 have been evicted
 	evictionPriority int
-	pod              v1.Pod
+	pod              *v1.Pod
 }
 
 // runEvictionTest sets up a testing environment given the provided nodes, and checks a few things:
@@ -148,7 +126,7 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 		By("seting up pods to be used by tests")
 		for _, spec := range podTestSpecs {
 			By(fmt.Sprintf("creating pod with container: %s", spec.pod.Name))
-			f.PodClient().CreateSync(&spec.pod)
+			f.PodClient().CreateSync(spec.pod)
 		}
 	})
 
@@ -341,4 +319,33 @@ func hasInodePressure(f *framework.Framework, testCondition string) (bool, error
 		}
 	}
 	return hasPressure, nil
+}
+
+// returns a pod that does not use any resources
+func getInnocentPod() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "innocent-pod"},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Image: "gcr.io/google_containers/busybox:1.24",
+					Name:  "innocent-container",
+					Command: []string{
+						"sh",
+						"-c", //make one large file
+						"dd if=/dev/urandom of=largefile bs=5000000000 count=1; while true; do sleep 5; done",
+					},
+				},
+			},
+		},
+	}
+}
+
+func getInodeConsumingCommand(path string) []string {
+	return []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("i=0; while true; do touch %s${i}.txt; sleep 0.001; i=$((i+=1)); done;", filepath.Join(path, "smallfile")),
+	}
 }

@@ -28,6 +28,8 @@ import (
 
 	"github.com/golang/glog"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
@@ -81,8 +83,9 @@ func RunKubelet() {
 
 const (
 	// Ports of different e2e services.
-	kubeletPort         = "10250"
-	kubeletReadOnlyPort = "10255"
+	kubeletPort          = "10250"
+	kubeletReadOnlyPort  = "10255"
+	kubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
@@ -91,12 +94,26 @@ const (
 // if the Kubelet fails to start.
 func (e *E2EServices) startKubelet() (*server, error) {
 	glog.Info("Starting kubelet")
+
+	// set feature gates so we can check which features are enabled and pass the appropriate flags
+	utilfeature.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
+
+	// Build kubeconfig
+	kubeconfigPath, err := createKubeconfigCWD()
+	if err != nil {
+		return nil, err
+	}
+
 	// Create pod manifest path
 	manifestPath, err := createPodManifestDirectory()
 	if err != nil {
 		return nil, err
 	}
 	e.rmDirs = append(e.rmDirs, manifestPath)
+	err = createRootDirectory(kubeletRootDirectory)
+	if err != nil {
+		return nil, err
+	}
 	var killCommand, restartCommand *exec.Cmd
 	var isSystemd bool
 	// Apply default kubelet flags.
@@ -128,16 +145,22 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		)
 	}
 	cmdArgs = append(cmdArgs,
-		"--api-servers", getAPIServerClientURL(),
+		"--kubeconfig", kubeconfigPath,
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
+		"--root-dir", kubeletRootDirectory,
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
 		"--pod-manifest-path", manifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
-		"--pod-cidr", "10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
+		// Assign a fixed CIDR to the node because there is no node controller.
+		//
+		// Note: this MUST be in sync with with the IP in
+		// - cluster/gce/config-test.sh and
+		// - test/e2e_node/conformance/run_test.sh.
+		"--pod-cidr", "10.100.0.0/24",
 		"--eviction-pressure-transition-period", "30s",
 		// Apply test framework feature gates by default. This could also be overridden
 		// by kubelet-flags.
@@ -146,6 +169,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-minimum-reclaim", "nodefs.available=5%,nodefs.inodesFree=5%", // The minimum reclaimed resources after eviction.
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		// Enable dynamic config if the feature gate is enabled
+		dynamicConfigDir, err := getDynamicConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		cmdArgs = append(cmdArgs, "--dynamic-config-dir", dynamicConfigDir)
+	}
+
 	// Enable kubenet by default.
 	cniBinDir, err := getCNIBinDirectory()
 	if err != nil {
@@ -201,6 +234,63 @@ func createPodManifestDirectory() (string, error) {
 	return path, nil
 }
 
+// createKubeconfig creates a kubeconfig file at the fully qualified `path`. The parent dirs must exist.
+func createKubeconfig(path string) error {
+	kubeconfig := []byte(`apiVersion: v1
+kind: Config
+users:
+- name: kubelet
+clusters:
+- cluster:
+    server: ` + getAPIServerClientURL() + `
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: kubelet
+  name: local-context
+current-context: local-context`)
+
+	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
+		return err
+	}
+	return nil
+}
+
+func createRootDirectory(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return os.MkdirAll(path, os.FileMode(0755))
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func kubeconfigCWDPath() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %v", err)
+	}
+	return filepath.Join(cwd, "kubeconfig"), nil
+}
+
+// like createKubeconfig, but creates kubeconfig at current-working-directory/kubeconfig
+// returns a fully-qualified path to the kubeconfig file
+func createKubeconfigCWD() (string, error) {
+	kubeconfigPath, err := kubeconfigCWDPath()
+	if err != nil {
+		return "", err
+	}
+
+	if err = createKubeconfig(kubeconfigPath); err != nil {
+		return "", err
+	}
+	return kubeconfigPath, nil
+}
+
 // getCNIBinDirectory returns CNI directory.
 func getCNIBinDirectory() (string, error) {
 	cwd, err := os.Getwd()
@@ -217,6 +307,15 @@ func getCNIConfDirectory() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, "cni", "net.d"), nil
+}
+
+// getDynamicConfigDir returns the directory for dynamic Kubelet configuration
+func getDynamicConfigDir() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "dynamic-kubelet-config"), nil
 }
 
 // adjustArgsForSystemd escape special characters in kubelet arguments for systemd. Systemd

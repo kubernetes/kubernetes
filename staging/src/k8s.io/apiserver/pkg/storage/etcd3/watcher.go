@@ -118,7 +118,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
 	}
-	if pred.Label.Empty() && pred.Field.Empty() {
+	if pred.Empty() {
 		// The filter doesn't filter out any object.
 		wc.internalFilter = nil
 	}

@@ -26,9 +26,26 @@ import (
 	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
+
+func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, error) {
+	if kubeconfigPath == "" && masterURL == "" {
+		kubeconfig, err := restclient.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		return kubeconfig, nil
+	}
+
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientapi.Cluster{Server: masterURL}}).ClientConfig()
+}
 
 func flattenSubsets(subsets []api.EndpointSubset) []string {
 	ips := []string{}
@@ -42,9 +59,10 @@ func flattenSubsets(subsets []api.EndpointSubset) []string {
 
 func main() {
 	flag.Parse()
+
 	glog.Info("Kubernetes Elasticsearch logging discovery")
 
-	cc, err := restclient.InClusterConfig()
+	cc, err := buildConfigFromEnvs(os.Getenv("APISERVER_HOST"), os.Getenv("KUBE_CONFIG_FILE"))
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}

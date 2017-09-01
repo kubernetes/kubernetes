@@ -36,7 +36,7 @@ const apiNoun = "federation apiserver"
 // GetRunOptions returns the default run options that can be used to run a test federation apiserver.
 func GetRunOptions() *options.ServerRunOptions {
 	r := options.NewServerRunOptions()
-	r.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURLFromEnv()}
+	r.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 	// Use a unique prefix to ensure isolation from other tests using the same etcd instance
 	r.Etcd.StorageConfig.Prefix = uuid.New()
 	// Disable secure serving

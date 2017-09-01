@@ -20,8 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
@@ -124,52 +122,6 @@ func TestStrategy_ValidateUpdate(t *testing.T) {
 		if !tc.isValid && len(errs) == 0 {
 			t.Errorf("%v: unexpected non-error", tc.name)
 		}
-	}
-}
-
-func TestControllerRevisionToSelectableFields(t *testing.T) {
-	rev := newControllerRevision("validname", "validns", newObject(), 0)
-	fieldSet := ControllerRevisionToSelectableFields(rev)
-	if fieldSet.Get("metadata.name") != rev.Name {
-		t.Errorf("expeted %s found %s", rev.Name, fieldSet.Get("metadata.name"))
-	}
-	if fieldSet.Get("metadata.namespace") != rev.Namespace {
-		t.Errorf("expeted %s found %s", rev.Namespace, fieldSet.Get("metadata.namespace"))
-	}
-}
-
-func TestGetAttrs(t *testing.T) {
-	rev := newControllerRevision("validname", "validns", newObject(), 0)
-	labelSet, fieldSet, err := GetAttrs(rev)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fieldSet.Get("metadata.name") != rev.Name {
-		t.Errorf("expeted %s found %s", rev.Name, fieldSet.Get("metadata.name"))
-	}
-	if fieldSet.Get("metadata.namespace") != rev.Namespace {
-		t.Errorf("expeted %s found %s", rev.Namespace, fieldSet.Get("metadata.namespace"))
-	}
-	if labelSet.Get("foo") != rev.Labels["foo"] {
-		t.Errorf("expected %s found %s", rev.Labels["foo"], labelSet.Get("foo"))
-	}
-}
-
-func TestMatchControllerRevision(t *testing.T) {
-	rev := newControllerRevision("validname", "validns", newObject(), 0)
-	ls := labels.SelectorFromSet(labels.Set(rev.Labels))
-	pred := MatchControllerRevision(ls, nil)
-	if matches, err := pred.Matches(rev); err != nil {
-		t.Error(err)
-	} else if !matches {
-		t.Error("failed to match ControllerRevision by labels")
-	}
-	fs := fields.SelectorFromSet(ControllerRevisionToSelectableFields(rev))
-	pred = MatchControllerRevision(ls, fs)
-	if matches, err := pred.Matches(rev); err != nil {
-		t.Error(err)
-	} else if !matches {
-		t.Error("failed to match ControllerRevision by fields")
 	}
 }
 

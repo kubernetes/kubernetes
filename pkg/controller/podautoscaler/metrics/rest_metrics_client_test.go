@@ -21,16 +21,18 @@ import (
 	"testing"
 	"time"
 
+	autoscalingapi "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
+	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	kv1 "k8s.io/kubernetes/pkg/api/v1"
-	autoscalingapi "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	// For api.Registry.RESTMapper()
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
@@ -70,7 +72,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 
 	if isResource {
-		fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{

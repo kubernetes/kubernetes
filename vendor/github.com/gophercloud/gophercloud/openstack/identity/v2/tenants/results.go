@@ -51,3 +51,36 @@ func ExtractTenants(r pagination.Page) ([]Tenant, error) {
 	err := (r.(TenantPage)).ExtractInto(&s)
 	return s.Tenants, err
 }
+
+type tenantResult struct {
+	gophercloud.Result
+}
+
+// Extract interprets any tenantResults as a tenant.
+func (r tenantResult) Extract() (*Tenant, error) {
+	var s struct {
+		Tenant *Tenant `json:"tenant"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Tenant, err
+}
+
+// GetResult temporarily contains the response from the Get call.
+type GetResult struct {
+	tenantResult
+}
+
+// CreateResult temporarily contains the reponse from the Create call.
+type CreateResult struct {
+	tenantResult
+}
+
+// DeleteResult temporarily contains the response from the Delete call.
+type DeleteResult struct {
+	gophercloud.ErrResult
+}
+
+// UpdateResult temporarily contains the response from the Update call.
+type UpdateResult struct {
+	tenantResult
+}

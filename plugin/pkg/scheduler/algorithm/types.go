@@ -17,10 +17,10 @@ limitations under the License.
 package algorithm
 
 import (
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -80,6 +80,9 @@ type PodLister interface {
 	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
 	// performing expensive copies that are unneeded.
 	List(labels.Selector) ([]*v1.Pod, error)
+	// This is similar to "List()", but the returned slice does not
+	// contain pods that don't pass `podFilter`.
+	FilteredList(podFilter schedulercache.PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
 // ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.

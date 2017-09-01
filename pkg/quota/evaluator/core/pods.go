@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper/qos"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -41,10 +43,13 @@ import (
 var podResources = []api.ResourceName{
 	api.ResourceCPU,
 	api.ResourceMemory,
+	api.ResourceEphemeralStorage,
 	api.ResourceRequestsCPU,
 	api.ResourceRequestsMemory,
+	api.ResourceRequestsEphemeralStorage,
 	api.ResourceLimitsCPU,
 	api.ResourceLimitsMemory,
+	api.ResourceLimitsEphemeralStorage,
 	api.ResourcePods,
 }
 
@@ -130,10 +135,19 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Pod")
 }
 
-// Handles returns true of the evaluator should handle the specified operation.
-func (p *podEvaluator) Handles(operation admission.Operation) bool {
-	// TODO: update this if/when pods support resizing resource requirements.
-	return admission.Create == operation
+// Handles returns true of the evaluator should handle the specified attributes.
+func (p *podEvaluator) Handles(a admission.Attributes) bool {
+	op := a.GetOperation()
+	if op == admission.Create {
+		return true
+	}
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		// fail closed, will try to give an evaluation.
+		return true
+	}
+	// only uninitialized pods might be updated.
+	return updateUninitialized
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -190,6 +204,13 @@ func podUsageHelper(requests api.ResourceList, limits api.ResourceList) api.Reso
 	if limit, found := limits[api.ResourceMemory]; found {
 		result[api.ResourceLimitsMemory] = limit
 	}
+	if request, found := requests[api.ResourceEphemeralStorage]; found {
+		result[api.ResourceEphemeralStorage] = request
+		result[api.ResourceRequestsEphemeralStorage] = request
+	}
+	if limit, found := limits[api.ResourceEphemeralStorage]; found {
+		result[api.ResourceLimitsEphemeralStorage] = limit
+	}
 	return result
 }
 
@@ -197,7 +218,7 @@ func toInternalPodOrError(obj runtime.Object) (*api.Pod, error) {
 	pod := &api.Pod{}
 	switch t := obj.(type) {
 	case *v1.Pod:
-		if err := v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
 			return nil, err
 		}
 	case *api.Pod:

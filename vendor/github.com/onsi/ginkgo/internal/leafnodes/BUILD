@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -20,7 +13,7 @@ go_library(
         "synchronized_after_suite_node.go",
         "synchronized_before_suite_node.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/internal/codelocation:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/failer:go_default_library",
@@ -39,4 +32,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

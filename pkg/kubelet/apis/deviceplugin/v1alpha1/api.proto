@@ -1,0 +1,127 @@
+// To regenerate api.pb.go run hack/update-device-plugin.sh
+syntax = 'proto3';
+
+package deviceplugin;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+
+// Registration is the service advertised by the Kubelet
+// Only when Kubelet answers with a success code to a Register Request
+// may Device Plugins start their service
+// Registration may fail when device plugin version is not supported by
+// Kubelet or the registered resourceName is already taken by another
+// active device plugin. Device plugin is expected to terminate upon registration failure
+service Registration {
+	rpc Register(RegisterRequest) returns (Empty) {}
+}
+
+message RegisterRequest {
+	// Version of the API the Device Plugin was built against
+	string version = 1;
+	// Name of the unix socket the device plugin is listening on
+	// PATH = path.Join(DevicePluginPath, endpoint)
+	string endpoint = 2;
+	// Schedulable resource name. As of now it's expected to be a DNS Label
+	string resource_name = 3;
+}
+
+message Empty {
+}
+
+// DevicePlugin is the service advertised by Device Plugins
+service DevicePlugin {
+	// ListAndWatch returns a stream of List of Devices
+	// Whenever a Device state change or a Device disapears, ListAndWatch
+	// returns the new list
+	rpc ListAndWatch(Empty) returns (stream ListAndWatchResponse) {}
+
+	// Allocate is called during container creation so that the Device
+	// Plugin can run device specific operations and instruct Kubelet
+	// of the steps to make the Device available in the container
+	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
+}
+
+// ListAndWatch returns a stream of List of Devices
+// Whenever a Device state change or a Device disapears, ListAndWatch
+// returns the new list
+message ListAndWatchResponse {
+	repeated Device devices = 1;
+}
+
+/* E.g:
+* struct Device {
+*    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
+*    State: "Healthy",
+*} */
+message Device {
+	// A unique ID assigned by the device plugin used
+	// to identify devices during the communication
+	// Max length of this field is 63 characters
+	string ID = 1;
+	// Health of the device, can be healthy or unhealthy, see constants.go
+	string health = 2;
+}
+
+// - Allocate is expected to be called during pod creation since allocation
+//   failures for any container would result in pod startup failure.
+// - Allocate allows kubelet to exposes additional artifacts in a pod's
+//   environment as directed by the plugin.
+// - Allocate allows Device Plugin to run device specific operations on
+//   the Devices requested
+message AllocateRequest {
+	repeated string devicesIDs = 1;
+}
+
+// Failure Handling:
+// if Kubelet sends an allocation request for dev1 and dev2.
+// Allocation on dev1 succeeds but allocation on dev2 fails.
+// The Device plugin should send a ListAndWatch update and fail the
+// Allocation request
+message AllocateResponse {
+	repeated DeviceRuntimeSpec spec = 1;
+}
+
+// The list to be added to the CRI spec
+message DeviceRuntimeSpec {
+	// ID of the Device
+	string ID = 1;
+	// List of environment variable to set in the container.
+	map<string, string> envs = 2;
+	// Mounts for the container.
+	repeated Mount mounts = 3;
+	// Devices for the container
+	repeated DeviceSpec devices = 4;
+}
+
+// Mount specifies a host volume to mount into a container.
+// where device library or tools are installed on host and container
+message Mount {
+	// Path of the mount within the container.
+	string container_path = 1;
+	// Path of the mount on the host.
+	string host_path = 2;
+	// If set, the mount is read-only.
+	bool read_only = 3;
+}
+
+// DeviceSpec specifies a host device to mount into a container.
+message DeviceSpec {
+    // Path of the device within the container.
+    string container_path = 1;
+    // Path of the device on the host.
+    string host_path = 2;
+    // Cgroups permissions of the device, candidates are one or more of
+    // * r - allows container to read from the specified device.
+    // * w - allows container to write to the specified device.
+    // * m - allows container to create device files that do not yet exist.
+    string permissions = 3;
+}

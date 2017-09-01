@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -116,27 +116,35 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	mapper, _ := f.Object()
 	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
+	o.resources, o.selector, err = getResourcesAndSelector(args)
+	if err != nil {
+		return err
+	}
 
-	o.builder = f.NewBuilder().
+	o.builder = f.NewBuilder(!o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
 		Flatten()
 
+	if !o.local {
+		o.builder = o.builder.
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
+
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, mapper, obj, o.out)
+		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
 	}
-
-	o.resources, o.selector, err = getResourcesAndSelector(args)
 	return err
 }
 
 // Validate basic inputs
 func (o *SelectorOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.fileOptions.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.fileOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if o.selector == nil {
@@ -147,10 +155,6 @@ func (o *SelectorOptions) Validate() error {
 
 // RunSelector executes the command.
 func (o *SelectorOptions) RunSelector() error {
-	if !o.local {
-		o.builder = o.builder.ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	}
 	r := o.builder.Do()
 	err := r.Err()
 	if err != nil {

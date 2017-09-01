@@ -19,8 +19,6 @@ package validation
 import (
 	"strings"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestIsDNS1123Label(t *testing.T) {
@@ -156,18 +154,42 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
-func createGroupIDs(ids ...int64) []types.UnixGroupID {
-	var output []types.UnixGroupID
+func TestIsInRange(t *testing.T) {
+	goodValues := []struct {
+		value int
+		min   int
+		max   int
+	}{{1, 0, 10}, {5, 5, 20}, {25, 10, 25}}
+	for _, val := range goodValues {
+		if msgs := IsInRange(val.value, val.min, val.max); len(msgs) > 0 {
+			t.Errorf("expected no errors for %#v, but got %v", val, msgs)
+		}
+	}
+
+	badValues := []struct {
+		value int
+		min   int
+		max   int
+	}{{1, 2, 10}, {5, -4, 2}, {25, 100, 120}}
+	for _, val := range badValues {
+		if msgs := IsInRange(val.value, val.min, val.max); len(msgs) == 0 {
+			t.Errorf("expected errors for %#v", val)
+		}
+	}
+}
+
+func createGroupIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixGroupID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }
 
-func createUserIDs(ids ...int64) []types.UnixUserID {
-	var output []types.UnixUserID
+func createUserIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixUserID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }

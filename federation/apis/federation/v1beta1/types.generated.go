@@ -25,9 +25,9 @@ import (
 	"errors"
 	"fmt"
 	codec1978 "github.com/ugorji/go/codec"
+	pkg1_v1 "k8s.io/api/core/v1"
 	pkg2_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkg3_types "k8s.io/apimachinery/pkg/types"
-	pkg1_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"reflect"
 	"runtime"
 	time "time"
@@ -63,9 +63,9 @@ func init() {
 		panic(err)
 	}
 	if false { // reference the types, but skip this branch at build/run time
-		var v0 pkg2_v1.Time
-		var v1 pkg3_types.UID
-		var v2 pkg1_v1.LocalObjectReference
+		var v0 pkg1_v1.LocalObjectReference
+		var v1 pkg2_v1.Time
+		var v2 pkg3_types.UID
 		var v3 time.Time
 		_, _, _, _ = v0, v1, v2, v3
 	}

@@ -40,15 +40,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ExternalAdmissionHookConfiguration).Name, nil
 		},
-		PredicateFunc:     externaladmissionhookconfiguration.MatchExternalAdmissionHookConfiguration,
-		QualifiedResource: admissionregistration.Resource("externaladmissionhookconfigurations"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("externaladmissionhookconfigurations"),
+		DefaultQualifiedResource: admissionregistration.Resource("externaladmissionhookconfigurations"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("externaladmissionhookconfigurations"),
 
 		CreateStrategy: externaladmissionhookconfiguration.Strategy,
 		UpdateStrategy: externaladmissionhookconfiguration.Strategy,
 		DeleteStrategy: externaladmissionhookconfiguration.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: externaladmissionhookconfiguration.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

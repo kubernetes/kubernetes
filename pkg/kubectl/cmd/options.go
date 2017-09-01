@@ -17,8 +17,10 @@ limitations under the License.
 package cmd
 
 import (
+	"io"
+
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +32,7 @@ var (
 )
 
 // NewCmdOptions implements the options command
-func NewCmdOptions() *cobra.Command {
+func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
 		Short:   i18n.T("Print the list of flags inherited by all commands"),
@@ -41,7 +43,13 @@ func NewCmdOptions() *cobra.Command {
 		},
 	}
 
-	templates.UseOptionsTemplates(cmd)
+	// The `options` command needs write its output to the `out` stream
+	// (typically stdout). Without calling SetOutput here, the Usage()
+	// function call will fall back to stderr.
+	//
+	// See https://github.com/kubernetes/kubernetes/pull/46394 for details.
+	cmd.SetOutput(out)
 
+	templates.UseOptionsTemplates(cmd)
 	return cmd
 }

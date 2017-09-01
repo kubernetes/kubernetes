@@ -23,11 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -85,19 +85,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 	return nil
 }
 
-// initNFSserverPod wraps volumes.go's startVolumeServer to return a running nfs host pod
-// commonly used by persistent volume testing
-func initNFSserverPod(c clientset.Interface, ns string) *v1.Pod {
-	return framework.StartVolumeServer(c, framework.VolumeTestConfig{
-		Namespace:   ns,
-		Prefix:      "nfs",
-		ServerImage: framework.NfsServerImage,
-		ServerPorts: []int{2049},
-		ServerArgs:  []string{"-G", "777", "/exports"},
-	})
-}
-
-var _ = framework.KubeDescribe("PersistentVolumes", func() {
+var _ = SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
@@ -123,7 +111,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PersistentVolumes:NFS", func() {
+	Describe("NFS", func() {
 
 		var (
 			nfsServerPod *v1.Pod
@@ -131,10 +119,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		)
 
 		BeforeEach(func() {
-			framework.Logf("[BeforeEach] Creating NFS Server Pod")
-			nfsServerPod = initNFSserverPod(c, ns)
-			serverIP = nfsServerPod.Status.PodIP
-			framework.Logf("[BeforeEach] Configuring PersistentVolume")
+			_, nfsServerPod, serverIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,
@@ -261,7 +246,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			It("should create 4 PVs and 2 PVCs: test write access", func() {
+			It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				Expect(err).NotTo(HaveOccurred())
@@ -291,7 +276,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			// This It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			It("should test that a PV becomes Available and is clean after the PVC is deleted. [Volume]", func() {
+			It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)

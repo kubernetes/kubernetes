@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -12,7 +10,6 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
-    tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
@@ -21,9 +18,9 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/util/crlf:go_default_library",
+        "//pkg/kubectl/util/term:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/util/crlf:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -43,7 +40,6 @@ go_test(
     name = "go_default_test",
     srcs = ["editor_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

@@ -24,6 +24,26 @@ import (
 	"strconv"
 	"time"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	authorizationapiv1 "k8s.io/api/authorization/v1"
+	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
+	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
+	batchapiv1 "k8s.io/api/batch/v1"
+	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
+	apiv1 "k8s.io/api/core/v1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	settingv1alpha1 "k8s.io/api/settings/v1alpha1"
+	storageapiv1 "k8s.io/api/storage/v1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -31,30 +51,11 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	admissionregistrationv1alpha1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	authenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
-	authorizationapiv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
-	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	certificatesapiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	networkingapiv1 "k8s.io/kubernetes/pkg/apis/networking/v1"
-	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
-	rbacv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	settingv1alpha1 "k8s.io/kubernetes/pkg/apis/settings/v1alpha1"
-	storageapiv1 "k8s.io/kubernetes/pkg/apis/storage/v1"
-	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	corev1client "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/thirdparty"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -75,6 +76,7 @@ import (
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	settingsrest "k8s.io/kubernetes/pkg/registry/settings/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -248,16 +250,21 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
-		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, s.DiscoveryGroupManager, c.StorageFactory)},
+		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
+		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
@@ -271,9 +278,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
-	if err := m.GenericAPIServer.AddPostStartHook("ca-registration", c.ClientCARegistrationHook.PostStartHook); err != nil {
-		glog.Fatalf("Error registering PostStartHook %q: %v", "ca-registration", err)
-	}
+	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ClientCARegistrationHook.PostStartHook)
 
 	return m, nil
 }
@@ -287,9 +292,7 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptio
 	if c.EnableCoreControllers {
 		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient)
-		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
-			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
-		}
+		m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
 	}
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
@@ -334,9 +337,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 			if err != nil {
 				glog.Fatalf("Error building PostStartHook: %v", err)
 			}
-			if err := m.GenericAPIServer.AddPostStartHook(name, hook); err != nil {
-				glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
-			}
+			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
@@ -375,19 +376,29 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
-		admissionregistrationv1alpha1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
+		// TODO: enable batch/v1beta1 by default before 1.8 release, after issues
+		// with CronJobs existing in multiple versions at once is solved
+		// batchapiv1beta1.SchemeGroupVersion,
 		authenticationv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsv1beta1.SchemeGroupVersion,
+		appsv1beta2.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
+		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
+		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
+		// by default only because they were enabled in previous releases.
+		// See https://github.com/kubernetes/kubernetes/pull/47690.
+		// TODO: disable rbac/v1alpha1 and settings/v1alpha1 by default in 1.8
 		rbacv1alpha1.SchemeGroupVersion,
 		settingv1alpha1.SchemeGroupVersion,
+		schedulingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
@@ -403,7 +414,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
 	)
 

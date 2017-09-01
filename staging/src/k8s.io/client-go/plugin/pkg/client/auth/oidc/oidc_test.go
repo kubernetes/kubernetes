@@ -110,7 +110,7 @@ func TestExpired(t *testing.T) {
 				return
 			}
 			if test.wantExpired == valid {
-				t.Errorf("wanted expired %t, got %", test.wantExpired, !valid)
+				t.Errorf("wanted expired %t, got %t", test.wantExpired, !valid)
 			}
 		})
 	}

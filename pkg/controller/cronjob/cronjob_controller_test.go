@@ -23,13 +23,15 @@ import (
 	"testing"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	"k8s.io/kubernetes/pkg/controller"
+	// For the cronjob controller to do conversions.
+	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 )
 
 // schedule is hourly on the hour
@@ -292,7 +294,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		}
 		for i := range jc.Jobs {
 			job := &jc.Jobs[i]
-			controllerRef := controller.GetControllerOf(job)
+			controllerRef := metav1.GetControllerOf(job)
 			if controllerRef == nil {
 				t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
 			} else {

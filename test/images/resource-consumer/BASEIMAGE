@@ -1,0 +1,4 @@
+amd64=gcr.io/google-containers/debian-base-amd64:0.1
+arm=gcr.io/google-containers/debian-base-arm:0.1
+arm64=gcr.io/google-containers/debian-base-arm64:0.1
+ppc64le=gcr.io/google-containers/debian-base-ppc64le:0.1

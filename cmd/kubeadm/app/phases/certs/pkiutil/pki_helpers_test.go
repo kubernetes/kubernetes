@@ -87,6 +87,45 @@ func TestNewCertAndKey(t *testing.T) {
 	}
 }
 
+func TestHasServerAuth(t *testing.T) {
+	caCert, caKey, _ := NewCertificateAuthority()
+
+	var tests = []struct {
+		config   certutil.Config
+		expected bool
+	}{
+		{
+			config: certutil.Config{
+				CommonName: "test",
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			},
+			expected: true,
+		},
+		{
+			config: certutil.Config{
+				CommonName: "test",
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			},
+			expected: false,
+		},
+	}
+
+	for _, rt := range tests {
+		cert, _, err := NewCertAndKey(caCert, caKey, rt.config)
+		if err != nil {
+			t.Fatalf("Couldn't create cert: %v", err)
+		}
+		actual := HasServerAuth(cert)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed HasServerAuth:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+}
+
 func TestWriteCertAndKey(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "")
 	if err != nil {

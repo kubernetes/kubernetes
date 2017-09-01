@@ -15,12 +15,10 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - davidopp
 - pmorie
-- kargakis
 - saad-ali
 - zmerlynn
 - luxas
@@ -29,7 +27,7 @@ reviewers:
 - pwittrock
 - roberthbailey
 - ncdc
-- timstclair
+- tallclair
 - eparis
 - mwielgus
 - timothysc
@@ -39,3 +37,4 @@ reviewers:
 - dims
 - madhusudancs
 - hongchaodeng
+- enj

@@ -23,7 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/controller"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -110,7 +111,7 @@ func TestPodTemplateSpecHash(t *testing.T) {
 		specJson := strings.Replace(podSpec, "@@VERSION@@", strconv.Itoa(i), 1)
 		spec := v1.PodTemplateSpec{}
 		json.Unmarshal([]byte(specJson), &spec)
-		hash := GetPodTemplateSpecHash(&spec, nil)
+		hash := controller.ComputeHash(&spec, nil)
 		if v, ok := seenHashes[hash]; ok {
 			t.Errorf("Hash collision, old: %d new: %d", v, i)
 			break
@@ -139,6 +140,6 @@ func BenchmarkFnv(b *testing.B) {
 	json.Unmarshal([]byte(podSpec), &spec)
 
 	for i := 0; i < b.N; i++ {
-		GetPodTemplateSpecHash(&spec, nil)
+		controller.ComputeHash(&spec, nil)
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 )
@@ -25,7 +26,9 @@ func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	if re == nil {
 		return errors.New("runtime.RawExtension: UnmarshalJSON on nil pointer")
 	}
-	re.Raw = append(re.Raw[0:0], in...)
+	if !bytes.Equal(in, []byte("null")) {
+		re.Raw = append(re.Raw[0:0], in...)
+	}
 	return nil
 }
 

@@ -20,9 +20,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -40,8 +41,9 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 
 	fakeSecretManager := secret.NewFakeManager()
+	fakeConfigMapManager := configmap.NewFakeManager()
 	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager)
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
 	fakeRuntime := &containertest.FakeRuntime{}

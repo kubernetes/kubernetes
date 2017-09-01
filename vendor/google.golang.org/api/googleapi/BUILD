@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -13,7 +6,7 @@ go_library(
         "googleapi.go",
         "types.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = ["//vendor/google.golang.org/api/googleapi/internal/uritemplates:go_default_library"],
 )
 
@@ -31,4 +24,5 @@ filegroup(
         "//vendor/google.golang.org/api/googleapi/internal/uritemplates:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

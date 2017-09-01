@@ -21,23 +21,25 @@ import (
 	"io/ioutil"
 	"os"
 
-	appsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/apps/v1beta1"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
+	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -50,8 +52,8 @@ import (
 func createRecorder(kubecli *clientset.Clientset, s *options.SchedulerServer) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.Core().RESTClient()).Events("")})
-	return eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: s.SchedulerName})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubecli.CoreV1().RESTClient()).Events("")})
+	return eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: s.SchedulerName})
 }
 
 func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
@@ -75,7 +77,7 @@ func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
 // CreateScheduler encapsulates the entire creation of a runnable scheduler.
 func CreateScheduler(
 	s *options.SchedulerServer,
-	kubecli *clientset.Clientset,
+	kubecli clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
 	podInformer coreinformers.PodInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
@@ -98,6 +100,7 @@ func CreateScheduler(
 		statefulSetInformer,
 		serviceInformer,
 		s.HardPodAffinitySymmetricWeight,
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 	)
 
 	// Rebuild the configurator with a default Create(...) method.

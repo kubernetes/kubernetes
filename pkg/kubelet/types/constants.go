@@ -19,4 +19,9 @@ package types
 const (
 	// system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
+
+	// different container runtimes
+	DockerContainerRuntime = "docker"
+	RktContainerRuntime    = "rkt"
+	RemoteContainerRuntime = "remote"
 )

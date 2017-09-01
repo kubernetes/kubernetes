@@ -17,11 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
-	"bytes"
-	"crypto/md5"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,14 +25,14 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
-	dockerfilters "github.com/docker/engine-api/types/filters"
+	dockertypes "github.com/docker/docker/api/types"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 
@@ -54,6 +50,10 @@ const (
 
 var (
 	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+
+	// this is hacky, but extremely common.
+	// if a container starts but the executable file is not found, runc gives a message that matches
+	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
 
 	// Docker changes the security option separator from ':' to '=' in the 1.23
 	// API version.
@@ -129,7 +129,8 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
-func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
+func generateMountBindings(mounts []*runtimeapi.Mount) []string {
+	result := make([]string, 0, len(mounts))
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		readOnly := m.Readonly
@@ -149,11 +150,11 @@ func generateMountBindings(mounts []*runtimeapi.Mount) (result []string) {
 		}
 		result = append(result, bind)
 	}
-	return
+	return result
 }
 
-func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]struct{}, map[dockernat.Port][]dockernat.PortBinding) {
-	exposedPorts := map[dockernat.Port]struct{}{}
+func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[dockernat.Port][]dockernat.PortBinding) {
+	exposedPorts := dockernat.PortSet{}
 	portBindings := map[dockernat.Port][]dockernat.PortBinding{}
 	for _, port := range pm {
 		exteriorPort := port.HostPort
@@ -197,59 +198,6 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-func getSeccompDockerOpts(annotations map[string]string, ctrName, profileRoot string) ([]dockerOpt, error) {
-	profile, profileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+ctrName]
-	if !profileOK {
-		// try the pod profile
-		profile, profileOK = annotations[v1.SeccompPodAnnotationKey]
-		if !profileOK {
-			// return early the default
-			return defaultSeccompOpt, nil
-		}
-	}
-
-	if profile == "unconfined" {
-		// return early the default
-		return defaultSeccompOpt, nil
-	}
-
-	if profile == "docker/default" {
-		// return nil so docker will load the default seccomp profile
-		return nil, nil
-	}
-
-	if !strings.HasPrefix(profile, "localhost/") {
-		return nil, fmt.Errorf("unknown seccomp profile option: %s", profile)
-	}
-
-	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
-	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
-	file, err := ioutil.ReadFile(fname)
-	if err != nil {
-		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
-	}
-
-	b := bytes.NewBuffer(nil)
-	if err := json.Compact(b, file); err != nil {
-		return nil, err
-	}
-	// Rather than the full profile, just put the filename & md5sum in the event log.
-	msg := fmt.Sprintf("%s(md5:%x)", name, md5.Sum(file))
-
-	return []dockerOpt{{"seccomp", b.String(), msg}}, nil
-}
-
-// getSeccompSecurityOpts gets container seccomp options from container and sandbox
-// config, currently from sandbox annotations.
-// It is an experimental feature and may be promoted to official runtime api in the future.
-func getSeccompSecurityOpts(containerName string, sandboxConfig *runtimeapi.PodSandboxConfig, seccompProfileRoot string, separator rune) ([]string, error) {
-	seccompOpts, err := getSeccompDockerOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
-	if err != nil {
-		return nil, err
-	}
-	return fmtDockerOpts(seccompOpts, separator), nil
-}
-
 // getApparmorSecurityOpts gets apparmor options from container config.
 func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separator rune) ([]string, error) {
 	if sc == nil || sc.ApparmorProfile == "" {
@@ -265,14 +213,12 @@ func getApparmorSecurityOpts(sc *runtimeapi.LinuxContainerSecurityContext, separ
 	return fmtOpts, nil
 }
 
-func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
+func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	if c.State.Pid == 0 {
-		// Docker reports pid 0 for an exited container. We can't use it to
-		// check the network namespace, so return an empty string instead.
-		glog.V(4).Infof("Cannot find network namespace for the terminated container %q", c.ID)
-		return ""
+		// Docker reports pid 0 for an exited container.
+		return "", fmt.Errorf("Cannot find network namespace for the terminated container %q", c.ID)
 	}
-	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid)
+	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
 }
 
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
@@ -335,7 +281,7 @@ func getUserFromImageUser(imageUser string) (*int64, string) {
 // In that case we have to create the container with a randomized name.
 // TODO(random-liu): Remove this work around after docker 1.11 is deprecated.
 // TODO(#33189): Monitor the tests to see if the fix is sufficient.
-func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockertypes.ContainerCreateResponse, error) {
+func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfig dockertypes.ContainerCreateConfig, err error) (*dockercontainer.ContainerCreateCreatedBody, error) {
 	matches := conflictRE.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {
 		return nil, err
@@ -358,6 +304,19 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 	createConfig.Name = randomizeName(createConfig.Name)
 	glog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
 	return client.CreateContainer(createConfig)
+}
+
+// transformStartContainerError does regex parsing on returned error
+// for where container runtimes are giving less than ideal error messages.
+func transformStartContainerError(err error) error {
+	if err == nil {
+		return nil
+	}
+	matches := startRE.FindStringSubmatch(err.Error())
+	if len(matches) > 0 {
+		return fmt.Errorf("executable not found in $PATH")
+	}
+	return err
 }
 
 // getSecurityOptSeparator returns the security option separator based on the

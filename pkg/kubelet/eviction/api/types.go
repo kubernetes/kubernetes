@@ -38,6 +38,8 @@ const (
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
+	// SignalAllocatableNodeFsAvailable is amount of local storage available for pod allocation
+	SignalAllocatableNodeFsAvailable Signal = "allocatableNodeFs.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.

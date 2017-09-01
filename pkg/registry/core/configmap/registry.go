@@ -69,7 +69,7 @@ func (s *storage) GetConfigMap(ctx genericapirequest.Context, name string, optio
 }
 
 func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, err := s.Create(ctx, cfg)
+	obj, err := s.Create(ctx, cfg, false)
 	if err != nil {
 		return nil, err
 	}

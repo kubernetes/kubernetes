@@ -79,6 +79,33 @@ func (e discoveryFilteredExpander) Expand(category string) ([]schema.GroupResour
 	return available, ok
 }
 
+type UnionCategoryExpander []CategoryExpander
+
+func (u UnionCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
+	ret := []schema.GroupResource{}
+	ok := false
+
+	for _, expansion := range u {
+		curr, currOk := expansion.Expand(category)
+
+		for _, currGR := range curr {
+			found := false
+			for _, existing := range ret {
+				if existing == currGR {
+					found = true
+					break
+				}
+			}
+			if !found {
+				ret = append(ret, currGR)
+			}
+		}
+		ok = ok || currOk
+	}
+
+	return ret, ok
+}
+
 // legacyUserResources are the resource names that apply to the primary, user facing resources used by
 // client tools. They are in deletion-first order - dependent resources should be last.
 // Should remain exported in order to expose a current list of resources to downstream
@@ -90,6 +117,8 @@ var legacyUserResources = []schema.GroupResource{
 	{Group: "apps", Resource: "statefulsets"},
 	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
 	{Group: "batch", Resource: "jobs"},
+	{Group: "batch", Resource: "cronjobs"},
+	{Group: "extensions", Resource: "daemonsets"},
 	{Group: "extensions", Resource: "deployments"},
 	{Group: "extensions", Resource: "replicasets"},
 }

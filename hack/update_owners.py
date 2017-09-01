@@ -105,13 +105,13 @@ def get_maintainers():
            "eparis", "erictune", "fabioy", "fejta", "fgrzadkowski", "freehan",
            "gmarek", "grodrigues3", "ingvagabund", "ixdy", "janetkuo", "jbeda",
            "jessfraz", "jingxu97", "jlowdermilk", "jsafrane", "jszczepkowski",
-           "justinsb", "kargakis", "Kashomon", "kevin-wangzefeng", "krousey",
+           "justinsb", "Kashomon", "kevin-wangzefeng", "krousey",
            "lavalamp", "liggitt", "luxas", "madhusudancs", "maisem", "matchstick",
            "mbohlool", "mikedanese", "mml", "mtaufen", "mwielgus", "ncdc",
            "nikhiljindal", "piosz", "pmorie", "pwittrock", "Q-Lee", "quinton-hoole",
            "Random-Liu", "rmmh", "roberthbailey", "saad-ali", "smarterclayton",
            "soltysh", "spxtr", "sttts", "thelinuxfoundation", "thockin",
-           "timothysc", "timstclair", "vishh", "wojtek-t", "xiang90", "yifan-gu",
+           "timothysc", "tallclair", "vishh", "wojtek-t", "xiang90", "yifan-gu",
            "yujuhong", "zmerlynn"}
     return sorted(ret - SKIP_MAINTAINERS)
 

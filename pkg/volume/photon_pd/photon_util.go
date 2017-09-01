@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/volume"
@@ -102,7 +102,7 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 		switch strings.ToLower(parameter) {
 		case "flavor":
 			volumeOptions.Flavor = value
-		case "fstype":
+		case volume.VolumeParameterFSType:
 			fstype = value
 			glog.V(4).Infof("Photon Controller Util: Setting fstype to %s", fstype)
 		default:

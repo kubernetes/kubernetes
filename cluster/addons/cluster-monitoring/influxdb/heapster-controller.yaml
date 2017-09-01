@@ -11,32 +11,41 @@
   {% set nanny_memory = (90 * 1024 + num_nodes * nanny_memory_per_node)|string + "Ki" -%}
 {% endif -%}
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: heapster
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: heapster-v1.3.0
+  name: heapster-v1.4.1
   namespace: kube-system
   labels:
     k8s-app: heapster
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v1.3.0
+    version: v1.4.1
 spec:
   replicas: 1
   selector:
     matchLabels:
       k8s-app: heapster
-      version: v1.3.0
+      version: v1.4.1
   template:
     metadata:
       labels:
         k8s-app: heapster
-        version: v1.3.0
+        version: v1.4.1
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster-amd64:v1.3.0
+        - image: gcr.io/google_containers/heapster-amd64:v1.4.1
           name: heapster
           livenessProbe:
             httpGet:
@@ -49,13 +58,13 @@ spec:
             - /heapster
             - --source=kubernetes.summary_api:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-        - image: gcr.io/google_containers/heapster-amd64:v1.3.0
+        - image: gcr.io/google_containers/heapster-amd64:v1.4.1
           name: eventer
           command:
             - /eventer
             - --source=kubernetes:''
             - --sink=influxdb:http://monitoring-influxdb:8086
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: gcr.io/google_containers/addon-resizer:2.0
           name: heapster-nanny
           resources:
             limits:
@@ -79,12 +88,10 @@ spec:
             - --extra-cpu={{ metrics_cpu_per_node }}m
             - --memory={{ base_metrics_memory }}
             - --extra-memory={{ metrics_memory_per_node }}Mi
-            - --threshold=5
-            - --deployment=heapster-v1.3.0
+            - --deployment=heapster-v1.4.1
             - --container=heapster
             - --poll-period=300000
-            - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: gcr.io/google_containers/addon-resizer:2.0
           name: eventer-nanny
           resources:
             limits:
@@ -108,11 +115,10 @@ spec:
             - --extra-cpu=0m
             - --memory={{ base_eventer_memory }}
             - --extra-memory={{ eventer_memory_per_node }}Ki
-            - --threshold=5
-            - --deployment=heapster-v1.3.0
+            - --deployment=heapster-v1.4.1
             - --container=eventer
             - --poll-period=300000
-            - --estimator=exponential
+      serviceAccountName: heapster
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"

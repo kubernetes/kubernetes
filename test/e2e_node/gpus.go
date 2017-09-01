@@ -21,11 +21,10 @@ import (
 	"os/exec"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -85,7 +84,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 			}
 
 			By("enabling support for GPUs")
-			var oldCfg *componentconfig.KubeletConfiguration
+			var oldCfg *kubeletconfig.KubeletConfiguration
 			defer func() {
 				if oldCfg != nil {
 					framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
@@ -94,9 +93,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
-			clone, err := api.Scheme.DeepCopy(oldCfg)
-			framework.ExpectNoError(err)
-			newCfg := clone.(*componentconfig.KubeletConfiguration)
+			newCfg := oldCfg.DeepCopy()
 			if newCfg.FeatureGates != "" {
 				newCfg.FeatureGates = fmt.Sprintf("%s,%s", acceleratorsFeatureGate, newCfg.FeatureGates)
 			} else {
@@ -161,7 +158,7 @@ func makePod(gpus int64, name string) *v1.Pod {
 			v1.ResourceNvidiaGPU: *resource.NewQuantity(gpus, resource.DecimalSI),
 		},
 	}
-	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$') ]]; then exit 1; fi; echo Success", gpus)
+	gpuverificationCmd := fmt.Sprintf("if [[ %d -ne $(ls /dev/ | egrep '^nvidia[0-9]+$' | wc -l) ]]; then exit 1; else echo Success; fi", gpus)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

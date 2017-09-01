@@ -26,7 +26,7 @@ const (
 	NodeControllerSubsystem = "node_collector"
 	ZoneHealthStatisticKey  = "zone_health"
 	ZoneSizeKey             = "zone_size"
-	ZoneNoUnhealthyNodesKey = "unhealty_nodes_in_zone"
+	ZoneNoUnhealthyNodesKey = "unhealthy_nodes_in_zone"
 	EvictionsNumberKey      = "evictions_number"
 )
 
@@ -35,7 +35,7 @@ var (
 		prometheus.GaugeOpts{
 			Subsystem: NodeControllerSubsystem,
 			Name:      ZoneHealthStatisticKey,
-			Help:      "Gauge measuring percentage of healty nodes per zone.",
+			Help:      "Gauge measuring percentage of healthy nodes per zone.",
 		},
 		[]string{"zone"},
 	)

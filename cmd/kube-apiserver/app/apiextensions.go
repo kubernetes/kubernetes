@@ -20,11 +20,11 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	apiextensionscmd "k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	apiextensionsapiserver "k8s.io/kube-apiextensions-server/pkg/apiserver"
-	apiextensionscmd "k8s.io/kube-apiextensions-server/pkg/cmd/server"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
@@ -33,21 +33,9 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, comm
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
 
-	// the apiextensions doesn't wire these up.  It just delegates them to the kubeapiserver
-	genericConfig.EnableSwaggerUI = false
-
-	// TODO these need to be sorted out.  There's an issue open
-	genericConfig.OpenAPIConfig = nil
-	genericConfig.SwaggerConfig = nil
-
-	// copy the loopbackclientconfig.  We're going to change the contenttype back to json until we get protobuf serializations for it
-	t := *kubeAPIServerConfig.LoopbackClientConfig
-	genericConfig.LoopbackClientConfig = &t
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = ""
-
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(schema.GroupVersion{Group: "apiextensions.k8s.io", Version: "v1alpha1"})
+	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.Copier = apiextensionsapiserver.Scheme
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 

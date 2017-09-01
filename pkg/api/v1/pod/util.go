@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -174,6 +174,10 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
 				return false
 			}
+		case source.StorageOS != nil:
+			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
@@ -190,6 +194,60 @@ func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 	for _, envVar := range container.Env {
 		if envVar.ValueFrom != nil && envVar.ValueFrom.SecretKeyRef != nil {
 			if !visitor(envVar.ValueFrom.SecretKeyRef.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// VisitPodConfigmapNames invokes the visitor function with the name of every configmap
+// referenced by the pod spec. If visitor returns false, visiting is short-circuited.
+// Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
+// Returns true if visiting completed, false if visiting was short-circuited.
+func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
+	for i := range pod.Spec.InitContainers {
+		if !visitContainerConfigmapNames(&pod.Spec.InitContainers[i], visitor) {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if !visitContainerConfigmapNames(&pod.Spec.Containers[i], visitor) {
+			return false
+		}
+	}
+	var source *v1.VolumeSource
+	for i := range pod.Spec.Volumes {
+		source = &pod.Spec.Volumes[i].VolumeSource
+		switch {
+		case source.Projected != nil:
+			for j := range source.Projected.Sources {
+				if source.Projected.Sources[j].ConfigMap != nil {
+					if !visitor(source.Projected.Sources[j].ConfigMap.Name) {
+						return false
+					}
+				}
+			}
+		case source.ConfigMap != nil:
+			if !visitor(source.ConfigMap.Name) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool {
+	for _, env := range container.EnvFrom {
+		if env.ConfigMapRef != nil {
+			if !visitor(env.ConfigMapRef.Name) {
+				return false
+			}
+		}
+	}
+	for _, envVar := range container.Env {
+		if envVar.ValueFrom != nil && envVar.ValueFrom.ConfigMapKeyRef != nil {
+			if !visitor(envVar.ValueFrom.ConfigMapKeyRef.Name) {
 				return false
 			}
 		}
@@ -290,8 +348,8 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 		isEqual := condition.Status == oldCondition.Status &&
 			condition.Reason == oldCondition.Reason &&
 			condition.Message == oldCondition.Message &&
-			condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
-			condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+			condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+			condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 
 		status.Conditions[conditionIndex] = *condition
 		// Return true if one of the fields have changed.

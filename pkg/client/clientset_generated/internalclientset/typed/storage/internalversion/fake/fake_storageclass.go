@@ -35,37 +35,7 @@ var storageclassesResource = schema.GroupVersionResource{Group: "storage.k8s.io"
 
 var storageclassesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "", Kind: "StorageClass"}
 
-func (c *FakeStorageClasses) Create(storageClass *storage.StorageClass) (result *storage.StorageClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &storage.StorageClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*storage.StorageClass), err
-}
-
-func (c *FakeStorageClasses) Update(storageClass *storage.StorageClass) (result *storage.StorageClass, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), &storage.StorageClass{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*storage.StorageClass), err
-}
-
-func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(storageclassesResource, name), &storage.StorageClass{})
-	return err
-}
-
-func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &storage.StorageClassList{})
-	return err
-}
-
+// Get takes name of the storageClass, and returns the corresponding storageClass object, and an error if there is any.
 func (c *FakeStorageClasses) Get(name string, options v1.GetOptions) (result *storage.StorageClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(storageclassesResource, name), &storage.StorageClass{})
@@ -75,6 +45,7 @@ func (c *FakeStorageClasses) Get(name string, options v1.GetOptions) (result *st
 	return obj.(*storage.StorageClass), err
 }
 
+// List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
 func (c *FakeStorageClasses) List(opts v1.ListOptions) (result *storage.StorageClassList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(storageclassesResource, storageclassesKind, opts), &storage.StorageClassList{})
@@ -99,6 +70,41 @@ func (c *FakeStorageClasses) List(opts v1.ListOptions) (result *storage.StorageC
 func (c *FakeStorageClasses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(storageclassesResource, opts))
+}
+
+// Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
+func (c *FakeStorageClasses) Create(storageClass *storage.StorageClass) (result *storage.StorageClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), &storage.StorageClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*storage.StorageClass), err
+}
+
+// Update takes the representation of a storageClass and updates it. Returns the server's representation of the storageClass, and an error, if there is any.
+func (c *FakeStorageClasses) Update(storageClass *storage.StorageClass) (result *storage.StorageClass, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), &storage.StorageClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*storage.StorageClass), err
+}
+
+// Delete takes name of the storageClass and deletes it. Returns an error if one occurs.
+func (c *FakeStorageClasses) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(storageclassesResource, name), &storage.StorageClass{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeStorageClasses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &storage.StorageClassList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched storageClass.

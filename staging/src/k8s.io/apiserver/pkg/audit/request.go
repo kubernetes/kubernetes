@@ -28,7 +28,7 @@ import (
 
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,7 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authenticationv1 "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
@@ -51,9 +50,9 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
-	ids := req.Header[auditinternal.HeaderAuditID]
-	if len(ids) > 0 {
-		ev.AuditID = types.UID(ids[0])
+	ids := req.Header.Get(auditinternal.HeaderAuditID)
+	if ids != "" {
+		ev.AuditID = types.UID(ids)
 	} else {
 		ev.AuditID = types.UID(uuid.NewRandom().String())
 	}
@@ -94,10 +93,11 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	if attribs.IsResourceRequest() {
 		ev.ObjectRef = &auditinternal.ObjectReference{
-			Namespace:  attribs.GetNamespace(),
-			Name:       attribs.GetName(),
-			Resource:   attribs.GetResource(),
-			APIVersion: attribs.GetAPIGroup() + "/" + attribs.GetAPIVersion(),
+			Namespace:   attribs.GetNamespace(),
+			Name:        attribs.GetName(),
+			Resource:    attribs.GetResource(),
+			Subresource: attribs.GetSubresource(),
+			APIVersion:  attribs.GetAPIGroup() + "/" + attribs.GetAPIVersion(),
 		}
 	}
 
@@ -106,17 +106,8 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogRequestObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
-	if ae == nil || ae.Level.Less(audit.LevelRequest) {
-		return
-	}
-
-	// TODO(audit): hook into the serializer to avoid double conversion
-	var err error
-	ae.RequestObject, err = encodeObject(obj, gv, s)
-	if err != nil {
-		// TODO(audit): add error slice to audit event struct
-		glog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+func LogRequestObject(ae *audit.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
 		return
 	}
 
@@ -124,7 +115,7 @@ func LogRequestObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersio
 	if ae.ObjectRef == nil {
 		ae.ObjectRef = &audit.ObjectReference{}
 	}
-	if acc, ok := obj.(v1.ObjectMetaAccessor); ok {
+	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
 		meta := acc.GetObjectMeta()
 		if len(ae.ObjectRef.Namespace) == 0 {
 			ae.ObjectRef.Namespace = meta.GetNamespace()
@@ -138,6 +129,29 @@ func LogRequestObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersio
 		if len(ae.ObjectRef.ResourceVersion) == 0 {
 			ae.ObjectRef.ResourceVersion = meta.GetResourceVersion()
 		}
+	}
+	// TODO: ObjectRef should include the API group.
+	if len(ae.ObjectRef.APIVersion) == 0 {
+		ae.ObjectRef.APIVersion = gvr.Version
+	}
+	if len(ae.ObjectRef.Resource) == 0 {
+		ae.ObjectRef.Resource = gvr.Resource
+	}
+	if len(ae.ObjectRef.Subresource) == 0 {
+		ae.ObjectRef.Subresource = subresource
+	}
+
+	if ae.Level.Less(audit.LevelRequest) {
+		return
+	}
+
+	// TODO(audit): hook into the serializer to avoid double conversion
+	var err error
+	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
+	if err != nil {
+		// TODO(audit): add error slice to audit event struct
+		glog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		return
 	}
 }
 
@@ -156,14 +170,16 @@ func LogRequestPatch(ae *audit.Event, patch []byte) {
 // LogResponseObject fills in the response object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
 func LogResponseObject(ae *audit.Event, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
-	if ae == nil || ae.Level.Less(audit.LevelRequestResponse) {
+	if ae == nil || ae.Level.Less(audit.LevelMetadata) {
 		return
 	}
-
 	if status, ok := obj.(*metav1.Status); ok {
 		ae.ResponseStatus = status
 	}
 
+	if ae.Level.Less(audit.LevelRequestResponse) {
+		return
+	}
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)

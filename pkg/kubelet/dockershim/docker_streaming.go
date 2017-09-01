@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -121,7 +121,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	if err != nil {
 		return nil, err
 	}
-	// TODO(timstclair): Verify that ports are exposed.
+	// TODO(tallclair): Verify that ports are exposed.
 	return ds.streamingServer.GetPortForward(req)
 }
 
@@ -140,7 +140,7 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-		client.ResizeContainerTTY(containerID, int(size.Height), int(size.Width))
+		client.ResizeContainerTTY(containerID, uint(size.Height), uint(size.Width))
 	})
 
 	// TODO(random-liu): Do we really use the *Logs* field here?
@@ -159,8 +159,8 @@ func attachContainer(client libdocker.Interface, containerID string, stdin io.Re
 	return client.AttachToContainer(containerID, opts, sopts)
 }
 
-func portForward(client libdocker.Interface, podInfraContainerID string, port int32, stream io.ReadWriteCloser) error {
-	container, err := client.InspectContainer(podInfraContainerID)
+func portForward(client libdocker.Interface, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+	container, err := client.InspectContainer(podSandboxID)
 	if err != nil {
 		return err
 	}

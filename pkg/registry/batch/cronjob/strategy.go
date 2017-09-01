@@ -17,16 +17,10 @@ limitations under the License.
 package cronjob
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -104,29 +98,4 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
-}
-
-// CronJobToSelectableFields returns a field set that represents the object for matching purposes.
-func CronJobToSelectableFields(cronJob *batch.CronJob) fields.Set {
-	return generic.ObjectMetaFieldsSet(&cronJob.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	cronJob, ok := obj.(*batch.CronJob)
-	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not a scheduled job.")
-	}
-	return labels.Set(cronJob.ObjectMeta.Labels), CronJobToSelectableFields(cronJob), nil
-}
-
-// MatchCronJob is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchCronJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }

@@ -24,13 +24,19 @@ import (
 )
 
 func extractResourceName(a Attributes) (name string, resource schema.GroupResource, err error) {
-	name = "Unknown"
 	resource = a.GetResource().GroupResource()
+
+	if len(a.GetName()) > 0 {
+		return a.GetName(), resource, nil
+	}
+
+	name = "Unknown"
 	obj := a.GetObject()
 	if obj != nil {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			return "", schema.GroupResource{}, err
+			// not all object have ObjectMeta.  If we don't, return a name with a slash (always illegal)
+			return "Unknown/errorGettingName", resource, nil
 		}
 
 		// this is necessary because name object name generation has not occurred yet

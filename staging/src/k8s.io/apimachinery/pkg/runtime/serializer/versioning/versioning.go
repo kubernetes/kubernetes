@@ -213,7 +213,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if e, ok := out.(runtime.NestedObjectEncoder); ok {
-		if err := e.EncodeNestedObjects(DirectEncoder{Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
+		if err := e.EncodeNestedObjects(DirectEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
 			return err
 		}
 	}

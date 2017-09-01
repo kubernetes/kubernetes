@@ -36,7 +36,6 @@ import (
 )
 
 const allAvailableInterfaces string = ""
-const stickyMaxAgeMinutes int = 180 // TODO: parameterize this in the API.
 
 type portal struct {
 	ip         string
@@ -122,22 +121,14 @@ var (
 	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 )
 
-// IsProxyLocked returns true if the proxy could not acquire the lock on iptables.
-func IsProxyLocked(err error) bool {
-	return strings.Contains(err.Error(), "holding the xtables lock")
-}
-
 // Used below.
 var localhostIPv4 = net.ParseIP("127.0.0.1")
 var localhostIPv6 = net.ParseIP("::1")
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
-// which to listen.  Because of the iptables logic, It is assumed that there
-// is only a single Proxier active on a machine. An error will be returned if
-// the proxier cannot be started due to an invalid ListenIP (loopback) or
-// if iptables fails to update or acquire the initial lock. Once a proxier is
-// created, it will keep iptables up to date in the background and will not
-// terminate if a particular iptables call fails.
+// which to listen. It is assumed that there is only a single Proxier active
+// on a machine. An error will be returned if the proxier cannot be started
+// due to an invalid ListenIP (loopback)
 func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, pr utilnet.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
@@ -148,7 +139,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interfac
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
 
-	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
+	glog.V(2).Infof("Setting proxy IP to %v", hostIP)
 	return createProxier(loadBalancer, listenIP, netsh, hostIP, syncPeriod, udpIdleTimeout)
 }
 
@@ -368,7 +359,11 @@ func (proxier *Proxier) mergeService(service *api.Service) map[ServicePortPortal
 				},
 				Port: servicePort.Name,
 			}
-			proxier.loadBalancer.NewService(servicePortName, service.Spec.SessionAffinity, stickyMaxAgeMinutes)
+			timeoutSeconds := 0
+			if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+				timeoutSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+			}
+			proxier.loadBalancer.NewService(servicePortName, service.Spec.SessionAffinity, timeoutSeconds)
 		}
 	}
 

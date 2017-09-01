@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	certificatesclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
 
 type certificateData struct {
@@ -164,19 +164,68 @@ func TestShouldRotate(t *testing.T) {
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
-						NotAfter:  test.notAfter,
 						NotBefore: test.notBefore,
+						NotAfter:  test.notAfter,
 					},
 				},
 				template: &x509.CertificateRequest{},
 				usages:   []certificates.KeyUsage{},
 			}
+			m.setRotationDeadline()
 			if m.shouldRotate() != test.shouldRotate {
-				t.Errorf("For time %v, a certificate issued for (%v, %v) should rotate should be %t.",
+				t.Errorf("Time %v, a certificate issued for (%v, %v) should rotate should be %t.",
 					now,
 					m.cert.Leaf.NotBefore,
 					m.cert.Leaf.NotAfter,
 					test.shouldRotate)
+			}
+		})
+	}
+}
+
+func TestSetRotationDeadline(t *testing.T) {
+	now := time.Now()
+	testCases := []struct {
+		name         string
+		notBefore    time.Time
+		notAfter     time.Time
+		shouldRotate bool
+	}{
+		{"just issued, still good", now.Add(-1 * time.Hour), now.Add(99 * time.Hour), false},
+		{"half way expired, still good", now.Add(-24 * time.Hour), now.Add(24 * time.Hour), false},
+		{"mostly expired, still good", now.Add(-69 * time.Hour), now.Add(31 * time.Hour), false},
+		{"just about expired, should rotate", now.Add(-91 * time.Hour), now.Add(9 * time.Hour), true},
+		{"nearly expired, should rotate", now.Add(-99 * time.Hour), now.Add(1 * time.Hour), true},
+		{"already expired, should rotate", now.Add(-10 * time.Hour), now.Add(-1 * time.Hour), true},
+		{"long duration", now.Add(-6 * 30 * 24 * time.Hour), now.Add(6 * 30 * 24 * time.Hour), true},
+		{"short duration", now.Add(-30 * time.Second), now.Add(30 * time.Second), true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := manager{
+				cert: &tls.Certificate{
+					Leaf: &x509.Certificate{
+						NotBefore: tc.notBefore,
+						NotAfter:  tc.notAfter,
+					},
+				},
+				template: &x509.CertificateRequest{},
+				usages:   []certificates.KeyUsage{},
+			}
+			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
+			upperBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.9))
+			for i := 0; i < 1000; i++ {
+				// setRotationDeadline includes jitter, so this needs to run many times for validation.
+				m.setRotationDeadline()
+				if m.rotationDeadline.Before(lowerBound) || m.rotationDeadline.After(upperBound) {
+					t.Errorf("For notBefore %v, notAfter %v, the rotationDeadline %v should be between %v and %v.",
+						tc.notBefore,
+						tc.notAfter,
+						m.rotationDeadline,
+						lowerBound,
+						upperBound)
+				}
 			}
 		})
 	}
@@ -198,8 +247,10 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 		},
 	}
 
-	if err := m.rotateCerts(); err == nil {
-		t.Errorf("Expected an error from 'rotateCerts'.")
+	if success, err := m.rotateCerts(); success {
+		t.Errorf("Got success from 'rotateCerts', wanted failure")
+	} else if err != nil {
+		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
 	}
 }
 
@@ -219,8 +270,10 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		},
 	}
 
-	if err := m.rotateCerts(); err == nil {
-		t.Errorf("Expected an error receiving results from the CSR request but nothing was received.")
+	if success, err := m.rotateCerts(); success {
+		t.Errorf("Got success from 'rotateCerts', wanted failure.")
+	} else if err != nil {
+		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
 	}
 }
 
@@ -244,7 +297,6 @@ func TestNewManagerBootstrap(t *testing.T) {
 	if cert == nil {
 		t.Errorf("Certificate was nil, expected something.")
 	}
-
 	if m, ok := cm.(*manager); !ok {
 		t.Errorf("Expected a '*manager' from 'NewManager'")
 	} else if !m.shouldRotate() {
@@ -283,11 +335,13 @@ func TestNewManagerNoBootstrap(t *testing.T) {
 	if currentCert == nil {
 		t.Errorf("Certificate was nil, expected something.")
 	}
-
 	if m, ok := cm.(*manager); !ok {
 		t.Errorf("Expected a '*manager' from 'NewManager'")
-	} else if m.shouldRotate() {
-		t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
+	} else {
+		m.setRotationDeadline()
+		if m.shouldRotate() {
+			t.Errorf("Expected rotation should happen during bootstrap, but it won't.")
+		}
 	}
 }
 
@@ -331,8 +385,8 @@ func TestGetCurrentCertificateOrBootstrap(t *testing.T) {
 				store,
 				tc.bootstrapCertData,
 				tc.bootstrapKeyData)
-			if certResult == nil || tc.expectedCert == nil {
-				if certResult != tc.expectedCert {
+			if certResult == nil || certResult.Certificate == nil || tc.expectedCert == nil {
+				if certResult != nil && tc.expectedCert != nil {
 					t.Errorf("Got certificate %v, wanted %v", certResult, tc.expectedCert)
 				}
 			} else {
@@ -436,8 +490,17 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 				t.Errorf("Got error %v, expected none.", err)
 			}
 
-			if err := certificateManager.(*manager).rotateCerts(); err != nil {
-				t.Errorf("Got error %v, expected none.", err)
+			if m, ok := certificateManager.(*manager); !ok {
+				t.Errorf("Expected a '*manager' from 'NewManager'")
+			} else {
+				m.setRotationDeadline()
+				if m.shouldRotate() {
+					if success, err := m.rotateCerts(); !success {
+						t.Errorf("Got failure from 'rotateCerts', wanted success.")
+					} else if err != nil {
+						t.Errorf("Got error %v, expected none.", err)
+					}
+				}
 			}
 
 			certificate = certificateManager.Current()
@@ -526,8 +589,17 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 				t.Errorf("Got %v, wanted %v", certificateString(certificate), certificateString(tc.expectedCertBeforeStart.certificate))
 			}
 
-			if err := certificateManager.(*manager).rotateCerts(); err != nil {
-				t.Errorf("Got error %v, expected none.", err)
+			if m, ok := certificateManager.(*manager); !ok {
+				t.Errorf("Expected a '*manager' from 'NewManager'")
+			} else {
+				m.setRotationDeadline()
+				if m.shouldRotate() {
+					if success, err := certificateManager.(*manager).rotateCerts(); !success {
+						t.Errorf("Got failure from 'rotateCerts', expected success")
+					} else if err != nil {
+						t.Errorf("Got error %v, expected none.", err)
+					}
+				}
 			}
 
 			certificate = certificateManager.Current()

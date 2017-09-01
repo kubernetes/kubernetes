@@ -20,14 +20,18 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api"
+	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -58,9 +62,9 @@ const (
 )
 
 const (
-	KindRC         = "replicationController"
-	KindDeployment = "deployment"
-	KindReplicaSet = "replicaset"
+	KindRC         = "ReplicationController"
+	KindDeployment = "Deployment"
+	KindReplicaSet = "ReplicaSet"
 	subresource    = "scale"
 )
 
@@ -83,6 +87,7 @@ type ResourceConsumer struct {
 	stopCPU                  chan int
 	stopMem                  chan int
 	stopCustomMetric         chan int
+	stopWaitGroup            sync.WaitGroup
 	consumptionTimeInSeconds int
 	sleepTime                time.Duration
 	requestSizeInMillicores  int
@@ -164,6 +169,8 @@ func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	millicores := 0
 	for {
@@ -183,6 +190,8 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	megabytes := 0
 	for {
@@ -202,6 +211,8 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 
 func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	defer GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
 	delta := 0
 	for {
@@ -310,49 +321,54 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
-		return int(replicationController.Status.Replicas)
+		return int(replicationController.Status.ReadyReplicas)
 	case KindDeployment:
 		deployment, err := rc.framework.ClientSet.Extensions().Deployments(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
-		return int(deployment.Status.Replicas)
+		return int(deployment.Status.ReadyReplicas)
 	case KindReplicaSet:
 		rs, err := rc.framework.ClientSet.Extensions().ReplicaSets(rc.framework.Namespace.Name).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
 			framework.Failf(rsIsNil)
 		}
-		return int(rs.Status.Replicas)
+		return int(rs.Status.ReadyReplicas)
 	default:
 		framework.Failf(invalidKind)
 	}
 	return 0
 }
 
-func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int) {
-	timeout := 15 * time.Minute
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		if desiredReplicas == rc.GetReplicas() {
-			framework.Logf("%s: current replicas number is equal to desired replicas number: %d", rc.kind, desiredReplicas)
-			return
-		} else {
-			framework.Logf("%s: current replicas number %d waiting to be %d", rc.kind, rc.GetReplicas(), desiredReplicas)
-		}
-	}
-	framework.Failf("timeout waiting %v for pods size to be %d", timeout, desiredReplicas)
+func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.Duration) {
+	interval := 20 * time.Second
+	err := wait.PollImmediate(interval, duration, func() (bool, error) {
+		replicas := rc.GetReplicas()
+		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
+	})
+	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
-func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, timeout time.Duration) {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		actual := rc.GetReplicas()
-		if desiredReplicas != actual {
-			framework.Failf("Number of replicas has changed: expected %v, got %v", desiredReplicas, actual)
+func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration) {
+	interval := 10 * time.Second
+	err := wait.PollImmediate(interval, duration, func() (bool, error) {
+		replicas := rc.GetReplicas()
+		framework.Logf("expecting there to be %d replicas (are: %d)", desiredReplicas, replicas)
+		if replicas != desiredReplicas {
+			return false, fmt.Errorf("number of replicas changed unexpectedly")
+		} else {
+			return false, nil // Expected number of replicas found. Continue polling until timeout.
 		}
-		framework.Logf("Number of replicas is as expected")
+	})
+	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
+	if err == wait.ErrWaitTimeout {
+		framework.Logf("Number of replicas was stable over %v", duration)
+		return
 	}
-	framework.Logf("Number of replicas was stable over %v", timeout)
+	framework.ExpectNoErrorWithOffset(1, err)
 }
 
 // Pause stops background goroutines responsible for consuming resources.
@@ -361,6 +377,7 @@ func (rc *ResourceConsumer) Pause() {
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
 	rc.stopCustomMetric <- 0
+	rc.stopWaitGroup.Wait()
 }
 
 // Pause starts background goroutines responsible for consuming resources.
@@ -376,12 +393,28 @@ func (rc *ResourceConsumer) CleanUp() {
 	close(rc.stopCPU)
 	close(rc.stopMem)
 	close(rc.stopCustomMetric)
+	rc.stopWaitGroup.Wait()
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, rc.framework.Namespace.Name, rc.name))
+	kind, err := kindOf(rc.kind)
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, kind, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.name, nil))
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, api.Kind("ReplicationController"), rc.framework.Namespace.Name, rc.controllerName))
 	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.controllerName, nil))
+}
+
+func kindOf(kind string) (schema.GroupKind, error) {
+	switch kind {
+	case KindRC:
+		return api.Kind(kind), nil
+	case KindReplicaSet:
+		return extensionsinternal.Kind(kind), nil
+	case KindDeployment:
+		return extensionsinternal.Kind(kind), nil
+	default:
+		return schema.GroupKind{}, fmt.Errorf("Unsupported kind: %v", kind)
+	}
 }
 
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
@@ -475,7 +508,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) {
+func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
 	hpa := &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
@@ -491,6 +524,11 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	_, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
+	hpa, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)
 	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
+	rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Delete(autoscalerName, nil)
 }

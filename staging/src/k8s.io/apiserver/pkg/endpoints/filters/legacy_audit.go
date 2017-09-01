@@ -29,10 +29,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
+	authenticationapi "k8s.io/api/authentication/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 var _ http.ResponseWriter = &legacyAuditResponseWriter{}
@@ -43,12 +43,15 @@ type legacyAuditResponseWriter struct {
 	id  string
 }
 
-func (a *legacyAuditResponseWriter) WriteHeader(code int) {
+func (a *legacyAuditResponseWriter) printResponse(code int) {
 	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
 	if _, err := fmt.Fprint(a.out, line); err != nil {
 		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
 	}
+}
 
+func (a *legacyAuditResponseWriter) WriteHeader(code int) {
+	a.printResponse(code)
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -68,6 +71,8 @@ func (f *fancyLegacyResponseWriterDelegator) Flush() {
 }
 
 func (f *fancyLegacyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// fake a response status before protocol switch happens
+	f.printResponse(http.StatusSwitchingProtocols)
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
@@ -75,7 +80,7 @@ var _ http.CloseNotifier = &fancyLegacyResponseWriterDelegator{}
 var _ http.Flusher = &fancyLegacyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyLegacyResponseWriterDelegator{}
 
-// WithAudit decorates a http.Handler with audit logging information for all the
+// WithLegacyAudit decorates a http.Handler with audit logging information for all the
 // requests coming to the server. If out is nil, no decoration takes place.
 // Each audit log contains two entries:
 // 1. the request line containing:

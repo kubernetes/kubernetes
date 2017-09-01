@@ -21,15 +21,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 	unsafe "unsafe"
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.
@@ -110,11 +110,7 @@ func Convert_v1alpha1_NodeMetricsList_To_metrics_NodeMetricsList(in *NodeMetrics
 
 func autoConvert_metrics_NodeMetricsList_To_v1alpha1_NodeMetricsList(in *metrics.NodeMetricsList, out *NodeMetricsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]NodeMetrics, 0)
-	} else {
-		out.Items = *(*[]NodeMetrics)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]NodeMetrics)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -140,11 +136,7 @@ func autoConvert_metrics_PodMetrics_To_v1alpha1_PodMetrics(in *metrics.PodMetric
 	out.ObjectMeta = in.ObjectMeta
 	out.Timestamp = in.Timestamp
 	out.Window = in.Window
-	if in.Containers == nil {
-		out.Containers = make([]ContainerMetrics, 0)
-	} else {
-		out.Containers = *(*[]ContainerMetrics)(unsafe.Pointer(&in.Containers))
-	}
+	out.Containers = *(*[]ContainerMetrics)(unsafe.Pointer(&in.Containers))
 	return nil
 }
 
@@ -166,11 +158,7 @@ func Convert_v1alpha1_PodMetricsList_To_metrics_PodMetricsList(in *PodMetricsLis
 
 func autoConvert_metrics_PodMetricsList_To_v1alpha1_PodMetricsList(in *metrics.PodMetricsList, out *PodMetricsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]PodMetrics, 0)
-	} else {
-		out.Items = *(*[]PodMetrics)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]PodMetrics)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

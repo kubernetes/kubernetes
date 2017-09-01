@@ -45,7 +45,7 @@ func TestDefaultNodeIdentifier_NodeIdentity(t *testing.T) {
 			name:           "node group without username",
 			user:           &user.DefaultInfo{Name: "foo", Groups: []string{"system:nodes"}},
 			expectNodeName: "",
-			expectIsNode:   true,
+			expectIsNode:   false,
 		},
 		{
 			name:           "node group and username",

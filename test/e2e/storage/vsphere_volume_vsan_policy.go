@@ -25,10 +25,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -83,7 +83,7 @@ const (
    8. Delete PVC, PV and Storage Class
 */
 
-var _ = framework.KubeDescribe("vSphere Storage policy support for dynamic provisioning [Volume]", func() {
+var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
 	var (
 		client       clientset.Interface
@@ -218,7 +218,7 @@ var _ = framework.KubeDescribe("vSphere Storage policy support for dynamic provi
 		framework.Logf("Invoking Test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
-		errorMsg := "User specified datastore: \\\"" + VsanDatastore + "\\\" is not compatible with the storagePolicy: \\\"" + os.Getenv("VSPHERE_SPBM_TAG_POLICY") + "\\\""
+		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + os.Getenv("VSPHERE_SPBM_TAG_POLICY") + "\\\""
 		if !strings.Contains(err.Error(), errorMsg) {
 			Expect(err).NotTo(HaveOccurred(), errorMsg)
 		}
@@ -248,7 +248,7 @@ var _ = framework.KubeDescribe("vSphere Storage policy support for dynamic provi
 		framework.Logf("Invoking Test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		Expect(err).To(HaveOccurred())
-		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one."
+		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
 		if !strings.Contains(err.Error(), errorMsg) {
 			Expect(err).NotTo(HaveOccurred(), errorMsg)
 		}

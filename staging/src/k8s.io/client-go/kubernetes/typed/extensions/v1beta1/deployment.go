@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -59,6 +59,41 @@ func newDeployments(c *ExtensionsV1beta1Client, namespace string) *deployments {
 	}
 }
 
+// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
+func (c *deployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
+	result = &v1beta1.Deployment{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Deployments that match those selectors.
+func (c *deployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
+	result = &v1beta1.DeploymentList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested deployments.
+func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *deployments) Create(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
@@ -85,7 +120,7 @@ func (c *deployments) Update(deployment *v1beta1.Deployment) (result *v1beta1.De
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *deployments) UpdateStatus(deployment *v1beta1.Deployment) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
@@ -120,41 +155,6 @@ func (c *deployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
-func (c *deployments) Get(name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
-	result = &v1beta1.Deployment{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Deployments that match those selectors.
-func (c *deployments) List(opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
-	result = &v1beta1.DeploymentList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested deployments.
-func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("deployments").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched deployment.

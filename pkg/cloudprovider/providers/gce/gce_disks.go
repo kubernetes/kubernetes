@@ -20,17 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
 	"strings"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
-	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
 
@@ -41,7 +38,8 @@ const (
 	DiskTypeStandard = "pd-standard"
 
 	diskTypeDefault     = DiskTypeStandard
-	diskTypeUriTemplate = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/diskTypes/%s"
+	diskTypeUriTemplate = "%s/zones/%s/diskTypes/%s"
+	diskTypePersistent  = "PERSISTENT"
 )
 
 // Disks is interface for manipulation with GCE PDs.
@@ -86,10 +84,7 @@ type GCEDisk struct {
 }
 
 func newDiskMetricContext(request, zone string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"disk_" + request, unusedMetricLabel, zone},
-	}
+	return newGenericMetricContext("disk", request, unusedMetricLabel, zone, computeV1Version)
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {
@@ -106,17 +101,18 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 	if readOnly {
 		readWrite = "READ_ONLY"
 	}
-	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
 
 	mc := newDiskMetricContext("attach", instance.Zone)
-	attachOp, err := gce.service.Instances.AttachDisk(
-		gce.projectID, disk.Zone, instance.Name, attachedDisk).Do()
+	source := gce.service.BasePath + strings.Join([]string{
+		gce.projectID, "zones", disk.Zone, "disks", disk.Name}, "/")
+	attachOp, err := gce.manager.AttachDisk(
+		disk.Name, disk.Kind, disk.Zone, readWrite, source, diskTypePersistent, instance.Name)
 
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(attachOp, disk.Zone, mc)
+	return gce.manager.WaitForZoneOp(attachOp, disk.Zone, mc)
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
@@ -136,12 +132,12 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 	}
 
 	mc := newDiskMetricContext("detach", inst.Zone)
-	detachOp, err := gce.service.Instances.DetachDisk(gce.projectID, inst.Zone, inst.Name, devicePath).Do()
+	detachOp, err := gce.manager.DetachDisk(inst.Zone, inst.Name, devicePath)
 	if err != nil {
 		return mc.Observe(err)
 	}
 
-	return gce.waitForZoneOp(detachOp, inst.Zone, mc)
+	return gce.manager.WaitForZoneOp(detachOp, inst.Zone, mc)
 }
 
 func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
@@ -234,17 +230,18 @@ func (gce *GCECloud) CreateDisk(
 	default:
 		return fmt.Errorf("invalid GCE disk type %q", diskType)
 	}
-	diskTypeUri := fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
 
-	diskToCreate := &compute.Disk{
-		Name:        name,
-		SizeGb:      sizeGb,
-		Description: tagsStr,
-		Type:        diskTypeUri,
+	projectsApiEndpoint := gceComputeAPIEndpoint + "projects/"
+	if gce.service != nil {
+		projectsApiEndpoint = gce.service.BasePath
 	}
+	diskTypeUri := projectsApiEndpoint + fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
 
 	mc := newDiskMetricContext("create", zone)
-	createOp, err := gce.manager.CreateDisk(gce.projectID, zone, diskToCreate)
+
+	createOp, err := gce.manager.CreateDisk(
+		name, sizeGb, tagsStr, diskTypeUri, zone)
+
 	if isGCEError(err, "alreadyExists") {
 		glog.Warningf("GCE PD %q already exists, reusing", name)
 		return nil
@@ -313,8 +310,8 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	}
 
 	labels := make(map[string]string)
-	labels[metav1.LabelZoneFailureDomain] = zone
-	labels[metav1.LabelZoneRegion] = region
+	labels[kubeletapis.LabelZoneFailureDomain] = zone
+	labels[kubeletapis.LabelZoneRegion] = region
 
 	return labels, nil
 }
@@ -325,13 +322,7 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*GCEDisk, err
 	mc := newDiskMetricContext("get", zone)
 	disk, err := gce.manager.GetDisk(gce.projectID, zone, diskName)
 	if err == nil {
-		d := &GCEDisk{
-			Zone: lastComponent(disk.Zone),
-			Name: disk.Name,
-			Kind: disk.Kind,
-			Type: disk.Type,
-		}
-		return d, mc.Observe(nil)
+		return disk, mc.Observe(nil)
 	}
 	if !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, mc.Observe(err)
@@ -416,19 +407,6 @@ func (gce *GCECloud) doDeleteDisk(diskToDelete string) error {
 	}
 
 	return gce.manager.WaitForZoneOp(deleteOp, disk.Zone, mc)
-}
-
-// Converts a Disk resource to an AttachedDisk resource.
-func (gce *GCECloud) convertDiskToAttachedDisk(disk *GCEDisk, readWrite string) *compute.AttachedDisk {
-	return &compute.AttachedDisk{
-		DeviceName: disk.Name,
-		Kind:       disk.Kind,
-		Mode:       readWrite,
-		Source: "https://" + path.Join(
-			"www.googleapis.com/compute/v1/projects/",
-			gce.projectID, "zones", disk.Zone, "disks", disk.Name),
-		Type: "PERSISTENT",
-	}
 }
 
 // isGCEError returns true if given error is a googleapi.Error with given

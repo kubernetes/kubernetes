@@ -24,32 +24,30 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 const (
-	// the mark-for-masquerade chain
+	// KubeMarkMasqChain is the mark-for-masquerade chain
 	// TODO: clean up this logic in kube-proxy
 	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
-	// the mark-for-drop chain
+	// KubeMarkDropChain is the mark-for-drop chain
 	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
 
-	// kubernetes postrouting rules
+	// KubePostroutingChain is kubernetes postrouting rules
 	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 
-	// kubernetes firewall rules
+	// KubeFirewallChain is kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
 // effectiveHairpinMode determines the effective hairpin mode given the
 // configured mode, container runtime, and whether cbr0 should be configured.
-func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRuntime string, networkPlugin string) (componentconfig.HairpinMode, error) {
+func effectiveHairpinMode(hairpinMode kubeletconfig.HairpinMode, containerRuntime string, networkPlugin string) (kubeletconfig.HairpinMode, error) {
 	// The hairpin mode setting doesn't matter if:
 	// - We're not using a bridge network. This is hard to check because we might
 	//   be using a plugin.
@@ -57,20 +55,20 @@ func effectiveHairpinMode(hairpinMode componentconfig.HairpinMode, containerRunt
 	//   to set the hairpin flag on the veth's of containers. Currently the
 	//   docker runtime is the only one that understands this.
 	// - It's set to "none".
-	if hairpinMode == componentconfig.PromiscuousBridge || hairpinMode == componentconfig.HairpinVeth {
+	if hairpinMode == kubeletconfig.PromiscuousBridge || hairpinMode == kubeletconfig.HairpinVeth {
 		// Only on docker.
 		if containerRuntime != "docker" {
 			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
-			return componentconfig.HairpinNone, nil
+			return kubeletconfig.HairpinNone, nil
 		}
-		if hairpinMode == componentconfig.PromiscuousBridge && networkPlugin != "kubenet" {
+		if hairpinMode == kubeletconfig.PromiscuousBridge && networkPlugin != "kubenet" {
 			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
 			// default values (from before the hairpin-mode flag existed) and we
 			// should keep the old behavior.
-			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, componentconfig.HairpinVeth)
-			return componentconfig.HairpinVeth, nil
+			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, kubeletconfig.HairpinVeth)
+			return kubeletconfig.HairpinVeth, nil
 		}
-	} else if hairpinMode != componentconfig.HairpinNone {
+	} else if hairpinMode != kubeletconfig.HairpinNone {
 		return "", fmt.Errorf("unknown value: %q", hairpinMode)
 	}
 	return hairpinMode, nil
@@ -97,10 +95,6 @@ func omitDuplicates(kl *Kubelet, pod *v1.Pod, combinedSearch []string) []string 
 		if _, exists := uniqueDomains[dnsDomain]; !exists {
 			combinedSearch[len(uniqueDomains)] = dnsDomain
 			uniqueDomains[dnsDomain] = true
-		} else {
-			log := fmt.Sprintf("Found and omitted duplicated dns domain in host search line: '%s' during merging with cluster dns domains", dnsDomain)
-			kl.recorder.Event(pod, v1.EventTypeWarning, "DNSSearchForming", log)
-			glog.Error(log)
 		}
 	}
 	return combinedSearch[:len(uniqueDomains)]
@@ -229,8 +223,8 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 		if len(fields) == 0 {
 			continue
 		}
-		if fields[0] == "nameserver" {
-			nameservers = append(nameservers, fields[1:]...)
+		if fields[0] == "nameserver" && len(fields) >= 2 {
+			nameservers = append(nameservers, fields[1])
 		}
 		if fields[0] == "search" {
 			searches = fields[1:]
@@ -242,51 +236,6 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 	// contact @thockin or @wlan0 for more information
 
 	return nameservers, searches, nil
-}
-
-// cleanupBandwidthLimits updates the status of bandwidth-limited containers
-// and ensures that only the appropriate CIDRs are active on the node.
-func (kl *Kubelet) cleanupBandwidthLimits(allPods []*v1.Pod) error {
-	if kl.shaper == nil {
-		return nil
-	}
-	currentCIDRs, err := kl.shaper.GetCIDRs()
-	if err != nil {
-		return err
-	}
-	possibleCIDRs := sets.String{}
-	for ix := range allPods {
-		pod := allPods[ix]
-		ingress, egress, err := bandwidth.ExtractPodBandwidthResources(pod.Annotations)
-		if err != nil {
-			return err
-		}
-		if ingress == nil && egress == nil {
-			glog.V(8).Infof("Not a bandwidth limited container...")
-			continue
-		}
-		status, found := kl.statusManager.GetPodStatus(pod.UID)
-		if !found {
-			// TODO(random-liu): Cleanup status get functions. (issue #20477)
-			s, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-			if err != nil {
-				return err
-			}
-			status = kl.generateAPIPodStatus(pod, s)
-		}
-		if status.Phase == v1.PodRunning {
-			possibleCIDRs.Insert(fmt.Sprintf("%s/32", status.PodIP))
-		}
-	}
-	for _, cidr := range currentCIDRs {
-		if !possibleCIDRs.Has(cidr) {
-			glog.V(2).Infof("Removing CIDR: %s (%v)", cidr, possibleCIDRs)
-			if err := kl.shaper.Reset(cidr); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 // syncNetworkStatus updates the network state
@@ -325,25 +274,6 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 
 	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
-}
-
-// shapingEnabled returns whether traffic shaping is enabled.
-func (kl *Kubelet) shapingEnabled() bool {
-	// Disable shaping if a network plugin is defined and supports shaping
-	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
-		return false
-	}
-	// This is not strictly true but we need to figure out how to handle
-	// bandwidth shaping anyway. If the kubelet doesn't have a networkPlugin,
-	// it could mean:
-	// a. the kubelet is responsible for bandwidth shaping
-	// b. the kubelet is using cri, and the cri has a network plugin
-	// Today, the only plugin that understands bandwidth shaping is kubenet, and
-	// it doesn't support bandwidth shaping when invoked through cri, so it
-	// effectively boils down to letting the kubelet decide how to handle
-	// shaping annotations. The combination of (cri + network plugin that
-	// handles bandwidth shaping) may not work because of this.
-	return true
 }
 
 // syncNetworkUtil ensures the network utility are present on host.

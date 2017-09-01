@@ -18,7 +18,7 @@ package rktshim
 
 import (
 	kubeletapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // PodSandboxManager provides basic operations to create/delete and examine

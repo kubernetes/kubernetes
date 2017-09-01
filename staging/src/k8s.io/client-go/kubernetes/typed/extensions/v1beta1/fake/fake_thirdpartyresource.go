@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -35,37 +35,7 @@ var thirdpartyresourcesResource = schema.GroupVersionResource{Group: "extensions
 
 var thirdpartyresourcesKind = schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "ThirdPartyResource"}
 
-func (c *FakeThirdPartyResources) Create(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &v1beta1.ThirdPartyResource{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ThirdPartyResource), err
-}
-
-func (c *FakeThirdPartyResources) Update(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(thirdpartyresourcesResource, thirdPartyResource), &v1beta1.ThirdPartyResource{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.ThirdPartyResource), err
-}
-
-func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(thirdpartyresourcesResource, name), &v1beta1.ThirdPartyResource{})
-	return err
-}
-
-func (c *FakeThirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.ThirdPartyResourceList{})
-	return err
-}
-
+// Get takes name of the thirdPartyResource, and returns the corresponding thirdPartyResource object, and an error if there is any.
 func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (result *v1beta1.ThirdPartyResource, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(thirdpartyresourcesResource, name), &v1beta1.ThirdPartyResource{})
@@ -75,6 +45,7 @@ func (c *FakeThirdPartyResources) Get(name string, options v1.GetOptions) (resul
 	return obj.(*v1beta1.ThirdPartyResource), err
 }
 
+// List takes label and field selectors, and returns the list of ThirdPartyResources that match those selectors.
 func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(thirdpartyresourcesResource, thirdpartyresourcesKind, opts), &v1beta1.ThirdPartyResourceList{})
@@ -99,6 +70,41 @@ func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.Thi
 func (c *FakeThirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(thirdpartyresourcesResource, opts))
+}
+
+// Create takes the representation of a thirdPartyResource and creates it.  Returns the server's representation of the thirdPartyResource, and an error, if there is any.
+func (c *FakeThirdPartyResources) Create(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateAction(thirdpartyresourcesResource, thirdPartyResource), &v1beta1.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ThirdPartyResource), err
+}
+
+// Update takes the representation of a thirdPartyResource and updates it. Returns the server's representation of the thirdPartyResource, and an error, if there is any.
+func (c *FakeThirdPartyResources) Update(thirdPartyResource *v1beta1.ThirdPartyResource) (result *v1beta1.ThirdPartyResource, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateAction(thirdpartyresourcesResource, thirdPartyResource), &v1beta1.ThirdPartyResource{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.ThirdPartyResource), err
+}
+
+// Delete takes name of the thirdPartyResource and deletes it. Returns an error if one occurs.
+func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewRootDeleteAction(thirdpartyresourcesResource, name), &v1beta1.ThirdPartyResource{})
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeThirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.ThirdPartyResourceList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched thirdPartyResource.

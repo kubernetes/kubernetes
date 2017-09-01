@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -56,7 +56,7 @@ const (
 
 var (
 	join_long = templates.LongDesc(`
-		Join a cluster to a federation.
+		Join adds a cluster to a federation.
 
         Current context is assumed to be a federation API
         server. Please use the --context flag otherwise.`)
@@ -183,7 +183,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	joiningClusterName := j.commonOptions.Name
 	secretName := j.options.secretName
 	if secretName == "" {
-		secretName = v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
+		secretName = k8s_api_v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
 	}
 
 	joiningClusterFactory := j.joningClusterFactory(config)
@@ -209,7 +209,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	glog.V(2).Info("Creating federation system namespace in joining cluster")
 	_, err = createFederationSystemNamespace(joiningClusterClientset, federationNamespace, federationName, joiningClusterName, dryRun)
 	if err != nil {
-		glog.V(2).Info("Error creating federation system namespace in joining cluster: %v", err)
+		glog.V(2).Infof("Error creating federation system namespace in joining cluster: %v", err)
 		return err
 	}
 	glog.V(2).Info("Created federation system namespace in joining cluster")
@@ -218,7 +218,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	po.LoadingRules.ExplicitPath = kubeconfig
 	clientConfig, err := po.GetStartingConfig()
 	if err != nil {
-		glog.V(2).Info("Could not load clientConfig from %s: %v", kubeconfig, err)
+		glog.V(2).Infof("Could not load clientConfig from %s: %v", kubeconfig, err)
 		return err
 	}
 
@@ -662,7 +662,7 @@ func populateSecretInHostCluster(clusterClientset, hostClientset internalclients
 		return nil, err
 	}
 
-	glog.V(2).Info("Getting secret named: %s", sa.Secrets[0].Name)
+	glog.V(2).Infof("Getting secret named: %s", sa.Secrets[0].Name)
 	var secret *api.Secret
 	err = wait.PollImmediate(1*time.Second, serviceAccountSecretTimeout, func() (bool, error) {
 		var err error

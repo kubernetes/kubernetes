@@ -27,7 +27,6 @@ import (
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
@@ -216,16 +215,9 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if volume.Status != VolumeAvailableStatus {
-		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
-		glog.Errorf(errmsg)
-		return "", errors.New(errmsg)
-	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
+
+	cClient, err := os.NewComputeV2()
+	if err != nil {
 		return "", err
 	}
 
@@ -234,11 +226,9 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
-		glog.V(2).Infof("Disk %s is attached to a different instance (%s), detaching", volumeID, volume.AttachedServerId)
-		err = os.DetachDisk(volume.AttachedServerId, volumeID)
-		if err != nil {
-			return "", err
-		}
+		errmsg := fmt.Sprintf("Disk %s is attached to a different instance (%s)", volumeID, volume.AttachedServerId)
+		glog.V(2).Infof(errmsg)
+		return "", errors.New(errmsg)
 	}
 
 	startTime := time.Now()
@@ -262,16 +252,19 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	if err != nil {
 		return err
 	}
+	if volume.Status == VolumeAvailableStatus {
+		// "available" is fine since that means the volume is detached from instance already.
+		glog.V(2).Infof("volume: %s has been detached from compute: %s ", volume.ID, instanceID)
+		return nil
+	}
+
 	if volume.Status != VolumeInUseStatus {
 		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
 		glog.Errorf(errmsg)
 		return errors.New(errmsg)
 	}
-	cClient, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil || cClient == nil {
-		glog.Errorf("Unable to initialize nova client for region: %s", os.region)
+	cClient, err := os.NewComputeV2()
+	if err != nil {
 		return err
 	}
 	if volume.AttachedServerId != instanceID {

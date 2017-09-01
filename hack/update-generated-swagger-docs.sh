@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/swagger.sh"
 
 kube::golang::setup_env
 
-GROUP_VERSIONS=(meta/v1 ${KUBE_AVAILABLE_GROUP_VERSIONS})
+GROUP_VERSIONS=(meta/v1 meta/v1alpha1 ${KUBE_AVAILABLE_GROUP_VERSIONS})
 
 # To avoid compile errors, remove the currently existing files.
 for group_version in "${GROUP_VERSIONS[@]}"; do

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis
+    role: master
+  name: test-storageos-redis
+spec:
+  containers:
+    - name: master
+      image: kubernetes/redis:v1
+      env:
+        - name: MASTER
+          value: "true"
+      ports:
+        - containerPort: 6379
+      resources:
+        limits:
+          cpu: "0.1"
+      volumeMounts:
+        - mountPath: /redis-master-data
+          name: redis-data
+  volumes:
+    - name: redis-data
+      storageos:
+        # This volume must already exist within StorageOS
+        volumeName: redis-vol01
+        # Namespace is optional, and specifies the volume scope within
+        # StorageOS.  If no namespace is provided, it will use the namespace
+        # of the pod.  Set to `default` or leave blank if you are not using
+        # namespaces.
+        #namespace: test-storageos
+        # The name of the storageos pool to use.  Will use `default` if not
+        # specified, which should be available on most StorageOS clusters.
+        pool: default
+        # The filesystem type to create on the volume, if required.
+        fsType: ext4

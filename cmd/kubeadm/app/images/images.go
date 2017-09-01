@@ -20,29 +20,19 @@ import (
 	"fmt"
 	"runtime"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-const (
-	KubeEtcdImage              = "etcd"
-	KubeAPIServerImage         = "apiserver"
-	KubeControllerManagerImage = "controller-manager"
-	KubeSchedulerImage         = "scheduler"
-	KubeProxyImage             = "proxy"
-
-	etcdVersion = "3.0.17"
-)
-
-func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
+func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage
 	}
-	repoPrefix := kubeadmapi.GlobalEnvParams.RepositoryPrefix
+	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(k8sVersion)
 	return map[string]string{
-		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, etcdVersion),
-		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, cfg.KubernetesVersion),
-		KubeControllerManagerImage: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, cfg.KubernetesVersion),
-		KubeSchedulerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, cfg.KubernetesVersion),
-		KubeProxyImage:             fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-proxy", runtime.GOARCH, cfg.KubernetesVersion),
+		constants.Etcd:                  fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, constants.DefaultEtcdVersion),
+		constants.KubeAPIServer:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, kubernetesImageTag),
+		constants.KubeControllerManager: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, kubernetesImageTag),
+		constants.KubeScheduler:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, kubernetesImageTag),
 	}[image]
 }

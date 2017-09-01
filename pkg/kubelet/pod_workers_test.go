@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -292,12 +292,12 @@ func TestFakePodWorkers(t *testing.T) {
 			&v1.Pod{},
 		},
 		{
-			podWithUidNameNs("12345678", "foo", "new"),
-			podWithUidNameNs("12345678", "fooMirror", "new"),
+			podWithUIDNameNs("12345678", "foo", "new"),
+			podWithUIDNameNs("12345678", "fooMirror", "new"),
 		},
 		{
-			podWithUidNameNs("98765", "bar", "new"),
-			podWithUidNameNs("98765", "barMirror", "new"),
+			podWithUIDNameNs("98765", "bar", "new"),
+			podWithUIDNameNs("98765", "barMirror", "new"),
 		},
 	}
 

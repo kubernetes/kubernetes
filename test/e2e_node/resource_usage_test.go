@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
 					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 			},
@@ -79,9 +79,9 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 
 		for _, testArg := range rTests {
 			itArg := testArg
-
-			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr), func() {
-				testInfo := getTestNodeInfo(f, itArg.getTestName())
+			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
+			It(desc, func() {
+				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
 
@@ -109,9 +109,9 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 
 		for _, testArg := range rTests {
 			itArg := testArg
-
-			It(fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr), func() {
-				testInfo := getTestNodeInfo(f, itArg.getTestName())
+			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
+			It(desc, func() {
+				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
 
@@ -202,8 +202,8 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
 	// Print resource usage
-	framework.PrintPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo))
-	framework.PrintPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo))
+	logPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode, testInfo), "memory")
+	logPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode, testInfo), "cpu")
 
 	// Verify resource usage
 	if isVerify {

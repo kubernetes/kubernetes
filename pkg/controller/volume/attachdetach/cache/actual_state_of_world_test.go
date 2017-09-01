@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -1162,89 +1162,6 @@ func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
 	// Assert
 	if err == nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Positive expects an entire node entry to be removed
-// from nodesToUpdateStatusFor
-func Test_RemoveNodeFromAttachUpdates_Positive(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-	nodeName := types.NodeName("node-1")
-	nodeToUpdate := nodeToUpdateStatusFor{
-		nodeName:                  nodeName,
-		statusUpdateNeeded:        true,
-		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
-	}
-	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates(nodeName)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("RemoveNodeFromAttachUpdates should not return error, but got: %v", err)
-	}
-	if len(asw.nodesToUpdateStatusFor) > 0 {
-		t.Fatal("nodesToUpdateStatusFor should be empty as its only entry has been deleted.")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Negative_NodeDoesNotExist expects an error to be thrown
-// when nodeName is not in nodesToUpdateStatusFor.
-func Test_RemoveNodeFromAttachUpdates_Negative_NodeDoesNotExist(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-	nodeName := types.NodeName("node-1")
-	nodeToUpdate := nodeToUpdateStatusFor{
-		nodeName:                  nodeName,
-		statusUpdateNeeded:        true,
-		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
-	}
-	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates("node-2")
-
-	// Assert
-	if err == nil {
-		t.Fatal("RemoveNodeFromAttachUpdates should return an error as the nodeName doesn't exist.")
-	}
-	if len(asw.nodesToUpdateStatusFor) != 1 {
-		t.Fatal("The length of nodesToUpdateStatusFor should not change because no operation was performed.")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Negative_Empty expects an error to be thrown
-// when a nodesToUpdateStatusFor is empty.
-func Test_RemoveNodeFromAttachUpdates_Negative_Empty(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates("node-1")
-
-	// Assert
-	if err == nil {
-		t.Fatal("RemoveNodeFromAttachUpdates should return an error as nodeToUpdateStatusFor is empty.")
-	}
-	if len(asw.nodesToUpdateStatusFor) != 0 {
-		t.Fatal("The length of nodesToUpdateStatusFor should be 0.")
 	}
 }
 

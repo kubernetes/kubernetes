@@ -20,7 +20,7 @@ import (
 	"time"
 
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -129,6 +129,15 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	out, err := in.service.ContainerStatus(containerID)
 	recordError(operation, err)
 	return out, err
+}
+
+func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	const operation = "container_status"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.UpdateContainerResources(containerID, resources)
+	recordError(operation, err)
+	return err
 }
 
 func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {

@@ -4,10 +4,10 @@ import "github.com/gophercloud/gophercloud"
 
 // Scope allows a created token to be limited to a specific domain or project.
 type Scope struct {
-	ProjectID   string `json:"scope.project.id,omitempty" not:"ProjectName,DomainID,DomainName"`
-	ProjectName string `json:"scope.project.name,omitempty"`
-	DomainID    string `json:"scope.project.id,omitempty" not:"ProjectName,ProjectID,DomainName"`
-	DomainName  string `json:"scope.project.id,omitempty"`
+	ProjectID   string
+	ProjectName string
+	DomainID    string
+	DomainName  string
 }
 
 // AuthOptionsBuilder describes any argument that may be passed to the Create call.
@@ -36,7 +36,7 @@ type AuthOptions struct {
 
 	// At most one of DomainID and DomainName must be provided if using Username
 	// with Identity V3. Otherwise, either are optional.
-	DomainID   string `json:"id,omitempty"`
+	DomainID   string `json:"-"`
 	DomainName string `json:"name,omitempty"`
 
 	// AllowReauth should be set to true if you grant permission for Gophercloud to
@@ -182,13 +182,13 @@ func Get(c *gophercloud.ServiceClient, token string) (r GetResult) {
 func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
 	resp, err := c.Request("HEAD", tokenURL(c), &gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
-		OkCodes:     []int{204, 404},
+		OkCodes:     []int{200, 204, 404},
 	})
 	if err != nil {
 		return false, err
 	}
 
-	return resp.StatusCode == 204, nil
+	return resp.StatusCode == 200 || resp.StatusCode == 204, nil
 }
 
 // Revoke immediately makes specified token invalid.

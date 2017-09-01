@@ -47,6 +47,8 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&extensions.DaemonSet{},
+		&extensions.DaemonSetList{},
 		&extensions.Deployment{},
 		&extensions.DeploymentList{},
 		&extensions.DeploymentRollback{},
@@ -55,6 +57,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&StatefulSetList{},
 		&ControllerRevision{},
 		&ControllerRevisionList{},
+		&extensions.ReplicaSet{},
+		&extensions.ReplicaSetList{},
 	)
 	return nil
 }

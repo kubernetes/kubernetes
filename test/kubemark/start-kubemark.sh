@@ -16,6 +16,10 @@
 
 # Script that creates a Kubemark cluster for any given cloud provider.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
@@ -66,7 +70,7 @@ SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-}"
 NUM_NODES="${NUM_NODES:-}"
-CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-}"
 EOF
   echo "Created the environment file for master."
 }
@@ -316,7 +320,7 @@ current-context: kubemark-context")
   if [ "${NUM_NODES:-10}" -gt 1000 ]; then
     proxy_cpu=50
   fi
-  proxy_mem_per_node=100
+  proxy_mem_per_node=50
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -352,7 +356,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       else
         echo "Got error while trying to list hollow-nodes. Probably API server is down."
       fi
-      pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+      pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
       running=$(($(echo "${pods}" | grep "Running" | wc -l)))
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))

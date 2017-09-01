@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -46,8 +46,14 @@ func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
-	return &dockerService{client: c, os: &containertest.FakeOS{}, network: pm,
-		legacyCleanup: legacyCleanupFlag{done: 1}, checkpointHandler: NewTestPersistentCheckpointHandler()}, c, fakeClock
+	return &dockerService{
+		client:            c,
+		os:                &containertest.FakeOS{},
+		network:           pm,
+		legacyCleanup:     legacyCleanupFlag{done: 1},
+		checkpointHandler: NewTestPersistentCheckpointHandler(),
+		networkReady:      make(map[string]bool),
+	}, c, fakeClock
 }
 
 func newTestDockerServiceWithVersionCache() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {

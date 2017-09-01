@@ -84,6 +84,10 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			if source.ISCSI.SecretRef != nil && !visitor(source.ISCSI.SecretRef.Name) {
 				return false
 			}
+		case source.StorageOS != nil:
+			if source.StorageOS.SecretRef != nil && !visitor(source.StorageOS.SecretRef.Name) {
+				return false
+			}
 		}
 	}
 	return true
@@ -214,8 +218,8 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	isEqual := condition.Status == oldCondition.Status &&
 		condition.Reason == oldCondition.Reason &&
 		condition.Message == oldCondition.Message &&
-		condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
-		condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.

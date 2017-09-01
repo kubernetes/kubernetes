@@ -34,7 +34,7 @@ import (
 )
 
 // apisHandler serves the `/apis` endpoint.
-// This is registered as a filter so that it never collides with any explictly registered endpoints
+// This is registered as a filter so that it never collides with any explicitly registered endpoints
 type apisHandler struct {
 	codecs serializer.CodecFactory
 	lister listers.APIServiceLister
@@ -73,7 +73,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	apiServicesByGroup := apiregistrationapi.SortedByGroup(apiServices)
+	apiServicesByGroup := apiregistrationapi.SortedByGroupAndVersion(apiServices)
 	for _, apiGroupServers := range apiServicesByGroup {
 		// skip the legacy group
 		if len(apiGroupServers[0].Spec.Group) == 0 {
@@ -91,7 +91,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
 // if none of the services are available, it will return nil.
 func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.APIGroup {
-	apiServicesByGroup := apiregistrationapi.SortedByGroup(apiServices)[0]
+	apiServicesByGroup := apiregistrationapi.SortedByGroupAndVersion(apiServices)[0]
 
 	var discoveryGroup *metav1.APIGroup
 

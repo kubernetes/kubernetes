@@ -75,6 +75,34 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("podManagementPolicy"), spec.PodManagementPolicy, fmt.Sprintf("must be '%s' or '%s'", apps.OrderedReadyPodManagement, apps.ParallelPodManagement)))
 	}
 
+	switch spec.UpdateStrategy.Type {
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), ""))
+	case apps.OnDeleteStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(
+				allErrs,
+				field.Invalid(
+					fldPath.Child("updateStrategy").Child("rollingUpdate"),
+					spec.UpdateStrategy.RollingUpdate,
+					fmt.Sprintf("only allowed for updateStrategy '%s'", apps.RollingUpdateStatefulSetStrategyType)))
+		}
+	case apps.RollingUpdateStatefulSetStrategyType:
+		if spec.UpdateStrategy.RollingUpdate != nil {
+			allErrs = append(allErrs,
+				apivalidation.ValidateNonnegativeField(
+					int64(spec.UpdateStrategy.RollingUpdate.Partition),
+					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+		}
+
+	default:
+		allErrs = append(allErrs,
+			field.Invalid(fldPath.Child("updateStrategy"), spec.UpdateStrategy,
+				fmt.Sprintf("must be '%s' or '%s'",
+					apps.RollingUpdateStatefulSetStrategyType,
+					apps.OnDeleteStatefulSetStrategyType)))
+	}
+
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
@@ -113,30 +141,59 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet) field.ErrorList {
 func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 
-	// TODO: For now we're taking the safe route and disallowing all updates to
-	// spec except for Replicas, for scaling, and Template.Spec.containers.image
-	// for rolling-update. Enable others on a case by case basis.
 	restoreReplicas := statefulSet.Spec.Replicas
 	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
 
-	restoreContainers := statefulSet.Spec.Template.Spec.Containers
-	statefulSet.Spec.Template.Spec.Containers = oldStatefulSet.Spec.Template.Spec.Containers
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
 
 	if !reflect.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas' and 'containers' are forbidden."))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden."))
 	}
 	statefulSet.Spec.Replicas = restoreReplicas
-	statefulSet.Spec.Template.Spec.Containers = restoreContainers
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
-	containerErrs, _ := apivalidation.ValidateContainerUpdates(statefulSet.Spec.Template.Spec.Containers, oldStatefulSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))
-	allErrs = append(allErrs, containerErrs...)
+	return allErrs
+}
+
+// ValidateStatefulSetStatus validates a StatefulSetStatus.
+func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Replicas), fieldPath.Child("replicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
+	if status.ObservedGeneration != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
+	}
+	if status.CollisionCount != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
+	}
+
+	msg := "cannot be greater than status.replicas"
+	if status.ReadyReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("readyReplicas"), status.ReadyReplicas, msg))
+	}
+	if status.CurrentReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("currentReplicas"), status.CurrentReplicas, msg))
+	}
+	if status.UpdatedReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
+	}
+
 	return allErrs
 }
 
 // ValidateStatefulSetStatusUpdate tests if required fields in the StatefulSet are set.
 func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateStatefulSetStatus(&statefulSet.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 	// TODO: Validate status.
 	return allErrs

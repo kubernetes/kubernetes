@@ -17,14 +17,73 @@ limitations under the License.
 package helper
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+func TestIsOpaqueIntResourceName(t *testing.T) { // resourceName input with the correct OpaqueIntResourceName prefix ("pod.alpha.kubernetes.io/opaque-int-resource-") should pass
+	testCases := []struct {
+		resourceName v1.ResourceName
+		expectVal    bool
+	}{
+		{
+			resourceName: "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			expectVal:    true, // resourceName should pass because the resourceName has the correct prefix.
+		},
+		{
+			resourceName: "foo",
+			expectVal:    false, // resourceName should fail because the resourceName has the wrong prefix.
+		},
+		{
+			resourceName: "",
+			expectVal:    false, // resourceName should fail, empty resourceName.
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
+			t.Parallel()
+			v := IsOpaqueIntResourceName(tc.resourceName)
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
+
+func TestOpaqueIntResourceName(t *testing.T) { // each output should have the correct appended prefix ("pod.alpha.kubernetes.io/opaque-int-resource-") for opaque counted resources.
+	testCases := []struct {
+		name      string
+		expectVal v1.ResourceName
+	}{
+		{
+			name:      "foo",
+			expectVal: "pod.alpha.kubernetes.io/opaque-int-resource-foo", // append prefix to input string foo
+		},
+		{
+			name:      "",
+			expectVal: "pod.alpha.kubernetes.io/opaque-int-resource-", // append prefix to input empty string
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("name input=%s, expected value=%s", tc.name, tc.expectVal), func(t *testing.T) {
+			t.Parallel()
+			v := OpaqueIntResourceName(tc.name)
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
 
 func TestAddToNodeAddresses(t *testing.T) {
 	testCases := []struct {
@@ -439,63 +498,6 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
 			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
-		}
-	}
-}
-
-// TODO: remove when alpha support for affinity is removed
-func TestGetAffinityFromPodAnnotations(t *testing.T) {
-	testCases := []struct {
-		pod       *v1.Pod
-		expectErr bool
-	}{
-		{
-			pod:       &v1.Pod{},
-			expectErr: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-						`,
-					},
-				},
-			},
-			expectErr: true,
-		},
-	}
-
-	for i, tc := range testCases {
-		_, err := GetAffinityFromPodAnnotations(tc.pod.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
 		}
 	}
 }

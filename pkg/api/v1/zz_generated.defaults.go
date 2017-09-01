@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -28,60 +29,64 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*ConfigMap)) })
-	scheme.AddTypeDefaultingFunc(&ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*ConfigMapList)) })
-	scheme.AddTypeDefaultingFunc(&Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*Endpoints)) })
-	scheme.AddTypeDefaultingFunc(&EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*EndpointsList)) })
-	scheme.AddTypeDefaultingFunc(&LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*LimitRange)) })
-	scheme.AddTypeDefaultingFunc(&LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*LimitRangeList)) })
-	scheme.AddTypeDefaultingFunc(&Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*Namespace)) })
-	scheme.AddTypeDefaultingFunc(&NamespaceList{}, func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*NamespaceList)) })
-	scheme.AddTypeDefaultingFunc(&Node{}, func(obj interface{}) { SetObjectDefaults_Node(obj.(*Node)) })
-	scheme.AddTypeDefaultingFunc(&NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*NodeList)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*PersistentVolume)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*PersistentVolumeClaim)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeClaimList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaimList(obj.(*PersistentVolumeClaimList)) })
-	scheme.AddTypeDefaultingFunc(&PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*PersistentVolumeList)) })
-	scheme.AddTypeDefaultingFunc(&Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*Pod)) })
-	scheme.AddTypeDefaultingFunc(&PodAttachOptions{}, func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*PodAttachOptions)) })
-	scheme.AddTypeDefaultingFunc(&PodExecOptions{}, func(obj interface{}) { SetObjectDefaults_PodExecOptions(obj.(*PodExecOptions)) })
-	scheme.AddTypeDefaultingFunc(&PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*PodList)) })
-	scheme.AddTypeDefaultingFunc(&PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*PodTemplate)) })
-	scheme.AddTypeDefaultingFunc(&PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*PodTemplateList)) })
-	scheme.AddTypeDefaultingFunc(&ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*ReplicationController)) })
-	scheme.AddTypeDefaultingFunc(&ReplicationControllerList{}, func(obj interface{}) { SetObjectDefaults_ReplicationControllerList(obj.(*ReplicationControllerList)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*ResourceQuota)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*ResourceQuotaList)) })
-	scheme.AddTypeDefaultingFunc(&Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*Secret)) })
-	scheme.AddTypeDefaultingFunc(&SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*SecretList)) })
-	scheme.AddTypeDefaultingFunc(&Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*Service)) })
-	scheme.AddTypeDefaultingFunc(&ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*ServiceList)) })
+	scheme.AddTypeDefaultingFunc(&v1.ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*v1.ConfigMap)) })
+	scheme.AddTypeDefaultingFunc(&v1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*v1.ConfigMapList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*v1.Endpoints)) })
+	scheme.AddTypeDefaultingFunc(&v1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*v1.EndpointsList)) })
+	scheme.AddTypeDefaultingFunc(&v1.LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*v1.LimitRange)) })
+	scheme.AddTypeDefaultingFunc(&v1.LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*v1.LimitRangeList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*v1.Namespace)) })
+	scheme.AddTypeDefaultingFunc(&v1.NamespaceList{}, func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*v1.NamespaceList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Node{}, func(obj interface{}) { SetObjectDefaults_Node(obj.(*v1.Node)) })
+	scheme.AddTypeDefaultingFunc(&v1.NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*v1.NodeList)) })
+	scheme.AddTypeDefaultingFunc(&v1.PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*v1.PersistentVolume)) })
+	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*v1.PersistentVolumeClaim)) })
+	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaimList{}, func(obj interface{}) {
+		SetObjectDefaults_PersistentVolumeClaimList(obj.(*v1.PersistentVolumeClaimList))
+	})
+	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodAttachOptions{}, func(obj interface{}) { SetObjectDefaults_PodAttachOptions(obj.(*v1.PodAttachOptions)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodExecOptions{}, func(obj interface{}) { SetObjectDefaults_PodExecOptions(obj.(*v1.PodExecOptions)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*v1.PodList)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
+	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
+	scheme.AddTypeDefaultingFunc(&v1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*v1.ReplicationController)) })
+	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) {
+		SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList))
+	})
+	scheme.AddTypeDefaultingFunc(&v1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*v1.ResourceQuota)) })
+	scheme.AddTypeDefaultingFunc(&v1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*v1.ResourceQuotaList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*v1.Secret)) })
+	scheme.AddTypeDefaultingFunc(&v1.SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*v1.SecretList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*v1.Service)) })
+	scheme.AddTypeDefaultingFunc(&v1.ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*v1.ServiceList)) })
 	return nil
 }
 
-func SetObjectDefaults_ConfigMap(in *ConfigMap) {
+func SetObjectDefaults_ConfigMap(in *v1.ConfigMap) {
 	SetDefaults_ConfigMap(in)
 }
 
-func SetObjectDefaults_ConfigMapList(in *ConfigMapList) {
+func SetObjectDefaults_ConfigMapList(in *v1.ConfigMapList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ConfigMap(a)
 	}
 }
 
-func SetObjectDefaults_Endpoints(in *Endpoints) {
+func SetObjectDefaults_Endpoints(in *v1.Endpoints) {
 	SetDefaults_Endpoints(in)
 }
 
-func SetObjectDefaults_EndpointsList(in *EndpointsList) {
+func SetObjectDefaults_EndpointsList(in *v1.EndpointsList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Endpoints(a)
 	}
 }
 
-func SetObjectDefaults_LimitRange(in *LimitRange) {
+func SetObjectDefaults_LimitRange(in *v1.LimitRange) {
 	for i := range in.Spec.Limits {
 		a := &in.Spec.Limits[i]
 		SetDefaults_LimitRangeItem(a)
@@ -93,41 +98,44 @@ func SetObjectDefaults_LimitRange(in *LimitRange) {
 	}
 }
 
-func SetObjectDefaults_LimitRangeList(in *LimitRangeList) {
+func SetObjectDefaults_LimitRangeList(in *v1.LimitRangeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_LimitRange(a)
 	}
 }
 
-func SetObjectDefaults_Namespace(in *Namespace) {
+func SetObjectDefaults_Namespace(in *v1.Namespace) {
 	SetDefaults_NamespaceStatus(&in.Status)
 }
 
-func SetObjectDefaults_NamespaceList(in *NamespaceList) {
+func SetObjectDefaults_NamespaceList(in *v1.NamespaceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Namespace(a)
 	}
 }
 
-func SetObjectDefaults_Node(in *Node) {
+func SetObjectDefaults_Node(in *v1.Node) {
 	SetDefaults_Node(in)
 	SetDefaults_NodeStatus(&in.Status)
 	SetDefaults_ResourceList(&in.Status.Capacity)
 	SetDefaults_ResourceList(&in.Status.Allocatable)
 }
 
-func SetObjectDefaults_NodeList(in *NodeList) {
+func SetObjectDefaults_NodeList(in *v1.NodeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Node(a)
 	}
 }
 
-func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
+func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	SetDefaults_PersistentVolume(in)
 	SetDefaults_ResourceList(&in.Spec.Capacity)
+	if in.Spec.PersistentVolumeSource.HostPath != nil {
+		SetDefaults_HostPathVolumeSource(in.Spec.PersistentVolumeSource.HostPath)
+	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
 		SetDefaults_RBDVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
@@ -142,33 +150,36 @@ func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 	}
 }
 
-func SetObjectDefaults_PersistentVolumeClaim(in *PersistentVolumeClaim) {
+func SetObjectDefaults_PersistentVolumeClaim(in *v1.PersistentVolumeClaim) {
 	SetDefaults_PersistentVolumeClaim(in)
 	SetDefaults_ResourceList(&in.Spec.Resources.Limits)
 	SetDefaults_ResourceList(&in.Spec.Resources.Requests)
 	SetDefaults_ResourceList(&in.Status.Capacity)
 }
 
-func SetObjectDefaults_PersistentVolumeClaimList(in *PersistentVolumeClaimList) {
+func SetObjectDefaults_PersistentVolumeClaimList(in *v1.PersistentVolumeClaimList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PersistentVolumeClaim(a)
 	}
 }
 
-func SetObjectDefaults_PersistentVolumeList(in *PersistentVolumeList) {
+func SetObjectDefaults_PersistentVolumeList(in *v1.PersistentVolumeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PersistentVolume(a)
 	}
 }
 
-func SetObjectDefaults_Pod(in *Pod) {
+func SetObjectDefaults_Pod(in *v1.Pod) {
 	SetDefaults_Pod(in)
 	SetDefaults_PodSpec(&in.Spec)
 	for i := range in.Spec.Volumes {
 		a := &in.Spec.Volumes[i]
 		SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -297,26 +308,29 @@ func SetObjectDefaults_Pod(in *Pod) {
 	}
 }
 
-func SetObjectDefaults_PodAttachOptions(in *PodAttachOptions) {
+func SetObjectDefaults_PodAttachOptions(in *v1.PodAttachOptions) {
 	SetDefaults_PodAttachOptions(in)
 }
 
-func SetObjectDefaults_PodExecOptions(in *PodExecOptions) {
+func SetObjectDefaults_PodExecOptions(in *v1.PodExecOptions) {
 	SetDefaults_PodExecOptions(in)
 }
 
-func SetObjectDefaults_PodList(in *PodList) {
+func SetObjectDefaults_PodList(in *v1.PodList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Pod(a)
 	}
 }
 
-func SetObjectDefaults_PodTemplate(in *PodTemplate) {
+func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 	SetDefaults_PodSpec(&in.Template.Spec)
 	for i := range in.Template.Spec.Volumes {
 		a := &in.Template.Spec.Volumes[i]
 		SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -445,20 +459,23 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 	}
 }
 
-func SetObjectDefaults_PodTemplateList(in *PodTemplateList) {
+func SetObjectDefaults_PodTemplateList(in *v1.PodTemplateList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PodTemplate(a)
 	}
 }
 
-func SetObjectDefaults_ReplicationController(in *ReplicationController) {
+func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 	SetDefaults_ReplicationController(in)
 	if in.Spec.Template != nil {
 		SetDefaults_PodSpec(&in.Spec.Template.Spec)
 		for i := range in.Spec.Template.Spec.Volumes {
 			a := &in.Spec.Template.Spec.Volumes[i]
 			SetDefaults_Volume(a)
+			if a.VolumeSource.HostPath != nil {
+				SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			}
 			if a.VolumeSource.Secret != nil {
 				SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 			}
@@ -588,42 +605,42 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 	}
 }
 
-func SetObjectDefaults_ReplicationControllerList(in *ReplicationControllerList) {
+func SetObjectDefaults_ReplicationControllerList(in *v1.ReplicationControllerList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicationController(a)
 	}
 }
 
-func SetObjectDefaults_ResourceQuota(in *ResourceQuota) {
+func SetObjectDefaults_ResourceQuota(in *v1.ResourceQuota) {
 	SetDefaults_ResourceList(&in.Spec.Hard)
 	SetDefaults_ResourceList(&in.Status.Hard)
 	SetDefaults_ResourceList(&in.Status.Used)
 }
 
-func SetObjectDefaults_ResourceQuotaList(in *ResourceQuotaList) {
+func SetObjectDefaults_ResourceQuotaList(in *v1.ResourceQuotaList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ResourceQuota(a)
 	}
 }
 
-func SetObjectDefaults_Secret(in *Secret) {
+func SetObjectDefaults_Secret(in *v1.Secret) {
 	SetDefaults_Secret(in)
 }
 
-func SetObjectDefaults_SecretList(in *SecretList) {
+func SetObjectDefaults_SecretList(in *v1.SecretList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Secret(a)
 	}
 }
 
-func SetObjectDefaults_Service(in *Service) {
+func SetObjectDefaults_Service(in *v1.Service) {
 	SetDefaults_Service(in)
 }
 
-func SetObjectDefaults_ServiceList(in *ServiceList) {
+func SetObjectDefaults_ServiceList(in *v1.ServiceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Service(a)

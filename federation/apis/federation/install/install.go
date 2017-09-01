@@ -37,7 +37,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  federation.GroupName,
 			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/federation/apis/federation",
 			AddInternalObjectsToScheme: federation.AddToScheme,
 			RootScopedKinds: sets.NewString(
 				"Cluster",

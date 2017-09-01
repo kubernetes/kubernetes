@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -29,8 +30,8 @@ import (
 type InitializerConfigurationLister interface {
 	// List lists all InitializerConfigurations in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.InitializerConfiguration, err error)
-	// InitializerConfigurations returns an object that can list and get InitializerConfigurations.
-	InitializerConfigurations(namespace string) InitializerConfigurationNamespaceLister
+	// Get retrieves the InitializerConfiguration from the index for a given name.
+	Get(name string) (*v1alpha1.InitializerConfiguration, error)
 	InitializerConfigurationListerExpansion
 }
 
@@ -52,38 +53,10 @@ func (s *initializerConfigurationLister) List(selector labels.Selector) (ret []*
 	return ret, err
 }
 
-// InitializerConfigurations returns an object that can list and get InitializerConfigurations.
-func (s *initializerConfigurationLister) InitializerConfigurations(namespace string) InitializerConfigurationNamespaceLister {
-	return initializerConfigurationNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// InitializerConfigurationNamespaceLister helps list and get InitializerConfigurations.
-type InitializerConfigurationNamespaceLister interface {
-	// List lists all InitializerConfigurations in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.InitializerConfiguration, err error)
-	// Get retrieves the InitializerConfiguration from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.InitializerConfiguration, error)
-	InitializerConfigurationNamespaceListerExpansion
-}
-
-// initializerConfigurationNamespaceLister implements the InitializerConfigurationNamespaceLister
-// interface.
-type initializerConfigurationNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all InitializerConfigurations in the indexer for a given namespace.
-func (s initializerConfigurationNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.InitializerConfiguration, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.InitializerConfiguration))
-	})
-	return ret, err
-}
-
-// Get retrieves the InitializerConfiguration from the indexer for a given namespace and name.
-func (s initializerConfigurationNamespaceLister) Get(name string) (*v1alpha1.InitializerConfiguration, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the InitializerConfiguration from the index for a given name.
+func (s *initializerConfigurationLister) Get(name string) (*v1alpha1.InitializerConfiguration, error) {
+	key := &v1alpha1.InitializerConfiguration{ObjectMeta: v1.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err
 	}

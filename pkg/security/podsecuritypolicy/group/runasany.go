@@ -17,7 +17,6 @@ limitations under the License.
 package group
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -34,17 +33,17 @@ func NewRunAsAny() (GroupStrategy, error) {
 }
 
 // Generate creates the group based on policy rules.  This strategy returns an empty slice.
-func (s *runAsAny) Generate(pod *api.Pod) ([]types.UnixGroupID, error) {
-	return []types.UnixGroupID{}, nil
+func (s *runAsAny) Generate(pod *api.Pod) ([]int64, error) {
+	return []int64{}, nil
 }
 
 // Generate a single value to be applied.  This is used for FSGroup.  This strategy returns nil.
-func (s *runAsAny) GenerateSingle(pod *api.Pod) (*types.UnixGroupID, error) {
+func (s *runAsAny) GenerateSingle(pod *api.Pod) (*int64, error) {
 	return nil, nil
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *runAsAny) Validate(pod *api.Pod, groups []types.UnixGroupID) field.ErrorList {
+func (s *runAsAny) Validate(pod *api.Pod, groups []int64) field.ErrorList {
 	return field.ErrorList{}
 
 }

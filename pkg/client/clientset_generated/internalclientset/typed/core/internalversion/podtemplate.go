@@ -58,6 +58,41 @@ func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
 	}
 }
 
+// Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
+func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodTemplate, err error) {
+	result = &api.PodTemplate{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
+func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
+	result = &api.PodTemplateList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested podTemplates.
+func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *podTemplates) Create(podTemplate *api.PodTemplate) (result *api.PodTemplate, err error) {
 	result = &api.PodTemplate{}
@@ -103,41 +138,6 @@ func (c *podTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
-func (c *podTemplates) Get(name string, options v1.GetOptions) (result *api.PodTemplate, err error) {
-	result = &api.PodTemplate{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(opts v1.ListOptions) (result *api.PodTemplateList, err error) {
-	result = &api.PodTemplateList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched podTemplate.

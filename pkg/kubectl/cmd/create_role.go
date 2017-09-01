@@ -31,7 +31,7 @@ import (
 	internalversionrbac "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -52,7 +52,7 @@ var (
 		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
 
 	// Valid resource verb list for validation.
-	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "redirect", "deletecollection", "use", "bind", "impersonate"}
+	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "impersonate"}
 
 	// Specialized verbs and GroupResources
 	specialVerbs = map[string][]schema.GroupResource{
@@ -76,6 +76,10 @@ var (
 			{
 				Group:    "",
 				Resource: "users",
+			},
+			{
+				Group:    "",
+				Resource: "serviceaccounts",
 			},
 			{
 				Group:    "",
@@ -130,9 +134,9 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "verb that applies to the resources contained in the rule")
-	cmd.Flags().StringSlice("resource", []string{}, "resource that the rule applies to")
-	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "Verb that applies to the resources contained in the rule")
+	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
+	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }
@@ -199,7 +203,7 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	}
 
 	c.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, c.Mapper, obj, c.Out)
+		return f.PrintObject(cmd, false, c.Mapper, obj, c.Out)
 	}
 
 	clientSet, err := f.ClientSet()

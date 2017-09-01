@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 var (
@@ -53,6 +53,18 @@ type FakeRuntimeService struct {
 	FakeStatus *runtimeapi.RuntimeStatus
 	Containers map[string]*FakeContainer
 	Sandboxes  map[string]*FakePodSandbox
+}
+
+func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	for id, c := range r.Containers {
+		if c.SandboxID == sandboxID && c.Metadata.Name == name && c.Metadata.Attempt == attempt {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("container (name, attempt, sandboxID)=(%q, %d, %q) not found", name, attempt, sandboxID)
 }
 
 func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
@@ -360,6 +372,10 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeapi.Co
 
 	status := c.ContainerStatus
 	return &status, nil
+}
+
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+	return nil
 }
 
 func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {

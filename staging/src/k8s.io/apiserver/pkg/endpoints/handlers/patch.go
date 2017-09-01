@@ -87,8 +87,8 @@ func strategicPatchObject(
 	objToUpdate runtime.Object,
 	versionedObj runtime.Object,
 ) error {
-	originalObjMap := make(map[string]interface{})
-	if err := unstructured.DefaultConverter.ToUnstructured(originalObject, &originalObjMap); err != nil {
+	originalObjMap, err := unstructured.DefaultConverter.ToUnstructured(originalObject)
+	if err != nil {
 		return err
 	}
 

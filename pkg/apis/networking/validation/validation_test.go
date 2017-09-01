@@ -122,6 +122,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.0.0/16",
+									Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// Success cases are expected to pass validation.
@@ -256,6 +276,83 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		"missing cidr field": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									Except: []string{"192.168.8.0/24", "192.168.9.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid cidr format": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.5.6",
+									Except: []string{"192.168.1.0/24", "192.168.2.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"except field is an empty string": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.8.0/24",
+									Except: []string{"", " "},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"except IP is outside of CIDR range": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.8.0/24",
+									Except: []string{"192.168.9.1/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// Error cases are not expected to pass validation.
@@ -271,8 +368,8 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 		old    networking.NetworkPolicy
 		update networking.NetworkPolicy
 	}
-	successCases := []npUpdateTest{
-		{
+	successCases := map[string]npUpdateTest{
+		"no change": {
 			old: networking.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: networking.NetworkPolicySpec{
@@ -289,32 +386,6 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 						MatchLabels: map[string]string{"a": "b"},
 					},
 					Ingress: []networking.NetworkPolicyIngressRule{},
-				},
-			},
-		},
-	}
-
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-	errorCases := map[string]npUpdateTest{
-		"change name": {
-			old: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
-				},
-			},
-			update: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
 				},
 			},
 		},
@@ -338,7 +409,36 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 		},
 	}
 
+	for testName, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+			t.Errorf("expected success (%s): %v", testName, errs)
+		}
+	}
+
+	errorCases := map[string]npUpdateTest{
+		"change name": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{},
+					Ingress:     []networking.NetworkPolicyIngressRule{},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{},
+					Ingress:     []networking.NetworkPolicyIngressRule{},
+				},
+			},
+		},
+	}
+
 	for testName, errorCase := range errorCases {
+		errorCase.old.ObjectMeta.ResourceVersion = "1"
+		errorCase.update.ObjectMeta.ResourceVersion = "1"
 		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}

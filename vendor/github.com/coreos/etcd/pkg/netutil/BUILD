@@ -1,26 +1,29 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "isolate_linux.go",
+        "isolate_stub.go",
         "netutil.go",
-        "routes_linux.go",
-    ],
-    tags = ["automanaged"],
+        "routes.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "isolate_linux.go",
+            "routes_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/coreos/etcd/pkg/cpuutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/coreos/etcd/pkg/cpuutil:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -34,4 +37,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

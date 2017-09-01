@@ -18,26 +18,22 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# TODO: this list should be empty.
-exceptions=("vendor/k8s.io/heapster/metrics/apis/metrics/v1alpha1")
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+staging_repos=($(ls "${KUBE_ROOT}/staging/src/k8s.io/"))
+staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 
 failed=false
 for i in $(find vendor/ -type d); do
-  exceptionFound=false
-  for e in ${exceptions[@]}; do
-    if [[ "${e}" == "${i}" ]]; then
-      echo "Skipping known violator $i"
-      exceptionFound=true
-      break
-    fi
-  done
-  if ( "${exceptionFound}" == "true" ); then
-    continue
-  fi
-
-  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./$i 2> /dev/null | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
-    if [ -n "${deps}" ]; then
+  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./$i 2> /dev/null || echo "")
+  deps_on_main=$(echo "${deps}" | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
+  if [ -n "${deps_on_main}" ]; then
     echo "Package ${i} has a cyclic dependency on the main repository."
+    failed=true
+  fi
+  deps_on_staging=$(echo "${deps}" | grep "k8s.io/kubernetes/vendor/k8s.io" | grep -E "k8s.io\/${staging_repos_pattern}\>" || echo "")
+  if [ -n "${deps_on_staging}" ]; then
+    echo "Package ${i} has a cyclic dependency on staging repository packages: ${deps_on_staging}"
     failed=true
   fi
 done

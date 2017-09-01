@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	"k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestGenerate(t *testing.T) {
@@ -1030,6 +1030,7 @@ func TestParseEnv(t *testing.T) {
 		{
 			envArray: []string{
 				"THIS_ENV=isOK",
+				"this.dotted.env=isOKToo",
 				"HAS_COMMAS=foo,bar",
 				"HAS_EQUALS=jJnro54iUu75xNy==",
 			},
@@ -1037,6 +1038,10 @@ func TestParseEnv(t *testing.T) {
 				{
 					Name:  "THIS_ENV",
 					Value: "isOK",
+				},
+				{
+					Name:  "this.dotted.env",
+					Value: "isOKToo",
 				},
 				{
 					Name:  "HAS_COMMAS",

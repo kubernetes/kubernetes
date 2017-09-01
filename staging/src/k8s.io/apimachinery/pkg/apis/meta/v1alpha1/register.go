@@ -43,7 +43,14 @@ func init() {
 		&Table{},
 		&TableOptions{},
 		&PartialObjectMetadata{},
+		&PartialObjectMetadataList{},
 	)
+
+	if err := scheme.AddConversionFuncs(
+		Convert_Slice_string_To_v1alpha1_IncludeObjectPolicy,
+	); err != nil {
+		panic(err)
+	}
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)

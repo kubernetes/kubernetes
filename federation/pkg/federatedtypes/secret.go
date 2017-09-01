@@ -17,15 +17,15 @@ limitations under the License.
 package federatedtypes
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -41,7 +41,7 @@ type SecretAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewSecretAdapter(client federationclientset.Interface) FederatedTypeAdapter {
+func NewSecretAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &SecretAdapter{client: client}
 }
 
@@ -73,9 +73,9 @@ func (a *SecretAdapter) Equivalent(obj1, obj2 pkgruntime.Object) bool {
 	return util.SecretEquivalent(*secret1, *secret2)
 }
 
-func (a *SecretAdapter) NamespacedName(obj pkgruntime.Object) types.NamespacedName {
+func (a *SecretAdapter) QualifiedName(obj pkgruntime.Object) QualifiedName {
 	secret := obj.(*apiv1.Secret)
-	return types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}
+	return QualifiedName{Namespace: secret.Namespace, Name: secret.Name}
 }
 
 func (a *SecretAdapter) ObjectMeta(obj pkgruntime.Object) *metav1.ObjectMeta {
@@ -87,12 +87,12 @@ func (a *SecretAdapter) FedCreate(obj pkgruntime.Object) (pkgruntime.Object, err
 	return a.client.CoreV1().Secrets(secret.Namespace).Create(secret)
 }
 
-func (a *SecretAdapter) FedDelete(namespacedName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return a.client.CoreV1().Secrets(namespacedName.Namespace).Delete(namespacedName.Name, options)
+func (a *SecretAdapter) FedDelete(qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return a.client.CoreV1().Secrets(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *SecretAdapter) FedGet(namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return a.client.CoreV1().Secrets(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *SecretAdapter) FedGet(qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return a.client.CoreV1().Secrets(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *SecretAdapter) FedList(namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -113,12 +113,12 @@ func (a *SecretAdapter) ClusterCreate(client kubeclientset.Interface, obj pkgrun
 	return client.CoreV1().Secrets(secret.Namespace).Create(secret)
 }
 
-func (a *SecretAdapter) ClusterDelete(client kubeclientset.Interface, nsName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return client.CoreV1().Secrets(nsName.Namespace).Delete(nsName.Name, options)
+func (a *SecretAdapter) ClusterDelete(client kubeclientset.Interface, qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return client.CoreV1().Secrets(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *SecretAdapter) ClusterGet(client kubeclientset.Interface, namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return client.CoreV1().Secrets(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *SecretAdapter) ClusterGet(client kubeclientset.Interface, qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return client.CoreV1().Secrets(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *SecretAdapter) ClusterList(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -132,6 +132,10 @@ func (a *SecretAdapter) ClusterUpdate(client kubeclientset.Interface, obj pkgrun
 
 func (a *SecretAdapter) ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return client.CoreV1().Secrets(namespace).Watch(options)
+}
+
+func (a *SecretAdapter) IsSchedulingAdapter() bool {
+	return false
 }
 
 func (a *SecretAdapter) NewTestObject(namespace string) pkgruntime.Object {

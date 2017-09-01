@@ -75,13 +75,14 @@ type StrategicMergePatchTestCaseData struct {
 // The meaning of each field is the same as StrategicMergePatchTestCaseData's.
 // The difference is that all the fields in StrategicMergePatchRawTestCaseData are json-encoded data.
 type StrategicMergePatchRawTestCaseData struct {
-	Original     []byte
-	Modified     []byte
-	Current      []byte
-	TwoWay       []byte
-	ThreeWay     []byte
-	Result       []byte
-	TwoWayResult []byte
+	Original      []byte
+	Modified      []byte
+	Current       []byte
+	TwoWay        []byte
+	ThreeWay      []byte
+	Result        []byte
+	TwoWayResult  []byte
+	ExpectedError string
 }
 
 type MergeItem struct {
@@ -460,7 +461,179 @@ testCases:
       retainKeysMergingList:
       - name: bar
       - name: foo
+  - description: preserve the order from the patch in a merging list
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: b
+        - name: 3
+    twoWay:
+      mergingList:
+        - name: 3
+          value: c
+        - name: 1
+          value: a
+        - name: 2
+          other: x
+    modified:
+      mergingList:
+        - name: 3
+          value: c
+        - name: 1
+          value: a
+        - name: 2
+          value: b
+          other: x
+  - description: preserve the order from the patch in a merging list 2
+    original:
+      mergingList:
+        - name: 1
+        - name: 2
+          value: b
+        - name: 3
+    twoWay:
+      mergingList:
+        - name: 3
+          value: c
+        - name: 1
+          value: a
+    modified:
+      mergingList:
+        - name: 2
+          value: b
+        - name: 3
+          value: c
+        - name: 1
+          value: a
+  - description: preserve the order from the patch in a merging int list
+    original:
+      mergingIntList:
+        - 1
+        - 2
+        - 3
+    twoWay:
+      mergingIntList:
+        - 3
+        - 1
+        - 2
+    modified:
+      mergingIntList:
+        - 3
+        - 1
+        - 2
+  - description: preserve the order from the patch in a merging int list
+    original:
+      mergingIntList:
+        - 1
+        - 2
+        - 3
+    twoWay:
+      mergingIntList:
+        - 3
+        - 1
+    modified:
+      mergingIntList:
+        - 2
+        - 3
+        - 1
 `)
+
+var customStrategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "$setElementOrder contains item that is not present in the list to be merged",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 3
+  - name: 2
+  - name: 1
+mergingList:
+  - name: 3
+    value: 3
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+  - name: 1
+    value: 1
+`),
+		},
+	},
+	{
+		Description: "$setElementOrder contains item that is not present in the int list to be merged",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 3
+  - 2
+  - 1
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 3
+  - 1
+`),
+		},
+	},
+	{
+		Description: "should check if order in $setElementOrder and patch list match",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+    value: 3
+  - name: 1
+    value: 1
+`),
+			ExpectedError: "doesn't match",
+		},
+	},
+	{
+		Description: "$setElementOrder contains item that is not present in the int list to be merged",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
+  - 3
+mergingIntList:
+  - 3
+  - 1
+`),
+			ExpectedError: "doesn't match",
+		},
+	},
+}
 
 func TestCustomStrategicMergePatch(t *testing.T) {
 	tc := StrategicMergePatchTestCases{}
@@ -472,7 +645,12 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 
 	for _, c := range tc.TestCases {
 		original, expectedTwoWayPatch, _, expectedResult := twoWayTestCaseToJSONOrFail(t, c)
-		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description)
+		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, "")
+	}
+
+	for _, c := range customStrategicMergePatchRawTestCases {
+		original, expectedTwoWayPatch, _, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
+		testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, c.ExpectedError)
 	}
 }
 
@@ -751,501 +929,6 @@ testCases:
       nonMergingIntList:
         - 2
         - 3
-  - description: merge lists of scalars
-    original:
-      mergingIntList:
-        - 1
-        - 2
-    twoWay:
-      mergingIntList:
-        - 3
-    modified:
-      mergingIntList:
-        - 1
-        - 2
-        - 3
-    current:
-      mergingIntList:
-        - 1
-        - 2
-        - 4
-    threeWay:
-      mergingIntList:
-        - 3
-    result:
-      mergingIntList:
-        - 1
-        - 2
-        - 3
-        - 4
-  - description: merge lists of maps
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 3
-          value: 3
-        - name: 4
-          value: 4
-    modified:
-      mergingList:
-        - name: 4
-          value: 4
-        - name: 1
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 3
-          value: 3
-        - name: 4
-          value: 4
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-        - name: 3
-          value: 3
-        - name: 4
-          value: 4
-  - description: merge lists of maps with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 3
-          value: 3
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 3
-          other: b
-    threeWay:
-      mergingList:
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-        - name: 3
-          value: 3
-  - description: add field to map in merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: 1
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: add field to map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 3
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-        - name: 3
-          value: 2
-          other: b
-  - description: add duplicate field to map in merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      {}
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: add duplicate field to map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 3
-          other: b
-    threeWay:
-      mergingList:
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace map field value in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: a
-    modified:
-      mergingList:
-        - name: 1
-          value: a
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: a
-    result:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace map field value in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: a
-    modified:
-      mergingList:
-        - name: 1
-          value: a
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 3
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: a
-    result:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete map from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete map from merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete missing map from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete missing map from merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 3
-          other: a
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-    result:
-      mergingList:
-        - name: 2
-        - name: 3
-          other: a
-  - description: add map and delete map from merging list
-    original:
-      merginglist:
-        - name: 1
-        - name: 2
-    twoWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    modified:
-      merginglist:
-        - name: 2
-        - name: 3
-    current:
-      merginglist:
-        - name: 1
-        - name: 2
-          other: b
-        - name: 4
-          other: c
-    threeWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    result:
-      merginglist:
-        - name: 2
-          other: b
-        - name: 3
-        - name: 4
-          other: c
-  - description: add map and delete map from merging list with conflict
-    original:
-      merginglist:
-        - name: 1
-        - name: 2
-    twoWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    modified:
-      merginglist:
-        - name: 2
-        - name: 3
-    current:
-      merginglist:
-        - name: 1
-          other: a
-        - name: 4
-          other: c
-    threeWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 2
-        - name: 3
-    result:
-      merginglist:
-        - name: 2
-        - name: 3
-        - name: 4
-          other: c
   - description: delete all maps from merging list
     original:
       mergingList:
@@ -1321,443 +1004,6 @@ testCases:
           $patch: delete
     result:
       mergingList: []
-  - description: delete field from map in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete field from map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-  - description: delete missing field from map in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete missing field from map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace non merging list nested in merging list
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: replace non merging list nested in merging list with value conflict
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: c
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: replace non merging list nested in merging list with deletion conflict
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list with value conflict
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: a
-              other: c
-            - name: 2
-              value: b
-              other: d
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-              other: c
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list with deletion conflict
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
   - description: merge empty merging lists
     original:
       mergingList: []
@@ -1771,163 +1017,6 @@ testCases:
       {}
     result:
       mergingList: []
-  - description: add map to merging list by pointer
-    original:
-      mergeItemPtr:
-        - name: 1
-    twoWay:
-      mergeItemPtr:
-        - name: 2
-    modified:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-        - name: 3
-    threeWay:
-      mergeItemPtr:
-        - name: 2
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-        - name: 2
-        - name: 3
-  - description: add map to merging list by pointer with conflict
-    original:
-      mergeItemPtr:
-        - name: 1
-    twoWay:
-      mergeItemPtr:
-        - name: 2
-    modified:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 3
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    result:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-        - name: 3
-  - description: add field to map in merging list by pointer
-    original:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    modified:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              other: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: 1
-              other: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-  - description: add field to map in merging list by pointer with conflict
-    original:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    modified:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
   - description: defined null values should propagate overwrite current fields (with conflict)
     original:
       name: 2
@@ -1995,7 +1084,7 @@ testCases:
       value: b
       retainKeysMap:
         name: foo
-  - description: retainKeys map with no change should not present
+  - description: retainKeys map with no change should not be present
     original:
       name: a
       retainKeysMap:
@@ -2033,6 +1122,9 @@ mergingIntList:
   - 3
 `),
 			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 `),
@@ -2049,6 +1141,9 @@ mergingIntList:
   - 4
 `),
 			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 `),
@@ -2071,6 +1166,9 @@ mergingIntList:
   - 3
 `),
 			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 `),
@@ -2088,6 +1186,9 @@ mergingIntList:
   - 4
 `),
 			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 `),
@@ -2109,6 +1210,10 @@ mergingIntList:
   - 3
 `),
 			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
+  - 4
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 mergingIntList:
@@ -2128,6 +1233,10 @@ mergingIntList:
   - 4
 `),
 			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
+  - 4
 $deleteFromPrimitiveList/mergingIntList:
   - 3
 `),
@@ -2136,6 +1245,3002 @@ mergingIntList:
   - 1
   - 2
   - 4
+`),
+		},
+	},
+	{
+		Description: "merge lists of maps",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+		},
+	},
+	{
+		Description: "merge lists of maps with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+    value: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 3
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 3
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+  - name: 3
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add duplicate field to map in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`{}`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add an item that already exists in current object in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+  - name: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: x
+  - name: 2
+  - name: 3
+`),
+			ThreeWay: []byte(`{}`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: x
+  - name: 2
+  - name: 3
+`),
+		},
+	},
+	{
+		Description: "add duplicate field to map in merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 3
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 2
+    value: 2
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace map field value in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: a
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: a
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace map field value in merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: a
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: 3
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: a
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete map from merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete map from merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete missing map from merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete missing map from merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 3
+    other: a
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+mergingList:
+  - name: 2
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+    other: a
+`),
+		},
+	},
+	{
+		Description: "add map and delete map from merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    other: b
+  - name: 4
+    other: c
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+  - name: 4
+    other: c
+  - name: 3
+`),
+		},
+	},
+	{
+		Description: "add map and delete map from merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 3
+  - name: 1
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 4
+    other: c
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 2
+  - name: 3
+  - name: 1
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 4
+    other: c
+  - name: 2
+  - name: 3
+`),
+		},
+	},
+	{
+		Description: "delete field from map in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete field from map in merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+`),
+		},
+	},
+	{
+		Description: "delete missing field from map in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "delete missing field from map in merging list with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    value: null
+  - name: 2
+    value: 2
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace non merging list nested in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace non merging list nested in merging list with value conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: c
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace non merging list nested in merging list with value conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: c
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "replace non merging list nested in merging list with deletion conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list nested in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list nested in merging list with value conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: a
+        other: c
+      - name: 2
+        value: b
+        other: d
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+        other: c
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list nested in merging list with deletion conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 1
+      - name: 2
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+		},
+	},
+
+	{
+		Description: "add field to map in merging list nested in merging list with deletion conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 2
+      - name: 1
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 2
+        value: 2
+      - name: 1
+        value: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 2
+mergingList:
+  - $setElementOrder/mergingList:
+      - name: 2
+      - name: 1
+    name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 2
+        value: 2
+        other: d
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add map to merging list by pointer",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergeItemPtr:
+  - name: 1
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - name: 2
+`),
+			Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+  - name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - name: 2
+`),
+			Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+  - name: 2
+  - name: 3
+`),
+		},
+	},
+	{
+		Description: "add map to merging list by pointer with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergeItemPtr:
+  - name: 1
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - name: 2
+`),
+			Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+			Current: []byte(`
+mergeItemPtr:
+  - name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+			Result: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+  - name: 3
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list by pointer",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - $setElementOrder/mergeItemPtr:
+      - name: 1
+      - name: 2
+    name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        other: a
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - $setElementOrder/mergeItemPtr:
+      - name: 1
+      - name: 2
+    name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: 1
+        other: a
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add field to map in merging list by pointer with conflict",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - $setElementOrder/mergeItemPtr:
+      - name: 1
+      - name: 2
+    name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+			Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+			Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: a
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergeItemPtr:
+  - name: 1
+  - name: 2
+mergeItemPtr:
+  - $setElementOrder/mergeItemPtr:
+      - name: 1
+      - name: 2
+    name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+			Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "merge lists of scalars",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+- 1
+- 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+- 1
+- 2
+- 3
+mergingIntList:
+- 3
+`),
+			Modified: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+`),
+			Current: []byte(`
+mergingIntList:
+- 1
+- 2
+- 4
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+- 1
+- 2
+- 3
+mergingIntList:
+- 3
+`),
+			Result: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+- 4
+`),
+		},
+	},
+	{
+		Description: "add duplicate field to map in merging int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 2
+  - 3
+mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			ThreeWay: []byte(`{}`),
+			Result: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+		},
+	},
+	// test case for setElementOrder
+	{
+		Description: "add an item in a list of primitives and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+- 1
+- 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+- 3
+- 1
+- 2
+mergingIntList:
+- 3
+`),
+			Modified: []byte(`
+mergingIntList:
+- 3
+- 1
+- 2
+`),
+			Current: []byte(`
+mergingIntList:
+- 1
+- 4
+- 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+- 3
+- 1
+- 2
+mergingIntList:
+- 3
+`),
+			Result: []byte(`
+mergingIntList:
+- 3
+- 1
+- 4
+- 2
+`),
+		},
+	},
+	{
+		Description: "delete an item in a list of primitives and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+$deleteFromPrimitiveList/mergingIntList:
+- 3
+`),
+			Modified: []byte(`
+mergingIntList:
+- 2
+- 1
+`),
+			Current: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+$deleteFromPrimitiveList/mergingIntList:
+- 3
+`),
+			Result: []byte(`
+mergingIntList:
+- 2
+- 1
+`),
+		},
+	},
+	{
+		Description: "add an item in a list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 3
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 3
+    value: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 3
+  - name: 1
+  - name: 2
+mergingList:
+  - name: 3
+    value: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+		},
+	},
+	{
+		Description: "add multiple items in a list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 4
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 1
+  - name: 4
+  - name: 2
+  - name: 3
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+		},
+	},
+	{
+		Description: "delete an item in a list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+    value: 3
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+mergingList:
+  - name: 3
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+mergingList:
+  - name: 3
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+    other: b
+  - name: 1
+    other: a
+`),
+		},
+	},
+	{
+		Description: "change an item in a list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+    value: 3
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+  - name: 1
+mergingList:
+  - name: 3
+    value: x
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 3
+    value: x
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 3
+  - name: 1
+mergingList:
+  - name: 3
+    value: x
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: x
+  - name: 1
+    other: a
+`),
+		},
+	},
+	{
+		Description: "add and delete an item in a list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+    value: 3
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 1
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    $patch: delete
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 1
+mergingList:
+  - name: 4
+    value: 4
+  - name: 3
+    $patch: delete
+`),
+			Result: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+    other: b
+  - name: 1
+    other: a
+`),
+		},
+	},
+	{
+		Description: "set elements order in a list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 3
+  - name: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 3
+  - name: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 1
+    other: a
+`),
+		},
+	},
+	{
+		Description: "set elements order in a list with server-only items",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 3
+  - name: 1
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 1
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 9
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 4
+  - name: 2
+  - name: 3
+  - name: 1
+`),
+			Result: []byte(`
+mergingList:
+  - name: 4
+    value: 4
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 1
+    other: a
+  - name: 9
+`),
+		},
+	},
+	{
+		Description: "set elements order in a list with server-only items 2",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+  - name: 4
+  - name: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 1
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+  - name: 9
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+  - name: 4
+  - name: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 1
+    other: a
+  - name: 9
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+		},
+	},
+	{
+		Description: "set elements order in a list with server-only items 3",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+  - name: 4
+  - name: 3
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 1
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+			Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+  - name: 7
+  - name: 9
+  - name: 8
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+  - name: 2
+  - name: 1
+  - name: 4
+  - name: 3
+`),
+			Result: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 1
+    other: a
+  - name: 7
+  - name: 9
+  - name: 8
+  - name: 4
+    value: 4
+  - name: 3
+    value: 3
+`),
+		},
+	},
+	{
+		Description: "add an item in a int list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 3
+  - 1
+  - 2
+mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 3
+  - 1
+  - 2
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 3
+  - 1
+  - 2
+mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 3
+  - 1
+  - 2
+`),
+		},
+	},
+	{
+		Description: "add multiple items in a int list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 4
+  - 2
+  - 3
+mergingIntList:
+  - 4
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 4
+  - 2
+  - 3
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 1
+  - 4
+  - 2
+  - 3
+mergingIntList:
+  - 4
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 1
+  - 4
+  - 2
+  - 3
+`),
+		},
+	},
+	{
+		Description: "delete an item in a int list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 2
+  - 1
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 2
+  - 1
+`),
+		},
+	},
+	{
+		Description: "add and delete an item in a int list and preserve order",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 1
+mergingIntList:
+  - 4
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 1
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 1
+mergingIntList:
+  - 4
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 1
+`),
+		},
+	},
+	{
+		Description: "set elements order in a int list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 4
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 4
+  - 2
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Result: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+		},
+	},
+	{
+		Description: "set elements order in a int list with server-only items",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 4
+  - 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 3
+  - 4
+  - 2
+  - 9
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+`),
+			Result: []byte(`
+mergingIntList:
+  - 4
+  - 2
+  - 3
+  - 1
+  - 9
+`),
+		},
+	},
+	{
+		Description: "set elements order in a int list with server-only items 2",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 9
+  - 3
+  - 4
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 2
+  - 1
+  - 9
+  - 4
+  - 3
+`),
+		},
+	},
+	{
+		Description: "set elements order in a int list with server-only items 3",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 7
+  - 9
+  - 8
+  - 3
+  - 4
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+  - 2
+  - 1
+  - 4
+  - 3
+`),
+			Result: []byte(`
+mergingIntList:
+  - 2
+  - 1
+  - 7
+  - 9
+  - 8
+  - 4
+  - 3
+`),
+		},
+	},
+	{
+		// This test case is used just to demonstrate the behavior when dealing with a list with duplicate
+		Description: "behavior of set element order for a merging list with duplicate",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+- name: 4
+`),
+			Current: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+- name: 4
+`),
+			Modified: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+  value: dup2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: 2
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+`),
+			TwoWayResult: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 2
+  value: dup2
+- name: 1
+- name: 4
+- name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: 2
+- name: 1
+- name: 4
+- name: 3
+- name: 2
+`),
+			Result: []byte(`
+mergingList:
+- name: 2
+  value: dup1
+- name: 2
+  value: dup2
+- name: 1
+- name: 4
+- name: 3
+`),
+		},
+	},
+	{
+		// This test case is used just to demonstrate the behavior when dealing with a list with duplicate
+		Description: "behavior of set element order for a merging int list with duplicate",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+- 2
+- 4
+`),
+			Current: []byte(`
+mergingIntList:
+- 1
+- 2
+- 3
+- 2
+- 4
+`),
+			Modified: []byte(`
+mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			TwoWayResult: []byte(`
+mergingIntList:
+- 2
+- 2
+- 1
+- 4
+- 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingIntList:
+- 2
+- 1
+- 4
+- 3
+- 2
+`),
+			Result: []byte(`
+mergingIntList:
+- 2
+- 2
+- 1
+- 4
+- 3
 `),
 		},
 	},
@@ -2949,6 +5054,9 @@ retainKeysMap:
     - mergingIntList
     - name
     - value
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
   value: bar
 `),
 			Result: []byte(`
@@ -2990,6 +5098,10 @@ retainKeysMap:
 `),
 			TwoWay: []byte(`
 retainKeysMap:
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
+    - 4
   $retainKeys:
     - mergingIntList
     - name
@@ -2998,6 +5110,10 @@ retainKeysMap:
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
+  $setElementOrder/mergingIntList:
+    - 1
+    - 2
+    - 4
   $retainKeys:
     - mergingIntList
     - name
@@ -3010,8 +5126,8 @@ retainKeysMap:
   mergingIntList:
   - 1
   - 2
-  - 3
   - 4
+  - 3
 `),
 		},
 	},
@@ -3049,6 +5165,9 @@ retainKeysMap:
     - name
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
@@ -3057,6 +5176,9 @@ retainKeysMap:
     - name
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
 `),
 			Result: []byte(`
 retainKeysMap:
@@ -3105,6 +5227,10 @@ retainKeysMap:
   - 5
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
+    - 5
 `),
 			ThreeWay: []byte(`
 retainKeysMap:
@@ -3115,6 +5241,10 @@ retainKeysMap:
   - 5
   $deleteFromPrimitiveList/mergingIntList:
   - 2
+  $setElementOrder/mergingIntList:
+    - 1
+    - 3
+    - 5
 `),
 			Result: []byte(`
 retainKeysMap:
@@ -3122,8 +5252,8 @@ retainKeysMap:
   mergingIntList:
   - 1
   - 3
-  - 4
   - 5
+  - 4
 `),
 		},
 	},
@@ -3208,6 +5338,9 @@ retainKeysMap:
     - mergingList
     - name
     - value
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   value: bar
 `),
 			Result: []byte(`
@@ -3252,6 +5385,10 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
+    - name: c
   mergingList:
   - name: c
 `),
@@ -3260,6 +5397,10 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
+    - name: c
   mergingList:
   - name: c
 `),
@@ -3307,6 +5448,9 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   mergingList:
   - name: b
     value: bar
@@ -3316,6 +5460,9 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
+    - name: b
   mergingList:
   - name: b
     value: bar
@@ -3405,6 +5552,8 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
   mergingList:
   - name: b
     $patch: delete
@@ -3414,6 +5563,8 @@ retainKeysMap:
   $retainKeys:
     - mergingList
     - name
+  $setElementOrder/mergingList:
+    - name: a
   mergingList:
   - name: b
     $patch: delete
@@ -3451,6 +5602,9 @@ retainKeysMergingList:
 `),
 			TwoWay: []byte(`{}`),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3488,6 +5642,9 @@ retainKeysMergingList:
   value: modified
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3496,6 +5653,9 @@ retainKeysMergingList:
   value: modified
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3534,6 +5694,9 @@ retainKeysMergingList:
   value: new
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3542,6 +5705,9 @@ retainKeysMergingList:
   value: new
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3580,6 +5746,9 @@ retainKeysMergingList:
   value: new
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3588,6 +5757,9 @@ retainKeysMergingList:
   value: new
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3623,6 +5795,9 @@ retainKeysMergingList:
   value: a
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3631,6 +5806,9 @@ retainKeysMergingList:
   value: a
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3667,6 +5845,9 @@ retainKeysMergingList:
   value: a
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3675,6 +5856,9 @@ retainKeysMergingList:
   value: a
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3711,6 +5895,9 @@ retainKeysMergingList:
 - name: foo
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3718,6 +5905,9 @@ retainKeysMergingList:
   value: null
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3753,6 +5943,9 @@ retainKeysMergingList:
 - name: foo
 `),
 			TwoWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3760,6 +5953,9 @@ retainKeysMergingList:
   value: null
 `),
 			ThreeWay: []byte(`
+$setElementOrder/retainKeysMergingList:
+  - name: bar
+  - name: foo
 retainKeysMergingList:
 - $retainKeys:
     - name
@@ -3770,6 +5966,75 @@ retainKeysMergingList:
 retainKeysMergingList:
 - name: bar
 - name: foo
+`),
+		},
+	},
+	{
+		Description: "delete and reorder in one list, reorder in another",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: a
+  value: a
+- name: b
+  value: b
+mergeItemPtr:
+- name: c
+  value: c
+- name: d
+  value: d
+`),
+			Current: []byte(`
+mergingList:
+- name: a
+  value: a
+- name: b
+  value: b
+mergeItemPtr:
+- name: c
+  value: c
+- name: d
+  value: d
+`),
+			Modified: []byte(`
+mergingList:
+- name: b
+  value: b
+mergeItemPtr:
+- name: d
+  value: d
+- name: c
+  value: c
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: b
+$setElementOrder/mergeItemPtr:
+- name: d
+- name: c
+mergingList:
+- $patch: delete
+  name: a
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: b
+$setElementOrder/mergeItemPtr:
+- name: d
+- name: c
+mergingList:
+- $patch: delete
+  name: a
+`),
+			Result: []byte(`
+mergingList:
+- name: b
+  value: b
+mergeItemPtr:
+- name: d
+  value: d
+- name: c
+  value: c
 `),
 		},
 	},
@@ -3797,9 +6062,12 @@ func TestStrategicMergePatch(t *testing.T) {
 		testThreeWayPatch(t, c)
 	}
 
-	for _, c := range strategicMergePatchRawTestCases {
-		testTwoWayPatchForRawTestCase(t, c)
-		testThreeWayPatchForRawTestCase(t, c)
+	// run multiple times to exercise different map traversal orders
+	for i := 0; i < 10; i++ {
+		for _, c := range strategicMergePatchRawTestCases {
+			testTwoWayPatchForRawTestCase(t, c)
+			testThreeWayPatchForRawTestCase(t, c)
+		}
 	}
 }
 
@@ -3829,7 +6097,7 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expectedPatch, actualPatch, c.Description)
-	testPatchApplication(t, original, actualPatch, expectedResult, c.Description)
+	testPatchApplication(t, original, actualPatch, expectedResult, c.Description, "")
 }
 
 func testTwoWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
@@ -3843,7 +6111,7 @@ func testTwoWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCas
 	}
 
 	testPatchCreation(t, expectedPatch, actualPatch, c.Description)
-	testPatchApplication(t, original, actualPatch, expectedResult, c.Description)
+	testPatchApplication(t, original, actualPatch, expectedResult, c.Description, c.ExpectedError)
 }
 
 func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte) {
@@ -3893,7 +6161,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 			}
 
 			testPatchCreation(t, expected, actual, c.Description)
-			testPatchApplication(t, current, actual, result, c.Description)
+			testPatchApplication(t, current, actual, result, c.Description, "")
 		}
 
 		return
@@ -3906,7 +6174,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, current, actual, result, c.Description)
+	testPatchApplication(t, current, actual, result, c.Description, "")
 }
 
 func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestCase) {
@@ -3934,7 +6202,7 @@ func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestC
 			}
 
 			testPatchCreation(t, expected, actual, c.Description)
-			testPatchApplication(t, current, actual, result, c.Description)
+			testPatchApplication(t, current, actual, result, c.Description, c.ExpectedError)
 		}
 
 		return
@@ -3947,7 +6215,7 @@ func testThreeWayPatchForRawTestCase(t *testing.T, c StrategicMergePatchRawTestC
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, current, actual, result, c.Description)
+	testPatchApplication(t, current, actual, result, c.Description, c.ExpectedError)
 }
 
 func threeWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte, []byte) {
@@ -3967,40 +6235,32 @@ func threeWayRawTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchRawTestC
 }
 
 func testPatchCreation(t *testing.T, expected, actual []byte, description string) {
-	sorted, err := sortMergeListsByName(actual, mergeItem)
-	if err != nil {
-		t.Errorf("error: %s\nin test case: %s\ncannot sort patch:\n%s\n",
-			err, description, jsonToYAMLOrError(actual))
-		return
-	}
-
-	if !reflect.DeepEqual(sorted, expected) {
+	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
-			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(sorted))
+			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(actual))
 		return
 	}
 }
 
-func testPatchApplication(t *testing.T, original, patch, expected []byte, description string) {
+func testPatchApplication(t *testing.T, original, patch, expected []byte, description, expectedError string) {
 	result, err := StrategicMergePatch(original, patch, mergeItem)
+	if len(expectedError) != 0 {
+		if err != nil && strings.Contains(err.Error(), expectedError) {
+			return
+		}
+		t.Errorf("expected error should contain:\n%s\nin test case: %s\nbut got:\n%s\n", expectedError, description, err)
+	}
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
 		return
 	}
 
-	sorted, err := sortMergeListsByName(result, mergeItem)
-	if err != nil {
-		t.Errorf("error: %s\nin test case: %s\ncannot sort result object:\n%s\n",
-			err, description, jsonToYAMLOrError(result))
-		return
-	}
-
-	if !reflect.DeepEqual(sorted, expected) {
+	if !reflect.DeepEqual(result, expected) {
 		format := "error in test case: %s\npatch application failed:\noriginal:\n%s\npatch:\n%s\nexpected:\n%s\ngot:\n%s\n"
 		t.Errorf(format, description,
 			jsonToYAMLOrError(original), jsonToYAMLOrError(patch),
-			jsonToYAMLOrError(expected), jsonToYAMLOrError(sorted))
+			jsonToYAMLOrError(expected), jsonToYAMLOrError(result))
 		return
 	}
 }
@@ -4285,6 +6545,9 @@ replacingItem:
   The: RawExtension
 `),
 			TwoWay: []byte(`
+$setElementOrder/merginglist:
+  - name: 1
+  - name: 2
 merginglist:
   - name: 2
 replacingItem:
@@ -4305,6 +6568,9 @@ replacingItem:
   The: RawExtension
 `),
 			ThreeWay: []byte(`
+$setElementOrder/merginglist:
+  - name: 1
+  - name: 2
 merginglist:
   - name: 2
 replacingItem:
@@ -4318,8 +6584,8 @@ value: some-value
 other: current-other
 merginglist:
   - name: 1
-  - name: 3
   - name: 2
+  - name: 3
 replacingItem:
   Newly: Modified
   Yaml: Inside
@@ -4331,88 +6597,8 @@ replacingItem:
 
 func TestReplaceWithRawExtension(t *testing.T) {
 	for _, c := range replaceRawExtensionPatchTestCases {
-		testTwoWayPatchWithoutSorting(t, c)
-		testThreeWayPatchWithoutSorting(t, c)
-	}
-}
-
-func testTwoWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
-	original, expectedPatch, modified, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
-
-	actualPatch, err := CreateTwoWayMergePatch(original, modified, mergeItem)
-	if err != nil {
-		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
-			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
-		return
-	}
-
-	testPatchCreationWithoutSorting(t, expectedPatch, actualPatch, c.Description)
-	testPatchApplicationWithoutSorting(t, original, actualPatch, expectedResult, c.Description)
-}
-
-func testThreeWayPatchWithoutSorting(t *testing.T, c StrategicMergePatchRawTestCase) {
-	original, modified, current, expected, result := threeWayRawTestCaseToJSONOrFail(t, c)
-	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
-	if err != nil {
-		if !mergepatch.IsConflict(err) {
-			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
-				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
-			return
-		}
-
-		if !strings.Contains(c.Description, "conflict") {
-			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
-				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
-			return
-		}
-
-		if len(c.Result) > 0 {
-			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
-			if err != nil {
-				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
-					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
-				return
-			}
-
-			testPatchCreationWithoutSorting(t, expected, actual, c.Description)
-			testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
-		}
-
-		return
-	}
-
-	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
-		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
-			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
-		return
-	}
-
-	testPatchCreationWithoutSorting(t, expected, actual, c.Description)
-	testPatchApplicationWithoutSorting(t, current, actual, result, c.Description)
-}
-
-func testPatchCreationWithoutSorting(t *testing.T, expected, actual []byte, description string) {
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
-			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(actual))
-		return
-	}
-}
-
-func testPatchApplicationWithoutSorting(t *testing.T, original, patch, expected []byte, description string) {
-	result, err := StrategicMergePatch(original, patch, mergeItem)
-	if err != nil {
-		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
-			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
-		return
-	}
-
-	if !reflect.DeepEqual(result, expected) {
-		format := "error in test case: %s\npatch application failed:\noriginal:\n%s\npatch:\n%s\nexpected:\n%s\ngot:\n%s\n"
-		t.Errorf(format, description,
-			jsonToYAMLOrError(original), jsonToYAMLOrError(patch),
-			jsonToYAMLOrError(expected), jsonToYAMLOrError(result))
-		return
+		testTwoWayPatchForRawTestCase(t, c)
+		testThreeWayPatchForRawTestCase(t, c)
 	}
 }
 

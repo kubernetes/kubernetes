@@ -1,6 +1,6 @@
 # privilegedPSP gives the privilegedPSP role
 # to the group privileged.
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
     name: privileged-psp-users
@@ -15,7 +15,7 @@ roleRef:
 ---
 # restrictedPSP grants the restrictedPSP role to
 # the groups restricted and privileged.
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
     name: restricted-psp-users
@@ -31,8 +31,9 @@ roleRef:
    kind: ClusterRole
    name: restricted-psp-user
 ---
-# edit grants edit role to system:authenticated.
-apiVersion: rbac.authorization.k8s.io/v1beta1
+# edit grants edit role to the groups
+# restricted and privileged.
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
     name: edit

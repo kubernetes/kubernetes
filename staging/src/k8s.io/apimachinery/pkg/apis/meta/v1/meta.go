@@ -67,14 +67,25 @@ type Object interface {
 
 // ListMetaAccessor retrieves the list interface from an object
 type ListMetaAccessor interface {
-	GetListMeta() List
+	GetListMeta() ListInterface
 }
 
-// List lets you work with list metadata from any of the versioned or
+// Common lets you work with core metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
 // TODO: move this, and TypeMeta and ListMeta, to a different package
-type List interface {
+type Common interface {
+	GetResourceVersion() string
+	SetResourceVersion(version string)
+	GetSelfLink() string
+	SetSelfLink(selfLink string)
+}
+
+// ListInterface lets you work with list metadata from any of the versioned or
+// internal API objects. Attempting to set or retrieve a field on an object that does
+// not support that field will be a no-op and return a default value.
+// TODO: move this, and TypeMeta and ListMeta, to a different package
+type ListInterface interface {
 	GetResourceVersion() string
 	SetResourceVersion(version string)
 	GetSelfLink() string
@@ -107,7 +118,7 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *ListMeta) GetListMeta() List { return obj }
+func (obj *ListMeta) GetListMeta() ListInterface { return obj }
 
 func (obj *ObjectMeta) GetObjectMeta() Object { return obj }
 
@@ -149,6 +160,9 @@ func (meta *ObjectMeta) GetFinalizers() []string                      { return m
 func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 
 func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
+	if meta.OwnerReferences == nil {
+		return nil
+	}
 	ret := make([]OwnerReference, len(meta.OwnerReferences))
 	for i := 0; i < len(meta.OwnerReferences); i++ {
 		ret[i].Kind = meta.OwnerReferences[i].Kind
@@ -168,6 +182,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference {
 }
 
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
+	if references == nil {
+		meta.OwnerReferences = nil
+		return
+	}
 	newReferences := make([]OwnerReference, len(references))
 	for i := 0; i < len(references); i++ {
 		newReferences[i].Kind = references[i].Kind

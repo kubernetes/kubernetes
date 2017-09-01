@@ -22,13 +22,13 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -39,7 +39,7 @@ import (
 )
 
 type APIHandlerManager interface {
-	AddAPIService(apiService *apiregistration.APIService)
+	AddAPIService(apiService *apiregistration.APIService) error
 	RemoveAPIService(apiServiceName string)
 }
 
@@ -102,30 +102,7 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 		return nil
 	}
 
-	c.apiHandlerManager.AddAPIService(apiService)
-	return nil
-}
-
-func (c *APIServiceRegistrationController) getDestinationHost(apiService *apiregistration.APIService) string {
-	if apiService.Spec.Service == nil {
-		return ""
-	}
-
-	destinationHost := apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc"
-	service, err := c.serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
-	if err != nil {
-		return destinationHost
-	}
-	switch {
-	// use IP from a clusterIP for these service types
-	case service.Spec.Type == v1.ServiceTypeClusterIP,
-		service.Spec.Type == v1.ServiceTypeNodePort,
-		service.Spec.Type == v1.ServiceTypeLoadBalancer:
-		return service.Spec.ClusterIP
-	}
-
-	// return the normal DNS name by default
-	return destinationHost
+	return c.apiHandlerManager.AddAPIService(apiService)
 }
 
 func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {

@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
 
@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 			By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 
 			// Cleanup
-			err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
+			err := f.FederationClientset.CoreV1().Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 			By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
 		})
@@ -113,7 +113,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
-					err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
+					err := f.FederationClientset.CoreV1().Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
 				}()
 				By(fmt.Sprintf("Wait for service shards to be created in all clusters for service \"%s/%s\"", nsName, service.Name))
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				defer func() {
 					// Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
-					err := f.FederationClientset.Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
+					err := f.FederationClientset.CoreV1().Services(nsName).Delete(service.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
 				}()
 				By(fmt.Sprintf("Wait for service shards to be created in all clusters for service \"%s/%s\"", nsName, service.Name))
@@ -183,8 +183,8 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 
 				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
-				service = createServiceOrFail(f.FederationClientset, nsName, FederatedServiceName)
-				obj, err := api.Scheme.DeepCopy(service)
+				service = createLBServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
+				obj, err := scheme.Scheme.DeepCopy(service)
 				// Cloning shouldn't fail. On the off-chance it does, we
 				// should shallow copy service to serviceShard before
 				// failing. If we don't do this we will never really
@@ -258,7 +258,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				By("Verified that DNS rules are working as expected")
 
 				By("Deleting the service to verify that DNS rules still work")
-				err := f.FederationClientset.Services(nsName).Delete(FederatedServiceName, &metav1.DeleteOptions{})
+				err := f.FederationClientset.CoreV1().Services(nsName).Delete(FederatedServiceName, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 				// Service is deleted, unset the test block-global service variable.
 				service = nil
@@ -325,7 +325,7 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	By(fmt.Sprintf("Waiting for service %s to be created in all underlying clusters", serviceName))
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		for _, cluster := range clusters {
-			_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+			_, err := cluster.CoreV1().Services(nsName).Get(serviceName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					return false, err
@@ -346,7 +346,7 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 	shouldExist := orphanDependents == nil || *orphanDependents == true
 	for _, cluster := range clusters {
 		clusterName := cluster.Name
-		_, err := cluster.Core().Services(nsName).Get(serviceName, metav1.GetOptions{})
+		_, err := cluster.CoreV1().Services(nsName).Get(serviceName, metav1.GetOptions{})
 		if shouldExist && errors.IsNotFound(err) {
 			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for service %s in cluster %s, expected service to exist", serviceName, clusterName))
 		} else if !shouldExist && !errors.IsNotFound(err) {
@@ -359,16 +359,16 @@ func verifyCascadingDeletionForService(clientset *fedclientset.Clientset, cluste
 }
 
 func updateServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
-	service, err := clientset.Services(namespace).Get(name, metav1.GetOptions{})
+	service, err := clientset.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Getting service %q in namespace %q", name, namespace)
 	service.Spec.Selector["name"] = "update-demo"
-	newService, err := clientset.Services(namespace).Update(service)
+	newService, err := clientset.CoreV1().Services(namespace).Update(service)
 	By(fmt.Sprintf("Successfully updated federated service %q in namespace %q", name, namespace))
 	return newService
 }
 
 func deleteServiceShard(c *fedframework.Cluster, namespace, service string) error {
-	err := c.Clientset.Services(namespace).Delete(service, &metav1.DeleteOptions{})
+	err := c.Clientset.CoreV1().Services(namespace).Delete(service, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service, namespace, c.Name)
 		return err
@@ -379,13 +379,10 @@ func deleteServiceShard(c *fedframework.Cluster, namespace, service string) erro
 
 // equivalent returns true if the two services are equivalent.  Fields which are expected to differ between
 // federated services and the underlying cluster services (e.g. ClusterIP, NodePort) are ignored.
-func equivalent(clusterService, federationService v1.Service) bool {
-	federationService.Spec.ClusterIP = clusterService.Spec.ClusterIP
-	for i := range federationService.Spec.Ports {
-		federationService.Spec.Ports[i].NodePort = clusterService.Spec.Ports[i].NodePort
-	}
-	if federationService.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyType("") {
-		federationService.Spec.ExternalTrafficPolicy = clusterService.Spec.ExternalTrafficPolicy
+func equivalent(federationService, clusterService v1.Service) bool {
+	clusterService.Spec.ClusterIP = federationService.Spec.ClusterIP
+	for i := range clusterService.Spec.Ports {
+		clusterService.Spec.Ports[i].NodePort = federationService.Spec.Ports[i].NodePort
 	}
 
 	if federationService.Name != clusterService.Name || federationService.Namespace != clusterService.Namespace {

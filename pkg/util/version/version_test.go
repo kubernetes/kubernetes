@@ -18,6 +18,7 @@ package version
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -254,6 +255,78 @@ func TestBadGenericVersions(t *testing.T) {
 		_, err := ParseGeneric(tests[i])
 		if err == nil {
 			t.Errorf("unexpected success parsing invalid version %q", tests[i])
+		}
+	}
+}
+
+func TestComponents(t *testing.T) {
+
+	var tests = []struct {
+		version               string
+		semver                bool
+		expectedComponents    []uint
+		expectedMajor         uint
+		expectedMinor         uint
+		expectedPatch         uint
+		expectedPreRelease    string
+		expectedBuildMetadata string
+	}{
+		{
+			version:            "1.0.2",
+			semver:             true,
+			expectedComponents: []uint{1, 0, 2},
+			expectedMajor:      1,
+			expectedMinor:      0,
+			expectedPatch:      2,
+		},
+		{
+			version:               "1.0.2-alpha+001",
+			semver:                true,
+			expectedComponents:    []uint{1, 0, 2},
+			expectedMajor:         1,
+			expectedMinor:         0,
+			expectedPatch:         2,
+			expectedPreRelease:    "alpha",
+			expectedBuildMetadata: "001",
+		},
+		{
+			version:            "1.2",
+			semver:             false,
+			expectedComponents: []uint{1, 2},
+			expectedMajor:      1,
+			expectedMinor:      2,
+		},
+		{
+			version:               "1.0.2-beta+exp.sha.5114f85",
+			semver:                true,
+			expectedComponents:    []uint{1, 0, 2},
+			expectedMajor:         1,
+			expectedMinor:         0,
+			expectedPatch:         2,
+			expectedPreRelease:    "beta",
+			expectedBuildMetadata: "exp.sha.5114f85",
+		},
+	}
+
+	for _, test := range tests {
+		version, _ := parse(test.version, test.semver)
+		if !reflect.DeepEqual(test.expectedComponents, version.Components()) {
+			t.Error("parse returned un'expected components")
+		}
+		if test.expectedMajor != version.Major() {
+			t.Errorf("parse returned version.Major %d, expected %d", test.expectedMajor, version.Major())
+		}
+		if test.expectedMinor != version.Minor() {
+			t.Errorf("parse returned version.Minor %d, expected %d", test.expectedMinor, version.Minor())
+		}
+		if test.expectedPatch != version.Patch() {
+			t.Errorf("parse returned version.Patch %d, expected %d", test.expectedPatch, version.Patch())
+		}
+		if test.expectedPreRelease != version.PreRelease() {
+			t.Errorf("parse returned version.PreRelease %s, expected %s", test.expectedPreRelease, version.PreRelease())
+		}
+		if test.expectedBuildMetadata != version.BuildMetadata() {
+			t.Errorf("parse returned version.BuildMetadata %s, expected %s", test.expectedBuildMetadata, version.BuildMetadata())
 		}
 	}
 }

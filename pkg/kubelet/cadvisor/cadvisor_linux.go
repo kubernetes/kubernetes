@@ -21,7 +21,11 @@ package cadvisor
 import (
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
+	"path"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,33 +78,51 @@ func init() {
 }
 
 func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
-	set := map[string]string{metrics.LabelID: c.Name}
+	// Prometheus requires that all metrics in the same family have the same labels,
+	// so we arrange to supply blank strings for missing labels
+	var name, image, podName, namespace, containerName string
 	if len(c.Aliases) > 0 {
-		set[metrics.LabelName] = c.Aliases[0]
+		name = c.Aliases[0]
 	}
-	if image := c.Spec.Image; len(image) > 0 {
-		set[metrics.LabelImage] = image
-	}
+	image = c.Spec.Image
 	if v, ok := c.Spec.Labels[types.KubernetesPodNameLabel]; ok {
-		set["pod_name"] = v
+		podName = v
 	}
 	if v, ok := c.Spec.Labels[types.KubernetesPodNamespaceLabel]; ok {
-		set["namespace"] = v
+		namespace = v
 	}
 	if v, ok := c.Spec.Labels[types.KubernetesContainerNameLabel]; ok {
-		set["container_name"] = v
+		containerName = v
+	}
+	set := map[string]string{
+		metrics.LabelID:    c.Name,
+		metrics.LabelName:  name,
+		metrics.LabelImage: image,
+		"pod_name":         podName,
+		"namespace":        namespace,
+		"container_name":   containerName,
 	}
 	return set
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}, http.DefaultClient)
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := os.Stat(rootPath); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(path.Clean(rootPath), 0750); err != nil {
+				return nil, fmt.Errorf("error creating root directory %q: %v", rootPath, err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
+		}
 	}
 
 	cadvisorClient := &cadvisorClient{
@@ -109,7 +131,7 @@ func New(port uint, runtime string, rootPath string) (Interface, error) {
 		Manager:  m,
 	}
 
-	err = cadvisorClient.exportHTTP(port)
+	err = cadvisorClient.exportHTTP(address, port)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +142,7 @@ func (cc *cadvisorClient) Start() error {
 	return cc.Manager.Start()
 }
 
-func (cc *cadvisorClient) exportHTTP(port uint) error {
+func (cc *cadvisorClient) exportHTTP(address string, port uint) error {
 	// Register the handlers regardless as this registers the prometheus
 	// collector properly.
 	mux := http.NewServeMux()
@@ -134,7 +156,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 	// Only start the http server if port > 0
 	if port > 0 {
 		serv := &http.Server{
-			Addr:    fmt.Sprintf(":%d", port),
+			Addr:    net.JoinHostPort(address, strconv.Itoa(int(port))),
 			Handler: mux,
 		}
 
@@ -222,4 +244,17 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return cc.WatchForEvents(request)
+}
+
+// HasDedicatedImageFs returns true if the imagefs has a dedicated device.
+func (cc *cadvisorClient) HasDedicatedImageFs() (bool, error) {
+	imageFsInfo, err := cc.ImagesFsInfo()
+	if err != nil {
+		return false, err
+	}
+	rootFsInfo, err := cc.RootFsInfo()
+	if err != nil {
+		return false, err
+	}
+	return imageFsInfo.Device != rootFsInfo.Device, nil
 }

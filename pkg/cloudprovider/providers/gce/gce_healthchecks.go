@@ -17,10 +17,7 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
-	"time"
-
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
@@ -38,18 +35,15 @@ var (
 )
 
 func init() {
-	if v, err := utilversion.ParseGeneric("1.7.0"); err != nil {
-		panic(err)
+	if v, err := utilversion.ParseGeneric("1.7.2"); err != nil {
+		glog.Fatalf("Failed to parse version for minNodesHealthCheckVersion: %v", err)
 	} else {
 		minNodesHealthCheckVersion = v
 	}
 }
 
 func newHealthcheckMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"healthcheck_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("healthcheck", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
@@ -208,26 +202,10 @@ func GetNodesHealthCheckPort() int32 {
 	return lbNodesHealthCheckPort
 }
 
-// getNodesHealthCheckPath returns the health check path used by the GCE load
+// GetNodesHealthCheckPath returns the health check path used by the GCE load
 // balancers (l4) for performing health checks on nodes.
-func getNodesHealthCheckPath() string {
+func GetNodesHealthCheckPath() string {
 	return nodesHealthCheckPath
-}
-
-// makeNodesHealthCheckName returns name of the health check resource used by
-// the GCE load balancers (l4) for performing health checks on nodes.
-func makeNodesHealthCheckName(clusterID string) string {
-	return fmt.Sprintf("k8s-%v-node", clusterID)
-}
-
-// MakeHealthCheckFirewallName returns the firewall name used by the GCE load
-// balancers (l4) for performing health checks.
-func MakeHealthCheckFirewallName(clusterID, hcName string, isNodesHealthCheck bool) string {
-	if isNodesHealthCheck {
-		// TODO: Change below fwName to match the proposed schema: k8s-{clusteriD}-{namespace}-{name}-{shortid}-hc.
-		return makeNodesHealthCheckName(clusterID) + "-http-hc"
-	}
-	return "k8s-" + hcName + "-http-hc"
 }
 
 // isAtLeastMinNodesHealthCheckVersion checks if a version is higher than

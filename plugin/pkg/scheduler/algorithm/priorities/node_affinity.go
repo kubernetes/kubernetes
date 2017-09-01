@@ -19,12 +19,13 @@ package priorities
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/golang/glog"
 )
 
 // CalculateNodeAffinityPriority prioritizes nodes according to node affinity scheduling preferences
@@ -43,7 +44,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 		affinity = priorityMeta.affinity
 	} else {
 		// We couldn't parse metadata - fallback to the podspec.
-		affinity = schedulercache.ReconcileAffinity(pod)
+		affinity = pod.Spec.Affinity
 	}
 
 	var count int32
@@ -87,7 +88,7 @@ func CalculateNodeAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeName
 	var fScore float64
 	for i := range result {
 		if maxCount > 0 {
-			fScore = 10 * (float64(result[i].Score) / maxCountFloat)
+			fScore = float64(schedulerapi.MaxPriority) * (float64(result[i].Score) / maxCountFloat)
 		} else {
 			fScore = 0
 		}

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	kubeletapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // Runtime provides an API for lifecycle, inspection and introspection
@@ -62,6 +62,11 @@ func (*Runtime) ListContainers(*runtimeapi.ContainerFilter) ([]*runtimeapi.Conta
 
 // ContainerStatus returns the RawContainerStatus of an app inside the pod sandbox.
 func (*Runtime) ContainerStatus(string) (*runtimeapi.ContainerStatus, error) {
+	panic("not implemented")
+}
+
+// UpdateContainerResources updates the resource constraints for the container.
+func (*Runtime) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
 	panic("not implemented")
 }
 

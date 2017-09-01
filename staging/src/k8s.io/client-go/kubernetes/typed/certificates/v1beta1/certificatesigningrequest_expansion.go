@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1beta1"
 )
 
 type CertificateSigningRequestExpansion interface {

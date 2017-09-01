@@ -54,6 +54,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{Replicas: 3},
 	}
@@ -74,6 +75,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector:            ps.Spec.Selector,
 			Template:            validPodTemplate.Template,
+			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
@@ -122,9 +124,10 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	oldPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: apps.StatefulSetSpec{
-			Replicas: 3,
-			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-			Template: validPodTemplate.Template,
+			Replicas:       3,
+			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:       validPodTemplate.Template,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{
 			Replicas: 1,
@@ -133,9 +136,10 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	newPS := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: apps.StatefulSetSpec{
-			Replicas: 1,
-			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
-			Template: validPodTemplate.Template,
+			Replicas:       1,
+			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
+			Template:       validPodTemplate.Template,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{
 			Replicas: 2,

@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
@@ -35,13 +36,46 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
-// Client is a Kubernetes client that allows you to access metadata
+// Interface is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
+type Interface interface {
+	// GetRateLimiter returns the rate limiter for this client.
+	GetRateLimiter() flowcontrol.RateLimiter
+	// Resource returns an API interface to the specified resource for this client's
+	// group and version.  If resource is not a namespaced resource, then namespace
+	// is ignored.  The ResourceInterface inherits the paramater codec of this client.
+	Resource(resource *metav1.APIResource, namespace string) ResourceInterface
+	// ParameterCodec returns a client with the provided parameter codec.
+	ParameterCodec(parameterCodec runtime.ParameterCodec) Interface
+}
+
+// ResourceInterface is an API interface to a specific resource under a
+// dynamic client.
+type ResourceInterface interface {
+	// List returns a list of objects for this resource.
+	List(opts metav1.ListOptions) (runtime.Object, error)
+	// Get gets the resource with the specified name.
+	Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error)
+	// Delete deletes the resource with the specified name.
+	Delete(name string, opts *metav1.DeleteOptions) error
+	// DeleteCollection deletes a collection of objects.
+	DeleteCollection(deleteOptions *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	// Create creates the provided resource.
+	Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
+	// Update updates the provided resource.
+	Update(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
+	// Watch returns a watch.Interface that watches the resource.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	// Patch patches the provided resource.
+	Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error)
+}
+
+// Client is a Kubernetes client that allows you to access metadata
+// and manipulate metadata of a Kubernetes API group, and implements Interface.
 type Client struct {
 	cl             *restclient.RESTClient
 	parameterCodec runtime.ParameterCodec
@@ -84,8 +118,8 @@ func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
 
 // Resource returns an API interface to the specified resource for this client's
 // group and version. If resource is not a namespaced resource, then namespace
-// is ignored. The ResourceClient inherits the parameter codec of c.
-func (c *Client) Resource(resource *metav1.APIResource, namespace string) *ResourceClient {
+// is ignored. The ResourceInterface inherits the parameter codec of c.
+func (c *Client) Resource(resource *metav1.APIResource, namespace string) ResourceInterface {
 	return &ResourceClient{
 		cl:             c.cl,
 		resource:       resource,
@@ -95,7 +129,7 @@ func (c *Client) Resource(resource *metav1.APIResource, namespace string) *Resou
 }
 
 // ParameterCodec returns a client with the provided parameter codec.
-func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
+func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) Interface {
 	return &Client{
 		cl:             c.cl,
 		parameterCodec: parameterCodec,
@@ -103,7 +137,7 @@ func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
 }
 
 // ResourceClient is an API interface to a specific resource under a
-// dynamic client.
+// dynamic client, and implements ResourceInterface.
 type ResourceClient struct {
 	cl             *restclient.RESTClient
 	resource       *metav1.APIResource
@@ -126,11 +160,16 @@ func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) 
 }
 
 // Get gets the resource with the specified name.
-func (rc *ResourceClient) Get(name string) (*unstructured.Unstructured, error) {
+func (rc *ResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
+	parameterEncoder := rc.parameterCodec
+	if parameterEncoder == nil {
+		parameterEncoder = defaultParameterEncoder
+	}
 	result := new(unstructured.Unstructured)
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
+		VersionedParams(&opts, parameterEncoder).
 		Name(name).
 		Do().
 		Into(result)
@@ -293,9 +332,9 @@ func (versionedParameterEncoderWithV1Fallback) DecodeParameters(parameters url.V
 }
 
 // VersionedParameterEncoderWithV1Fallback is useful for encoding query
-// parameters for thirdparty resources. It tries to convert object to the
+// parameters for custom resources. It tries to convert object to the
 // specified version before converting it to query parameters, and falls back to
 // converting to v1 if the object is not registered in the specified version.
 // For the record, currently API server always treats query parameters sent to a
-// thirdparty resource endpoint as v1.
+// custom resource endpoint as v1.
 var VersionedParameterEncoderWithV1Fallback runtime.ParameterCodec = versionedParameterEncoderWithV1Fallback{}

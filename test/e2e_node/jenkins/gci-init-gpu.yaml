@@ -1,6 +1,8 @@
 #cloud-config
 
 runcmd:
+  - modprobe configs
+  - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e BASE_DIR=/rootfs/nvidia --privileged gcr.io/google_containers/cos-nvidia-driver-install@sha256:cb55c7971c337fece62f2bfe858662522a01e43ac9984a2dd1dd5c71487d225c
   - mount /tmp /tmp -o remount,exec,suid
   - usermod -a -G docker jenkins
   - mkdir -p /var/lib/kubelet
@@ -15,5 +17,3 @@ runcmd:
   - mount --bind /proc /home/kubernetes/containerized_mounter/rootfs/proc
   - mount --bind /dev /home/kubernetes/containerized_mounter/rootfs/dev
   - rm /tmp/mounter.tar
-  - modprobe configs
-  - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e LAKITU_KERNEL_SHA1=2fdf6034a0fae9794d80e4d218e237771224ba8f -e BASE_DIR=/rootfs/nvidia --privileged gcr.io/google_containers/cos-nvidia-driver-install@sha256:ad83ede6e0c6d768bf7cf69a7dec972aa5e8f88778142ca46afd3286ad58cfc8

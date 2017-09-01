@@ -18,9 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"os"
 	"reflect"
 	"sort"
@@ -28,10 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 const (
@@ -141,6 +142,100 @@ func TestToAuthOptions(t *testing.T) {
 	}
 	if ao.Username != cfg.Global.Username {
 		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+}
+
+func TestCheckOpenStackOpts(t *testing.T) {
+	delay := MyDuration{60 * time.Second}
+	timeout := MyDuration{30 * time.Second}
+	tests := []struct {
+		name          string
+		openstackOpts *OpenStack
+		expectedError error
+	}{
+		{
+			name: "test1",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "test2",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "test3",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					ManageSecurityGroups: true,
+					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+			},
+			expectedError: fmt.Errorf("monitor-delay not set in cloud provider config"),
+		},
+		{
+			name: "test4",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+			},
+			expectedError: fmt.Errorf("node-security-group not set in cloud provider config"),
+		},
+	}
+
+	for _, testcase := range tests {
+		err := checkOpenStackOpts(testcase.openstackOpts)
+
+		if err == nil && testcase.expectedError == nil {
+			continue
+		}
+		if (err != nil && testcase.expectedError == nil) || (err == nil && testcase.expectedError != nil) || err.Error() != testcase.expectedError.Error() {
+			t.Errorf("%s failed: expected err=%q, got %q",
+				testcase.name, testcase.expectedError, err)
+		}
 	}
 }
 
@@ -378,7 +473,12 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
 
-	diskId, err := os.AttachDisk(os.localInstanceID, vol)
+	id, err := os.InstanceID()
+	if err != nil {
+		t.Fatalf("Cannot find instance id: %v", err)
+	}
+
+	diskId, err := os.AttachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 	}
@@ -392,7 +492,7 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
 
-	err = os.DetachDisk(os.localInstanceID, vol)
+	err = os.DetachDisk(id, vol)
 	if err != nil {
 		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
 	}
@@ -446,6 +546,50 @@ func TestCinderAutoDetectApiVersion(t *testing.T) {
 	for _, suite := range testCases {
 		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case); autodetectedVersion != suite.wanted_result {
 			t.Fatalf("Autodetect for suite: %s, failed with result: '%s', wanted '%s'", suite.test_case, autodetectedVersion, suite.wanted_result)
+		}
+	}
+}
+
+func TestInstanceIDFromProviderID(t *testing.T) {
+	testCases := []struct {
+		providerID string
+		instanceID string
+		fail       bool
+	}{
+		{
+			providerID: ProviderName + "://" + "/" + "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			fail:       false,
+		},
+		{
+			providerID: "openstack://7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+		{
+			providerID: "other-provider:///7b9cf879-7146-417c-abfd-cb4272f0c935",
+			instanceID: "",
+			fail:       true,
+		},
+	}
+
+	for _, test := range testCases {
+		instanceID, err := instanceIDFromProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("%s yielded `err != nil` as %t. expected %t", test.providerID, (err != nil), test.fail)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if instanceID != test.instanceID {
+			t.Errorf("%s yielded %s. expected %s", test.providerID, instanceID, test.instanceID)
 		}
 	}
 }

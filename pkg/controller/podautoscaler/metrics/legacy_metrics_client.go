@@ -26,13 +26,13 @@ import (
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
+	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
+	clientgov1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	clientgov1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (

@@ -13,19 +13,22 @@ spec:
         k8s-app: ip-masq-agent
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        scheduler.alpha.kubernetes.io/tolerations: |
-          [{"key": "dedicated", "value": "master", "effect": "NoSchedule" },
-          {"key":"CriticalAddonsOnly", "operator":"Exists"}]
     spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.0
+        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.2
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
         securityContext:
           privileged: true
         volumeMounts:
           - name: config
             mountPath: /etc/config
+      nodeSelector:
+        beta.kubernetes.io/masq-agent-ds-ready: "true"  
       volumes:
         - name: config
           configMap:
@@ -36,3 +39,6 @@ spec:
               # The daemon looks for its config in a YAML file at /etc/config/ip-masq-agent
               - key: config
                 path: ip-masq-agent
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"

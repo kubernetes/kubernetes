@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Docker integration using pkg/kubelet/apis/cri/v1alpha1/api.pb.go
+// Docker integration using pkg/kubelet/apis/cri/v1alpha1/runtime/api.pb.go
 package dockershim

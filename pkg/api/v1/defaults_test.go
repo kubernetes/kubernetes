@@ -21,12 +21,13 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
@@ -711,7 +712,7 @@ func TestSetDefaultConfigMapVolumeSource(t *testing.T) {
 	expectedMode := v1.ConfigMapVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected v1.ConfigMap DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -755,7 +756,7 @@ func TestSetDefaultProjectedVolumeSource(t *testing.T) {
 	expectedMode := v1.ProjectedVolumeSourceDefaultMode
 
 	if defaultMode == nil || *defaultMode != expectedMode {
-		t.Errorf("Expected ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
+		t.Errorf("Expected v1.ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
 	}
 }
 
@@ -885,27 +886,15 @@ func TestSetDefaulServiceExternalTraffic(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeGlobal {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeGlobal, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeGlobal {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeGlobal, out.Spec.ExternalTrafficPolicy)
-	}
-
-	in = &v1.Service{
-		Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
-		ObjectMeta: metav1.ObjectMeta{
-			Annotations: map[string]string{v1.BetaAnnotationExternalTraffic: v1.AnnotationValueExternalTrafficLocal},
-		},
-	}
-	obj = roundTrip(t, runtime.Object(in))
-	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != "" {
-		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
 	}
 }
 
@@ -1042,7 +1031,7 @@ func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 		actual := node2.Status.Allocatable
 		expected := testcase.expectedAllocatable
 		if !resourceListsEqual(expected, actual) {
-			t.Errorf("[%d] Expected NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
+			t.Errorf("[%d] Expected v1.NodeStatus.Allocatable: %+v; Got: %+v", i, expected, actual)
 		}
 	}
 }
@@ -1104,7 +1093,7 @@ func TestSetMinimumScalePod(t *testing.T) {
 	pod := &v1.Pod{
 		Spec: s,
 	}
-	v1.SetObjectDefaults_Pod(pod)
+	k8s_api_v1.SetObjectDefaults_Pod(pod)
 
 	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
 		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
@@ -1286,5 +1275,27 @@ func TestSetDefaultSchedulerName(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.SchedulerName != v1.DefaultSchedulerName {
 		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
+	}
+}
+
+func TestSetDefaultHostPathVolumeSource(t *testing.T) {
+	s := v1.PodSpec{}
+	s.Volumes = []v1.Volume{
+		{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "foo"},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*v1.Pod)
+	defaultType := pod2.Spec.Volumes[0].VolumeSource.HostPath.Type
+	expectedType := v1.HostPathUnset
+
+	if defaultType == nil || *defaultType != expectedType {
+		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
 	}
 }

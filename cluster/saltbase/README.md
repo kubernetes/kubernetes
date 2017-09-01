@@ -1,7 +1,7 @@
 # SaltStack configuration
 
 This is the root of the SaltStack configuration for Kubernetes. A high
-level overview for the Kubernetes SaltStack configuration can be found [in the docs tree.](../../docs/admin/salt.md)
+level overview for the Kubernetes SaltStack configuration can be found [in the docs tree.](https://kubernetes.io/docs/admin/salt.md)
 
 This SaltStack configuration currently applies to default
 configurations for Debian-on-GCE, Fedora-on-Vagrant, Ubuntu-on-AWS and

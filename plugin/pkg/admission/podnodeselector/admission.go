@@ -33,6 +33,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 )
 
 // The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
@@ -112,11 +113,20 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
+	updateInitialized, err := util.IsUpdatingInitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if updateInitialized {
+		// node selector of an initialized pod is immutable
+		return nil
+	}
+
 	name := pod.Name
 	nsName := a.GetNamespace()
 	var namespace *api.Namespace
 
-	namespace, err := p.namespaceLister.Get(nsName)
+	namespace, err = p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		namespace, err = p.defaultGetNamespace(nsName)
 		if err != nil {
@@ -158,7 +168,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 
 func NewPodNodeSelector(clusterNodeSelectors map[string]string) *podNodeSelector {
 	return &podNodeSelector{
-		Handler:              admission.NewHandler(admission.Create),
+		Handler:              admission.NewHandler(admission.Create, admission.Update),
 		clusterNodeSelectors: clusterNodeSelectors,
 	}
 }

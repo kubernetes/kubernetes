@@ -36,40 +36,7 @@ var controllerrevisionsResource = schema.GroupVersionResource{Group: "apps", Ver
 
 var controllerrevisionsKind = schema.GroupVersionKind{Group: "apps", Version: "", Kind: "ControllerRevision"}
 
-func (c *FakeControllerRevisions) Create(controllerRevision *apps.ControllerRevision) (result *apps.ControllerRevision, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), &apps.ControllerRevision{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*apps.ControllerRevision), err
-}
-
-func (c *FakeControllerRevisions) Update(controllerRevision *apps.ControllerRevision) (result *apps.ControllerRevision, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), &apps.ControllerRevision{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*apps.ControllerRevision), err
-}
-
-func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &apps.ControllerRevision{})
-
-	return err
-}
-
-func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &apps.ControllerRevisionList{})
-	return err
-}
-
+// Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
 func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (result *apps.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(controllerrevisionsResource, c.ns, name), &apps.ControllerRevision{})
@@ -80,6 +47,7 @@ func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (resul
 	return obj.(*apps.ControllerRevision), err
 }
 
+// List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
 func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *apps.ControllerRevisionList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(controllerrevisionsResource, controllerrevisionsKind, c.ns, opts), &apps.ControllerRevisionList{})
@@ -106,6 +74,44 @@ func (c *FakeControllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, e
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(controllerrevisionsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
+func (c *FakeControllerRevisions) Create(controllerRevision *apps.ControllerRevision) (result *apps.ControllerRevision, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), &apps.ControllerRevision{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*apps.ControllerRevision), err
+}
+
+// Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
+func (c *FakeControllerRevisions) Update(controllerRevision *apps.ControllerRevision) (result *apps.ControllerRevision, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), &apps.ControllerRevision{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*apps.ControllerRevision), err
+}
+
+// Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
+func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &apps.ControllerRevision{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &apps.ControllerRevisionList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched controllerRevision.

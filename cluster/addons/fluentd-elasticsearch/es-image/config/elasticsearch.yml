@@ -12,3 +12,6 @@ path.data: /data
 network.host: 0.0.0.0
 
 discovery.zen.minimum_master_nodes: ${MINIMUM_MASTER_NODES}
+
+xpack.security.enabled: false
+xpack.monitoring.enabled: false

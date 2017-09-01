@@ -17,17 +17,11 @@ limitations under the License.
 package statefulset
 
 import (
-	"fmt"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -104,30 +98,6 @@ func (statefulSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, ol
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
 func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// StatefulSetToSelectableFields returns a field set that represents the object.
-func StatefulSetToSelectableFields(statefulSet *apps.StatefulSet) fields.Set {
-	return generic.ObjectMetaFieldsSet(&statefulSet.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	statefulSet, ok := obj.(*apps.StatefulSet)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not an StatefulSet.")
-	}
-	return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), nil
-}
-
-// MatchStatefulSet is the filter used by the generic etcd backend to watch events
-// from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchStatefulSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type statefulSetStatusStrategy struct {

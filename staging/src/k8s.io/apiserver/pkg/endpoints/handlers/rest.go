@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,6 +66,8 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 
+	TableConvertor rest.TableConvertor
+
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
 	Subresource string
@@ -75,6 +78,30 @@ type RequestScope struct {
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	ctx := scope.ContextFunc(req)
 	responsewriters.ErrorNegotiated(ctx, err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
+	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
+	if gvk.GroupVersion() == metav1alpha1.SchemeGroupVersion {
+		switch gvk.Kind {
+		case "Table":
+			return scope.TableConvertor != nil
+		case "PartialObjectMetadata", "PartialObjectMetadataList":
+			// TODO: should delineate between lists and non-list endpoints
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func (scope *RequestScope) AllowsServerVersion(version string) bool {
+	return version == scope.MetaGroupVersion.Version
+}
+
+func (scope *RequestScope) AllowsStreamSchema(s string) bool {
+	return s == "watch"
 }
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -115,7 +142,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		}
 
 		trace.Step("About to write a response")
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -128,6 +155,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 			if values := req.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
+					err = errors.NewBadRequest(err.Error())
 					return nil, err
 				}
 				if exports.Export {
@@ -137,6 +165,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 					return e.Export(ctx, name, exports)
 				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
+					err = errors.NewBadRequest(err.Error())
 					return nil, err
 				}
 			}
@@ -154,6 +183,7 @@ func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubr
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
+				err = errors.NewBadRequest(err.Error())
 				return nil, err
 			}
 			if trace != nil {
@@ -200,6 +230,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -254,7 +285,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		}
 
 		// Watches for single objects are routed to this function.
-		// Treat a /name parameter the same as a field selector entry.
+		// Treat a name parameter the same as a field selector entry.
 		hasName := true
 		_, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -266,6 +297,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -348,7 +380,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 		}
 
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -410,7 +442,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		if admit != nil && admit.Handles(admission.Create) {
 			userInfo, _ := request.UserFrom(ctx)
@@ -422,13 +454,12 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			}
 		}
 
+		// TODO: replace with content type negotiation?
+		includeUninitialized := req.URL.Query().Get("includeUninitialized") == "1"
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*metav1.Status); ok && err == nil && status.Code == 0 {
-				status.Code = http.StatusCreated
-			}
-			return out, err
+			return r.Create(ctx, name, obj, includeUninitialized)
 		})
 		if err != nil {
 			scope.err(err, w, req)
@@ -447,7 +478,19 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(ctx, http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		// If the object is partially initialized, always indicate it via StatusAccepted
+		code := http.StatusCreated
+		if accessor, err := meta.Accessor(result); err == nil {
+			if accessor.GetInitializers() != nil {
+				code = http.StatusAccepted
+			}
+		}
+		status, ok := result.(*metav1.Status)
+		if ok && err == nil && status.Code == 0 {
+			status.Code = int32(code)
+		}
+
+		transformResponseObject(ctx, scope, req, w, code, result)
 	}
 }
 
@@ -465,8 +508,8 @@ type namedCreaterAdapter struct {
 	rest.Creater
 }
 
-func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
-	return c.Creater.Create(ctx, obj)
+func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj, includeUninitialized)
 }
 
 // PatchResource returns a function that will handle a resource patch
@@ -547,9 +590,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		responsewriters.WriteObject(ctx, http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
-
 }
 
 type updateAdmissionFunc func(updatedObject runtime.Object, currentObject runtime.Object) error
@@ -652,8 +694,8 @@ func patchResource(
 					return nil, err
 				}
 				// Capture the original object map and patch for possible retries.
-				originalMap := make(map[string]interface{})
-				if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &originalMap); err != nil {
+				originalMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+				if err != nil {
 					return nil, err
 				}
 				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
@@ -692,15 +734,14 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			currentObjMap := make(map[string]interface{})
-
 			// Since the patch is applied on versioned objects, we need to convert the
 			// current object to versioned representation first.
 			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
-			if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &currentObjMap); err != nil {
+			currentObjMap, err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject)
+			if err != nil {
 				return nil, err
 			}
 
@@ -820,7 +861,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		defaultGVK := scope.Kind
 		original := r.New()
 		trace.Step("About to convert to expected version")
-		obj, gvk, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
+		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: defaultGVK.Group, Version: runtime.APIVersionInternal})
+		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
 			scope.err(err, w, req)
@@ -834,7 +876,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
 			scope.err(err, w, req)
@@ -877,7 +919,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+
+		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
 
@@ -926,10 +969,11 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				}
 
 				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
 				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
+						err = errors.NewBadRequest(err.Error())
 						scope.err(err, w, req)
 						return
 					}
@@ -947,7 +991,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		trace.Step("About do delete object from database")
+		trace.Step("About to delete object from database")
 		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			obj, deleted, err := r.Delete(ctx, name, options)
@@ -996,7 +1040,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		responsewriters.WriteObject(ctx, status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		transformResponseObject(ctx, scope, req, w, status, result)
 	}
 }
 
@@ -1027,6 +1071,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 		listOptions := metainternalversion.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
+			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
 		}
@@ -1070,7 +1115,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				}
 
 				ae := request.AuditEventFrom(ctx)
-				audit.LogRequestObject(ae, obj, scope.Resource.GroupVersion(), scope.Serializer)
+				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			}
 		}
 
@@ -1102,7 +1147,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		responsewriters.WriteObjectNegotiated(ctx, scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
+		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }
 

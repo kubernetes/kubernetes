@@ -127,7 +127,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			200,
-			1,
+			2,
 			[]eventCheck{
 				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"c".*}`),
@@ -144,7 +144,7 @@ func TestAudit(t *testing.T) {
 				namespace:   "other",
 			},
 			200,
-			1,
+			2,
 			[]eventCheck{
 				noRequestBody(0),
 				responseBodyMatches(0, `{.*"name":"a".*"name":"b".*}`),
@@ -157,7 +157,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			201,
-			1,
+			2,
 			[]eventCheck{
 				requestBodyIs(0, string(simpleFooJSON)),
 				responseBodyMatches(0, `{.*"foo".*}`),
@@ -170,7 +170,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			405,
-			1,
+			2,
 			[]eventCheck{
 				noRequestBody(0),  // the 405 is thrown long before the create handler would be executed
 				noResponseBody(0), // the 405 is thrown long before the create handler would be executed
@@ -183,7 +183,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			200,
-			1,
+			2,
 			[]eventCheck{
 				noRequestBody(0),
 				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
@@ -196,7 +196,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			200,
-			1,
+			2,
 			[]eventCheck{
 				requestBodyMatches(0, "DeleteOptions"),
 				responseBodyMatches(0, `{.*"kind":"Status".*"status":"Success".*}`),
@@ -209,7 +209,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			200,
-			1,
+			2,
 			[]eventCheck{
 				requestBodyIs(0, string(simpleCPrimeJSON)),
 				responseBodyMatches(0, `{.*"bla".*}`),
@@ -222,7 +222,7 @@ func TestAudit(t *testing.T) {
 			},
 			selfLinker,
 			400,
-			1,
+			2,
 			[]eventCheck{
 				requestBodyIs(0, string(simpleCPrimeJSON)),
 				responseBodyMatches(0, `"Status".*"status":"Failure".*"code":400}`),
@@ -242,7 +242,7 @@ func TestAudit(t *testing.T) {
 				namespace:   "other",
 			},
 			200,
-			1,
+			2,
 			[]eventCheck{
 				requestBodyIs(0, `{"labels":{"foo":"bar"}}`),
 				responseBodyMatches(0, `"name":"c".*"labels":{"foo":"bar"}`),
@@ -259,7 +259,7 @@ func TestAudit(t *testing.T) {
 				namespace:   "other",
 			},
 			200,
-			2,
+			3,
 			[]eventCheck{
 				noRequestBody(0),
 				noResponseBody(0),

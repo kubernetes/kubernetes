@@ -33,6 +33,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,10 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
@@ -98,6 +98,7 @@ func TestInitFederation(t *testing.T) {
 		serverImage                  string
 		etcdImage                    string
 		etcdPVCapacity               string
+		etcdPVStorageClass           string
 		etcdPersistence              string
 		expectedErr                  string
 		dnsProvider                  string
@@ -200,6 +201,7 @@ func TestInitFederation(t *testing.T) {
 			serverImage:          "example.test/foo:bar",
 			etcdImage:            "gcr.io/google_containers/etcd:latest",
 			etcdPVCapacity:       "5Gi",
+			etcdPVStorageClass:   "fast",
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dryRun:               "",
@@ -244,7 +246,7 @@ func TestInitFederation(t *testing.T) {
 			tc.etcdImage = defaultEtcdImage
 		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -270,6 +272,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
+		if tc.etcdPVStorageClass != "" {
+			cmd.Flags().Set("etcd-pv-storage-class", tc.etcdPVStorageClass)
 		}
 		if tc.etcdPersistence != "true" {
 			cmd.Flags().Set("etcd-persistent-storage", tc.etcdPersistence)
@@ -616,7 +621,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -729,6 +734,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		Data: nil,
 	}
 
+	var storageClassName *string
+	if len(etcdPVStorageClass) > 0 {
+		storageClassName = &etcdPVStorageClass
+	}
+
 	pvc := v1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -739,8 +749,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Namespace: namespaceName,
 			Labels:    componentLabel,
 			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "yes",
-				federation.FederationNameAnnotation:        federationName,
+				federation.FederationNameAnnotation: federationName,
 			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -752,6 +761,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					v1.ResourceStorage: capacity,
 				},
 			},
+			StorageClassName: storageClassName,
 		},
 	}
 
@@ -773,7 +783,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	role := rbacv1beta1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Role",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -795,7 +805,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	rolebinding := rbacv1beta1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RoleBinding",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -1434,7 +1444,11 @@ func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {
 		}
 	}()
 
-	c, err := tls.Dial("tcp", s.Addr().String(), cCfg)
+	// workaround [::] not working in ipv4 only systems (https://github.com/golang/go/issues/18806)
+	// TODO: remove with Golang 1.9 with https://go-review.googlesource.com/c/45088/
+	addr := strings.TrimPrefix(s.Addr().String(), "[::]")
+
+	c, err := tls.Dial("tcp", addr, cCfg)
 	if err != nil {
 		// Intentionally not serializing the error received because we want to
 		// test for the failure case in the caller test function.

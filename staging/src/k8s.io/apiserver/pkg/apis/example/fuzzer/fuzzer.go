@@ -17,18 +17,21 @@ limitations under the License.
 package fuzzer
 
 import (
+	"fmt"
+
 	"github.com/google/gofuzz"
 
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 )
 
-// overrideGenericFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
+// overrideMetaFuncs override some generic fuzzer funcs from k8s.io/apiserver in order to have more realistic
 // values in a Kubernetes context.
-func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
+func overrideMetaFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(j *runtime.Object, c fuzz.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
@@ -54,8 +57,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 			// Convert the object to raw bytes
 			bytes, err := runtime.Encode(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), obj)
 			if err != nil {
-				t.Errorf("Failed to encode object: %v", err)
-				return
+				panic(fmt.Sprintf("Failed to encode object: %v", err))
 			}
 
 			// Set the bytes field on the RawExtension
@@ -64,7 +66,7 @@ func overrideGenericFuncs(t apitesting.TestingCommon, codecs runtimeserializer.C
 	}
 }
 
-func exampleFuncs(t apitesting.TestingCommon) []interface{} {
+func exampleFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(s *example.PodSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
@@ -90,10 +92,8 @@ func exampleFuncs(t apitesting.TestingCommon) []interface{} {
 	}
 }
 
-func Funcs(t apitesting.TestingCommon, codecs runtimeserializer.CodecFactory) []interface{} {
-	return apitesting.MergeFuzzerFuncs(t,
-		apitesting.GenericFuzzerFuncs(t, codecs),
-		overrideGenericFuncs(t, codecs),
-		exampleFuncs(t),
-	)
-}
+// Funcs returns the fuzzer functions for the example api group.
+var Funcs = fuzzer.MergeFuzzerFuncs(
+	overrideMetaFuncs,
+	exampleFuncs,
+)

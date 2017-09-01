@@ -32,17 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"k8s.io/api/core/v1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	storage "k8s.io/api/storage/v1"
+	storagebeta "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	storage "k8s.io/kubernetes/pkg/apis/storage/v1"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
-	storagebeta "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -210,7 +211,7 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 	return nil
 }
 
-var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
+var _ = SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
@@ -222,8 +223,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("DynamicProvisioner", func() {
-		It("should provision storage with different parameters [Slow] [Volume]", func() {
+	Describe("DynamicProvisioner", func() {
+		It("should provision storage with different parameters [Slow]", func() {
 			cloudZone := getRandomCloudZone(c)
 
 			// This test checks that dynamic provisioning can provision a volume
@@ -408,7 +409,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout)
 		// when there is no regression.
-		It("should not provision a volume in an unmanaged GCE zone. [Slow] [Volume]", func() {
+		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
 
@@ -466,7 +467,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 			framework.Logf(err.Error())
 		})
 
-		It("should test that deleting a claim before the volume is provisioned deletes the volume. [Volume]", func() {
+		It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
 			// This case tests for the regressions of a bug fixed by PR #21268
 			// REGRESSION: Deleting the PVC before the PV is provisioned can result in the PV
 			// not being deleted.
@@ -516,11 +517,11 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner External", func() {
-		It("should let an external dynamic provisioner create and delete persistent volumes [Slow] [Volume]", func() {
+	Describe("DynamicProvisioner External", func() {
+		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner role
-			framework.BindClusterRole(c.Rbac(), "system:persistent-volume-provisioner", ns,
+			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
 
 			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
@@ -554,8 +555,8 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	framework.KubeDescribe("DynamicProvisioner Default", func() {
-		It("should create and delete default persistent volumes [Slow] [Volume]", func() {
+	Describe("DynamicProvisioner Default", func() {
+		It("should create and delete default persistent volumes [Slow]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 
 			By("creating a claim with no annotation")
@@ -569,7 +570,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
@@ -600,7 +601,7 @@ var _ = framework.KubeDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive] [Volume]", func() {
+		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
@@ -829,7 +830,7 @@ func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
@@ -935,7 +936,7 @@ func getRandomCloudZone(c clientset.Interface) string {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[metav1.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
 	}

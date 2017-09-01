@@ -29,7 +29,10 @@
 "kind": "Pod",
 "metadata": {
   "name":"etcd-server{{ suffix }}",
-  "namespace": "kube-system"
+  "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  }
 },
 "spec":{
 "hostNetwork": true,
@@ -100,7 +103,8 @@
   },
   { "name": "varlogetcd",
     "hostPath": {
-        "path": "/var/log/etcd{{ suffix }}.log"}
+        "path": "/var/log/etcd{{ suffix }}.log",
+        "type": "FileOrCreate"}
   },
   { "name": "etc",
     "hostPath": {

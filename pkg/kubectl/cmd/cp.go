@@ -18,7 +18,7 @@ package cmd
 
 import (
 	"archive/tar"
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,22 +27,22 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 )
 
 var (
-	cp_example = templates.Examples(i18n.T(`
-	    # !!!Important Note!!!
-	    # Requires that the 'tar' binary is present in your container
-	    # image.  If 'tar' is not present, 'kubectl cp' will fail.
+	cpExample = templates.Examples(i18n.T(`
+		# !!!Important Note!!!
+		# Requires that the 'tar' binary is present in your container
+		# image.  If 'tar' is not present, 'kubectl cp' will fail.
 
-	    # Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
+		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
 
-        # Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
+		# Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
 		kubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>
 
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
@@ -52,8 +52,8 @@ var (
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 
 	cpUsageStr = dedent.Dedent(`
-	    expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
-	    <file-spec> is:
+		expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
+		<file-spec> is:
 		[namespace/]pod-name:/file/path for a remote file
 		/file/path for a local file`)
 )
@@ -64,7 +64,7 @@ func NewCmdCp(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 		Use:     "cp <file-spec-src> <file-spec-dest>",
 		Short:   i18n.T("Copy files and directories to and from containers."),
 		Long:    "Copy files and directories to and from containers.",
-		Example: cp_example,
+		Example: cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runCopy(f, cmd, cmdOut, cmdErr, args))
 		},
@@ -80,13 +80,17 @@ type fileSpec struct {
 	File         string
 }
 
+var errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
+
 func extractFileSpec(arg string) (fileSpec, error) {
 	pieces := strings.Split(arg, ":")
 	if len(pieces) == 1 {
 		return fileSpec{File: arg}, nil
 	}
 	if len(pieces) != 2 {
-		return fileSpec{}, fmt.Errorf("Unexpected fileSpec: %s, expected [[namespace/]pod:]file/path", arg)
+		// FIXME Kubernetes can't copy files that contain a ':'
+		// character.
+		return fileSpec{}, errFileSpecDoesntMatchFormat
 	}
 	file := pieces[1]
 
@@ -105,12 +109,12 @@ func extractFileSpec(arg string) (fileSpec, error) {
 		}, nil
 	}
 
-	return fileSpec{}, fmt.Errorf("Unexpected file spec: %s, expected [[namespace/]pod:]file/path", arg)
+	return fileSpec{}, errFileSpecDoesntMatchFormat
 }
 
 func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args []string) error {
 	if len(args) != 2 {
-		return cmdutil.UsageError(cmd, cpUsageStr)
+		return cmdutil.UsageErrorf(cmd, cpUsageStr)
 	}
 	srcSpec, err := extractFileSpec(args[0])
 	if err != nil {
@@ -126,7 +130,7 @@ func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args 
 	if len(destSpec.PodName) != 0 {
 		return copyToPod(f, cmd, out, cmderr, srcSpec, destSpec)
 	}
-	return cmdutil.UsageError(cmd, "One of src or dest must be a remote file specification")
+	return cmdutil.UsageErrorf(cmd, "One of src or dest must be a remote file specification")
 }
 
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {

@@ -4,6 +4,8 @@ repo: kubernetes/kubernetes
 labels:
 - name: approved
   color: 0ffa16
+- name: approved-for-milestone
+  color: fef2c0
 - name: area/admin
   color: 0052cc
 - name: area/admission-control
@@ -48,11 +50,15 @@ labels:
   color: 0052cc
 - name: area/HA
   color: 0052cc
+- name: area/hw-accelerators
+  color: 0052cc
 - name: area/images-registry
   color: 0052cc
 - name: area/ingress
   color: 0052cc
 - name: area/introspection
+  color: 0052cc
+- name: area/ipv6
   color: 0052cc
 - name: area/isolation
   color: 0052cc
@@ -204,6 +210,8 @@ labels:
   color: b60205
 - name: needs-rebase
   color: BDBDBD
+- name: needs-sig
+  color: ededed
 - name: non-release-blocker
   color: 0e8a16
 - name: ok-to-merge
@@ -256,11 +264,15 @@ labels:
   color: d2b48c
 - name: sig/apps
   color: d2b48c
+- name: sig/architecture
+  color: d2b48c
 - name: sig/auth
   color: d2b48c
 - name: sig/autoscaling
   color: d2b48c
 - name: sig/aws
+  color: d2b48c
+- name: sig/azure
   color: d2b48c
 - name: sig/big-data
   color: d2b48c
@@ -286,6 +298,8 @@ labels:
   color: d2b48c
 - name: sig/openstack
   color: d2b48c
+- name: sig/release
+  color: d2b48c
 - name: sig/rktnetes
   color: d2b48c
 - name: sig/scalability
@@ -297,6 +311,8 @@ labels:
 - name: sig/storage
   color: d2b48c
 - name: sig/testing
+  color: d2b48c
+- name: sig/ui
   color: d2b48c
 - name: sig/windows
   color: d2b48c
@@ -314,6 +330,10 @@ labels:
   color: ee0000
 - name: stale
   color: "795548"
+- name: status/in-progress
+  color: fef2c0
+- name: status/in-review
+  color: fef2c0
 - name: team/api (deprecated - do not use)
   color: ededed
 - name: team/cluster (deprecated - do not use)

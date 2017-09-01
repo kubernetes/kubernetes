@@ -15,28 +15,42 @@
 # This Dockerfile will build an image that is configured
 # to run Fluentd with an Elasticsearch plug-in and the
 # provided configuration file.
-# TODO(a-robinson): Use a lighter base image, e.g. some form of busybox.
 # The image acts as an executable for the binary /usr/sbin/td-agent.
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/log/containers/*
-# Please see http://docs.fluentd.org/articles/install-by-deb for more
-# information about installing fluentd using deb package.
 
-FROM gcr.io/google_containers/ubuntu-slim:0.6
+FROM debian:stretch-slim
 
-# Ensure there are enough file descriptors for running Fluentd.
-RUN ulimit -n 65536
+COPY clean-apt /usr/bin
+COPY clean-install /usr/bin
+COPY Gemfile /Gemfile
 
-# Disable prompts from apt.
-ENV DEBIAN_FRONTEND noninteractive
+# 1. Install & configure dependencies.
+# 2. Install fluentd via ruby.
+# 3. Remove build dependencies.
+# 4. Cleanup leftover caches & files.
+RUN BUILD_DEPS="make gcc g++ libc6-dev ruby-dev" \
+    && clean-install $BUILD_DEPS \
+                     ca-certificates \
+                     libjemalloc1 \
+                     ruby \
+    && echo 'gem: --no-document' >> /etc/gemrc \
+    && gem install --file Gemfile \
+    && apt-get purge -y --auto-remove \
+                     -o APT::AutoRemove::RecommendsImportant=false \
+                     $BUILD_DEPS \
+    && clean-apt \
+    # Ensure fluent has enough file descriptors
+    && ulimit -n 65536
 
-# Copy the Fluentd configuration file.
-COPY td-agent.conf /etc/td-agent/td-agent.conf
+# Copy the Fluentd configuration file for logging Docker container logs.
+COPY fluent.conf /etc/fluent/fluent.conf
+COPY run.sh /run.sh
 
-COPY build.sh /tmp/build.sh
-RUN /tmp/build.sh
+# Expose prometheus metrics.
+EXPOSE 80
 
-ENV LD_PRELOAD /opt/td-agent/embedded/lib/libjemalloc.so
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
-# Run the Fluentd service.
-ENTRYPOINT ["td-agent"]
+# Start Fluentd to pick up our config that watches Docker container logs.
+CMD /run.sh $FLUENTD_ARGS

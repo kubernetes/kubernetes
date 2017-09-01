@@ -19,20 +19,20 @@ package node
 import (
 	"fmt"
 
+	certsapi "k8s.io/api/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	certsapi "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 )
 
 // ValidateAPIServer makes sure the server we're connecting to supports the Beta Certificates API
-func ValidateAPIServer(client *clientset.Clientset) error {
-	version, err := client.DiscoveryClient.ServerVersion()
+func ValidateAPIServer(client clientset.Interface) error {
+	version, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("failed to check server version: %v", err)
 	}
 	fmt.Printf("[bootstrap] Detected server version: %s\n", version.String())
 
 	// Check certificates API. If the server supports the version of the Certificates API we're using, we're good to go
-	serverGroups, err := client.DiscoveryClient.ServerGroups()
+	serverGroups, err := client.Discovery().ServerGroups()
 	if err != nil {
 		return fmt.Errorf("certificate API check failed: failed to retrieve a list of supported API objects [%v]", err)
 	}

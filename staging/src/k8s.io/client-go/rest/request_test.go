@@ -34,10 +34,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -48,7 +48,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -100,8 +99,6 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	}
 	r := original
 	changed := r.Param("foo", "bar").
-		LabelsSelectorParam(labels.Set{"a": "b"}.AsSelector()).
-		UintParam("uint", 1).
 		AbsPath("/abs").
 		Prefix("test").
 		Suffix("testing").
@@ -257,7 +254,7 @@ func TestRequestVersionedParamsFromListOptions(t *testing.T) {
 		"resourceVersion": []string{"1", "2"},
 		"timeoutSeconds":  []string{"10"},
 	}) {
-		t.Errorf("should have set a param: %#v", r)
+		t.Errorf("should have set a param: %#v %v", r.params, r.err)
 	}
 }
 
@@ -326,6 +323,16 @@ func TestResultIntoWithErrReturnsErr(t *testing.T) {
 	res := Result{err: errors.New("test")}
 	if err := res.Into(&v1.Pod{}); err != res.err {
 		t.Errorf("should have returned exact error from result")
+	}
+}
+
+func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
+	res := Result{
+		body:    []byte{},
+		decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+	}
+	if err := res.Into(&v1.Pod{}); err == nil || !strings.Contains(err.Error(), "0-length") {
+		t.Errorf("should have complained about 0 length body")
 	}
 }
 
@@ -1123,7 +1130,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 			return
 		}
 		w.Header().Set("Retry-After", "1")
-		http.Error(w, "Too many requests, please try again later.", apierrors.StatusTooManyRequests)
+		http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
 	}))
 	defer testServer.Close()
 
@@ -1197,7 +1204,7 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 			return
 		}
 		w.Header().Set("Retry-After", "0")
-		w.WriteHeader([]int{apierrors.StatusTooManyRequests, 500, 501, 504}[count])
+		w.WriteHeader([]int{http.StatusTooManyRequests, 500, 501, 504}[count])
 		count++
 	}))
 	defer testServer.Close()
@@ -1227,7 +1234,7 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 			return
 		}
 		w.Header().Set("Retry-After", "0")
-		w.WriteHeader(apierrors.StatusTooManyRequests)
+		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer testServer.Close()
 
@@ -1266,7 +1273,6 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Resource("bar").
 		Name("baz").
 		Prefix("foo").
-		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -1281,7 +1287,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("foo", "bar", "", "baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1306,7 +1312,6 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		Suffix("baz").
 		Name("bar").
 		Resource("foo").
-		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
 		Do().Get()
@@ -1321,7 +1326,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	requestURL := defaultResourcePathWithPrefix("", "foo", "", "bar/baz")
-	requestURL += "?" + metav1.LabelSelectorQueryParam(v1.SchemeGroupVersion.String()) + "=name%3Dfoo&timeout=1s"
+	requestURL += "?timeout=1s"
 	fakeHandler.ValidateRequest(t, requestURL, "POST", &tmpStr)
 }
 
@@ -1479,33 +1484,14 @@ func TestAbsPath(t *testing.T) {
 	}
 }
 
-func TestUintParam(t *testing.T) {
-	table := []struct {
-		name      string
-		testVal   uint64
-		expectStr string
-	}{
-		{"foo", 31415, "http://localhost?foo=31415"},
-		{"bar", 42, "http://localhost?bar=42"},
-		{"baz", 0, "http://localhost?baz=0"},
-	}
-
-	for _, item := range table {
-		u, _ := url.Parse("http://localhost")
-		r := NewRequest(nil, "GET", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil).AbsPath("").UintParam(item.name, item.testVal)
-		if e, a := item.expectStr, r.URL().String(); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-	}
-}
-
 func TestUnacceptableParamNames(t *testing.T) {
 	table := []struct {
 		name          string
 		testVal       string
 		expectSuccess bool
 	}{
-		{"timeout", "42", false},
+		// timeout is no longer "protected"
+		{"timeout", "42", true},
 	}
 
 	for _, item := range table {

@@ -22,46 +22,45 @@ import (
 	"path"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = framework.KubeDescribe("Projected", func() {
 	// Part 1/3 - Secrets
 	f := framework.NewDefaultFramework("projected")
 
-	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume [Conformance] [sig-storage]", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with defaultMode set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		fsGroup := types.UnixGroupID(1001)
-		uid := types.UnixUserID(1000)
+		fsGroup := int64(1001)
+		uid := int64(1000)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings [Conformance] [sig-storage]", func() {
 		doProjectedSecretE2EWithMapping(f, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance] [sig-storage]", func() {
 		mode := int32(0400)
 		doProjectedSecretE2EWithMapping(f, &mode)
 	})
 
-	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [Volume]", func() {
+	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [sig-storage]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -82,7 +81,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
 	})
 
-	It("should be consumable in multiple volumes in a pod [Conformance] [Volume]", func() {
+	It("should be consumable in multiple volumes in a pod [Conformance] [sig-storage]", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
@@ -171,25 +170,9 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
-
-		// With SecretManager, we may have to wait up to full sync period + TTL of
-		// a secret to elapse before the Kubelet projects the update into the volume
-		// and the container picks it ip.
-		// This timeout is based on default Kubelet sync period (1 minute) plus
-		// maximum secret TTL (based on cluster size) plus additional time for fudge
-		// factor.
-		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		// Since TTL the kubelet is using are stored in node object, for the timeout
-		// purpose we take it from a first node (all of them should be the same).
-		// We take the TTL from the first node.
-		secretTTL, exists := framework.GetTTLAnnotationFromNode(&nodes.Items[0])
-		if !exists {
-			framework.Logf("Couldn't get ttl annotation from: %#v", nodes.Items[0])
-		}
-		podLogTimeout := 240*time.Second + secretTTL
-
+	It("optional updates should be reflected in volume [Conformance] [sig-storage]", func() {
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/projected-secret-volumes"
 
@@ -233,6 +216,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		}
 
 		By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
+		var err error
 		if deleteSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
 		}
@@ -304,7 +288,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    deleteContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -316,7 +300,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    updateContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -328,7 +312,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    createContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -383,52 +367,48 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 
 	// Part 2/3 - ConfigMaps
-	It("should be consumable from pods in volume [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with defaultMode set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Feature:FSGroup] [sig-storage]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item mode set[Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings and Item mode set[Conformance] [sig-storage]", func() {
 		mode := int32(0400)
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root [Conformance] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings as non-root [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup] [Volume]", func() {
+	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
-	It("updates should be reflected in volume [Conformance] [Volume]", func() {
-
-		// We may have to wait or a full sync period to elapse before the
-		// Kubelet projects the update into the volume and the container picks
-		// it up. This timeout is based on the default Kubelet sync period (1
-		// minute) plus additional time for fudge factor.
-		const podLogTimeout = 300 * time.Second
+	It("updates should be reflected in volume [Conformance] [sig-storage]", func() {
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "projected-configmap-test-upd-" + string(uuid.NewUUID())
 		volumeName := "projected-configmap-volume"
@@ -477,7 +457,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    containerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -509,15 +489,10 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
-	It("optional updates should be reflected in volume [Conformance] [Volume]", func() {
-
-		// We may have to wait or a full sync period to elapse before the
-		// Kubelet projects the update into the volume and the container picks
-		// it up. This timeout is based on the default Kubelet sync period (1
-		// minute) plus additional time for fudge factor.
-		const podLogTimeout = 300 * time.Second
+	It("optional updates should be reflected in volume [Conformance] [sig-storage]", func() {
+		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
-
 		volumeMountPath := "/etc/projected-configmap-volumes"
 
 		deleteName := "cm-test-opt-del-" + string(uuid.NewUUID())
@@ -632,7 +607,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    deleteContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -644,7 +619,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    updateContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -656,7 +631,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 					{
 						Name:    createContainerName,
 						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
+						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -710,7 +685,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
 	})
 
-	It("should be consumable in multiple volumes in the same pod [Conformance] [Volume]", func() {
+	It("should be consumable in multiple volumes in the same pod [Conformance] [sig-storage]", func() {
 		var (
 			name             = "projected-configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "projected-configmap-volume"
@@ -803,7 +778,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		podClient = f.PodClient()
 	})
 
-	It("should provide podname only [Conformance] [Volume]", func() {
+	It("should provide podname only [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 
@@ -812,7 +787,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should set DefaultMode on files [Conformance] [Volume]", func() {
+	It("should set DefaultMode on files [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podname", nil, &defaultMode)
@@ -822,7 +797,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should set mode on item file [Conformance] [Volume]", func() {
+	It("should set mode on item file [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
@@ -832,10 +807,10 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup [Feature:FSGroup] [Volume]", func() {
+	It("should provide podname as non-root with fsgroup [Feature:FSGroup] [sig-storage]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			RunAsUser: &uid,
@@ -846,10 +821,10 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup] [Volume]", func() {
+	It("should provide podname as non-root with fsgroup and defaultMode [Feature:FSGroup] [sig-storage]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := types.UnixUserID(1001)
-		gid := types.UnixGroupID(1234)
+		uid := int64(1001)
+		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
@@ -861,7 +836,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should update labels on modification [Conformance] [Volume]", func() {
+	It("should update labels on modification [Conformance] [sig-storage]", func() {
 		labels := map[string]string{}
 		labels["key1"] = "value1"
 		labels["key2"] = "value2"
@@ -888,7 +863,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 	})
 
-	It("should update annotations on modification [Conformance] [Volume]", func() {
+	It("should update annotations on modification [Conformance] [sig-storage]", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
 		podName := "annotationupdate" + string(uuid.NewUUID())
@@ -917,7 +892,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
 	})
 
-	It("should provide container's cpu limit [Conformance] [Volume]", func() {
+	It("should provide container's cpu limit [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_limit")
 
@@ -926,7 +901,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide container's memory limit [Conformance] [Volume]", func() {
+	It("should provide container's memory limit [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_limit")
 
@@ -935,7 +910,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide container's cpu request [Conformance] [Volume]", func() {
+	It("should provide container's cpu request [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_request")
 
@@ -944,7 +919,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide container's memory request [Conformance] [Volume]", func() {
+	It("should provide container's memory request [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_request")
 
@@ -953,14 +928,14 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
-	It("should provide node allocatable (cpu) as default cpu limit if the limit is not set [Conformance] [Volume]", func() {
+	It("should provide node allocatable (cpu) as default cpu limit if the limit is not set [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/cpu_limit")
 
 		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
 
-	It("should provide node allocatable (memory) as default memory limit if the limit is not set [Conformance] [Volume]", func() {
+	It("should provide node allocatable (memory) as default memory limit if the limit is not set [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/memory_limit")
 
@@ -968,7 +943,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 
 	// Test multiple projections
-	It("should project all components that make up the projection API [Conformance] [Volume] [Projection]", func() {
+	It("should project all components that make up the projection API [Conformance] [sig-storage] [Projection]", func() {
 		var err error
 		podName := "projected-volume-" + string(uuid.NewUUID())
 		secretName := "secret-projected-all-test-volume-" + string(uuid.NewUUID())
@@ -1025,7 +1000,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 })
 
 func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,
-	secretName string, fsGroup *types.UnixGroupID, uid *types.UnixUserID) {
+	secretName string, fsGroup *int64, uid *int64) {
 	var (
 		volumeName      = "projected-secret-volume"
 		volumeMountPath = "/etc/projected-secret-volume"
@@ -1185,8 +1160,8 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 }
 
 func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "projected-configmap-test-volume-" + string(uuid.NewUUID())
@@ -1269,8 +1244,8 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 }
 
 func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
-	userID := types.UnixUserID(uid)
-	groupID := types.UnixGroupID(fsGroup)
+	userID := int64(uid)
+	groupID := int64(fsGroup)
 
 	var (
 		name            = "projected-configmap-test-volume-map-" + string(uuid.NewUUID())

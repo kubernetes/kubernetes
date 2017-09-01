@@ -34,6 +34,9 @@ type FloatingIP struct {
 
 	// The condition of the API resource.
 	Status string `json:"status"`
+
+	//The ID of the router used for this Floating-IP
+	RouterID string `json:"router_id"`
 }
 
 type commonResult struct {

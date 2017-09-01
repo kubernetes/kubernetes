@@ -29,13 +29,13 @@ import (
 
 	"github.com/golang/glog"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
-	certificatesclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/certificates/v1beta1"
 )
 
 const (
@@ -52,14 +52,17 @@ type Manager interface {
 	// Start the API server status sync loop.
 	Start()
 	// Current returns the currently selected certificate from the
-	// certificate manager.
+	// certificate manager, as well as the associated certificate and key data
+	// in PEM format.
 	Current() *tls.Certificate
 }
 
 // Config is the set of configuration parameters available for a new Manager.
 type Config struct {
 	// CertificateSigningRequestClient will be used for signing new certificate
-	// requests generated when a key rotation occurs.
+	// requests generated when a key rotation occurs. It must be set either at
+	// initialization or by using CertificateSigningRequestClient before
+	// Manager.Start() is called.
 	CertificateSigningRequestClient certificatesclient.CertificateSigningRequestInterface
 	// Template is the CertificateRequest that will be used as a template for
 	// generating certificate signing requests for all new keys generated as
@@ -99,7 +102,8 @@ type Config struct {
 // Depending on the concrete implementation, the backing store for this
 // behavior may vary.
 type Store interface {
-	// Current returns the currently selected certificate. If the Store doesn't
+	// Current returns the currently selected certificate, as well as the
+	// associated certificate and key data in PEM format. If the Store doesn't
 	// have a cert/key pair currently, it should return a NoCertKeyError so
 	// that the Manager can recover by using bootstrap certificates to request
 	// a new cert/key pair.
@@ -122,6 +126,7 @@ type manager struct {
 	certStore                Store
 	certAccessLock           sync.RWMutex
 	cert                     *tls.Certificate
+	rotationDeadline         time.Time
 	forceRotation            bool
 }
 
@@ -186,16 +191,31 @@ func (m *manager) Start() {
 
 	glog.V(2).Infof("Certificate rotation is enabled.")
 
-	err := m.rotateCerts()
-	if err != nil {
-		glog.Errorf("Could not rotate certificates: %v", err)
+	m.setRotationDeadline()
+
+	// Synchronously request a certificate before entering the background
+	// loop to allow bootstrap scenarios, where the certificate manager
+	// doesn't have a certificate at all yet.
+	if m.shouldRotate() {
+		glog.V(1).Infof("shouldRotate() is true, forcing immediate rotation")
+		_, err := m.rotateCerts()
+		if err != nil {
+			glog.Errorf("Could not rotate certificates: %v", err)
+		}
+	}
+	backoff := wait.Backoff{
+		Duration: 2 * time.Second,
+		Factor:   2,
+		Jitter:   0.1,
+		Steps:    7,
 	}
 	go wait.Forever(func() {
-		for range time.Tick(syncPeriod) {
-			err := m.rotateCerts()
-			if err != nil {
-				glog.Errorf("Could not rotate certificates: %v", err)
-			}
+		sleepInterval := m.rotationDeadline.Sub(time.Now())
+		glog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
+		time.Sleep(sleepInterval)
+		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
+			glog.Errorf("Reached backoff limit, still unable to rotate certs: %v", err)
+			wait.PollInfinite(128*time.Second, m.rotateCerts)
 		}
 	}, 0)
 }
@@ -242,6 +262,51 @@ func (m *manager) shouldRotate() bool {
 	if m.cert == nil {
 		return true
 	}
+	if m.forceRotation {
+		return true
+	}
+	return time.Now().After(m.rotationDeadline)
+}
+
+func (m *manager) rotateCerts() (bool, error) {
+	glog.V(2).Infof("Rotating certificates")
+
+	csrPEM, keyPEM, err := m.generateCSR()
+	if err != nil {
+		glog.Errorf("Unable to generate a certificate signing request: %v", err)
+		return false, nil
+	}
+
+	// Call the Certificate Signing Request API to get a certificate for the
+	// new private key.
+	crtPEM, err := requestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
+	if err != nil {
+		glog.Errorf("Failed while requesting a signed certificate from the master: %v", err)
+		return false, nil
+	}
+
+	cert, err := m.certStore.Update(crtPEM, keyPEM)
+	if err != nil {
+		glog.Errorf("Unable to store the new cert/key pair: %v", err)
+		return false, nil
+	}
+
+	m.updateCached(cert)
+	m.setRotationDeadline()
+	m.forceRotation = false
+	return true, nil
+}
+
+// setRotationDeadline sets a cached value for the threshold at which the
+// current certificate should be rotated, 80%+/-10% of the expiration of the
+// certificate.
+func (m *manager) setRotationDeadline() {
+	m.certAccessLock.RLock()
+	defer m.certAccessLock.RUnlock()
+	if m.cert == nil {
+		m.rotationDeadline = time.Now()
+		return
+	}
 
 	notAfter := m.cert.Leaf.NotAfter
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
@@ -253,36 +318,8 @@ func (m *manager) shouldRotate() bool {
 	// certificates at the same time for the rest of the life of the cluster.
 	jitteryDuration := wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 
-	rotationThreshold := m.cert.Leaf.NotBefore.Add(jitteryDuration)
-	passedThreshold := time.Now().After(rotationThreshold)
-	return m.forceRotation || passedThreshold
-}
-
-func (m *manager) rotateCerts() error {
-	if !m.shouldRotate() {
-		return nil
-	}
-
-	csrPEM, keyPEM, err := m.generateCSR()
-	if err != nil {
-		return err
-	}
-
-	// Call the Certificate Signing Request API to get a certificate for the
-	// new private key.
-	crtPEM, err := requestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
-	if err != nil {
-		return fmt.Errorf("unable to get a new key signed: %v", err)
-	}
-
-	cert, err := m.certStore.Update(crtPEM, keyPEM)
-	if err != nil {
-		return fmt.Errorf("unable to store the new cert/key pair: %v", err)
-	}
-
-	m.updateCached(cert)
-	m.forceRotation = false
-	return nil
+	m.rotationDeadline = m.cert.Leaf.NotBefore.Add(jitteryDuration)
+	glog.V(2).Infof("Certificate rotation deadline is %v", m.rotationDeadline)
 }
 
 func (m *manager) updateCached(cert *tls.Certificate) {

@@ -19,7 +19,7 @@ package cri
 import (
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 // RuntimeVersioner contains methods for runtime name, version and API version.
@@ -43,6 +43,8 @@ type ContainerManager interface {
 	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 	// ContainerStatus returns the status of the container.
 	ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error)
+	// UpdateContainerResources updates the cgroup resources for the container.
+	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error
 	// ExecSync executes a command in the container, and returns the stdout output.
 	// If command exits with a non-zero exit code, an error is returned.
 	ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error)

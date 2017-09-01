@@ -32,7 +32,7 @@ func TestValidatePolicy(t *testing.T) {
 		}, { // Specific request
 			Level:      audit.LevelRequestResponse,
 			Verbs:      []string{"get"},
-			Resources:  []audit.GroupResources{{Resources: []string{"secrets"}}},
+			Resources:  []audit.GroupResources{{Group: "rbac.authorization.k8s.io", Resources: []string{"roles", "rolebindings"}}},
 			Namespaces: []string{"kube-system"},
 		}, { // Some non-resource URLs
 			Level:      audit.LevelMetadata,
@@ -41,6 +41,7 @@ func TestValidatePolicy(t *testing.T) {
 				"/logs*",
 				"/healthz*",
 				"/metrics",
+				"*",
 			},
 		},
 	}
@@ -73,6 +74,33 @@ func TestValidatePolicy(t *testing.T) {
 			Level:           audit.LevelMetadata,
 			Resources:       []audit.GroupResources{{Resources: []string{"secrets"}}},
 			NonResourceURLs: []string{"/logs*"},
+		}, { // invalid group name
+			Level:     audit.LevelMetadata,
+			Resources: []audit.GroupResources{{Group: "rbac.authorization.k8s.io/v1beta1", Resources: []string{"roles"}}},
+		}, { // invalid non-resource URLs
+			Level: audit.LevelMetadata,
+			NonResourceURLs: []string{
+				"logs",
+				"/healthz*",
+			},
+		}, { // empty non-resource URLs
+			Level: audit.LevelMetadata,
+			NonResourceURLs: []string{
+				"",
+				"/healthz*",
+			},
+		}, { // invalid non-resource URLs with multi "*"
+			Level: audit.LevelMetadata,
+			NonResourceURLs: []string{
+				"/logs/*/*",
+				"/metrics",
+			},
+		}, { // invalid non-resrouce URLs with "*" not in the end
+			Level: audit.LevelMetadata,
+			NonResourceURLs: []string{
+				"/logs/*.log",
+				"/metrics",
+			},
 		},
 	}
 	errorCases := []audit.Policy{}

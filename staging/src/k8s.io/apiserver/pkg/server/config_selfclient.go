@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"crypto/x509"
 	"fmt"
 	"net"
 
@@ -55,41 +54,6 @@ func (s *SecureServingInfo) NewLoopbackClientConfig(token string, loopbackCert [
 	}, nil
 }
 
-func trustedChain(chain []*x509.Certificate) bool {
-	intermediates := x509.NewCertPool()
-	for _, cert := range chain[1:] {
-		intermediates.AddCert(cert)
-	}
-	_, err := chain[0].Verify(x509.VerifyOptions{
-		Intermediates: intermediates,
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-	})
-	return err == nil
-}
-
-func parseChain(bss [][]byte) ([]*x509.Certificate, error) {
-	var result []*x509.Certificate
-	for _, bs := range bss {
-		x509Cert, err := x509.ParseCertificate(bs)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, x509Cert)
-	}
-
-	return result, nil
-}
-
-func findCA(chain []*x509.Certificate) (*x509.Certificate, error) {
-	for _, cert := range chain {
-		if cert.IsCA {
-			return cert, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no certificate with CA:TRUE found in chain")
-}
-
 // LoopbackHostPort returns the host and port loopback REST clients should use
 // to contact the server.
 func LoopbackHostPort(bindAddress string) (string, string, error) {
@@ -101,28 +65,19 @@ func LoopbackHostPort(bindAddress string) (string, string, error) {
 
 	// Value is expected to be an IP or DNS name, not "0.0.0.0".
 	if host == "0.0.0.0" {
-		// compare MaybeDefaultWithSelfSignedCerts which adds "localhost" to the cert as alternateDNS
 		host = "localhost"
+		// Get ip of local interface, but fall back to "localhost".
+		// Note that "localhost" is resolved with the external nameserver first with Go's stdlib.
+		// So if localhost.<yoursearchdomain> resolves, we don't get a 127.0.0.1 as expected.
+		addrs, err := net.InterfaceAddrs()
+		if err == nil {
+			for _, address := range addrs {
+				if ipnet, ok := address.(*net.IPNet); ok && ipnet.IP.IsLoopback() {
+					host = ipnet.IP.String()
+					break
+				}
+			}
+		}
 	}
 	return host, port, nil
-}
-
-func certMatchesName(cert *x509.Certificate, name string) bool {
-	for _, certName := range cert.DNSNames {
-		if certName == name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func certMatchesIP(cert *x509.Certificate, ip string) bool {
-	for _, certIP := range cert.IPAddresses {
-		if certIP.String() == ip {
-			return true
-		}
-	}
-
-	return false
 }

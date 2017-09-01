@@ -22,21 +22,33 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	// Version strings for recording metrics.
+	computeV1Version    = "v1"
+	computeAlphaVersion = "alpha"
+	computeBetaVersion  = "beta"
+)
+
 type apiCallMetrics struct {
 	latency *prometheus.HistogramVec
 	errors  *prometheus.CounterVec
 }
 
 var (
-	apiMetrics = registerAPIMetrics(
+	metricLabels = []string{
 		"request", // API function that is begin invoked.
 		"region",  // region (optional).
 		"zone",    // zone (optional).
-	)
+		"version", // API version.
+	}
+
+	apiMetrics = registerAPIMetrics(metricLabels...)
 )
 
 type metricContext struct {
-	start      time.Time
+	start time.Time
+	// The cardinalities of attributes and metricLabels (defined above) must
+	// match, or prometheus will panic.
 	attributes []string
 }
 
@@ -52,6 +64,13 @@ func (mc *metricContext) Observe(err error) error {
 	}
 
 	return err
+}
+
+func newGenericMetricContext(prefix, request, region, zone, version string) *metricContext {
+	return &metricContext{
+		start:      time.Now(),
+		attributes: []string{prefix + "_" + request, region, zone, version},
+	}
 }
 
 // registerApiMetrics adds metrics definitions for a category of API calls.

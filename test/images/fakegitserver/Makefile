@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	all image push clean
+SRCS = fakegitserver
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
 
-TAG = 0.1
-PREFIX = gcr.io/google_containers
-IMAGE = fakegitserver
-ARCH = amd64
+IGNORE := $(shell git rev-parse HEAD > $(TARGET)/GITHASH.txt)
 
-image:
-	./prepare.sh $(ARCH)
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
+bin:
+	../image-util.sh bin $(SRCS)
 
-push: image
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
-
-all: push
-
-clean:
-	rm -f gitserver GITHASH.txt
+.PHONY: bin

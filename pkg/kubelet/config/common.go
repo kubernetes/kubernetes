@@ -22,13 +22,18 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
+	// TODO: remove this import if
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// to "v1"?
+	_ "k8s.io/kubernetes/pkg/api/install"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
@@ -93,7 +98,7 @@ func getSelfLink(name, namespace string) string {
 	if len(namespace) == 0 {
 		namespace = metav1.NamespaceDefault
 	}
-	selfLink = fmt.Sprintf("/api/"+api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version+"/pods/namespaces/%s/%s", name, namespace)
+	selfLink = fmt.Sprintf("/api/"+api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version+"/namespaces/%s/pods/%s", namespace, name)
 	return selfLink
 }
 
@@ -109,12 +114,14 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	if err != nil {
 		return false, pod, err
 	}
+
+	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
-	if _, ok := obj.(*api.Pod); !ok {
+	if !ok {
 		err = fmt.Errorf("invalid pod: %#v", obj)
 		return false, pod, err
 	}
-	newPod := obj.(*api.Pod)
+
 	// Apply default values and validate the pod.
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
@@ -124,7 +131,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, pod, err
 	}
 	v1Pod := &v1.Pod{}
-	if err := v1.Convert_api_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+	if err := k8s_api_v1.Convert_api_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
 		return true, nil, err
 	}
 	return true, v1Pod, nil
@@ -135,12 +142,14 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 	if err != nil {
 		return false, pods, err
 	}
+
+	newPods, ok := obj.(*api.PodList)
 	// Check whether the object could be converted to list of pods.
-	if _, ok := obj.(*api.PodList); !ok {
+	if !ok {
 		err = fmt.Errorf("invalid pods list: %#v", obj)
 		return false, pods, err
 	}
-	newPods := obj.(*api.PodList)
+
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
@@ -153,7 +162,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		}
 	}
 	v1Pods := &v1.PodList{}
-	if err := v1.Convert_api_PodList_To_v1_PodList(newPods, v1Pods, nil); err != nil {
+	if err := k8s_api_v1.Convert_api_PodList_To_v1_PodList(newPods, v1Pods, nil); err != nil {
 		return true, pods, err
 	}
 	return true, *v1Pods, err

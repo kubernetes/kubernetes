@@ -27,9 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-func (obj *MetadataOnlyObject) GetObjectKind() schema.ObjectKind     { return obj }
-func (obj *MetadataOnlyObjectList) GetObjectKind() schema.ObjectKind { return obj }
-
 type metaOnlyJSONScheme struct{}
 
 // This function can be extended to mapping different gvk to different MetadataOnlyObject,
@@ -52,14 +49,14 @@ func NewMetadataCodecFactory() serializer.CodecFactory {
 		if kind.Version == runtime.APIVersionInternal {
 			continue
 		}
-		if kind == api.Unversioned.WithKind("Status") {
+		if kind == metav1.Unversioned.WithKind("Status") {
 			// this is added below as unversioned
 			continue
 		}
 		metaOnlyObject := gvkToMetadataOnlyObject(kind)
 		scheme.AddKnownTypeWithName(kind, metaOnlyObject)
 	}
-	scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
+	scheme.AddUnversionedTypes(metav1.Unversioned, &metav1.Status{})
 	return serializer.NewCodecFactory(scheme)
 }
 

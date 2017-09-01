@@ -51,6 +51,7 @@ const (
 	Pods                       Resource = "pods"
 	PodSecurityPolicies        Resource = "podsecuritypolicies"
 	PodTemplates               Resource = "podtemplates"
+	PriorityClasses            Resource = "priorityclasses"
 	Replicasets                Resource = "replicasets"
 	ResourceQuotas             Resource = "resourcequotas"
 	CronJobs                   Resource = "cronjobs"
@@ -73,7 +74,7 @@ func InitializeWatchCacheSizes(expectedRAMCapacityMB int) {
 	// This is the heuristics that from memory capacity is trying to infer
 	// the maximum number of nodes in the cluster and set cache sizes based
 	// on that value.
-	// From our documentation, we officially recomment 120GB machines for
+	// From our documentation, we officially recommend 120GB machines for
 	// 2000 nodes, and we scale from that point. Thus we assume ~60MB of
 	// capacity per node.
 	// TODO: Revisit this heuristics
@@ -102,6 +103,10 @@ func SetWatchCacheSizes(cacheSizes []string) {
 		size, err := strconv.Atoi(tokens[1])
 		if err != nil {
 			glog.Errorf("invalid size of watch cache capabilities: %s", c)
+			continue
+		}
+		if size < 0 {
+			glog.Errorf("watch cache size cannot be negative: %s", c)
 			continue
 		}
 

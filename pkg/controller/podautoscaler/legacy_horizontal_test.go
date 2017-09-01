@@ -27,20 +27,19 @@ import (
 	"testing"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2alpha1"
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	clientfake "k8s.io/client-go/kubernetes/fake"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
@@ -332,11 +331,11 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					Containers: []metricsapi.ContainerMetrics{
 						{
 							Name: "container",
-							Usage: clientv1.ResourceList{
-								clientv1.ResourceCPU: *resource.NewMilliQuantity(
+							Usage: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(
 									int64(cpu),
 									resource.DecimalSI),
-								clientv1.ResourceMemory: *resource.NewQuantity(
+								v1.ResourceMemory: *resource.NewQuantity(
 									int64(1024*1024),
 									resource.BinarySI),
 							},
@@ -464,7 +463,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		tc.Lock()
 		defer tc.Unlock()
 
-		obj := action.(core.CreateAction).GetObject().(*clientv1.Event)
+		obj := action.(core.CreateAction).GetObject().(*v1.Event)
 		if tc.verifyEvents {
 			switch obj.Reason {
 			case "SuccessfulRescale":

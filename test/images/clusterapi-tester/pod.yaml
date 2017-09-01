@@ -4,7 +4,7 @@ metadata:
   name: clusterapi-tester
 spec:
   containers:
-  - image: gcr.io/google_containers/clusterapi-tester:1.0
+  - image: gcr.io/kubernetes-e2e-test-images/clusterapi-tester-amd64:1.0
     name: clusterapi-tester
     readinessProbe:
       httpGet:

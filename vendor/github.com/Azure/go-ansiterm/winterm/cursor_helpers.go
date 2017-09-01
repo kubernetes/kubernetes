@@ -3,11 +3,11 @@
 package winterm
 
 const (
-	Horizontal = iota
-	Vertical
+	horizontal = iota
+	vertical
 )
 
-func (h *WindowsAnsiEventHandler) getCursorWindow(info *CONSOLE_SCREEN_BUFFER_INFO) SMALL_RECT {
+func (h *windowsAnsiEventHandler) getCursorWindow(info *CONSOLE_SCREEN_BUFFER_INFO) SMALL_RECT {
 	if h.originMode {
 		sr := h.effectiveSr(info.Window)
 		return SMALL_RECT{
@@ -27,7 +27,7 @@ func (h *WindowsAnsiEventHandler) getCursorWindow(info *CONSOLE_SCREEN_BUFFER_IN
 }
 
 // setCursorPosition sets the cursor to the specified position, bounded to the screen size
-func (h *WindowsAnsiEventHandler) setCursorPosition(position COORD, window SMALL_RECT) error {
+func (h *windowsAnsiEventHandler) setCursorPosition(position COORD, window SMALL_RECT) error {
 	position.X = ensureInRange(position.X, window.Left, window.Right)
 	position.Y = ensureInRange(position.Y, window.Top, window.Bottom)
 	err := SetConsoleCursorPosition(h.fd, position)
@@ -38,15 +38,15 @@ func (h *WindowsAnsiEventHandler) setCursorPosition(position COORD, window SMALL
 	return err
 }
 
-func (h *WindowsAnsiEventHandler) moveCursorVertical(param int) error {
-	return h.moveCursor(Vertical, param)
+func (h *windowsAnsiEventHandler) moveCursorVertical(param int) error {
+	return h.moveCursor(vertical, param)
 }
 
-func (h *WindowsAnsiEventHandler) moveCursorHorizontal(param int) error {
-	return h.moveCursor(Horizontal, param)
+func (h *windowsAnsiEventHandler) moveCursorHorizontal(param int) error {
+	return h.moveCursor(horizontal, param)
 }
 
-func (h *WindowsAnsiEventHandler) moveCursor(moveMode int, param int) error {
+func (h *windowsAnsiEventHandler) moveCursor(moveMode int, param int) error {
 	info, err := GetConsoleScreenBufferInfo(h.fd)
 	if err != nil {
 		return err
@@ -54,10 +54,10 @@ func (h *WindowsAnsiEventHandler) moveCursor(moveMode int, param int) error {
 
 	position := info.CursorPosition
 	switch moveMode {
-	case Horizontal:
-		position.X += SHORT(param)
-	case Vertical:
-		position.Y += SHORT(param)
+	case horizontal:
+		position.X += int16(param)
+	case vertical:
+		position.Y += int16(param)
 	}
 
 	if err = h.setCursorPosition(position, h.getCursorWindow(info)); err != nil {
@@ -67,7 +67,7 @@ func (h *WindowsAnsiEventHandler) moveCursor(moveMode int, param int) error {
 	return nil
 }
 
-func (h *WindowsAnsiEventHandler) moveCursorLine(param int) error {
+func (h *windowsAnsiEventHandler) moveCursorLine(param int) error {
 	info, err := GetConsoleScreenBufferInfo(h.fd)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (h *WindowsAnsiEventHandler) moveCursorLine(param int) error {
 
 	position := info.CursorPosition
 	position.X = 0
-	position.Y += SHORT(param)
+	position.Y += int16(param)
 
 	if err = h.setCursorPosition(position, h.getCursorWindow(info)); err != nil {
 		return err
@@ -84,14 +84,14 @@ func (h *WindowsAnsiEventHandler) moveCursorLine(param int) error {
 	return nil
 }
 
-func (h *WindowsAnsiEventHandler) moveCursorColumn(param int) error {
+func (h *windowsAnsiEventHandler) moveCursorColumn(param int) error {
 	info, err := GetConsoleScreenBufferInfo(h.fd)
 	if err != nil {
 		return err
 	}
 
 	position := info.CursorPosition
-	position.X = SHORT(param) - 1
+	position.X = int16(param) - 1
 
 	if err = h.setCursorPosition(position, h.getCursorWindow(info)); err != nil {
 		return err

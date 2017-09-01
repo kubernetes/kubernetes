@@ -27,25 +27,24 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -109,7 +108,7 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	}
 	dc := &DeploymentController{
 		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "deployment-controller"}),
+		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
@@ -206,7 +205,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(rs); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(rs); controllerRef != nil {
 		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
 		if d == nil {
 			return
@@ -261,8 +260,8 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := controller.GetControllerOf(curRS)
-	oldControllerRef := controller.GetControllerOf(oldRS)
+	curControllerRef := metav1.GetControllerOf(curRS)
+	oldControllerRef := metav1.GetControllerOf(oldRS)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -320,7 +319,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(rs)
+	controllerRef := metav1.GetControllerOf(rs)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -356,7 +355,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
-		rsList, err := dc.getReplicaSetsForDeployment(d)
+		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.ExtensionsV1beta1()))
 		if err != nil {
 			return
 		}
@@ -410,7 +409,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	// Find the owning replica set
 	var rs *extensions.ReplicaSet
 	var err error
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller owns this Pod.
 		return nil
@@ -426,7 +425,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 	}
 
 	// Now find the Deployment that owns that ReplicaSet.
-	controllerRef = controller.GetControllerOf(rs)
+	controllerRef = metav1.GetControllerOf(rs)
 	if controllerRef == nil {
 		return nil
 	}
@@ -435,7 +434,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *extensions.Dep
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
-// of the corrrect Kind.
+// of the correct Kind.
 func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.Deployment {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -543,7 +542,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *extensions.Deployment,
 	for _, pod := range pods {
 		// Do not ignore inactive Pods because Recreate Deployments need to verify that no
 		// Pods from older versions are running before spinning up new Pods.
-		controllerRef := controller.GetControllerOf(pod)
+		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
 			continue
 		}
@@ -579,10 +578,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
-	d, err := util.DeploymentDeepCopy(deployment)
-	if err != nil {
-		return err
-	}
+	d := deployment.DeepCopy()
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
@@ -592,20 +588,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
 		}
 		return nil
-	}
-
-	// This is the point at which we used to add/remove the overlap annotation.
-	// Now we always remove it if it exists, because it is obsolete as of 1.6.
-	// Although the server no longer adds or looks at the annotation,
-	// it's important to remove it from controllers created before the upgrade,
-	// so that old clients (e.g. kubectl reaper) know they can no longer assume
-	// the controller is blocked due to selector overlap and has no dependents.
-	if _, ok := d.Annotations[util.OverlapAnnotation]; ok {
-		delete(d.Annotations, util.OverlapAnnotation)
-		d, err = dc.client.ExtensionsV1beta1().Deployments(d.Namespace).UpdateStatus(d)
-		if err != nil {
-			return fmt.Errorf("couldn't remove obsolete overlap annotation from deployment %v: %v", key, err)
-		}
 	}
 
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
@@ -628,39 +610,12 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d, rsList, podMap)
 	}
 
-	// Why run the cleanup policy only when there is no rollback request?
-	// The thing with the cleanup policy currently is that it is far from smart because it takes into account
-	// the latest replica sets while it should instead retain the latest *working* replica sets. This means that
-	// you can have a cleanup policy of 1 but your last known working replica set may be 2 or 3 versions back
-	// in the history.
-	// Eventually we will want to find a way to recognize replica sets that have worked at some point in time
-	// (and chances are higher that they will work again as opposed to others that didn't) for candidates to
-	// automatically roll back to (#23211) and the cleanup policy should help.
-	if d.Spec.RollbackTo == nil {
-		_, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, podMap, false)
-		if err != nil {
-			return err
-		}
-		// So far the cleanup policy was executed once a deployment was paused, scaled up/down, or it
-		// successfully completed deploying a replica set. Decouple it from the strategies and have it
-		// run almost unconditionally - cleanupDeployment is safe by default.
-		dc.cleanupDeployment(oldRSs, d)
-	}
-
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
 	if err = dc.checkPausedConditions(d); err != nil {
 		return err
 	}
-
-	_, err = dc.hasFailed(d, rsList, podMap)
-	if err != nil {
-		return err
-	}
-	// TODO: Automatically rollback here if we failed above. Locate the last complete
-	// revision and populate the rollback spec with it.
-	// See https://github.com/kubernetes/kubernetes/issues/23211.
 
 	if d.Spec.Paused {
 		return dc.sync(d, rsList, podMap)

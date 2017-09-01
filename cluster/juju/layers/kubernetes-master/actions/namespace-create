@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 from yaml import safe_load as load
 from charmhelpers.core.hookenv import (
     action_get,
@@ -9,6 +9,9 @@ from charmhelpers.core.hookenv import (
 )
 from charms.templating.jinja2 import render
 from subprocess import check_output
+
+
+os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 
 def kubectl(args):

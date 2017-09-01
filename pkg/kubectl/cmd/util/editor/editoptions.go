@@ -44,8 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/crlf"
 )
 
 // EditOptions contains all the options for running edit cli command.
@@ -53,6 +53,7 @@ type EditOptions struct {
 	resource.FilenameOptions
 
 	Output             string
+	OutputPatch        bool
 	WindowsLineEndings bool
 
 	cmdutil.ValidateOptions
@@ -96,6 +97,10 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	}
 	o.editPrinterOptions = getPrinter(o.Output)
 
+	if o.OutputPatch && o.EditMode != NormalEditMode {
+		return fmt.Errorf("the edit mode doesn't support output the patch")
+	}
+
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -104,7 +109,11 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	if err != nil {
 		return err
 	}
-	b := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme)
+
+	b, err := f.NewUnstructuredBuilder(true)
+	if err != nil {
+		return err
+	}
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
@@ -220,7 +229,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
+			schema, err := o.f.Validator(o.EnableValidation, o.UseOpenAPI, o.SchemaCacheDir)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
@@ -326,6 +335,9 @@ func (o *EditOptions) Run() error {
 		infos, err := o.OriginalResult.Infos()
 		if err != nil {
 			return err
+		}
+		if len(infos) == 0 {
+			return errors.New("edit cancelled, no objects found.")
 		}
 		return editFn(infos)
 	case ApplyEditMode:
@@ -433,10 +445,7 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
-	objCopy, err := api.Scheme.Copy(obj)
-	if err != nil {
-		return nil, beforeJSON, types.MergePatchType, err
-	}
+	objCopy := obj.DeepCopyObject()
 	accessor := meta.NewAccessor()
 	annotations, err := accessor.Annotations(objCopy)
 	if err != nil {
@@ -491,11 +500,7 @@ func getPrinter(format string) *editPrinterOptions {
 	}
 }
 
-func (o *EditOptions) visitToPatch(
-	originalInfos []*resource.Info,
-	patchVisitor resource.Visitor,
-	results *editResults,
-) error {
+func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor resource.Visitor, results *editResults) error {
 	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		editObjUID, err := meta.NewAccessor().UID(info.Object)
 		if err != nil {
@@ -571,6 +576,10 @@ func (o *EditOptions) visitToPatch(
 				}
 				return err
 			}
+		}
+
+		if o.OutputPatch {
+			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)

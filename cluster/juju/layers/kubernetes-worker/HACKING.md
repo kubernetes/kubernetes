@@ -2,7 +2,7 @@
 
 ### Building from the layer
 
-You can clone the kubenetes-worker layer with git and build locally if you
+You can clone the kubernetes-worker layer with git and build locally if you
 have the charm package/snap installed.
 
 ```shell

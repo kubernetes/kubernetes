@@ -19,6 +19,13 @@ limitations under the License.
 package api
 
 const (
+	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy
+	// webhook backend fails.
+	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
+
+	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
+	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
+
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
@@ -40,6 +47,8 @@ const (
 
 	// CreatedByAnnotation represents the key used to store the spec(json)
 	// used to create the resource.
+	// This field is deprecated in favor of ControllerRef (see #44407).
+	// TODO(#50720): Remove this field in v1.9.
 	CreatedByAnnotation = "kubernetes.io/created-by"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
@@ -65,11 +74,6 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	// TODO: remove when alpha support for affinity is removed
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
 
@@ -87,20 +91,4 @@ const (
 	//
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
-
-	// AnnotationValueExternalTrafficLocal Value of annotation to specify local endpoints behavior.
-	AnnotationValueExternalTrafficLocal = "OnlyLocal"
-	// AnnotationValueExternalTrafficGlobal Value of annotation to specify global (legacy) behavior.
-	AnnotationValueExternalTrafficGlobal = "Global"
-
-	// TODO: The beta annotations have been deprecated, remove them when we release k8s 1.8.
-
-	// BetaAnnotationHealthCheckNodePort Annotation specifying the healthcheck nodePort for the service.
-	// If not specified, annotation is created by the service api backend with the allocated nodePort.
-	// Will use user-specified nodePort value if specified by the client.
-	BetaAnnotationHealthCheckNodePort = "service.beta.kubernetes.io/healthcheck-nodeport"
-
-	// BetaAnnotationExternalTraffic An annotation that denotes if this Service desires to route
-	// external traffic to local endpoints only. This preserves Source IP and avoids a second hop.
-	BetaAnnotationExternalTraffic = "service.beta.kubernetes.io/external-traffic"
 )

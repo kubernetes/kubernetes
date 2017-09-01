@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -34,15 +36,15 @@ type LogfFn func(format string, args ...interface{})
 
 func LogReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
-		logf("New ReplicaSet of Deployment %s:\n%+v", deployment.Name, *newRS)
+		logf(spew.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
 	} else {
-		logf("New ReplicaSet of Deployment %s is nil.", deployment.Name)
+		logf("New ReplicaSet of Deployment %q is nil.", deployment.Name)
 	}
 	if len(allOldRSs) > 0 {
-		logf("All old ReplicaSets of Deployment %s:", deployment.Name)
+		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf("%+v", *allOldRSs[i])
+		logf(spew.Sprintf("%+v", *allOldRSs[i]))
 	}
 }
 
@@ -53,9 +55,8 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 	}
 
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
-
 	if err != nil {
-		logf("Failed to list Pods of Deployment %s: %v", deployment.Name, err)
+		logf("Failed to list Pods of Deployment %q: %v", deployment.Name, err)
 		return
 	}
 	for _, pod := range podList.Items {
@@ -63,7 +64,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *extensions.Deploymen
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
-		logf("Pod %s is %s:\n%+v", pod.Name, availability, pod)
+		logf(spew.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
 	}
 }
 
@@ -84,7 +85,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 		if err != nil {
 			return false, err
 		}
-		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c)
+		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
 		if err != nil {
 			return false, err
 		}
@@ -153,7 +154,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		}
 		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
 
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c)
+		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 
 		if err != nil {
 			return false, err
@@ -174,8 +175,8 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			logf(reason)
 			return false, nil
 		}
-		if deployment.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("Deployment %q doesn't have the required image set", deployment.Name)
+		if !containsImage(deployment.Spec.Template.Spec.Containers, image) {
+			reason = fmt.Sprintf("Deployment %q doesn't have the required image %s set", deployment.Name, image)
 			logf(reason)
 			return false, nil
 		}
@@ -184,8 +185,8 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			logf(reason)
 			return false, nil
 		}
-		if newRS.Spec.Template.Spec.Containers[0].Image != image {
-			reason = fmt.Sprintf("New replica set %q doesn't have the required image set", newRS.Name)
+		if !containsImage(newRS.Spec.Template.Spec.Containers, image) {
+			reason = fmt.Sprintf("New replica set %q doesn't have the required image %s.", newRS.Name, image)
 			logf(reason)
 			return false, nil
 		}
@@ -202,4 +203,13 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		return fmt.Errorf("error waiting for deployment %q (got %s / %s) and new replica set %q (got %s / %s) revision and image to match expectation (expected %s / %s): %v", deploymentName, deployment.Annotations[deploymentutil.RevisionAnnotation], deployment.Spec.Template.Spec.Containers[0].Image, newRS.Name, newRS.Annotations[deploymentutil.RevisionAnnotation], newRS.Spec.Template.Spec.Containers[0].Image, revision, image, err)
 	}
 	return nil
+}
+
+func containsImage(containers []v1.Container, imageName string) bool {
+	for _, container := range containers {
+		if container.Image == imageName {
+			return true
+		}
+	}
+	return false
 }

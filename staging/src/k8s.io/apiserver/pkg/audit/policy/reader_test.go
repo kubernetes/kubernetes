@@ -24,12 +24,36 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/audit"
+	// import to call webhook's init() function to register audit.Policy to schema
+	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const policyDef = `
+const policyDefV1alpha1 = `
+apiVersion: audit.k8s.io/v1beta1
+kind: Policy
+rules:
+  - level: None
+    nonResourceURLs:
+      - /healthz*
+      - /version
+  - level: RequestResponse
+    users: ["tim"]
+    userGroups: ["testers", "developers"]
+    verbs: ["patch", "delete", "create"]
+    resources:
+      - group: ""
+      - group: "rbac.authorization.k8s.io"
+        resources: ["clusterroles", "clusterrolebindings"]
+    namespaces: ["default", "kube-system"]
+  - level: Metadata
+`
+
+const policyDefV1beta1 = `
+apiVersion: audit.k8s.io/v1beta1
+kind: Policy
 rules:
   - level: None
     nonResourceURLs:
@@ -66,13 +90,32 @@ var expectedPolicy = &audit.Policy{
 	}},
 }
 
-func TestParser(t *testing.T) {
+func TestParserV1alpha1(t *testing.T) {
 	// Create a policy file.
 	f, err := ioutil.TempFile("", "policy.yaml")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	_, err = f.WriteString(policyDef)
+	_, err = f.WriteString(policyDefV1alpha1)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	policy, err := LoadPolicyFromFile(f.Name())
+	require.NoError(t, err)
+
+	assert.Len(t, policy.Rules, 3) // Sanity check.
+	if !reflect.DeepEqual(policy, expectedPolicy) {
+		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
+	}
+}
+
+func TestParserV1beta1(t *testing.T) {
+	// Create a policy file.
+	f, err := ioutil.TempFile("", "policy.yaml")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+
+	_, err = f.WriteString(policyDefV1beta1)
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 

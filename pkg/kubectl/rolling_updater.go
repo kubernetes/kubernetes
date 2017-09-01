@@ -17,13 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
-	goerrors "errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,11 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/integer"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
@@ -424,7 +424,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 		}
 		for _, pod := range pods.Items {
 			v1Pod := &v1.Pod{}
-			if err := v1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
+			if err := apiv1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
 				return 0, 0, err
 			}
 			// Do not count deleted pods as ready
@@ -565,10 +565,7 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	}
 	// Then create the same RC with the new name.
 	_, err = c.ReplicationControllers(rc.Namespace).Create(rc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func LoadExistingNextReplicationController(c coreclient.ReplicationControllersGetter, namespace, newName string) (*api.ReplicationController, error) {
@@ -616,11 +613,11 @@ func CreateNewControllerFromCurrentController(rcClient coreclient.ReplicationCon
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) > 1 && len(cfg.Container) == 0 {
-		return nil, goerrors.New("Must specify container to update when updating a multi-container pod")
+		return nil, fmt.Errorf("must specify container to update when updating a multi-container pod")
 	}
 
 	if len(newRc.Spec.Template.Spec.Containers) == 0 {
-		return nil, goerrors.New(fmt.Sprintf("Pod has no containers! (%v)", newRc))
+		return nil, fmt.Errorf("pod has no containers! (%v)", newRc)
 	}
 	newRc.Spec.Template.Spec.Containers[containerIndex].Image = cfg.Image
 	if len(cfg.PullPolicy) != 0 {
@@ -684,14 +681,14 @@ func UpdateExistingReplicationController(rcClient coreclient.ReplicationControll
 	if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
 		SetNextControllerAnnotation(oldRc, newName)
 		return AddDeploymentKeyToReplicationController(oldRc, rcClient, podClient, deploymentKey, deploymentValue, namespace, out)
-	} else {
-		// If we didn't need to update the controller for the deployment key, we still need to write
-		// the "next" controller.
-		applyUpdate := func(rc *api.ReplicationController) {
-			SetNextControllerAnnotation(rc, newName)
-		}
-		return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 	}
+
+	// If we didn't need to update the controller for the deployment key, we still need to write
+	// the "next" controller.
+	applyUpdate := func(rc *api.ReplicationController) {
+		SetNextControllerAnnotation(rc, newName)
+	}
+	return updateRcWithRetries(rcClient, namespace, oldRc, applyUpdate)
 }
 
 func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, deploymentKey, deploymentValue, namespace string, out io.Writer) (*api.ReplicationController, error) {
@@ -752,7 +749,9 @@ func AddDeploymentKeyToReplicationController(oldRc *api.ReplicationController, r
 	// we've finished re-adopting existing pods to the rc.
 	selector = labels.SelectorFromSet(selectorCopy)
 	options = metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err = podClient.Pods(namespace).List(options)
+	if podList, err = podClient.Pods(namespace).List(options); err != nil {
+		return nil, err
+	}
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != deploymentValue {
@@ -773,12 +772,8 @@ type updateRcFunc func(controller *api.ReplicationController)
 // 3. Update the resource
 func updateRcWithRetries(rcClient coreclient.ReplicationControllersGetter, namespace string, rc *api.ReplicationController, applyUpdate updateRcFunc) (*api.ReplicationController, error) {
 	// Deep copy the rc in case we failed on Get during retry loop
-	obj, err := api.Scheme.Copy(rc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deep copy rc before updating it: %v", err)
-	}
-	oldRc := obj.(*api.ReplicationController)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
+	oldRc := rc.DeepCopy()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, e = rcClient.ReplicationControllers(namespace).Update(rc); e == nil {
@@ -808,12 +803,8 @@ type updatePodFunc func(controller *api.Pod)
 // 3. Update the resource
 func updatePodWithRetries(podClient coreclient.PodsGetter, namespace string, pod *api.Pod, applyUpdate updatePodFunc) (*api.Pod, error) {
 	// Deep copy the pod in case we failed on Get during retry loop
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deep copy pod before updating it: %v", err)
-	}
-	oldPod := obj.(*api.Pod)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
+	oldPod := pod.DeepCopy()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(pod)
 		if pod, e = podClient.Pods(namespace).Update(pod); e == nil {

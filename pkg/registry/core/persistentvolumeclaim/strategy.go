@@ -98,12 +98,12 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx genericapirequest.
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
+		return nil, nil, false, fmt.Errorf("not a persistentvolumeclaim")
 	}
-	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
+	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), persistentvolumeclaimObj.Initializers != nil, nil
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.

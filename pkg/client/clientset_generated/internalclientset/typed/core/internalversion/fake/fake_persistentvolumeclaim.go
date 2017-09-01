@@ -36,50 +36,7 @@ var persistentvolumeclaimsResource = schema.GroupVersionResource{Group: "", Vers
 
 var persistentvolumeclaimsKind = schema.GroupVersionKind{Group: "", Version: "", Kind: "PersistentVolumeClaim"}
 
-func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*api.PersistentVolumeClaim), err
-}
-
-func (c *FakePersistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
-
-	return err
-}
-
-func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &api.PersistentVolumeClaimList{})
-	return err
-}
-
+// Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
 func (c *FakePersistentVolumeClaims) Get(name string, options v1.GetOptions) (result *api.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
@@ -90,6 +47,7 @@ func (c *FakePersistentVolumeClaims) Get(name string, options v1.GetOptions) (re
 	return obj.(*api.PersistentVolumeClaim), err
 }
 
+// List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
 func (c *FakePersistentVolumeClaims) List(opts v1.ListOptions) (result *api.PersistentVolumeClaimList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), &api.PersistentVolumeClaimList{})
@@ -116,6 +74,56 @@ func (c *FakePersistentVolumeClaims) Watch(opts v1.ListOptions) (watch.Interface
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
+func (c *FakePersistentVolumeClaims) Create(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.PersistentVolumeClaim), err
+}
+
+// Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
+func (c *FakePersistentVolumeClaims) Update(persistentVolumeClaim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.PersistentVolumeClaim), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakePersistentVolumeClaims) UpdateStatus(persistentVolumeClaim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &api.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.PersistentVolumeClaim), err
+}
+
+// Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
+func (c *FakePersistentVolumeClaims) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(persistentvolumeclaimsResource, c.ns, name), &api.PersistentVolumeClaim{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &api.PersistentVolumeClaimList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.

@@ -21,9 +21,9 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -36,7 +36,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -59,7 +59,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
@@ -123,7 +123,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cephfs")
 	if err != nil {
 		t.Errorf("can't find cephfs plugin by name")
@@ -134,4 +134,95 @@ func TestConstructVolumeSpec(t *testing.T) {
 	if cephfsSpec.Name() != "cephfsVolume" {
 		t.Errorf("Get wrong cephfs spec name, got: %s", cephfsSpec.Name())
 	}
+}
+
+type testcase struct {
+	name      string
+	defaultNs string
+	spec      *volume.Spec
+	// Expected return of the test
+	expectedName  string
+	expectedNs    string
+	expectedError error
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							CephFS: &v1.CephFSPersistentVolumeSource{
+								Monitors: []string{"a", "b"},
+								User:     "user",
+								SecretRef: &v1.SecretReference{
+									Name: "name",
+								},
+								SecretFile: "/etc/ceph/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						CephFS: &v1.CephFSVolumeSource{
+							Monitors: []string{"a", "b"},
+							User:     "user",
+							SecretRef: &v1.LocalObjectReference{
+								Name: "name",
+							},
+							SecretFile: "/etc/ceph/user.secret",
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getSecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
 }

@@ -134,3 +134,22 @@ func equalStringSets(x, y []string) bool {
 	yString := sets.NewString(y...)
 	return xString.Equal(yString)
 }
+
+func isNotFound(err error) bool {
+	return isHTTPErrorCode(err, http.StatusNotFound)
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || isNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+func isNotFoundOrInUse(err error) bool {
+	return isNotFound(err) || isInUsedByError(err)
+}
+
+func makeGoogleAPINotFoundError(message string) error {
+	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
+}

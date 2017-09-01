@@ -17,8 +17,10 @@ package machine
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -30,6 +32,8 @@ import (
 
 	"github.com/golang/glog"
 )
+
+const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
 
 var machineIdFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
 var bootIdFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
@@ -48,6 +52,45 @@ func getInfoFromFiles(filePaths string) string {
 	return ""
 }
 
+// GetHugePagesInfo returns information about pre-allocated huge pages
+func GetHugePagesInfo() ([]info.HugePagesInfo, error) {
+	var hugePagesInfo []info.HugePagesInfo
+	files, err := ioutil.ReadDir(hugepagesDirectory)
+	if err != nil {
+		// treat as non-fatal since kernels and machine can be
+		// configured to disable hugepage support
+		return hugePagesInfo, nil
+	}
+	for _, st := range files {
+		nameArray := strings.Split(st.Name(), "-")
+		pageSizeArray := strings.Split(nameArray[1], "kB")
+		pageSize, err := strconv.ParseUint(string(pageSizeArray[0]), 10, 64)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+
+		numFile := hugepagesDirectory + st.Name() + "/nr_hugepages"
+		val, err := ioutil.ReadFile(numFile)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+		var numPages uint64
+		// we use sscanf as the file as a new-line that trips up ParseUint
+		// it returns the number of tokens successfully parsed, so if
+		// n != 1, it means we were unable to parse a number from the file
+		n, err := fmt.Sscanf(string(val), "%d", &numPages)
+		if err != nil || n != 1 {
+			return hugePagesInfo, fmt.Errorf("could not parse file %v contents %q", numFile, string(val))
+		}
+
+		hugePagesInfo = append(hugePagesInfo, info.HugePagesInfo{
+			NumPages: numPages,
+			PageSize: pageSize,
+		})
+	}
+	return hugePagesInfo, nil
+}
+
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.MachineInfo, error) {
 	rootFs := "/"
 	if !inHostNamespace {
@@ -61,6 +104,11 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	}
 
 	memoryCapacity, err := GetMachineMemoryCapacity()
+	if err != nil {
+		return nil, err
+	}
+
+	hugePagesInfo, err := GetHugePagesInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +147,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		NumCores:       numCores,
 		CpuFrequency:   clockSpeed,
 		MemoryCapacity: memoryCapacity,
+		HugePages:      hugePagesInfo,
 		DiskMap:        diskMap,
 		NetworkDevices: netDevices,
 		Topology:       topology,
@@ -116,7 +165,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		if fs.Inodes != nil {
 			inodes = *fs.Inodes
 		}
-		machineInfo.Filesystems = append(machineInfo.Filesystems, info.FsInfo{Device: fs.Device, Type: fs.Type.String(), Capacity: fs.Capacity, Inodes: inodes, HasInodes: fs.Inodes != nil})
+		machineInfo.Filesystems = append(machineInfo.Filesystems, info.FsInfo{Device: fs.Device, DeviceMajor: uint64(fs.Major), DeviceMinor: uint64(fs.Minor), Type: fs.Type.String(), Capacity: fs.Capacity, Inodes: inodes, HasInodes: fs.Inodes != nil})
 	}
 
 	return machineInfo, nil

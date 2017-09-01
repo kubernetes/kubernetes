@@ -21,9 +21,12 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/golang/glog"
+
+	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
 )
 
 type InitializerConfigurationLister interface {
@@ -32,6 +35,23 @@ type InitializerConfigurationLister interface {
 
 type InitializerConfigurationManager struct {
 	*poller
+}
+
+func NewInitializerConfigurationManager(c InitializerConfigurationLister) *InitializerConfigurationManager {
+	getFn := func() (runtime.Object, error) {
+		list, err := c.List(metav1.ListOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) || errors.IsForbidden(err) {
+				glog.V(5).Infof("Initializers are disabled due to an error: %v", err)
+				return nil, ErrDisabled
+			}
+			return nil, err
+		}
+		return mergeInitializerConfigurations(list), nil
+	}
+	return &InitializerConfigurationManager{
+		newPoller(getFn),
+	}
 }
 
 // Initializers returns the merged InitializerConfiguration.
@@ -47,16 +67,8 @@ func (im *InitializerConfigurationManager) Initializers() (*v1alpha1.Initializer
 	return initializerConfiguration, nil
 }
 
-func NewInitializerConfigurationManager(c InitializerConfigurationLister) *InitializerConfigurationManager {
-	getFn := func() (runtime.Object, error) {
-		list, err := c.List(metav1.ListOptions{})
-		if err != nil {
-			return nil, err
-		}
-		return mergeInitializerConfigurations(list), nil
-	}
-	return &InitializerConfigurationManager{
-		newPoller(getFn)}
+func (im *InitializerConfigurationManager) Run(stopCh <-chan struct{}) {
+	im.poller.Run(stopCh)
 }
 
 func mergeInitializerConfigurations(initializerConfigurationList *v1alpha1.InitializerConfigurationList) *v1alpha1.InitializerConfiguration {

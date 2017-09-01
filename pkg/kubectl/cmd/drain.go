@@ -20,21 +20,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/util/json"
 	"math"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -42,8 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type DrainOptions struct {
@@ -83,7 +86,6 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
-	kMaxNodeUpdateRetry  = 10
 )
 
 var (
@@ -196,7 +198,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) != 1 {
-		return cmdutil.UsageError(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
+		return cmdutil.UsageErrorf(cmd, "USAGE: %s [flags]", cmd.Use)
 	}
 
 	if o.client, err = o.Factory.ClientSet(); err != nil {
@@ -215,7 +217,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	r := o.Factory.NewBuilder().
+	r := o.Factory.NewBuilder(true).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceNames("node", args[0]).
 		Do()
@@ -266,40 +268,38 @@ func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 	return err
 }
 
-func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, error) {
-	switch sr.Reference.Kind {
+func (o *DrainOptions) getController(namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
+	switch controllerRef.Kind {
 	case "ReplicationController":
-		return o.client.Core().ReplicationControllers(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Core().ReplicationControllers(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "DaemonSet":
-		return o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Extensions().DaemonSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "Job":
-		return o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Batch().Jobs(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "ReplicaSet":
-		return o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
-		return o.client.Apps().StatefulSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{})
+		return o.client.Apps().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	}
-	return nil, fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
+	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }
 
-func (o *DrainOptions) getPodCreator(pod api.Pod) (*api.SerializedReference, error) {
-	creatorRef, found := pod.ObjectMeta.Annotations[api.CreatedByAnnotation]
-	if !found {
+func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, error) {
+	controllerRef := metav1.GetControllerOf(&pod)
+	if controllerRef == nil {
 		return nil, nil
 	}
-	// Now verify that the specified creator actually exists.
-	sr := &api.SerializedReference{}
-	if err := runtime.DecodeInto(o.Factory.Decoder(true), []byte(creatorRef), sr); err != nil {
-		return nil, err
-	}
+
 	// We assume the only reason for an error is because the controller is
-	// gone/missing, not for any other cause.  TODO(mml): something more
-	// sophisticated than this
-	_, err := o.getController(sr)
+	// gone/missing, not for any other cause.
+	// TODO(mml): something more sophisticated than this
+	// TODO(juntee): determine if it's safe to remove getController(),
+	// so that drain can work for controller types that we don't know about
+	_, err := o.getController(pod.Namespace, controllerRef)
 	if err != nil {
 		return nil, err
 	}
-	return sr, nil
+	return controllerRef, nil
 }
 
 func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) {
@@ -308,7 +308,7 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 		return true, nil, nil
 	}
 
-	sr, err := o.getPodCreator(pod)
+	controllerRef, err := o.getPodController(pod)
 	if err != nil {
 		// if we're forcing, remove orphaned pods with a warning
 		if apierrors.IsNotFound(err) && o.Force {
@@ -316,7 +316,7 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if sr != nil {
+	if controllerRef != nil {
 		return true, nil, nil
 	}
 	if !o.Force {
@@ -333,7 +333,7 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
-	sr, err := o.getPodCreator(pod)
+	controllerRef, err := o.getPodController(pod)
 	if err != nil {
 		// if we're forcing, remove orphaned pods with a warning
 		if apierrors.IsNotFound(err) && o.Force {
@@ -341,10 +341,10 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 		}
 		return false, nil, &fatal{err.Error()}
 	}
-	if sr == nil || sr.Reference.Kind != "DaemonSet" {
+	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
-	if _, err := o.client.Extensions().DaemonSets(sr.Reference.Namespace).Get(sr.Reference.Name, metav1.GetOptions{}); err != nil {
+	if _, err := o.client.Extensions().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		return false, nil, &fatal{err.Error()}
 	}
 	if !o.IgnoreDaemonsets {
@@ -354,7 +354,7 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 }
 
 func mirrorPodFilter(pod api.Pod) (bool, *warning, *fatal) {
-	if _, found := pod.ObjectMeta.Annotations[types.ConfigMirrorAnnotationKey]; found {
+	if _, found := pod.ObjectMeta.Annotations[corev1.MirrorPodAnnotationKey]; found {
 		return false, nil, nil
 	}
 	return true, nil, nil
@@ -494,6 +494,9 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 				err = o.evictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
+				} else if apierrors.IsNotFound(err) {
+					doneCh <- true
+					return
 				} else if apierrors.IsTooManyRequests(err) {
 					time.Sleep(5 * time.Second)
 				} else {
@@ -544,7 +547,7 @@ func (o *DrainOptions) deletePods(pods []api.Pod, getPodFn func(namespace, name 
 	}
 	for _, pod := range pods {
 		err := o.deletePod(pod)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -622,27 +625,33 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 	}
 
 	if o.nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-		unsched := reflect.ValueOf(o.nodeInfo.Object).Elem().FieldByName("Spec").FieldByName("Unschedulable")
-		if unsched.Bool() == desired {
+		obj, err := o.nodeInfo.Mapping.ConvertToVersion(o.nodeInfo.Object, o.nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+		if err != nil {
+			return err
+		}
+		oldData, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		node, ok := obj.(*corev1.Node)
+		if !ok {
+			return fmt.Errorf("unexpected Type%T, expected Node", obj)
+		}
+		unsched := node.Spec.Unschedulable
+		if unsched == desired {
 			cmdutil.PrintSuccess(o.mapper, false, o.Out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
-			unsched.SetBool(desired)
-			var err error
-			for i := 0; i < kMaxNodeUpdateRetry; i++ {
-				// We don't care about what previous versions may exist, we always want
-				// to overwrite, and Replace always sets current ResourceVersion if version is "".
-				helper.Versioner.SetResourceVersion(o.nodeInfo.Object, "")
-				_, err = helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
-				if err != nil {
-					if !apierrors.IsConflict(err) {
-						return err
-					}
-				} else {
-					break
-				}
-				// It's a race, no need to sleep
+			node.Spec.Unschedulable = desired
+			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
 			}
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			if err != nil {
+				return err
+			}
+			_, err = helper.Patch(cmdNamespace, o.nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
 			if err != nil {
 				return err
 			}

@@ -31,6 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 )
@@ -60,16 +63,18 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.ReplicaSet{} },
-		NewListFunc:       func() runtime.Object { return &extensions.ReplicaSetList{} },
-		PredicateFunc:     replicaset.MatchReplicaSet,
-		QualifiedResource: extensions.Resource("replicasets"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("replicasets"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &extensions.ReplicaSet{} },
+		NewListFunc:              func() runtime.Object { return &extensions.ReplicaSetList{} },
+		PredicateFunc:            replicaset.MatchReplicaSet,
+		DefaultQualifiedResource: extensions.Resource("replicasets"),
+		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("replicasets"),
 
 		CreateStrategy: replicaset.Strategy,
 		UpdateStrategy: replicaset.Strategy,
 		DeleteStrategy: replicaset.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicaset.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -88,6 +93,14 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"rs"}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet

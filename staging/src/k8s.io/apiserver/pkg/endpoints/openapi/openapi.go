@@ -20,20 +20,20 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"unicode"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/util/trie"
-	"sort"
+	"k8s.io/kube-openapi/pkg/util"
 )
 
-var verbs = trie.New([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
+var verbs = util.NewTrie([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
 
 const (
 	extensionGVK = "x-kubernetes-group-version-kind"
@@ -59,41 +59,33 @@ func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 }
 
 // GetOperationIDAndTags returns a customize operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
-func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string, error) {
+func GetOperationIDAndTags(r *restful.Route) (string, []string, error) {
 	op := r.Operation
 	path := r.Path
 	var tags []string
-	// TODO: This is hacky, figure out where this name conflict is created and fix it at the root.
-	if strings.HasPrefix(path, "/apis/extensions/v1beta1/namespaces/{namespace}/") && strings.HasSuffix(op, "ScaleScale") {
-		op = op[:len(op)-10] + strings.Title(strings.Split(path[48:], "/")[0]) + "Scale"
+	prefix, exists := verbs.GetPrefix(op)
+	if !exists {
+		return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
 	}
-	switch servePath {
-	case "/swagger.json":
-		prefix, exists := verbs.GetPrefix(op)
-		if !exists {
-			return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
-		}
-		op = op[len(prefix):]
-		parts := strings.Split(strings.Trim(path, "/"), "/")
-		// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
-		if len(parts) >= 1 && parts[0] == "api" {
-			parts = append([]string{"apis", "core"}, parts[1:]...)
-		}
-		if len(parts) >= 2 && parts[0] == "apis" {
-			prefix = prefix + ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
-			tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
-			if len(parts) > 2 {
-				prefix = prefix + ToValidOperationID(parts[2], prefix != "")
-				tag = tag + "_" + ToValidOperationID(parts[2], false)
-			}
-			tags = append(tags, tag)
-		} else if len(parts) >= 1 {
-			tags = append(tags, ToValidOperationID(parts[0], false))
-		}
-		return prefix + ToValidOperationID(op, prefix != ""), tags, nil
-	default:
-		return op, tags, nil
+	op = op[len(prefix):]
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
+	if len(parts) >= 1 && parts[0] == "api" {
+		parts = append([]string{"apis", "core"}, parts[1:]...)
 	}
+	if len(parts) >= 2 && parts[0] == "apis" {
+		trimmed := strings.TrimSuffix(parts[1], ".k8s.io")
+		prefix = prefix + ToValidOperationID(trimmed, prefix != "")
+		tag := ToValidOperationID(trimmed, false)
+		if len(parts) > 2 {
+			prefix = prefix + ToValidOperationID(parts[2], prefix != "")
+			tag = tag + "_" + ToValidOperationID(parts[2], false)
+		}
+		tags = append(tags, tag)
+	} else if len(parts) >= 1 {
+		tags = append(tags, ToValidOperationID(parts[0], false))
+	}
+	return prefix + ToValidOperationID(op, prefix != ""), tags, nil
 }
 
 type groupVersionKinds []v1.GroupVersionKind
@@ -143,7 +135,11 @@ func friendlyName(name string) string {
 }
 
 func typeName(t reflect.Type) string {
-	return fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
+	path := t.PkgPath()
+	if strings.Contains(path, "/vendor/") {
+		path = path[strings.Index(path, "/vendor/")+len("/vendor/"):]
+	}
+	return fmt.Sprintf("%s.%s", path, t.Name())
 }
 
 // NewDefinitionNamer constructs a new DefinitionNamer to be used to customize OpenAPI spec.
@@ -161,7 +157,7 @@ func NewDefinitionNamer(s *runtime.Scheme) DefinitionNamer {
 }
 
 // GetDefinitionName returns the name and tags for a given definition
-func (d *DefinitionNamer) GetDefinitionName(servePath string, name string) (string, spec.Extensions) {
+func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extensions) {
 	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
 		return friendlyName(name), spec.Extensions{
 			extensionGVK: []v1.GroupVersionKind(groupVersionKinds),

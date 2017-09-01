@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
@@ -127,7 +127,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	m.activePods = activePods
 
 	// update qos cgroup tiers on startup and in periodic intervals
-	// to ensure desired state is in synch with actual state.
+	// to ensure desired state is in sync with actual state.
 	go wait.Until(func() {
 		err := m.UpdateCgroups()
 		if err != nil {
@@ -148,10 +148,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req, _, err := resource.PodRequestsAndLimits(pod)
-		if err != nil {
-			return err
-		}
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
@@ -188,11 +185,7 @@ func (m *qosContainerManagerImpl) setMemoryReserve(configs map[v1.PodQOSClass]*C
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req, _, err := resource.PodRequestsAndLimits(pod)
-		if err != nil {
-			glog.V(2).Infof("[Container Manager] Pod resource requests/limits could not be determined.  Not setting QOS memory limts.")
-			return
-		}
+		req, _ := resource.PodRequestsAndLimits(pod)
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}

@@ -19,9 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	v1alpha1 "k8s.io/client-go/pkg/apis/admissionregistration/v1alpha1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -29,8 +30,8 @@ import (
 type ExternalAdmissionHookConfigurationLister interface {
 	// List lists all ExternalAdmissionHookConfigurations in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error)
-	// ExternalAdmissionHookConfigurations returns an object that can list and get ExternalAdmissionHookConfigurations.
-	ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationNamespaceLister
+	// Get retrieves the ExternalAdmissionHookConfiguration from the index for a given name.
+	Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error)
 	ExternalAdmissionHookConfigurationListerExpansion
 }
 
@@ -52,38 +53,10 @@ func (s *externalAdmissionHookConfigurationLister) List(selector labels.Selector
 	return ret, err
 }
 
-// ExternalAdmissionHookConfigurations returns an object that can list and get ExternalAdmissionHookConfigurations.
-func (s *externalAdmissionHookConfigurationLister) ExternalAdmissionHookConfigurations(namespace string) ExternalAdmissionHookConfigurationNamespaceLister {
-	return externalAdmissionHookConfigurationNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// ExternalAdmissionHookConfigurationNamespaceLister helps list and get ExternalAdmissionHookConfigurations.
-type ExternalAdmissionHookConfigurationNamespaceLister interface {
-	// List lists all ExternalAdmissionHookConfigurations in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error)
-	// Get retrieves the ExternalAdmissionHookConfiguration from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error)
-	ExternalAdmissionHookConfigurationNamespaceListerExpansion
-}
-
-// externalAdmissionHookConfigurationNamespaceLister implements the ExternalAdmissionHookConfigurationNamespaceLister
-// interface.
-type externalAdmissionHookConfigurationNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ExternalAdmissionHookConfigurations in the indexer for a given namespace.
-func (s externalAdmissionHookConfigurationNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ExternalAdmissionHookConfiguration, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ExternalAdmissionHookConfiguration))
-	})
-	return ret, err
-}
-
-// Get retrieves the ExternalAdmissionHookConfiguration from the indexer for a given namespace and name.
-func (s externalAdmissionHookConfigurationNamespaceLister) Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the ExternalAdmissionHookConfiguration from the index for a given name.
+func (s *externalAdmissionHookConfigurationLister) Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
+	key := &v1alpha1.ExternalAdmissionHookConfiguration{ObjectMeta: v1.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
 	if err != nil {
 		return nil, err
 	}

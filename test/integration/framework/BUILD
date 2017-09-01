@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,27 +8,21 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "etcd.go",
         "master_utils.go",
         "perf_utils.go",
         "serializer.go",
+        "util.go",
     ],
-    tags = ["automanaged"],
+    data = [
+        "@com_coreos_etcd//:etcd",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/apps/v1beta1:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/certificates/v1beta1:go_default_library",
-        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/policy/v1alpha1:go_default_library",
-        "//pkg/apis/rbac/v1alpha1:go_default_library",
-        "//pkg/apis/storage/v1:go_default_library",
-        "//pkg/client/clientset_generated/clientset:go_default_library",
-        "//pkg/client/clientset_generated/clientset/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/externalversions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -45,13 +37,19 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
+        "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/rbac/v1alpha1:go_default_library",
+        "//vendor/k8s.io/api/storage/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",

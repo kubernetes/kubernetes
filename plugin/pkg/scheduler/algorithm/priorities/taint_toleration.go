@@ -19,11 +19,12 @@ package priorities
 import (
 	"fmt"
 
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/golang/glog"
 )
 
 // CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
@@ -83,13 +84,10 @@ func ComputeTaintTolerationPriorityReduce(pod *v1.Pod, meta interface{}, nodeNam
 	}
 	maxCountFloat := float64(maxCount)
 
-	// The maximum priority value to give to a node
-	// Priority values range from 0 - maxPriority
-	const maxPriority = float64(10)
 	for i := range result {
-		fScore := maxPriority
+		fScore := float64(schedulerapi.MaxPriority)
 		if maxCountFloat > 0 {
-			fScore = (1.0 - float64(result[i].Score)/maxCountFloat) * 10
+			fScore = (1.0 - float64(result[i].Score)/maxCountFloat) * float64(schedulerapi.MaxPriority)
 		}
 		if glog.V(10) {
 			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is

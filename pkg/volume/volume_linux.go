@@ -24,8 +24,6 @@ import (
 
 	"os"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/golang/glog"
 )
 
@@ -37,7 +35,7 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *types.UnixGroupID) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 
 	if fsGroup == nil {
 		return nil
@@ -90,4 +88,18 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *types.UnixGroupID) error {
 
 		return nil
 	})
+}
+
+// IsSameFSGroup is called only for requests to mount an already mounted
+// volume. It checks if fsGroup of new mount request is the same or not.
+// It returns false if it not the same. It also returns current Gid of a path
+// provided for dir variable.
+func IsSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
+	info, err := os.Stat(dir)
+	if err != nil {
+		glog.Errorf("Error getting stats for %s (%v)", dir, err)
+		return false, 0, err
+	}
+	s := info.Sys().(*syscall.Stat_t)
+	return int(s.Gid) == int(fsGroup), int(s.Gid), nil
 }

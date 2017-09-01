@@ -20,12 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // InitializerConfiguration describes the configuration of initializers.
 type InitializerConfiguration struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
@@ -39,11 +41,13 @@ type InitializerConfiguration struct {
 	Initializers []Initializer
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // InitializerConfigurationList is a list of InitializerConfiguration.
 type InitializerConfigurationList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 
@@ -64,14 +68,8 @@ type Initializer struct {
 
 	// Rules describes what resources/subresources the initializer cares about.
 	// The initializer cares about an operation if it matches _any_ Rule.
+	// Rule.Resources must not include subresources.
 	Rules []Rule
-
-	// FailurePolicy defines what happens if the responsible initializer controller
-	// fails to takes action. Allowed values are Ignore, or Fail. If "Ignore" is
-	// set, initializer is removed from the initializers list of an object if
-	// the timeout is reached; If "Fail" is set, admissionregistration returns timeout error
-	// if the timeout is reached.
-	FailurePolicy *FailurePolicyType
 }
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
@@ -97,7 +95,10 @@ type Rule struct {
 	// '*/scale' means all scale subresources.
 	// '*/*' means all resources and their subresources.
 	//
-	// If '*' or '*/*' is present, the length of the slice must be one.
+	// If wildcard is present, the validation rule will ensure resources do not
+	// overlap with each other.
+	//
+	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string
 }
@@ -113,12 +114,14 @@ const (
 	Fail FailurePolicyType = "Fail"
 )
 
-// +genclient=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ExternalAdmissionHookConfiguration describes the configuration of initializers.
 type ExternalAdmissionHookConfiguration struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 	// ExternalAdmissionHooks is a list of external admission webhooks and the
@@ -127,11 +130,13 @@ type ExternalAdmissionHookConfiguration struct {
 	ExternalAdmissionHooks []ExternalAdmissionHook
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.
 type ExternalAdmissionHookConfigurationList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta
 	// List of ExternalAdmissionHookConfiguration.

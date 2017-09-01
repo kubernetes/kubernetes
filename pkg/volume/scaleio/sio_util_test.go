@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	api "k8s.io/kubernetes/pkg/api/v1"
 )
 
 var (
@@ -115,10 +115,10 @@ func TestUtilApplyConfigDefaults(t *testing.T) {
 	if data[confKey.system] != "sio" {
 		t.Error("Unexpected system value")
 	}
-	if data[confKey.protectionDomain] != "default" {
+	if data[confKey.protectionDomain] != "" {
 		t.Error("Unexpected protection domain value")
 	}
-	if data[confKey.storagePool] != "default" {
+	if data[confKey.storagePool] != "" {
 		t.Error("Unexpected storage pool value")
 	}
 	if data[confKey.volumeName] != "sio-vol" {
@@ -212,10 +212,13 @@ func TestUtilLoadConfig(t *testing.T) {
 	configFile := path.Join(tmpDir, sioConfigFileName)
 
 	if err := saveConfig(configFile, config); err != nil {
-		t.Fatal("failed while saving data", err)
+		t.Fatalf("failed to save configFile %s error:%v", configFile, err)
 	}
 
 	dataRcvd, err := loadConfig(configFile)
+	if err != nil {
+		t.Fatalf("failed to load configFile %s error:%v", configFile, err)
+	}
 	if dataRcvd[confKey.gateway] != config[confKey.gateway] ||
 		dataRcvd[confKey.system] != config[confKey.system] {
 		t.Fatal("loaded config data not matching saved config data")

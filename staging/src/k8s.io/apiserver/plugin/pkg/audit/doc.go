@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package auduút contains implementations for pkg/audit/AuditBackend interface
+// Package audit contains implementations for pkg/audit/AuditBackend interface
 package audit // import "k8s.io/apiserver/plugin/pkg/audit"

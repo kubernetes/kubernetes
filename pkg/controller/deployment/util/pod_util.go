@@ -17,33 +17,14 @@ limitations under the License.
 package util
 
 import (
-	"encoding/binary"
-	"hash/fnv"
-
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	"k8s.io/kubernetes/pkg/client/retry"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/util/retry"
 )
-
-func GetPodTemplateSpecHash(template *v1.PodTemplateSpec, uniquifier *int64) uint32 {
-	podTemplateSpecHasher := fnv.New32a()
-	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
-
-	// Add uniquifier in the hash if it exists.
-	if uniquifier != nil {
-		uniquifierBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(uniquifierBytes, uint64(*uniquifier))
-		podTemplateSpecHasher.Write(uniquifierBytes)
-	}
-
-	return podTemplateSpecHasher.Sum32()
-}
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
@@ -60,11 +41,7 @@ func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.P
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := api.Scheme.DeepCopy(pod)
-		if deepCopyErr != nil {
-			return deepCopyErr
-		}
-		pod = obj.(*v1.Pod)
+		pod = pod.DeepCopy()
 		// Apply the update, then attempt to push it to the apiserver.
 		if applyErr := applyUpdate(pod); applyErr != nil {
 			return applyErr

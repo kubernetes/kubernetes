@@ -130,8 +130,7 @@ func TestPatchNoop(t *testing.T) {
 
 	// Patched
 	{
-		copied, _ := api.Scheme.DeepCopy(patchObject)
-		patchObject = copied.(*api.Service)
+		patchObject = patchObject.DeepCopy()
 		if patchObject.Annotations == nil {
 			patchObject.Annotations = map[string]string{}
 		}
@@ -150,19 +149,14 @@ func TestPatchNoop(t *testing.T) {
 func TestPatchObjectFromFileOutput(t *testing.T) {
 	_, svc, _ := testData()
 
-	svcCopyObj, err := api.Scheme.DeepCopy(&svc.Items[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	svcCopy := svcCopyObj.(*api.Service)
+	svcCopy := svc.Items[0].DeepCopy()
 	if svcCopy.Labels == nil {
 		svcCopy.Labels = map[string]string{}
 	}
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.CommandPrinter = &printers.YAMLPrinter{}
-	tf.GenericPrinter = true
+	tf.Printer = &printers.YAMLPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
 		NegotiatedSerializer: unstructuredSerializer,

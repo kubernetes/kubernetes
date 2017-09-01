@@ -39,8 +39,8 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -398,7 +398,25 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, er
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (i *Instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	instanceID, err := instanceIDFromProviderID(providerID)
+
+	if err != nil {
+		return []v1.NodeAddress{}, err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+
+	if err != nil {
+		return []v1.NodeAddress{}, err
+	}
+
+	addresses, err := i.NodeAddresses(mapServerToNodeName(server))
+
+	if err != nil {
+		return []v1.NodeAddress{}, err
+	}
+
+	return addresses, nil
 }
 
 // mapNodeNameToServerName maps from a k8s NodeName to a rackspace Server Name
@@ -418,6 +436,12 @@ func (i *Instances) ExternalID(nodeName types.NodeName) (string, error) {
 	return probeInstanceID(i.compute, serverName)
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
 // InstanceID returns the cloud provider ID of the kubelet's instance.
 func (rs *Rackspace) InstanceID() (string, error) {
 	return readInstanceID()
@@ -431,14 +455,59 @@ func (i *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(name types.NodeName) (string, error) {
-	return "", nil
+	serverName := mapNodeNameToServerName(name)
+
+	srv, err := getServerByName(i.compute, serverName)
+	if err != nil {
+		return "", err
+	}
+
+	return srvInstanceType(srv)
+}
+
+func srvInstanceType(srv *osservers.Server) (string, error) {
+	val, ok := srv.Flavor["name"]
+
+	if !ok {
+		return "", fmt.Errorf("flavor name not present in server info")
+	}
+
+	flavor, ok := val.(string)
+
+	if !ok {
+		return "", fmt.Errorf("flavor name is not a string")
+	}
+
+	return flavor, nil
+}
+
+func instanceIDFromProviderID(providerID string) (instanceID string, err error) {
+	var providerIDRegexp = regexp.MustCompile(`^rackspace://([^/]+)$`)
+	matches := providerIDRegexp.FindStringSubmatch(providerID)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"rackspace://InstanceID\"", providerID)
+	}
+
+	return matches[1], nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (i *Instances) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	instanceID, err := instanceIDFromProviderID(providerID)
+
+	if err != nil {
+		return "", err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+
+	if err != nil {
+		return "", err
+	}
+
+	return srvInstanceType(server)
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -466,6 +535,11 @@ func (os *Rackspace) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (os *Rackspace) HasClusterID() bool {
+	return true
+}
+
 func (os *Rackspace) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
@@ -484,6 +558,20 @@ func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
 	return cloudprovider.Zone{Region: os.region}, nil
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *Rackspace) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (os *Rackspace) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
 }
 
 // Create a volume of given size (in GiB)

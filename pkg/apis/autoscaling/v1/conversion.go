@@ -19,6 +19,8 @@ package v1
 import (
 	"encoding/json"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
@@ -42,18 +44,18 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *HorizontalPodAutoscaler, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *autoscalingv1.HorizontalPodAutoscaler, s conversion.Scope) error {
 	if err := autoConvert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(in, out, s); err != nil {
 		return err
 	}
 
-	otherMetrics := make([]MetricSpec, 0, len(in.Spec.Metrics))
+	otherMetrics := make([]autoscalingv1.MetricSpec, 0, len(in.Spec.Metrics))
 	for _, metric := range in.Spec.Metrics {
 		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU && metric.Resource.TargetAverageUtilization != nil {
 			continue
 		}
 
-		convMetric := MetricSpec{}
+		convMetric := autoscalingv1.MetricSpec{}
 		if err := Convert_autoscaling_MetricSpec_To_v1_MetricSpec(&metric, &convMetric, s); err != nil {
 			return err
 		}
@@ -61,16 +63,24 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	}
 
 	// NB: we need to save the status even if it maps to a CPU utilization status in order to save the raw value as well
-	currentMetrics := make([]MetricStatus, len(in.Status.CurrentMetrics))
+	currentMetrics := make([]autoscalingv1.MetricStatus, len(in.Status.CurrentMetrics))
 	for i, currentMetric := range in.Status.CurrentMetrics {
 		if err := Convert_autoscaling_MetricStatus_To_v1_MetricStatus(&currentMetric, &currentMetrics[i], s); err != nil {
 			return err
 		}
 	}
 
-	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 {
+	// store HPA conditions in an annotation
+	currentConditions := make([]autoscalingv1.HorizontalPodAutoscalerCondition, len(in.Status.Conditions))
+	for i, currentCondition := range in.Status.Conditions {
+		if err := Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v1_HorizontalPodAutoscalerCondition(&currentCondition, &currentConditions[i], s); err != nil {
+			return err
+		}
+	}
+
+	if len(otherMetrics) > 0 || len(in.Status.CurrentMetrics) > 0 || len(currentConditions) > 0 {
 		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old)+2)
+		out.Annotations = make(map[string]string, len(old)+3)
 		if old != nil {
 			for k, v := range old {
 				out.Annotations[k] = v
@@ -94,16 +104,24 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		out.Annotations[autoscaling.MetricStatusesAnnotation] = string(currentMetricsEnc)
 	}
 
+	if len(in.Status.Conditions) > 0 {
+		currentConditionsEnc, err := json.Marshal(currentConditions)
+		if err != nil {
+			return err
+		}
+		out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation] = string(currentConditionsEnc)
+	}
+
 	return nil
 }
 
-func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
+func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *autoscalingv1.HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
 	if err := autoConvert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in, out, s); err != nil {
 		return err
 	}
 
 	if otherMetricsEnc, hasOtherMetrics := out.Annotations[autoscaling.MetricSpecsAnnotation]; hasOtherMetrics {
-		var otherMetrics []MetricSpec
+		var otherMetrics []autoscalingv1.MetricSpec
 		if err := json.Unmarshal([]byte(otherMetricsEnc), &otherMetrics); err != nil {
 			return err
 		}
@@ -124,7 +142,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 
 	if currentMetricsEnc, hasCurrentMetrics := out.Annotations[autoscaling.MetricStatusesAnnotation]; hasCurrentMetrics {
 		// ignore any existing status values -- the ones here have more information
-		var currentMetrics []MetricStatus
+		var currentMetrics []autoscalingv1.MetricStatus
 		if err := json.Unmarshal([]byte(currentMetricsEnc), &currentMetrics); err != nil {
 			return err
 		}
@@ -154,10 +172,25 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		*out.Spec.Metrics[0].Resource.TargetAverageUtilization = autoscaling.DefaultCPUUtilization
 	}
 
+	if currentConditionsEnc, hasCurrentConditions := out.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]; hasCurrentConditions {
+		var currentConditions []autoscalingv1.HorizontalPodAutoscalerCondition
+		if err := json.Unmarshal([]byte(currentConditionsEnc), &currentConditions); err != nil {
+			return err
+		}
+
+		out.Status.Conditions = make([]autoscaling.HorizontalPodAutoscalerCondition, len(currentConditions))
+		for i, currentCondition := range currentConditions {
+			if err := Convert_v1_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(&currentCondition, &out.Status.Conditions[i], s); err != nil {
+				return err
+			}
+		}
+		delete(out.Annotations, autoscaling.HorizontalPodAutoscalerConditionsAnnotation)
+	}
+
 	return nil
 }
 
-func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *autoscalingv1.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	if err := Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
@@ -178,7 +211,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 	return nil
 }
 
-func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *autoscalingv1.HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	if err := Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
@@ -202,7 +235,7 @@ func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscal
 	return nil
 }
 
-func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *autoscalingv1.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.LastScaleTime = in.LastScaleTime
 
@@ -221,7 +254,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutosc
 	return nil
 }
 
-func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *autoscalingv1.HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.LastScaleTime = in.LastScaleTime
 
