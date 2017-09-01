@@ -84,6 +84,11 @@ func makeBackendServiceDescription(nm types.NamespacedName, shared bool) string 
 
 // External Load Balancer
 
+// makeServiceDescription is used to generate descriptions for forwarding rules and addresses.
+func makeServiceDescription(serviceName string) string {
+	return fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName)
+}
+
 // makeNodesHealthCheckName returns name of the health check resource used by
 // the GCE load balancers (l4) for performing health checks on nodes.
 func makeNodesHealthCheckName(clusterID string) string {
