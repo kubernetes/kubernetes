@@ -230,6 +230,8 @@ type ObjectMappingFactory interface {
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// OpenAPISchema returns the schema openapi schema definiton
 	OpenAPISchema(cacheDir string) (openapi.Resources, error)
+	// ValidResourcesFromDiscoveryClient fetch valiedResource from apiserver.
+	ValidResourcesFromDiscoveryClient() string
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.

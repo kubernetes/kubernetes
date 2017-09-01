@@ -428,6 +428,10 @@ func (f *FakeFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) 
 	return nil, nil
 }
 
+func (f *FakeFactory) ValidResourcesFromDiscoveryClient() string {
+	return ""
+}
+
 func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
@@ -801,6 +805,10 @@ func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (openapi.Resources, erro
 		return f.tf.OpenAPISchemaFunc()
 	}
 	return nil, nil
+}
+
+func (f *fakeAPIFactory) ValidResourcesFromDiscoveryClient() string {
+	return ""
 }
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {

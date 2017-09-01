@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -489,3 +490,69 @@ func (f *ring1Factory) OpenAPISchema(cacheDir string) (openapi.Resources, error)
 	// Delegate to the OpenAPIGetter
 	return f.openAPIGetter.getter.Get()
 }
+
+func (f *ring1Factory) ValidResourcesFromDiscoveryClient() string {
+	resourceMap := make(map[string]metav1.APIResource)
+	var keys []string
+	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return validLegacyGroupResources
+	}
+	apiResList, err := discoveryClient.ServerResources()
+	if err != nil {
+		return validLegacyGroupResources
+	}
+
+	for _, apiResources := range apiResList {
+		for _, apiRes := range apiResources.APIResources {
+			if !strings.Contains(apiRes.Name, "/") {
+				if _, ok := resourceMap[apiRes.Name]; !ok {
+					resourceMap[apiRes.Name] = apiRes
+					keys = append(keys, apiRes.Name)
+				}
+			}
+		}
+	}
+	sort.Strings(keys)
+	row := "Valid resource types include:\n\n  * all\n"
+	for _, k := range keys {
+		//add resource name
+		row = row + fmt.Sprintf("  * %s ", resourceMap[k].Name)
+		//concatenate shortnames
+		if len(resourceMap[k].ShortNames) > 0 {
+			row = row + " (aka "
+			for i, shortName := range resourceMap[k].ShortNames {
+				row = row + "'" + shortName + "'"
+				if i < len(resourceMap[k].ShortNames)-1 {
+					row = row + ","
+				}
+			}
+			row = row + ")"
+		}
+		//add newline
+		row = row + "\n"
+	}
+	return row
+}
+
+const validLegacyGroupResources = `Valid resource types include:
+
+    * all
+    * bindings
+    * componentstatuses (aka 'cs')
+    * configmaps (aka 'cm')
+    * endpoints (aka 'ep')
+    * events (aka 'ev')
+    * limitranges (aka 'limits')
+    * namespaces (aka 'ns')
+    * nodes (aka 'no')
+    * persistentvolumeclaims (aka 'pvc')
+    * persistentvolumes (aka 'pv')
+    * pods (aka 'po')
+    * podtemplates
+    * replicationcontrollers (aka 'rc')
+    * resourcequotas (aka 'quota')
+    * secrets
+    * serviceaccounts (aka 'sa')
+    * services (aka 'svc')
+`

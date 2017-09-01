@@ -51,17 +51,17 @@ type GetOptions struct {
 }
 
 var (
-	getLong = templates.LongDesc(`
+	getLong = `
 		Display one or many resources.
 
-		` + validResources + `
+		%[1]s` +
 
-		This command will hide resources that have completed, such as pods that are
+		`This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
 		resource by providing the '--show-all' flag.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resources.`)
+		of the --template flag, you can filter the attributes of the fetched resources.`
 
 	getExample = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
@@ -115,7 +115,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   i18n.T("Display one or many resources"),
-		Long:    getLong,
+		Long:    templates.LongDesc(fmt.Sprintf(getLong, f.ValidResourcesFromDiscoveryClient())),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, errOut, cmd, args, options)
@@ -183,7 +183,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
+		fmt.Fprint(errOut, "You must specify the type of resource to get. ", f.ValidResourcesFromDiscoveryClient())
 
 		fullCmdName := cmd.Parent().CommandPath()
 		usageString := "Required resource not specified."
