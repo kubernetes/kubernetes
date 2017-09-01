@@ -427,6 +427,28 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	return nil
 }
 
+func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *v1.Pod, s conversion.Scope) error {
+	if err := autoConvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
+		return err
+	}
+
+	// drop init container annotations so they don't take effect on legacy kubelets.
+	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
+	if len(out.Annotations) > 0 {
+		old := out.Annotations
+		out.Annotations = make(map[string]string, len(old))
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
+	}
+
+	return nil
+}
+
 func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *api.Secret, s conversion.Scope) error {
 	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
 		return err
