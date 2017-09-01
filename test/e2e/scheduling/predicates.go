@@ -151,7 +151,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
-	It("validates local ephemeral storage resource limits of pods that are allowed to run [Conformance]", func() {
+	It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
 		nodeMaxAllocatable := int64(0)
 
 		nodeToAllocatableMap := make(map[string]int64)
