@@ -61,6 +61,18 @@ func TestChecker(t *testing.T) {
 			ResourceRequest: false,
 			Path:            "/logs/kubelet.log",
 		},
+		"subresource": &authorizer.AttributesRecord{
+			User:            tim,
+			Verb:            "get",
+			Namespace:       "default",
+			APIGroup:        "", // Core
+			APIVersion:      "v1",
+			Resource:        "pods",
+			Subresource:     "log",
+			Name:            "busybox",
+			ResourceRequest: true,
+			Path:            "/api/v1/namespaces/default/pods/busybox",
+		},
 	}
 
 	rules := map[string]audit.PolicyRule{
@@ -88,6 +100,11 @@ func TestChecker(t *testing.T) {
 			Verbs:     []string{"get"},
 			Resources: []audit.GroupResources{{Resources: []string{"pods"}}},
 		},
+		"getPodLogs": {
+			Level:     audit.LevelRequest,
+			Verbs:     []string{"get"},
+			Resources: []audit.GroupResources{{Resources: []string{"pods/log"}}},
+		},
 		"getClusterRoles": {
 			Level: audit.LevelRequestResponse,
 			Verbs: []string{"get"},
@@ -110,6 +127,14 @@ func TestChecker(t *testing.T) {
 			NonResourceURLs: []string{
 				"/metrics",
 			},
+		},
+		"clusterRoleEdit": {
+			Level: audit.LevelRequest,
+			Resources: []audit.GroupResources{{
+				Group:         "rbac.authorization.k8s.io",
+				Resources:     []string{"clusterroles"},
+				ResourceNames: []string{"edit"},
+			}},
 		},
 	}
 
@@ -135,6 +160,7 @@ func TestChecker(t *testing.T) {
 	test("namespaced", audit.LevelNone, "getMetrics")
 	test("namespaced", audit.LevelMetadata, "getMetrics", "serviceAccounts", "default")
 	test("namespaced", audit.LevelRequestResponse, "getMetrics", "getPods", "default")
+	test("namespaced", audit.LevelRequestResponse, "getPodLogs", "getPods")
 
 	test("cluster", audit.LevelMetadata, "default")
 	test("cluster", audit.LevelNone, "create")
@@ -143,10 +169,12 @@ func TestChecker(t *testing.T) {
 	test("cluster", audit.LevelNone, "serviceAccounts")
 	test("cluster", audit.LevelNone, "getPods")
 	test("cluster", audit.LevelRequestResponse, "getClusterRoles")
+	test("cluster", audit.LevelRequest, "clusterRoleEdit", "getClusterRoles")
 	test("cluster", audit.LevelNone, "getLogs")
 	test("cluster", audit.LevelNone, "getMetrics")
 	test("cluster", audit.LevelMetadata, "getMetrics", "serviceAccounts", "default")
 	test("cluster", audit.LevelRequestResponse, "getMetrics", "getClusterRoles", "default")
+	test("cluster", audit.LevelNone, "getPodLogs", "getPods")
 
 	test("nonResource", audit.LevelMetadata, "default")
 	test("nonResource", audit.LevelNone, "create")
@@ -159,4 +187,8 @@ func TestChecker(t *testing.T) {
 	test("nonResource", audit.LevelNone, "getMetrics")
 	test("nonResource", audit.LevelMetadata, "getMetrics", "serviceAccounts", "default")
 	test("nonResource", audit.LevelRequestResponse, "getLogs", "getClusterRoles", "default")
+	test("nonResource", audit.LevelNone, "getPodLogs", "getPods")
+
+	test("subresource", audit.LevelRequest, "getPodLogs", "getPods")
+	test("subresource", audit.LevelRequest, "getPods", "getPodLogs")
 }
