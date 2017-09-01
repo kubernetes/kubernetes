@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // ClaimToClaimKey return namespace/name string for pvc
@@ -36,10 +35,7 @@ func UpdatePVCCondition(pvc *v1.PersistentVolumeClaim,
 	pvcConditions []v1.PersistentVolumeClaimCondition,
 	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 
-	claimClone, err := ClonePVC(pvc)
-	if err != nil {
-		return nil, err
-	}
+	claimClone := pvc.DeepCopy()
 	claimClone.Status.Conditions = pvcConditions
 	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if updateErr != nil {
@@ -47,21 +43,4 @@ func UpdatePVCCondition(pvc *v1.PersistentVolumeClaim,
 		return nil, updateErr
 	}
 	return updatedClaim, nil
-}
-
-// ClonePVC returns a clone of PVC to be used while updating it
-func ClonePVC(oldPvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	clone, err := scheme.Scheme.DeepCopy(oldPvc)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim %s : %v", ClaimToClaimKey(oldPvc), err)
-	}
-
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
-	return claimClone, nil
-
 }

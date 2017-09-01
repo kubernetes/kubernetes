@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -43,7 +42,7 @@ func Test_AddValidPvcUpdate(t *testing.T) {
 		VolumeName: "foo",
 	})
 
-	claimClone, _ := util.ClonePVC(claim1)
+	claimClone := claim1.DeepCopy()
 	claimClone.Spec.Resources.Requests[v1.ResourceStorage] = resource.MustParse("12G")
 	pv := getPersistentVolume("foo", resource.MustParse("10G"), claim1)
 	resizeMap.AddPVCUpdate(claimClone, pv)

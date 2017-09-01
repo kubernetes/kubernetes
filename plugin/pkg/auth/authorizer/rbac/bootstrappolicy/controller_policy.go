@@ -136,6 +136,7 @@ func init() {
 			eventsRule(),
 		},
 	})
+
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},
 		Rules: []rbac.PolicyRule{

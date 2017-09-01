@@ -17,14 +17,16 @@ limitations under the License.
 package cache
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	commontypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/util"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -162,19 +164,29 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	defer resizeMap.Unlock()
 
 	oldPv := pvcr.PersistentVolume
-	clone, err := scheme.Scheme.DeepCopy(oldPv)
+	pvClone := oldPv.DeepCopy()
+
+	oldData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Error cloning PV %q with error : %v", oldPv.Name, err)
-	}
-	pvClone, ok := clone.(*v1.PersistentVolume)
-
-	if !ok {
-		return fmt.Errorf("Unexpected cast error for PV : %v", pvClone)
+		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
 	}
 
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
-	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Update(pvClone)
+
+	newData, err := json.Marshal(pvClone)
+
+	if err != nil {
+		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
+
+	if err != nil {
+		return fmt.Errorf("Error Creating two way merge patch for  PV : %q with error %v", pvClone.Name, err)
+	}
+
+	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)
 
 	if updateErr != nil {
 		glog.V(4).Infof("Error updating pv %q with error : %v", pvClone.Name, updateErr)
@@ -185,13 +197,11 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 
 func (resizeMap *volumeResizeMap) updatePVCCapacityAndConditions(pvcr *PVCWithResizeRequest, newSize resource.Quantity, pvcConditions []v1.PersistentVolumeClaimCondition) error {
 
-	claimClone, err := util.ClonePVC(pvcr.PVC)
-	if err != nil {
-		return err
-	}
+	claimClone := pvcr.PVC.DeepCopy()
 
 	claimClone.Status.Capacity[v1.ResourceStorage] = newSize
 	claimClone.Status.Conditions = pvcConditions
+
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if updateErr != nil {
 		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: failed: %v", pvcr.QualifiedName(), updateErr)

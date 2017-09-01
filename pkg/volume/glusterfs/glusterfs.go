@@ -1079,10 +1079,11 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	}
 
 	// Find out delta size
-	expansionSize := int(newSize.Value() - oldSize.Value())
+	expansionSize := (newSize.Value() - oldSize.Value())
+	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1024*1024*1024))
 
 	// Make volume expansion request
-	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSize}
+	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGB}
 
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)

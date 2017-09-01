@@ -195,16 +195,7 @@ func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.Per
 		return nil, fmt.Errorf("failed to find PV %q in PV informer cache with error : %v", volumeName, err)
 	}
 
-	clonedPvObject, err := scheme.Scheme.DeepCopy(pv)
-	if err != nil || clonedPvObject == nil {
-		return nil, fmt.Errorf("failed to deep copy %q PV object. err=%v", volumeName, err)
-	}
-
-	clonedPV, ok := clonedPvObject.(*v1.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast %q clonedPV %#v to PersistentVolume", volumeName, pv)
-	}
-	return clonedPV, nil
+	return pv.DeepCopy(), nil
 }
 
 // Implementing VolumeHost interface

@@ -19,8 +19,9 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )
 
@@ -42,7 +43,6 @@ go_test(
     srcs = ["volume_resize_map_test.go"],
     library = ":go_default_library",
     deps = [
-        "//pkg/controller/volume/expand/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
