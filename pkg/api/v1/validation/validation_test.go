@@ -22,6 +22,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
+	"time"
 )
 
 func TestValidateResourceRequirements(t *testing.T) {
@@ -174,6 +177,75 @@ func TestValidateResourceRequirements(t *testing.T) {
 	for _, tc := range errorCase {
 		if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+func TestValidatePodLogOptions(t *testing.T) {
+	errTailLines := int64(-1)
+	errLimitBytes := int64(0)
+	sinceSeconds := int64(0)
+
+	testCases := []struct {
+		name      string
+		plo       *v1.PodLogOptions
+		errtype   field.ErrorType
+		errfield  string
+		errdetail string
+	}{
+		{
+			name: "Test for tailline < 0",
+			plo: &v1.PodLogOptions{
+				TailLines: &errTailLines,
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "tailLines",
+			errdetail: "must be greater than or equal to 0",
+		},
+		{
+			name: "Test for limitbytes < 1",
+			plo: &v1.PodLogOptions{
+				LimitBytes: &errLimitBytes,
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "limitBytes",
+			errdetail: "must be greater than 0",
+		},
+		{
+			name: "Test for both existing sinceseconds and sincetime",
+			plo: &v1.PodLogOptions{
+				SinceSeconds: &sinceSeconds,
+				SinceTime:    &metav1.Time{Time: time.Now()},
+			},
+			errtype:   field.ErrorTypeForbidden,
+			errfield:  "",
+			errdetail: "at most one of `sinceTime` or `sinceSeconds` may be specified",
+		},
+		{
+			name: "Test for sinceseconds < 1",
+			plo: &v1.PodLogOptions{
+				SinceSeconds: &sinceSeconds,
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "sinceSeconds",
+			errdetail: "must be greater than 0",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := ValidatePodLogOptions(tc.plo)
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.Contains(errs[0].Field, tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			} else if !strings.Contains(errs[0].Detail, tc.errdetail) {
+				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
+			}
 		}
 	}
 }
