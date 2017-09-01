@@ -107,6 +107,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	// 	},
 	// }
 	config.SwaggerConfig = DefaultSwaggerConfig()
+	config.Complete()
 
 	return etcdServer, *config, assert.New(t)
 }
