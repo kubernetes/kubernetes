@@ -30,10 +30,15 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -99,7 +104,10 @@ type GCECloud struct {
 	serviceAlpha             *computealpha.Service
 	containerService         *container.Service
 	cloudkmsService          *cloudkms.Service
+	client                   clientset.Interface
 	clientBuilder            controller.ControllerClientBuilder
+	eventBroadcaster         record.EventBroadcaster
+	eventRecorder            record.EventRecorder
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
@@ -531,6 +539,14 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 // This must be called before utilizing the funcs of gce.ClusterID
 func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
 	gce.clientBuilder = clientBuilder
+	gce.client = clientBuilder.ClientOrDie("cloud-provider")
+
+	if gce.OnXPN() {
+		gce.eventBroadcaster = record.NewBroadcaster()
+		gce.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(gce.client.Core().RESTClient()).Events("")})
+		gce.eventRecorder = gce.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "gce-cloudprovider"})
+	}
+
 	go gce.watchClusterID()
 }
 
