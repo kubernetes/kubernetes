@@ -181,7 +181,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
-						"Name": Equal("test-empty-dir"),
+						"Name":   Equal("test-empty-dir"),
+						"PVCRef": BeNil(),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
