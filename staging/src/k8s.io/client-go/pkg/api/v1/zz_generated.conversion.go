@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -1240,7 +1241,7 @@ func Convert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *api.D
 
 func autoConvert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVolumeSource, out *api.EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = api.StorageMedium(in.Medium)
-	out.SizeLimit = in.SizeLimit
+	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
 	return nil
 }
 
@@ -1251,7 +1252,7 @@ func Convert_v1_EmptyDirVolumeSource_To_api_EmptyDirVolumeSource(in *EmptyDirVol
 
 func autoConvert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *api.EmptyDirVolumeSource, out *EmptyDirVolumeSource, s conversion.Scope) error {
 	out.Medium = StorageMedium(in.Medium)
-	out.SizeLimit = in.SizeLimit
+	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
 	return nil
 }
 
