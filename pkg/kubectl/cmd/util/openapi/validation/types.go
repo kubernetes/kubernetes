@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapi "k8s.io/apimachinery/pkg/util/openapiparsing"
 )
 
 type ValidationItem interface {

@@ -28,6 +28,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
+	openapi "k8s.io/apimachinery/pkg/util/openapiparsing"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -58,12 +59,12 @@ func NewCachingOpenAPIClient(client discovery.OpenAPISchemaInterface, version, c
 // It will first attempt to read the spec from a local cache
 // If it cannot read a local cache, it will read the file
 // using the client and then write the cache.
-func (c *CachingOpenAPIClient) OpenAPIData() (Resources, error) {
+func (c *CachingOpenAPIClient) OpenAPIData() (openapi.Resources, error) {
 	// Try to use the cached version
 	if c.useCache() {
 		doc, err := c.readOpenAPICache()
 		if err == nil {
-			return NewOpenAPIData(doc)
+			return openapi.NewOpenAPIData(doc)
 		}
 	}
 
@@ -74,7 +75,7 @@ func (c *CachingOpenAPIClient) OpenAPIData() (Resources, error) {
 		return nil, err
 	}
 
-	oa, err := NewOpenAPIData(s)
+	oa, err := openapi.NewOpenAPIData(s)
 	if err != nil {
 		glog.V(2).Infof("Failed to parse openapi data %v", err)
 		return nil, err

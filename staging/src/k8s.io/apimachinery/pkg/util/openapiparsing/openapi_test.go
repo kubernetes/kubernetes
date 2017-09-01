@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi_test
+package openapiparsing_test
 
 import (
 	"path/filepath"
@@ -23,11 +23,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	openapi "k8s.io/apimachinery/pkg/util/openapiparsing"
+	tst "k8s.io/apimachinery/pkg/util/openapiparsing/testing"
 )
 
-var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fakeSchema = tst.Fake{Path: filepath.Join("testing", "swagger.json")}
 
 var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 	var resources openapi.Resources

@@ -24,9 +24,9 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	// This dependency is needed to register API types.
+	openapi "k8s.io/apimachinery/pkg/util/openapiparsing"
+	tst "k8s.io/apimachinery/pkg/util/openapiparsing/testing"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 )
 
