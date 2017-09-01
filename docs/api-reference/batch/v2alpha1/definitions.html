@@ -2403,9 +2403,16 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">activeDeadlineSeconds</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">backoffLimit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the number of retries before marking this job failed. Defaults to 6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>

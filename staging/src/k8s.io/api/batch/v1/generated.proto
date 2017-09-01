@@ -103,10 +103,15 @@ message JobSpec {
   // +optional
   optional int32 completions = 2;
 
-  // Optional duration in seconds relative to the startTime that the job may be active
+  // Specifies the duration in seconds relative to the startTime that the job may be active
   // before the system tries to terminate it; value must be positive integer
   // +optional
   optional int64 activeDeadlineSeconds = 3;
+
+  // Specifies the number of retries before marking this job failed.
+  // Defaults to 6
+  // +optional
+  optional int32 backoffLimit = 7;
 
   // A label query over pods that should match the pod count.
   // Normally, the system sets this field for you.
