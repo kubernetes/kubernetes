@@ -112,6 +112,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
+		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 	)
 	if err != nil {
 		return true, err
@@ -330,6 +331,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
+		ctx.InformersStarted,
 	)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)

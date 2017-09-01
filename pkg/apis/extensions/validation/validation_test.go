@@ -2418,6 +2418,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 				},
+				AllowedHostPaths: []extensions.AllowedHostPath{
+					{PathPrefix: "/foo/bar"},
+					{PathPrefix: "/baz/"},
+				},
 			},
 		}
 	}
@@ -2495,6 +2499,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
+	invalidAllowedHostPathMissingPath := validPSP()
+	invalidAllowedHostPathMissingPath.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: ""},
+	}
+
+	invalidAllowedHostPathBacksteps := validPSP()
+	invalidAllowedHostPathBacksteps.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/dont/allow/backsteps/.."},
 	}
 
 	invalidDefaultAllowPrivilegeEscalation := validPSP()
@@ -2611,6 +2625,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         invalidDefaultAllowPrivilegeEscalation,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true",
+		},
+		"invalid allowed host path empty path": {
+			psp:         invalidAllowedHostPathMissingPath,
+			errorType:   field.ErrorTypeRequired,
+			errorDetail: "is required",
+		},
+		"invalid allowed host path with backsteps": {
+			psp:         invalidAllowedHostPathBacksteps,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must not contain '..'",
 		},
 	}
 

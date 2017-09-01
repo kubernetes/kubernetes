@@ -92,8 +92,14 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		return
 	}
 
+	// Get volume specs for the pod - key'd by volume name
+	volumesSpec := make(map[string]v1.Volume)
+	for _, v := range s.pod.Spec.Volumes {
+		volumesSpec[v.Name] = v
+	}
+
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
-	stats := make([]stats.VolumeStats, 0, len(volumes))
+	fsStats := make([]stats.VolumeStats, 0, len(volumes))
 	for name, v := range volumes {
 		metric, err := v.GetMetrics()
 		if err != nil {
@@ -103,15 +109,25 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 			}
 			continue
 		}
-		stats = append(stats, s.parsePodVolumeStats(name, metric))
+		// Lookup the volume spec and add a 'PVCReference' for volumes that reference a PVC
+		volSpec := volumesSpec[name]
+		if pvcSource := volSpec.PersistentVolumeClaim; pvcSource != nil {
+			pvcRef := stats.PVCReference{
+				Name:      pvcSource.ClaimName,
+				Namespace: s.pod.GetNamespace(),
+			}
+			fsStats = append(fsStats, s.parsePodVolumeStats(name, &pvcRef, metric))
+		} else {
+			fsStats = append(fsStats, s.parsePodVolumeStats(name, nil, metric))
+		}
 	}
 
 	// Store the new stats
-	s.latest.Store(PodVolumeStats{Volumes: stats})
+	s.latest.Store(PodVolumeStats{Volumes: fsStats})
 }
 
 // parsePodVolumeStats converts (internal) volume.Metrics to (external) stats.VolumeStats structures
-func (s *volumeStatCalculator) parsePodVolumeStats(podName string, metric *volume.Metrics) stats.VolumeStats {
+func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats.PVCReference, metric *volume.Metrics) stats.VolumeStats {
 	available := uint64(metric.Available.Value())
 	capacity := uint64(metric.Capacity.Value())
 	used := uint64(metric.Used.Value())
@@ -119,7 +135,8 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, metric *volum
 	inodesFree := uint64(metric.InodesFree.Value())
 	inodesUsed := uint64(metric.InodesUsed.Value())
 	return stats.VolumeStats{
-		Name: podName,
+		Name:   podName,
+		PVCRef: pvcRef,
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}

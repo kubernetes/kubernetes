@@ -419,6 +419,42 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <h2 id="_definitions">Definitions</h2>
 <div class="sectionbody">
 <div class="sect2">
+<h3 id="_v1beta1_allowedhostpath">v1beta1.AllowedHostPath</h3>
+<div class="paragraph">
+<p>defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pathPrefix</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">is the path prefix that the host volume must match. It does not support <code>*</code>. Trailing slashes are trimmed when validating the path prefix with a host path.<br>
+<br>
+Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> and <code>/foo/bar</code> <code>/foo</code> would not allow <code>/food</code> or <code>/etc/foo</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1beta1_deploymentstatus">v1beta1.DeploymentStatus</h3>
 <div class="paragraph">
 <p>DeploymentStatus is the most recently observed status of the Deployment.</p>
@@ -7690,6 +7726,13 @@ Both these may change in the future. Incoming requests are matched against the h
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allowedHostPaths</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">is a white list of allowed host paths. Empty indicates that all host paths may be used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_allowedhostpath">v1beta1.AllowedHostPath</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>

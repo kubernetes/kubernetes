@@ -1240,14 +1240,38 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	instance, err := c.getInstanceByID(string(instanceID))
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	zone := cloudprovider.Zone{
+		FailureDomain: *(instance.Placement.AvailabilityZone),
+		Region:        c.region,
+	}
+
+	return zone, nil
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	instance, err := c.getInstanceByNodeName(nodeName)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	zone := cloudprovider.Zone{
+		FailureDomain: *(instance.Placement.AvailabilityZone),
+		Region:        c.region,
+	}
+
+	return zone, nil
+
 }
 
 // Abstraction around AWS Instance Types

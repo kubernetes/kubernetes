@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -57,7 +58,7 @@ func effectiveHairpinMode(hairpinMode kubeletconfig.HairpinMode, containerRuntim
 	// - It's set to "none".
 	if hairpinMode == kubeletconfig.PromiscuousBridge || hairpinMode == kubeletconfig.HairpinVeth {
 		// Only on docker.
-		if containerRuntime != "docker" {
+		if containerRuntime != kubetypes.DockerContainerRuntime {
 			glog.Warningf("Hairpin mode set to %q but container runtime is %q, ignoring", hairpinMode, containerRuntime)
 			return kubeletconfig.HairpinNone, nil
 		}
