@@ -36,6 +36,17 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec
 }
 
+// Policy Type string describes the NetworkPolicy type
+// This type is beta-level in 1.8
+type PolicyType string
+
+const (
+	// PolicyTypeIngress is a NetworkPolicy that affects ingress traffic on selected pods"
+	PolicyTypeIngress PolicyType = "Ingress"
+	// PolicyTypeEgress is a NetworkPolicy that affects egress traffic on selected pods"
+	PolicyTypeEgress PolicyType = "Egress"
+)
+
 // NetworkPolicySpec provides the specification of a NetworkPolicy
 type NetworkPolicySpec struct {
 	// Selects the pods to which this NetworkPolicy object applies. The array of
@@ -55,6 +66,23 @@ type NetworkPolicySpec struct {
 	// solely to ensure that the pods it selects are isolated by default)
 	// +optional
 	Ingress []NetworkPolicyIngressRule
+
+	// List of egress rules to be applied to the selected pods. Outgoing traffic is
+	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
+	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
+	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
+	// this field is empty then this NetworkPolicy does not limit any outgoing traffic.
+	// This field is beta-level in 1.8
+	// +optional
+	Egress []NetworkPolicyEgressRule
+
+	// List of rule types that the NetworkPolicy relates to.
+	// Valid options are Ingress, Egress, or Ingress,Egress. If this field is not specified, it will
+	// default based on the existence of Ingress or Egress rules. PolicyTypes will always include Ingress
+	// in the list unless the field only contains Egress.
+	// This field is beta-level in 1.8
+	// +optional
+	PolicyTypes []PolicyType
 }
 
 // NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods
@@ -75,6 +103,27 @@ type NetworkPolicyIngressRule struct {
 	// allows traffic only if the traffic matches at least one item in the from list.
 	// +optional
 	From []NetworkPolicyPeer
+}
+
+// NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
+// matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
+// This type is beta-level in 1.8
+type NetworkPolicyEgressRule struct {
+	// List of destination ports for outgoing traffic.
+	// Each item in this list is combined using a logical OR. If this field is
+	// empty or missing, this rule matches all ports (traffic not restricted by port).
+	// If this field is present and contains at least one item, then this rule allows
+	// traffic only if the traffic matches at least one port in the list.
+	// +optional
+	Ports []NetworkPolicyPort
+
+	// List of destinations for outgoing traffic of pods selected for this rule.
+	// Items in this list are combined using a logical OR operation. If this field is
+	// empty or missing, this rule matches all destinations (traffic not restricted by
+	// destination). If this field is present and contains at least one item, this rule
+	// allows traffic only if the traffic matches at least one item in the to list.
+	// +optional
+	To []NetworkPolicyPeer
 }
 
 // NetworkPolicyPort describes a port to allow traffic on

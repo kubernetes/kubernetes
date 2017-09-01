@@ -133,4 +133,14 @@ func SetDefaults_NetworkPolicy(obj *extensionsv1beta1.NetworkPolicy) {
 			}
 		}
 	}
+
+	if obj.Spec.PolicyTypes == nil || len(obj.Spec.PolicyTypes) == 0 {
+		// Default for undefined PolicyTypes with defined Egress rules
+		if obj.Spec.Egress != nil || len(obj.Spec.Egress) != 0 {
+			obj.Spec.PolicyTypes = []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress, extensionsv1beta1.PolicyTypeEgress}
+			// Default for undefined PolicyTypes with undefined Egress rules
+		} else if obj.Spec.Egress == nil || len(obj.Spec.Egress) == 0 {
+			obj.Spec.PolicyTypes = []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress}
+		}
+	}
 }
