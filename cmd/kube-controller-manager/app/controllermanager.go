@@ -157,6 +157,7 @@ func Run(s *options.CMServer) error {
 		}
 
 		ctx.InformerFactory.Start(ctx.Stop)
+		close(ctx.InformersStarted)
 
 		select {}
 	}
@@ -264,6 +265,10 @@ type ControllerContext struct {
 
 	// Stop is the stop channel
 	Stop <-chan struct{}
+
+	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
+	// for an individual controller to start the shared informers. Before it is closed, they should not.
+	InformersStarted chan struct{}
 }
 
 func (c ControllerContext) IsControllerEnabled(name string) bool {
@@ -443,6 +448,7 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 		AvailableResources: availableResources,
 		Cloud:              cloud,
 		Stop:               stop,
+		InformersStarted:   make(chan struct{}),
 	}
 	return ctx, nil
 }
