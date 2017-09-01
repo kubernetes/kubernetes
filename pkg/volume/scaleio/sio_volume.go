@@ -208,21 +208,25 @@ func (v *sioVolume) TearDownAt(dir string) error {
 		return err
 	}
 
-	// Detach volume from node:
-	// use "last attempt wins" strategy to detach volume from node
-	// only allow volume to detach when it is not busy (not being used by other pods)
-	if !deviceBusy {
-		glog.V(4).Info(log("teardown is attempting to detach/unmap volume for PV %s", v.volSpecName))
-		if err := v.resetSioMgr(); err != nil {
-			glog.Error(log("teardown failed, unable to reset scalio mgr: %v", err))
-		}
-		volName := v.volName
-		if err := v.sioMgr.DetachVolume(volName); err != nil {
-			glog.Warning(log("warning: detaching failed for volume %s:  %v", volName, err))
-			return nil
-		}
-		glog.V(4).Infof(log("teardown of volume %v detached successfully", volName))
+	// if device still busy, bail
+	if deviceBusy {
+		glog.V(4).Info(log("teardown unable to detach busy device %s", dev))
+		return fmt.Errorf("teardown failed due to device %s busy", dev)
 	}
+
+	// Detach volume from node:
+	// only allow volume to detach when it is not busy (not being used by other pods)
+	glog.V(4).Info(log("teardown is attempting to detach/unmap volume for PV %s", v.volSpecName))
+	if err := v.resetSioMgr(); err != nil {
+		glog.Error(log("teardown failed, unable to reset scalio mgr: %v", err))
+		return err
+	}
+	volName := v.volName
+	if err := v.sioMgr.DetachVolume(volName); err != nil {
+		glog.Error(log("teardown failed to detach volume %s:  %v", volName, err))
+		return err
+	}
+	glog.V(4).Infof(log("teardown of volume %v detached successfully", volName))
 	return nil
 }
 
