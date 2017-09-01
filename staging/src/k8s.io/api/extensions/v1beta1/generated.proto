@@ -39,6 +39,19 @@ message APIVersion {
   optional string name = 1;
 }
 
+// defines the host volume conditions that will be enabled by a policy
+// for pods to use. It requires the path prefix to be defined.
+message AllowedHostPath {
+  // is the path prefix that the host volume must match.
+  // It does not support `*`.
+  // Trailing slashes are trimmed when validating the path prefix with a host path.
+  // 
+  // Examples:
+  // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
+  // `/foo` would not allow `/food` or `/etc/foo`
+  optional string pathPrefix = 1;
+}
+
 message CustomMetricCurrentStatus {
   // Custom Metric name.
   optional string name = 1;
@@ -755,6 +768,10 @@ message PodSecurityPolicySpec {
   // privilege escalation.
   // +optional
   optional bool allowPrivilegeEscalation = 16;
+
+  // is a white list of allowed host paths. Empty indicates that all host paths may be used.
+  // +optional
+  repeated AllowedHostPath allowedHostPaths = 17;
 }
 
 // ReplicaSet represents the configuration of a ReplicaSet.

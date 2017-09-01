@@ -966,6 +966,22 @@ type PodSecurityPolicySpec struct {
 	// privilege escalation.
 	// +optional
 	AllowPrivilegeEscalation bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,16,opt,name=allowPrivilegeEscalation"`
+	// is a white list of allowed host paths. Empty indicates that all host paths may be used.
+	// +optional
+	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
+}
+
+// defines the host volume conditions that will be enabled by a policy
+// for pods to use. It requires the path prefix to be defined.
+type AllowedHostPath struct {
+	// is the path prefix that the host volume must match.
+	// It does not support `*`.
+	// Trailing slashes are trimmed when validating the path prefix with a host path.
+	//
+	// Examples:
+	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
+	// `/foo` would not allow `/food` or `/etc/foo`
+	PathPrefix string `json:"pathPrefix,omitempty" protobuf:"bytes,1,rep,name=pathPrefix"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.
