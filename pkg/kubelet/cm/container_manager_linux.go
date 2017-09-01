@@ -332,32 +332,6 @@ func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLi
 	return &internalContainerLifecycleImpl{cm.cpuManager}
 }
 
-// Implements InternalContainerLifecycle interface.
-type internalContainerLifecycleImpl struct {
-	cpuManager cpumanager.Manager
-}
-
-func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		return i.cpuManager.AddContainer(pod, container, containerID)
-	}
-	return nil
-}
-
-func (i *internalContainerLifecycleImpl) PreStopContainer(containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		return i.cpuManager.RemoveContainer(containerID)
-	}
-	return nil
-}
-
-func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		return i.cpuManager.RemoveContainer(containerID)
-	}
-	return nil
-}
-
 // Create a cgroup container manager.
 func createManager(containerName string) *fs.Manager {
 	allowAllDevices := true
