@@ -2,15 +2,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "state.go",
-        "state_mem.go",
-    ],
+    srcs = ["state.go"],
     visibility = ["//visibility:public"],
-    deps = [
-        "//pkg/kubelet/cm/cpuset:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-    ],
+    deps = ["//pkg/kubelet/cm/cpuset:go_default_library"],
 )
 
 filegroup(

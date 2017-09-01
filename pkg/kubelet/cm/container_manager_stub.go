@@ -19,16 +19,13 @@ package cm
 import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
 type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
+func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc) error {
 	glog.V(2).Infof("Starting stub container manager")
 	return nil
 }
@@ -67,10 +64,6 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
-}
-
-func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

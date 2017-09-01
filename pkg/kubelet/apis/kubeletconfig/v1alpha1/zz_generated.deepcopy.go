@@ -299,7 +299,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.LockFilePath != nil {
 		in, out := &in.LockFilePath, &out.LockFilePath
