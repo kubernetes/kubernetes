@@ -112,6 +112,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
+		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 	)
 	if err != nil {
 		return true, err

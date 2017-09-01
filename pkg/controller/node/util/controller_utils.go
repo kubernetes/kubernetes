@@ -254,31 +254,35 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 
 // SwapNodeControllerTaint returns true in case of success and false
 // otherwise.
-func SwapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
-	taintToAdd.TimeAdded = metav1.Now()
-	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintToAdd)
-	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to taint %v unresponsive Node %q: %v",
-				taintToAdd.Key,
-				node.Name,
-				err))
-		return false
+func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
+	for _, taintToAdd := range taintsToAdd {
+		taintToAdd.TimeAdded = metav1.Now()
 	}
-	glog.V(4).Infof("Added %v Taint to Node %v", taintToAdd, node.Name)
 
-	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintToRemove)
+	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
-				"unable to remove %v unneeded taint from unresponsive Node %q: %v",
-				taintToRemove.Key,
+				"unable to taint %+v unresponsive Node %q: %v",
+				taintsToAdd,
 				node.Name,
 				err))
 		return false
 	}
-	glog.V(4).Infof("Made sure that Node %v has no %v Taint", node.Name, taintToRemove)
+	glog.V(4).Infof("Added %+v Taint to Node %v", taintsToAdd, node.Name)
+
+	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
+	if err != nil {
+		utilruntime.HandleError(
+			fmt.Errorf(
+				"unable to remove %+v unneeded taint from unresponsive Node %q: %v",
+				taintsToRemove,
+				node.Name,
+				err))
+		return false
+	}
+	glog.V(4).Infof("Made sure that Node %+v has no %v Taint", node.Name, taintsToRemove)
+
 	return true
 }
 
