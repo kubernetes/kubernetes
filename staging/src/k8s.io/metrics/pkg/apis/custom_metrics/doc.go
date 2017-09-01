@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +groupName=custom-metrics.metrics.k8s.io
+// +groupName=custom.metrics.k8s.io
 package custom_metrics
