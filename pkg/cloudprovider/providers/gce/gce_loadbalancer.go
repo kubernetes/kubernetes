@@ -137,6 +137,9 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nod
 			if err != nil {
 				return nil, err
 			}
+
+			// Assume the ensureDeleted function successfully deleted the forwarding rule.
+			existingFwdRule = nil
 		}
 	}
 
