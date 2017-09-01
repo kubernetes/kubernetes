@@ -160,6 +160,8 @@ type ThirdPartyResourceData struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
@@ -531,6 +533,8 @@ type DaemonSetStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// more information.
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
@@ -766,6 +770,8 @@ type IngressBackend struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
+// more information.
 // ReplicaSet represents the configuration of a ReplicaSet.
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
