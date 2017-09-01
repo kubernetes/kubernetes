@@ -521,20 +521,9 @@ kube::util::ensure_godep_version() {
     return
   fi
 
-  kube::log::status "Getting godep version ${GODEP_VERSION}"
-  kube::util::ensure-temp-dir
-  mkdir -p "${KUBE_TEMP}/go/src"
+  kube::log::status "Installing godep version ${GODEP_VERSION}"
+  go install ./vendor/github.com/tools/godep/
 
-  GP="$(echo $GOPATH | cut -f1 -d:)"
-  rm -rf "${GP}/src/github.com/tools/godep"
-  go get -d -u github.com/tools/godep
-  pushd "${GP}/src/github.com/tools/godep" >/dev/null
-    git checkout -q "${GODEP_VERSION}"
-    go install .
-  popd >/dev/null
-
-  hash -r # force bash to clear PATH cache
-  PATH="${PATH}:${GP}/bin"
   if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
     kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
     return 1
