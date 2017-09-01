@@ -22,7 +22,7 @@ set -o pipefail
 
 KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
 
-DEFAULT_KUBECONFIG="${HOME}/.kube/config"
+DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
