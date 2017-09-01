@@ -238,6 +238,11 @@ type ObjectReference struct {
 	Name string
 	// +optional
 	UID types.UID
+	// APIGroup is the name of the API group that contains the referred object.
+	// The empty string represents the core API group.
+	// +optional
+	APIGroup string
+	// APIVersion is the version of the API group that contains the referred object.
 	// +optional
 	APIVersion string
 	// +optional
