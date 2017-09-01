@@ -78,6 +78,11 @@ func TestMultiIndexKeys(t *testing.T) {
 	if len(erniePods) != 2 {
 		t.Errorf("Expected 2 pods but got %v", len(erniePods))
 	}
+	for _, erniePod := range erniePods {
+		if erniePod.(*v1.Pod).Name != "one" && erniePod.(*v1.Pod).Name != "tre" {
+			t.Errorf("Expected only 'one' or 'tre' but got %s", erniePod.(*v1.Pod).Name)
+		}
+	}
 
 	bertPods, err := index.ByIndex("byUser", "bert")
 	if err != nil {
@@ -85,6 +90,11 @@ func TestMultiIndexKeys(t *testing.T) {
 	}
 	if len(bertPods) != 2 {
 		t.Errorf("Expected 2 pods but got %v", len(bertPods))
+	}
+	for _, bertPod := range bertPods {
+		if bertPod.(*v1.Pod).Name != "one" && bertPod.(*v1.Pod).Name != "two" {
+			t.Errorf("Expected only 'one' or 'two' but got %s", bertPod.(*v1.Pod).Name)
+		}
 	}
 
 	oscarPods, err := index.ByIndex("byUser", "oscar")
@@ -94,6 +104,11 @@ func TestMultiIndexKeys(t *testing.T) {
 	if len(oscarPods) != 1 {
 		t.Errorf("Expected 1 pods but got %v", len(erniePods))
 	}
+	for _, oscarPod := range oscarPods {
+		if oscarPod.(*v1.Pod).Name != "two" {
+			t.Errorf("Expected only 'two' but got %s", oscarPod.(*v1.Pod).Name)
+		}
+	}
 
 	ernieAndBertKeys, err := index.Index("byUser", pod1)
 	if err != nil {
@@ -101,6 +116,11 @@ func TestMultiIndexKeys(t *testing.T) {
 	}
 	if len(ernieAndBertKeys) != 3 {
 		t.Errorf("Expected 3 pods but got %v", len(ernieAndBertKeys))
+	}
+	for _, ernieAndBertKey := range ernieAndBertKeys {
+		if ernieAndBertKey.(*v1.Pod).Name != "one" && ernieAndBertKey.(*v1.Pod).Name != "two" && ernieAndBertKey.(*v1.Pod).Name != "tre" {
+			t.Errorf("Expected only 'one', 'two' or 'tre' but got %s", ernieAndBertKey.(*v1.Pod).Name)
+		}
 	}
 
 	index.Delete(pod3)
@@ -111,6 +131,12 @@ func TestMultiIndexKeys(t *testing.T) {
 	if len(erniePods) != 1 {
 		t.Errorf("Expected 1 pods but got %v", len(erniePods))
 	}
+	for _, erniePod := range erniePods {
+		if erniePod.(*v1.Pod).Name != "one" {
+			t.Errorf("Expected only 'one' but got %s", erniePod.(*v1.Pod).Name)
+		}
+	}
+
 	elmoPods, err := index.ByIndex("byUser", "elmo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -132,6 +158,11 @@ func TestMultiIndexKeys(t *testing.T) {
 	}
 	if len(bertPods) != 1 {
 		t.Errorf("Expected 1 pods but got %v", len(bertPods))
+	}
+	for _, bertPod := range bertPods {
+		if bertPod.(*v1.Pod).Name != "one" {
+			t.Errorf("Expected only 'one' but got %s", bertPod.(*v1.Pod).Name)
+		}
 	}
 
 }
