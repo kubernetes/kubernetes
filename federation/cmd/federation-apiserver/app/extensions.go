@@ -23,6 +23,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/storage"
+	fedclient "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
+	replicasetfedstore "k8s.io/kubernetes/federation/registry/extensions/replicaset/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
@@ -35,8 +37,10 @@ import (
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, optsGetter generic.RESTOptionsGetter, apiResourceConfigSource storage.APIResourceConfigSource) {
 	replicasetsStorageFn := func() map[string]rest.Storage {
 		replicaSetStorage := replicasetstore.NewStorage(optsGetter)
+		fedReplicaSetStorage := replicasetfedstore.NewREST(optsGetter,
+			fedclient.NewForConfigOrDie(g.LoopbackClientConfig), replicaSetStorage.ReplicaSet)
 		return map[string]rest.Storage{
-			"replicasets":        replicaSetStorage.ReplicaSet,
+			"replicasets":        fedReplicaSetStorage,
 			"replicasets/status": replicaSetStorage.Status,
 			"replicasets/scale":  replicaSetStorage.Scale,
 		}

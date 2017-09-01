@@ -29,8 +29,6 @@ cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
 examples/guestbook-go
-federation/apis/core
-federation/apis/core/v1
 federation/apis/federation
 federation/apis/federation/v1beta1
 federation/apis/federation/validation

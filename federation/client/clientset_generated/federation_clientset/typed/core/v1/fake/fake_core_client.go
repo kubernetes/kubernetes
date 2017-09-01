@@ -38,6 +38,14 @@ func (c *FakeCoreV1) Namespaces() v1.NamespaceInterface {
 	return &FakeNamespaces{c}
 }
 
+func (c *FakeCoreV1) Nodes() v1.NodeInterface {
+	return &FakeNodes{c}
+}
+
+func (c *FakeCoreV1) Pods(namespace string) v1.PodInterface {
+	return &FakePods{c, namespace}
+}
+
 func (c *FakeCoreV1) Secrets(namespace string) v1.SecretInterface {
 	return &FakeSecrets{c, namespace}
 }

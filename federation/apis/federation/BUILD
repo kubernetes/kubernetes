@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//federation/apis/federation/fuzzer:all-srcs",
         "//federation/apis/federation/install:all-srcs",
         "//federation/apis/federation/v1beta1:all-srcs",
         "//federation/apis/federation/validation:all-srcs",

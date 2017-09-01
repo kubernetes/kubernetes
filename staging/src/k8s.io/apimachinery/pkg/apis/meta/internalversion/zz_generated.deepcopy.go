@@ -103,6 +103,11 @@ func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 			**out = **in
 		}
 	}
+	if in.ClusterSelector == nil {
+		out.ClusterSelector = nil
+	} else {
+		out.ClusterSelector = in.ClusterSelector.DeepCopySelector()
+	}
 	return
 }
 

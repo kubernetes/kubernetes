@@ -23,6 +23,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,11 +49,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.FieldPath = c.RandString()
 		},
-		func(j *api.ListOptions, c fuzz.Continue) {
+		func(j *metav1.ListOptions, c fuzz.Continue) {
 			label, _ := labels.Parse("a=b")
-			j.LabelSelector = label
+			j.LabelSelector = label.String()
 			field, _ := fields.ParseSelector("a=b")
-			j.FieldSelector = field
+			j.FieldSelector = field.String()
+			clusterLabel, _ := labels.Parse("a=b")
+			j.ClusterSelector = clusterLabel.String()
 		},
 		func(j *api.PodExecOptions, c fuzz.Continue) {
 			j.Stdout = true

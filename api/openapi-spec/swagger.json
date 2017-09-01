@@ -113,6 +113,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -257,6 +264,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -344,6 +358,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -437,6 +458,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -527,6 +555,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -596,6 +631,13 @@
      ],
      "operationId": "listCoreV1Namespace",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -800,6 +842,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -921,6 +970,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -1260,6 +1316,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -1381,6 +1444,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedEndpoints",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -1720,6 +1790,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -1841,6 +1918,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedEvent",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -2180,6 +2264,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -2301,6 +2392,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedLimitRange",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -2640,6 +2738,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -2761,6 +2866,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPersistentVolumeClaim",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -3254,6 +3366,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -3375,6 +3494,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPod",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -4990,6 +5116,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -5111,6 +5244,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPodTemplate",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -5450,6 +5590,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -5571,6 +5718,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedReplicationController",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -6218,6 +6372,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -6339,6 +6500,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedResourceQuota",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -6832,6 +7000,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -6953,6 +7128,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedSecret",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -7292,6 +7474,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -7413,6 +7602,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNamespacedServiceAccount",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -7749,6 +7945,13 @@
      ],
      "operationId": "listCoreV1NamespacedService",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -9218,6 +9421,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -9339,6 +9549,13 @@
      ],
      "operationId": "deleteCoreV1CollectionNode",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -10334,6 +10551,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -10403,6 +10627,13 @@
      ],
      "operationId": "listCoreV1PersistentVolume",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -10527,6 +10758,13 @@
      ],
      "operationId": "deleteCoreV1CollectionPersistentVolume",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -11014,6 +11252,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -11101,6 +11346,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -12708,6 +12960,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -12795,6 +13054,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -12888,6 +13154,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -12975,6 +13248,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -13068,6 +13348,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -13155,6 +13442,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -13248,6 +13542,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -13335,6 +13636,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -13428,6 +13736,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -13518,6 +13833,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -13605,6 +13927,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -13703,6 +14032,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -13812,6 +14148,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -13907,6 +14250,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -14016,6 +14366,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -14111,6 +14468,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -14220,6 +14584,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -14315,6 +14686,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -14424,6 +14802,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -14519,6 +14904,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -14628,6 +15020,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -14723,6 +15122,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -14832,6 +15238,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -14927,6 +15340,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -15036,6 +15456,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -15131,6 +15558,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -15240,6 +15674,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -15335,6 +15776,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -15444,6 +15892,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -15539,6 +15994,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -15648,6 +16110,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -15743,6 +16212,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -15852,6 +16328,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -15947,6 +16430,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -16056,6 +16546,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16154,6 +16651,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16241,6 +16745,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -16342,6 +16853,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16432,6 +16950,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16519,6 +17044,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -16620,6 +17152,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16707,6 +17246,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -16800,6 +17346,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -16887,6 +17440,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -16980,6 +17540,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -17070,6 +17637,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -17157,6 +17731,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -17331,6 +17912,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -17452,6 +18040,13 @@
      ],
      "operationId": "deleteAdmissionregistrationV1alpha1CollectionExternalAdmissionHookConfiguration",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -17775,6 +18370,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -17896,6 +18498,13 @@
      ],
      "operationId": "deleteAdmissionregistrationV1alpha1CollectionInitializerConfiguration",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -18237,6 +18846,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -18324,6 +18940,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -18425,6 +19048,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -18512,6 +19142,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -18661,6 +19298,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -18782,6 +19426,13 @@
      ],
      "operationId": "deleteApiregistrationV1beta1CollectionAPIService",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -19187,6 +19838,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -19274,6 +19932,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -19441,6 +20106,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -19531,6 +20203,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -19600,6 +20279,13 @@
      ],
      "operationId": "listAppsV1beta1NamespacedControllerRevision",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -19724,6 +20410,13 @@
      ],
      "operationId": "deleteAppsV1beta1CollectionNamespacedControllerRevision",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -20063,6 +20756,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -20184,6 +20884,13 @@
      ],
      "operationId": "deleteAppsV1beta1CollectionNamespacedDeployment",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -20903,6 +21610,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -21024,6 +21738,13 @@
      ],
      "operationId": "deleteAppsV1beta1CollectionNamespacedStatefulSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -21689,6 +22410,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -21776,6 +22504,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -21869,6 +22604,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -21956,6 +22698,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22054,6 +22803,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22163,6 +22919,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -22258,6 +23021,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22367,6 +23137,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -22462,6 +23239,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22568,6 +23352,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22694,6 +23485,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -22781,6 +23579,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -22874,6 +23679,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -22943,6 +23755,13 @@
      ],
      "operationId": "listAppsV1beta2NamespacedControllerRevision",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -23067,6 +23886,13 @@
      ],
      "operationId": "deleteAppsV1beta2CollectionNamespacedControllerRevision",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -23406,6 +24232,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -23527,6 +24360,13 @@
      ],
      "operationId": "deleteAppsV1beta2CollectionNamespacedDaemonSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -24020,6 +24860,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -24141,6 +24988,13 @@
      ],
      "operationId": "deleteAppsV1beta2CollectionNamespacedDeployment",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -24788,6 +25642,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -24909,6 +25770,13 @@
      ],
      "operationId": "deleteAppsV1beta2CollectionNamespacedReplicaSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -25556,6 +26424,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -25677,6 +26552,13 @@
      ],
      "operationId": "deleteAppsV1beta2CollectionNamespacedStatefulSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -26342,6 +27224,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -26429,6 +27318,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -26522,6 +27418,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -26609,6 +27512,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -26702,6 +27612,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -26789,6 +27706,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -26887,6 +27811,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -26996,6 +27927,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -27091,6 +28029,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -27200,6 +28145,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -27295,6 +28247,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -27404,6 +28363,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -27499,6 +28465,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -27608,6 +28581,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -27703,6 +28683,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -27812,6 +28799,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -27899,6 +28893,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -28720,6 +29721,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -28789,6 +29797,13 @@
      ],
      "operationId": "listAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -28913,6 +29928,13 @@
      ],
      "operationId": "deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -29424,6 +30446,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -29511,6 +30540,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -29609,6 +30645,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -29751,6 +30794,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -29820,6 +30870,13 @@
      ],
      "operationId": "listAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -29944,6 +31001,13 @@
      ],
      "operationId": "deleteAutoscalingV2alpha1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -30455,6 +31519,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -30542,6 +31613,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -30640,6 +31718,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -30815,6 +31900,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -30884,6 +31976,13 @@
      ],
      "operationId": "listBatchV1NamespacedJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -31008,6 +32107,13 @@
      ],
      "operationId": "deleteBatchV1CollectionNamespacedJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -31519,6 +32625,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -31606,6 +32719,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -31704,6 +32824,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -31846,6 +32973,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -31915,6 +33049,13 @@
      ],
      "operationId": "listBatchV1beta1NamespacedCronJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -32039,6 +33180,13 @@
      ],
      "operationId": "deleteBatchV1beta1CollectionNamespacedCronJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -32550,6 +33698,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -32637,6 +33792,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -32735,6 +33897,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -32877,6 +34046,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -32946,6 +34122,13 @@
      ],
      "operationId": "listBatchV2alpha1NamespacedCronJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -33070,6 +34253,13 @@
      ],
      "operationId": "deleteBatchV2alpha1CollectionNamespacedCronJob",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -33581,6 +34771,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -33668,6 +34865,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -33766,6 +34970,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -33923,6 +35134,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -34044,6 +35262,13 @@
      ],
      "operationId": "deleteCertificatesV1beta1CollectionCertificateSigningRequest",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -34513,6 +35738,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -34600,6 +35832,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -34767,6 +36006,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -34854,6 +36100,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -34947,6 +36200,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -35016,6 +36276,13 @@
      ],
      "operationId": "listExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -35140,6 +36407,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDaemonSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -35633,6 +36907,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -35754,6 +37035,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDeployment",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -36473,6 +37761,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -36594,6 +37889,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedIngress",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -37087,6 +38389,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -37208,6 +38517,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedNetworkPolicy",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -37547,6 +38863,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -37668,6 +38991,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedReplicaSet",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -38487,6 +39817,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -38556,6 +39893,13 @@
      ],
      "operationId": "listExtensionsV1beta1PodSecurityPolicy",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -38680,6 +40024,13 @@
      ],
      "operationId": "deleteExtensionsV1beta1CollectionPodSecurityPolicy",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -39021,6 +40372,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -39108,6 +40466,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -39201,6 +40566,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -39291,6 +40663,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -39378,6 +40757,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -39476,6 +40862,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -39585,6 +40978,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -39680,6 +41080,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -39789,6 +41196,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -39884,6 +41298,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -39993,6 +41414,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -40088,6 +41516,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -40197,6 +41632,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -40292,6 +41734,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -40401,6 +41850,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -40491,6 +41947,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -40578,6 +42041,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -40676,6 +42146,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -40817,6 +42294,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -40938,6 +42422,13 @@
      ],
      "operationId": "deleteNetworkingV1CollectionNamespacedNetworkPolicy",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -41295,6 +42786,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -41382,6 +42880,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -41480,6 +42985,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -41586,6 +43098,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -41727,6 +43246,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -41848,6 +43374,13 @@
      ],
      "operationId": "deletePolicyV1beta1CollectionNamespacedPodDisruptionBudget",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -42359,6 +43892,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -42446,6 +43986,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -42544,6 +44091,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -42650,6 +44204,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -42791,6 +44352,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -42912,6 +44480,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1CollectionClusterRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -43219,6 +44794,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -43340,6 +44922,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1CollectionClusterRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -43647,6 +45236,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -43768,6 +45364,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1CollectionNamespacedRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -44091,6 +45694,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -44212,6 +45822,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1CollectionNamespacedRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -44553,6 +46170,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -44640,6 +46264,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -44733,6 +46364,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -44820,6 +46458,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -44921,6 +46566,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -45008,6 +46660,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -45109,6 +46768,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -45204,6 +46870,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -45313,6 +46986,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -45408,6 +47088,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -45517,6 +47204,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -45604,6 +47298,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -45709,6 +47410,13 @@
      ],
      "operationId": "listRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -45833,6 +47541,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -46140,6 +47855,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -46261,6 +47983,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -46568,6 +48297,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -46689,6 +48425,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -47012,6 +48755,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -47133,6 +48883,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -47474,6 +49231,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -47561,6 +49325,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -47654,6 +49425,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -47741,6 +49519,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -47842,6 +49627,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -47929,6 +49721,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -48030,6 +49829,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -48125,6 +49931,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -48234,6 +50047,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -48329,6 +50149,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -48438,6 +50265,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -48525,6 +50359,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -48630,6 +50471,13 @@
      ],
      "operationId": "listRbacAuthorizationV1beta1ClusterRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -48754,6 +50602,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1beta1CollectionClusterRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -49061,6 +50916,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -49182,6 +51044,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1beta1CollectionClusterRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -49489,6 +51358,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -49610,6 +51486,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1beta1CollectionNamespacedRoleBinding",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -49933,6 +51816,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -50054,6 +51944,13 @@
      ],
      "operationId": "deleteRbacAuthorizationV1beta1CollectionNamespacedRole",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -50395,6 +52292,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -50482,6 +52386,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -50575,6 +52486,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -50662,6 +52580,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -50763,6 +52688,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -50850,6 +52782,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -50951,6 +52890,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -51046,6 +52992,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -51155,6 +53108,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -51250,6 +53210,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -51359,6 +53326,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -51446,6 +53420,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -51587,6 +53568,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -51708,6 +53696,13 @@
      ],
      "operationId": "deleteSchedulingV1alpha1CollectionPriorityClass",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -52049,6 +54044,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -52136,6 +54138,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -52285,6 +54294,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -52406,6 +54422,13 @@
      ],
      "operationId": "deleteSettingsV1alpha1CollectionNamespacedPodPreset",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -52763,6 +54786,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -52850,6 +54880,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -52948,6 +54985,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -53054,6 +55098,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -53195,6 +55246,13 @@
       {
        "uniqueItems": true,
        "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
        "name": "fieldSelector",
        "in": "query"
@@ -53316,6 +55374,13 @@
      ],
      "operationId": "deleteStorageV1CollectionStorageClass",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -53657,6 +55722,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -53744,6 +55816,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",
@@ -53857,6 +55936,13 @@
      ],
      "operationId": "listStorageV1beta1StorageClass",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -53981,6 +56067,13 @@
      ],
      "operationId": "deleteStorageV1beta1CollectionStorageClass",
      "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+       "name": "clusterSelector",
+       "in": "query"
+      },
       {
        "uniqueItems": true,
        "type": "string",
@@ -54322,6 +56415,13 @@
      {
       "uniqueItems": true,
       "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
       "name": "fieldSelector",
       "in": "query"
@@ -54409,6 +56509,13 @@
      }
     },
     "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "Used in federation only, selects clusters to list the objects in Defaults to federation control plane.",
+      "name": "clusterSelector",
+      "in": "query"
+     },
      {
       "uniqueItems": true,
       "type": "string",

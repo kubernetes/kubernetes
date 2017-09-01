@@ -172,6 +172,11 @@ message GetOptions {
   // If true, partially initialized resources are included in the response.
   // +optional
   optional bool includeUninitialized = 2;
+
+  // Used in federation only, selects name of the cluster to get the object
+  // Defaults to federation control plane.
+  // +optional
+  optional string clusterName = 3;
 }
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
@@ -357,6 +362,11 @@ message ListOptions {
   // Timeout for the list/watch call.
   // +optional
   optional int64 timeoutSeconds = 5;
+
+  // Used in federation only, selects clusters to list the objects in
+  // Defaults to federation control plane.
+  // +optional
+  optional string clusterSelector = 7;
 }
 
 // MicroTime is version of Time with microsecond level precision.

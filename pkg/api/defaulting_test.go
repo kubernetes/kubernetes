@@ -131,6 +131,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                      {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                               {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                           {},
+		{Group: "federation", Version: "v1beta1", Kind: "Cluster"}:                                                   {},
+		{Group: "federation", Version: "v1beta1", Kind: "ClusterList"}:                                               {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
@@ -140,10 +142,11 @@ func TestDefaulting(t *testing.T) {
 			c.FuzzNoCustom(s)
 			s.MatchExpressions = nil // need to fuzz this specially
 		},
-		func(s *apiv1.ListOptions, c fuzz.Continue) {
+		func(s *metav1.ListOptions, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
-			s.LabelSelector = "" // need to fuzz requirement strings specially
-			s.FieldSelector = "" // need to fuzz requirement strings specially
+			s.LabelSelector = ""   // need to fuzz requirement strings specially
+			s.FieldSelector = ""   // need to fuzz requirement strings specially
+			s.ClusterSelector = "" // need to fuzz requirement strings specially
 		},
 		func(s *extensionsv1beta1.ScaleStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s)

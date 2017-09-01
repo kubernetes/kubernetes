@@ -14,6 +14,7 @@ go_library(
     ],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
+        "//federation/apis/federation/fuzzer:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/fuzzer:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
