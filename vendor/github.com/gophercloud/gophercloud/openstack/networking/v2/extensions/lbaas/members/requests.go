@@ -26,10 +26,10 @@ type ListOpts struct {
 }
 
 // List returns a Pager which allows you to iterate over a collection of
-// pools. It accepts a ListOpts struct, which allows you to filter and sort
+// members. It accepts a ListOpts struct, which allows you to filter and sort
 // the returned collection for greater efficiency.
 //
-// Default policy settings return only those pools that are owned by the
+// Default policy settings return only those members that are owned by the
 // tenant who submits the request, unless an admin user submits the request.
 func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	q, err := gophercloud.BuildQueryString(&opts)
@@ -42,23 +42,29 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	})
 }
 
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToLBMemberCreateMap() (map[string]interface{}, error)
 }
 
 // CreateOpts contains all the values needed to create a new pool member.
 type CreateOpts struct {
-	// The IP address of the member.
+	// Address is the IP address of the member.
 	Address string `json:"address" required:"true"`
-	// The port on which the application is hosted.
+
+	// ProtocolPort is the port on which the application is hosted.
 	ProtocolPort int `json:"protocol_port" required:"true"`
-	// The pool to which this member will belong.
+
+	// PoolID is the pool to which this member will belong.
 	PoolID string `json:"pool_id" required:"true"`
-	// Only required if the caller has an admin role and wants to create a pool
-	// for another tenant.
+
+	// TenantID is only required if the caller has an admin role and wants
+	// to create a pool for another tenant.
 	TenantID string `json:"tenant_id,omitempty"`
 }
 
+// ToLBMemberCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToLBMemberCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "member")
 }
@@ -81,6 +87,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToLBMemberUpdateMap() (map[string]interface{}, error)
 }
@@ -91,6 +99,7 @@ type UpdateOpts struct {
 	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
+// ToLBMemberUpdateMap builds a request body from UpdateOpts.
 func (opts UpdateOpts) ToLBMemberUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "member")
 }
