@@ -246,6 +246,7 @@ filegroup(
         "//vendor/github.com/influxdata/influxdb/pkg/escape:all-srcs",
         "//vendor/github.com/jmespath/go-jmespath:all-srcs",
         "//vendor/github.com/jonboulle/clockwork:all-srcs",
+        "//vendor/github.com/json-iterator/go:all-srcs",
         "//vendor/github.com/jteeuwen/go-bindata:all-srcs",
         "//vendor/github.com/juju/ratelimit:all-srcs",
         "//vendor/github.com/kardianos/osext:all-srcs",

@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/ugorji/go/codec"
+	jsoniter "github.com/json-iterator/go"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -536,7 +536,7 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for codecgen JSON decode performance
+// BenchmarkDecodeJSON provides a baseline for JSON decode performance
 func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	kcodec := testapi.Default.Codec()
 	items := benchmarkItems(b)
@@ -549,12 +549,11 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 		}
 		encoded[i] = data
 	}
-	handler := &codec.JsonHandle{}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := codec.NewDecoderBytes(encoded[i%width], handler).Decode(&obj); err != nil {
+		if err := jsoniter.ConfigFastest.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}
