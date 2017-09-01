@@ -778,6 +778,12 @@ type APIResource struct {
 	SingularName string `json:"singularName" protobuf:"bytes,6,opt,name=singularName"`
 	// namespaced indicates if a resource is namespaced or not.
 	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
+	// group is the preferred group of the resource.  Empty implies the group of the containing resource list.
+	// For subresources, this may have a different value, for example: Scale".
+	Group string `json:"group,omitempty" protobuf:"bytes,8,opt,name=group"`
+	// version is the preferred version of the resource.  Empty implies the version of the containing resource list
+	// For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)".
+	Version string `json:"version,omitempty" protobuf:"bytes,9,opt,name=version"`
 	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
 	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
 	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
