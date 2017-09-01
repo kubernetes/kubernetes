@@ -23,7 +23,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -32,7 +35,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -70,6 +73,10 @@ func (cm *unsupportedContainerManager) GetCapacity() v1.ResourceList {
 
 func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
 	return &unsupportedPodContainerManager{}
+}
+
+func (cm *unsupportedContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
 }
 
 func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
