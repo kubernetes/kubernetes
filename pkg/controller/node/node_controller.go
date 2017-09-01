@@ -208,7 +208,7 @@ func NewNodeController(
 	runTaintManager bool,
 	useTaintBasedEvictions bool) (*NodeController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
