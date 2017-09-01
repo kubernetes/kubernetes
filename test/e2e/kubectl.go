@@ -191,55 +191,6 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 
 	// Customized Wait  / ForEach wrapper for this test.  These demonstrate the
 
-	framework.KubeDescribe("Kubectl run ScheduledJob", func() {
-		var nsFlag string
-		var sjName string
-
-		BeforeEach(func() {
-			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			sjName = "e2e-test-echo-scheduledjob"
-		})
-
-		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", sjName, nsFlag)
-		})
-
-		It("should create a ScheduledJob", func() {
-			framework.SkipIfMissingResource(f.ClientPool, ScheduledJobGroupVersionResource, f.Namespace.Name)
-			serverVersion, err := c.Discovery().ServerVersion()
-			if err != nil {
-				framework.Failf("Failed to get server version: %v", err)
-			}
-			sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
-			if err != nil {
-				framework.Failf("Failed to parse server version: %v", err)
-			}
-			if !sv.LessThan(utilversion.MustParseSemantic("v1.8.0")) {
-				framework.Skipf("scheduledjob/v2alpha1 generator not supported on cluster starting in 1.8")
-			}
-
-			schedule := "*/5 * * * ?"
-			framework.RunKubectlOrDie("run", sjName, "--restart=OnFailure", "--generator=scheduledjob/v2alpha1",
-				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
-			By("verifying the ScheduledJob " + sjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(sjName, metav1.GetOptions{})
-			if err != nil {
-				framework.Failf("Failed getting ScheduledJob %s: %v", sjName, err)
-			}
-			if sj.Spec.Schedule != schedule {
-				framework.Failf("Failed creating a ScheduledJob with correct schedule %s, but got %s", schedule, sj.Spec.Schedule)
-			}
-			containers := sj.Spec.JobTemplate.Spec.Template.Spec.Containers
-			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
-				framework.Failf("Failed creating ScheduledJob %s for 1 pod with expected image %s: %#v", sjName, busyboxImage, containers)
-			}
-			restartPolicy := sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy
-			if sj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
-				framework.Failf("Failed creating a ScheduledJob with correct restart policy %s, but got %s", v1.RestartPolicyOnFailure, restartPolicy)
-			}
-		})
-	})
-
 	framework.KubeDescribe("Kubectl run CronJob", func() {
 		var nsFlag string
 		var cjName string
