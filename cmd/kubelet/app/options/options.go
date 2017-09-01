@@ -138,8 +138,8 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
 	}
 	// ensure that nobody sets InitConfigDir if the dynamic config feature gate is turned off
-	if f.InitConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --init-config-dir flag")
+	if f.InitConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.KubeletConfigFile) {
+		return fmt.Errorf("the KubeletConfigFile feature gate must be enabled in order to use the --init-config-dir flag")
 	}
 	return nil
 }
