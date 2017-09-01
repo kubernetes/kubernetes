@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -144,9 +146,13 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 // Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
-	if op == admission.Create || op == admission.Update {
+	if op == admission.Create {
 		return true
 	}
+	if op == admission.Update && utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		return true
+	}
+
 	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
 	if err != nil {
 		// fail closed, will try to give an evaluation.
