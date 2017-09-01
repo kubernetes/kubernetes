@@ -17,6 +17,7 @@ limitations under the License.
 package mount
 
 import (
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -135,6 +136,11 @@ func (f *FakeMounter) IsNotMountPoint(dir string) (bool, error) {
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
+
+	_, err := os.Stat(file)
+	if err != nil {
+		return true, err
+	}
 
 	// If file is a symlink, get its absolute path
 	absFile, err := filepath.EvalSymlinks(file)
