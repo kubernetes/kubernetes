@@ -490,17 +490,17 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	}
 	privateKey, err := certutil.PrivateKeyFromFile(ctx.Options.ServiceAccountKeyFile)
 	if err != nil {
-		return false, fmt.Errorf("error reading key for service account token controller: %v", err)
+		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}
 
 	var rootCA []byte
 	if ctx.Options.RootCAFile != "" {
 		rootCA, err = ioutil.ReadFile(ctx.Options.RootCAFile)
 		if err != nil {
-			return false, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
+			return true, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
 		}
 		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
-			return false, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
+			return true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.Options.RootCAFile, err)
 		}
 	} else {
 		rootCA = c.rootClientBuilder.ConfigOrDie("tokens-controller").CAData
