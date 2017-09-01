@@ -718,8 +718,8 @@ function kube::build::copy_output() {
   kube::build::rsync \
     --prune-empty-dirs \
     --filter='- /_temp/' \
-    --filter='+ /vendor/' \
-    --filter='+ /Godeps/' \
+    --filter='+ /vendor/**' \
+    --filter='+ /Godeps/**' \
     --filter='+ /staging/***/Godeps/**' \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \
