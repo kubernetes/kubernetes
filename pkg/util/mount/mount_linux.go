@@ -350,9 +350,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) MakeRShared(path string) error {
-	mountCmd := defaultMountCommand
-	mountArgs := []string{}
-	return doMakeRShared(path, procMountInfoPath, mountCmd, mountArgs)
+	return doMakeRShared(path, procMountInfoPath)
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -523,7 +521,7 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 // path is shared and bind-mounts it as rshared if needed. mountCmd and
 // mountArgs are expected to contain mount-like command, doMakeRShared will add
 // '--bind <path> <path>' and '--make-rshared <path>' to mountArgs.
-func doMakeRShared(path string, mountInfoFilename string, mountCmd string, mountArgs []string) error {
+func doMakeRShared(path string, mountInfoFilename string) error {
 	shared, err := isShared(path, mountInfoFilename)
 	if err != nil {
 		return err
