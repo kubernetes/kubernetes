@@ -124,7 +124,7 @@ func addStorageLimit(pod *v1.Pod, sizeLimit int64, medium v1.StorageMedium) *v1.
 					Name: "emptyDirVolumeName",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							SizeLimit: *resource.NewQuantity(sizeLimit, resource.BinarySI),
+							SizeLimit: resource.NewQuantity(sizeLimit, resource.BinarySI),
 							Medium:    medium,
 						},
 					},
