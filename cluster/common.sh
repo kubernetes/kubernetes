@@ -795,6 +795,13 @@ ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
 ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
 ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
 EOF
+    # KUBE_APISERVER_REQUEST_TIMEOUT_SEC (if set) controls the --request-timeout
+    # flag
+    if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
+      cat >>$file <<EOF
+KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT_SEC})
+EOF
+    fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
     if [ -n "${ETCD_IMAGE:-}" ]; then
       cat >>$file <<EOF
