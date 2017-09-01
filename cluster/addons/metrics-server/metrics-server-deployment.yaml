@@ -3,6 +3,9 @@ kind: ServiceAccount
 metadata:
   name: metrics-server
   namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -11,6 +14,8 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: metrics-server
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
@@ -20,6 +25,8 @@ spec:
       name: metrics-server
       labels:
         k8s-app: metrics-server
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       serviceAccountName: metrics-server
       containers:
