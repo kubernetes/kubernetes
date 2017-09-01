@@ -137,6 +137,12 @@ const (
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
+
+	// owner: @jsafrane
+	// alpha: v1.8
+	//
+	// Enable mount propagation of volumes.
+	MountPropagation utilfeature.Feature = "MountPropagation"
 )
 
 func init() {
@@ -164,6 +170,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
+	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
