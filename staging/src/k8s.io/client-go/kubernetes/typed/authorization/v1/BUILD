@@ -16,6 +16,7 @@ go_library(
         "selfsubjectaccessreview.go",
         "selfsubjectaccessreview_expansion.go",
         "selfsubjectrulesreview.go",
+        "selfsubjectrulesreview_expansion.go",
         "subjectaccessreview.go",
         "subjectaccessreview_expansion.go",
     ],

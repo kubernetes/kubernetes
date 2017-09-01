@@ -14,4 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package fake
+
+import (
+	authorizationapi "k8s.io/api/authorization/v1"
+	core "k8s.io/client-go/testing"
+)
+
+func (c *FakeSelfSubjectRulesReviews) Create(srr *authorizationapi.SelfSubjectRulesReview) (result *authorizationapi.SelfSubjectRulesReview, err error) {
+	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("selfsubjectrulesreviews"), srr), &authorizationapi.SelfSubjectRulesReview{})
+	return obj.(*authorizationapi.SelfSubjectRulesReview), err
+}
