@@ -61,10 +61,7 @@ kube::util::ensure_godep_version
 # Create a fake git repo the root of the repo to prevent godeps from complaining
 kube::util::create-fake-git-tree "${KUBE_ROOT}"
 
-kube::log::status "Checking whether godeps are restored"
-if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-  ${KUBE_ROOT}/hack/godep-restore.sh
-fi
+"${KUBE_ROOT}/hack/godep-restore.sh"
 
 kube::util::ensure-temp-dir
 TMP_GOPATH="${KUBE_TEMP}/go"

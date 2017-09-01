@@ -85,7 +85,7 @@ kube::util::trap_add() {
     if [[ -z "${existing_cmd}" ]]; then
       new_cmd="${trap_add_cmd}"
     else
-      new_cmd="${existing_cmd};${trap_add_cmd}"
+      new_cmd="${trap_add_cmd};${existing_cmd}"
     fi
 
     # Assign the test
