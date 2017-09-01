@@ -319,10 +319,7 @@ func KnownControllers() []string {
 	return ret.List()
 }
 
-var ControllersDisabledByDefault = sets.NewString(
-	"bootstrapsigner",
-	"tokencleaner",
-)
+var ControllersDisabledByDefault = sets.NewString()
 
 const (
 	saTokenControllerName = "serviceaccount-token"
