@@ -53,7 +53,7 @@ if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
-kube::util::ensure_godep_version v79
+kube::util::ensure_godep_version
 
 if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
 	echo "Running godep restore"

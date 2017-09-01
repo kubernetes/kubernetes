@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::util::ensure_single_dir_gopath
-kube::util::ensure_godep_version v79
+kube::util::ensure_godep_version
 kube::util::ensure_no_staging_repos_in_gopath
 
 if [ -e "${KUBE_ROOT}/vendor" -o -e "${KUBE_ROOT}/Godeps" ]; then

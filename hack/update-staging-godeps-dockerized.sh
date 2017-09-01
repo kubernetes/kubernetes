@@ -57,7 +57,7 @@ kube::golang::setup_env
 kube::util::ensure_single_dir_gopath
 kube::util::ensure_no_staging_repos_in_gopath
 # Confirm we have the right godep version installed
-kube::util::ensure_godep_version v79
+kube::util::ensure_godep_version
 # Create a fake git repo the root of the repo to prevent godeps from complaining
 kube::util::create-fake-git-tree "${KUBE_ROOT}"
 

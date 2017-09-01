@@ -512,25 +512,33 @@ kube::util::ensure_clean_working_dir() {
   done 1>&2
 }
 
-# Ensure that the given godep version is installed and in the path
+# Ensure that the given godep version is installed and in the path.  Almost
+# nobody should use any version but the default.
 kube::util::ensure_godep_version() {
-  GODEP_VERSION=${1:-"v79"}
+  GODEP_VERSION=${1:-"v79"} # this version is known to work
+
   if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
   fi
 
+  kube::log::status "Getting godep version ${GODEP_VERSION}"
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep
-  pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
+  GP="$(echo $GOPATH | cut -f1 -d:)"
+  rm -rf "${GP}/src/github.com/tools/godep"
+  go get -d -u github.com/tools/godep
+  pushd "${GP}/src/github.com/tools/godep" >/dev/null
     git checkout -q "${GODEP_VERSION}"
-    GOPATH="${KUBE_TEMP}/go" go install .
+    go install .
   popd >/dev/null
 
-  PATH="${KUBE_TEMP}/go/bin:${PATH}"
   hash -r # force bash to clear PATH cache
-  godep version
+  PATH="${PATH}:${GP}/bin"
+  if [[ "$(godep version 2>/dev/null)" != *"godep ${GODEP_VERSION}"* ]]; then
+    kube::log::error "Expected godep ${GODEP_VERSION}, got $(godep version)"
+    return 1
+  fi
 }
 
 # Ensure that none of the staging repos is checked out in the GOPATH because this
