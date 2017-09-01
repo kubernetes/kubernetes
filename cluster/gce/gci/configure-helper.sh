@@ -432,6 +432,12 @@ EOF
 alpha-features = ${GCE_ALPHA_FEATURES}
 EOF
   fi
+  if [[ -n "${SECONDARY_RANGE_NAME:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >> /etc/gce.conf
+secondary-range-name = ${SECONDARY-RANGE-NAME}
+EOF
+  fi
   if [[ "${use_cloud_config}" != "true" ]]; then
     rm -f /etc/gce.conf
   fi
