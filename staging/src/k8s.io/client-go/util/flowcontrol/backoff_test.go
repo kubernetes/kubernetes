@@ -193,3 +193,78 @@ func TestIsInBackOffSinceUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestSlowBackoffWithNbRetry(t *testing.T) {
+	id := "_idSlow"
+	tc := clock.NewFakeClock(time.Now())
+	step := time.Second
+	maxDuration := 50 * step
+
+	b := NewFakeBackOff(step, maxDuration, tc)
+	cases := []struct {
+		//expected
+		expectedRetry int32
+		expectedDelay time.Duration
+	}{
+		{
+			0,
+			time.Duration(0) * time.Second,
+		},
+		{
+			0,
+			time.Duration(1) * time.Second,
+		},
+		{
+			1,
+			time.Duration(2) * time.Second,
+		},
+		{
+			2,
+			time.Duration(4) * time.Second,
+		},
+		{
+			3,
+			time.Duration(8) * time.Second,
+		},
+		{
+			4,
+			time.Duration(16) * time.Second,
+		},
+		{
+			5,
+			time.Duration(32) * time.Second,
+		},
+		{
+			6,
+			time.Duration(50) * time.Second,
+		},
+		{
+			7,
+			time.Duration(50) * time.Second,
+		},
+		{
+			8,
+			time.Duration(50) * time.Second,
+		},
+	}
+	for ix, c := range cases {
+		tc.Step(step)
+		w, retry := b.GetWithRetryNumber(id)
+		if retry != c.expectedRetry {
+			t.Errorf("input: '%d': retry expected %d, got %d", ix, ix, retry)
+		}
+		if w != c.expectedDelay {
+			t.Errorf("input: '%d': expected %s, got %s", ix, c.expectedDelay, w)
+		}
+		b.NextWithInitDuration(id, step, tc.Now())
+	}
+
+	//Now confirm that the Reset cancels backoff.
+	b.NextWithInitDuration(id, step, tc.Now())
+	b.Reset(id)
+	backoff, counter := b.GetWithRetryNumber(id)
+	if backoff != 0 || counter != 0 {
+		t.Errorf("Reset didn't clear the backoff.")
+	}
+
+}

@@ -27,6 +27,7 @@ import (
 type backoffEntry struct {
 	backoff    time.Duration
 	lastUpdate time.Time
+	retry      int32
 }
 
 type Backoff struct {
@@ -57,25 +58,39 @@ func NewBackOff(initial, max time.Duration) *Backoff {
 
 // Get the current backoff Duration
 func (p *Backoff) Get(id string) time.Duration {
+	delay, _ := p.GetWithRetryNumber(id)
+	return delay
+}
+
+// GetWithRetryNumber the current backoff Duration and the number of previous retry
+func (p *Backoff) GetWithRetryNumber(id string) (time.Duration, int32) {
 	p.Lock()
 	defer p.Unlock()
 	var delay time.Duration
+	var nbRetry int32
 	entry, ok := p.perItemBackoff[id]
 	if ok {
 		delay = entry.backoff
+		nbRetry = entry.retry
 	}
-	return delay
+	return delay, nbRetry
 }
 
 // move backoff to the next mark, capping at maxDuration
 func (p *Backoff) Next(id string, eventTime time.Time) {
+	p.NextWithInitDuration(id, p.defaultDuration, eventTime)
+}
+
+// NextWithInitDuration move backoff to the next mark and increment the number of retry, capping at maxDuration
+func (p *Backoff) NextWithInitDuration(id string, initial time.Duration, eventTime time.Time) {
 	p.Lock()
 	defer p.Unlock()
 	entry, ok := p.perItemBackoff[id]
 	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
-		entry = p.initEntryUnsafe(id)
+		entry = p.initEntryUnsafe(id, initial)
 	} else {
 		delay := entry.backoff * 2 // exponential
+		entry.retry++
 		entry.backoff = time.Duration(integer.Int64Min(int64(delay), int64(p.maxDuration)))
 	}
 	entry.lastUpdate = p.Clock.Now()
@@ -136,9 +151,26 @@ func (p *Backoff) DeleteEntry(id string) {
 	delete(p.perItemBackoff, id)
 }
 
+// StartBackoffGC used to start the Backoff garbage collection mechanism
+// Backoff.GC() will be executed each minute
+func StartBackoffGC(backoff *Backoff, stopCh <-chan struct{}) {
+	go func() {
+		for {
+			select {
+			case <-time.After(time.Minute):
+				backoff.GC()
+			case <-stopCh:
+				return
+			}
+		}
+	}()
+}
+
 // Take a lock on *Backoff, before calling initEntryUnsafe
-func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
-	entry := &backoffEntry{backoff: p.defaultDuration}
+func (p *Backoff) initEntryUnsafe(id string, backoff time.Duration) *backoffEntry {
+	entry := &backoffEntry{
+		backoff: backoff,
+	}
 	p.perItemBackoff[id] = entry
 	return entry
 }
