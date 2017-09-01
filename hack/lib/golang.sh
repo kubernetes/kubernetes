@@ -366,12 +366,15 @@ kube::golang::setup_env() {
 
   kube::golang::create_gopath_tree
 
-  export GOPATH=${KUBE_GOPATH}
+  export GOPATH="${KUBE_GOPATH}"
 
   # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
     GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
   fi
+
+  # Make sure our own Go binaries are in PATH.
+  export PATH="${KUBE_GOPATH}/bin:${PATH}"
 
   # Change directories so that we are within the GOPATH.  Some tools get really
   # upset if this is not true.  We use a whole fake GOPATH here to collect the
