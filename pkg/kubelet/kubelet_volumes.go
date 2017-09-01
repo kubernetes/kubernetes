@@ -126,7 +126,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 
 	logSpew := func(errs []error) {
 		if len(errs) > 0 {
-			glog.Errorf("%v : There were a total of %v errors similar to this.  Turn up verbosity to see them.", errs[0], len(errs))
+			glog.Errorf("%v : There were a total of %v errors similar to this. Turn up verbosity to see them.", errs[0], len(errs))
 			for _, err := range errs {
 				glog.V(5).Infof("Orphan pod: %v", err)
 			}
