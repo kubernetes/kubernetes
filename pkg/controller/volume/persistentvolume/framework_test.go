@@ -601,7 +601,7 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 		EventRecorder:             record.NewFakeRecorder(1000),
 		EnableDynamicProvisioning: enableDynamicProvisioning,
 	}
-	ctrl, err := NewController(params)
+	ctrl, err := NewPersistentVolumeController(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct persistentvolume controller: %v", err)
 	}

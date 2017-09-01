@@ -70,10 +70,10 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	jm := &CronJobController{
@@ -87,19 +87,16 @@ func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	return jm
 }
 
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) *CronJobController {
-	jm := NewCronJobController(kubeClient)
-	return jm
-}
-
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	glog.Infof("Starting CronJob Manager")
+	glog.Infof("Starting CronJob Controller")
+
 	// Check things every 10 second.
 	go wait.Until(jm.syncAll, 10*time.Second, stopCh)
+
 	<-stopCh
-	glog.Infof("Shutting down CronJob Manager")
+	glog.Infof("Shutting down CronJob Controller")
 }
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.

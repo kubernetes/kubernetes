@@ -39,7 +39,7 @@ const testTokenID = "abc123"
 func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset) {
 	options := DefaultBootstrapSignerOptions()
 	cl := fake.NewSimpleClientset()
-	return NewBootstrapSigner(cl, options), cl
+	return NewBootstrapSignerController(cl, options), cl
 }
 
 func newConfigMap(tokenID, signature string) *v1.ConfigMap {

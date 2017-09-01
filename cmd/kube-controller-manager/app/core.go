@@ -59,7 +59,7 @@ import (
 )
 
 func startServiceController(ctx ControllerContext) (bool, error) {
-	serviceController, err := servicecontroller.New(
+	serviceController, err := servicecontroller.NewServiceController(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
 		ctx.InformerFactory.Core().V1().Services(),
@@ -140,14 +140,14 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
 	}
-	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
+	routeController := routecontroller.NewRouteController(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
 	return true, nil
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) {
 	params := persistentvolumecontroller.ControllerParameters{
-		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
+		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistentvolume-controller"),
 		SyncPeriod:                ctx.Options.PVClaimBinderSyncPeriod.Duration,
 		VolumePlugins:             ProbeControllerVolumePlugins(ctx.Cloud, ctx.Options.VolumeConfiguration),
 		Cloud:                     ctx.Cloud,
@@ -157,7 +157,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (bool, error) 
 		ClassInformer:             ctx.InformerFactory.Storage().V1().StorageClasses(),
 		EnableDynamicProvisioning: ctx.Options.VolumeConfiguration.EnableDynamicProvisioning,
 	}
-	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
+	volumeController, volumeControllerErr := persistentvolumecontroller.NewPersistentVolumeController(params)
 	if volumeControllerErr != nil {
 		return true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
 	}
@@ -219,7 +219,7 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 }
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
-	go replicationcontroller.NewReplicationManager(
+	go replicationcontroller.NewReplicationController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
@@ -249,7 +249,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		api.Kind("ConfigMap"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		QuotaClient:               resourceQuotaControllerClient.Core(),
+		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
@@ -257,8 +257,8 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
-	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(

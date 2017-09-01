@@ -107,7 +107,6 @@ func NewHorizontalController(
 	resyncPeriod time.Duration,
 	upscaleForbiddenWindow time.Duration,
 	downscaleForbiddenWindow time.Duration,
-
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
 	// TODO: remove the wrapper when every clients have moved to use the clientset.

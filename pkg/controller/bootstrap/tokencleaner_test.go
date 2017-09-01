@@ -35,7 +35,7 @@ func init() {
 func newTokenCleaner() (*TokenCleaner, *fake.Clientset) {
 	options := DefaultTokenCleanerOptions()
 	cl := fake.NewSimpleClientset()
-	return NewTokenCleaner(cl, options), cl
+	return NewTokenCleanerController(cl, options), cl
 }
 
 func TestCleanerNoExpiration(t *testing.T) {

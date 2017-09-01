@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/to"
+
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -31,13 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"github.com/Azure/go-autorest/autorest/to"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -98,6 +100,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	kubeClient := fake.NewSimpleClientset()
 
 	dc := NewDisruptionController(
 		informerFactory.Core().V1().Pods(),
@@ -106,7 +109,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Extensions().V1beta1().Deployments(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
-		nil,
+		kubeClient,
 	)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady
@@ -115,6 +118,8 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
+
+	dc.recorder = &record.FakeRecorder{}
 
 	return &disruptionController{
 		dc,
