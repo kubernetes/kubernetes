@@ -46,31 +46,79 @@ func TestResourcesLocal(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdResources(f, buf, buf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
 	mapper, typer := f.Object()
 	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
-	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
-		Out:               buf,
-		Local:             true,
-		Limits:            "cpu=200m,memory=512Mi",
-		Requests:          "cpu=200m,memory=512Mi",
-		ContainerSelector: "*"}
-
-	err := opts.Complete(f, cmd, []string{""})
-	if err == nil {
-		err = opts.Validate()
+	testCases := []struct {
+		name             string
+		resourcesOptions *ResourcesOptions
+		expectErr        string
+		expectOut        string
+	}{
+		{
+			name: "sucess test case",
+			resourcesOptions: &ResourcesOptions{FilenameOptions: resource.FilenameOptions{
+				Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+				Out:               buf,
+				Local:             true,
+				Limits:            "cpu=200m,memory=512Mi",
+				Requests:          "cpu=200m,memory=512Mi",
+				ContainerSelector: "*"},
+			expectErr: "",
+			expectOut: "replicationcontrollers/cassandra",
+		},
+		{
+			name: "test for requests and limits empty",
+			resourcesOptions: &ResourcesOptions{FilenameOptions: resource.FilenameOptions{
+				Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+				Out:               buf,
+				Local:             true,
+				ContainerSelector: "*"},
+			expectErr: "you must specify an update to requests or limits (in the form of --requests/--limits)",
+			expectOut: "",
+		},
+		{
+			name: "test invalid argument",
+			resourcesOptions: &ResourcesOptions{FilenameOptions: resource.FilenameOptions{
+				Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+				Out:               buf,
+				Local:             true,
+				Requests:          "cpu=500m memory=1Gi",
+				ContainerSelector: "*"},
+			expectErr: "Invalid argument syntax cpu=500m memory=1Gi, expected <resource>=<value>",
+			expectOut: "",
+		},
+		{
+			name: "test for invalid container named",
+			resourcesOptions: &ResourcesOptions{FilenameOptions: resource.FilenameOptions{
+				Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+				Out:               buf,
+				Local:             true,
+				Limits:            "cpu=200m,memory=512Mi",
+				Requests:          "cpu=200m,memory=512Mi",
+				ContainerSelector: ""},
+			expectErr: "error: unable to find container named ",
+			expectOut: "",
+		},
 	}
-	if err == nil {
-		err = opts.Run()
-	}
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(buf.String(), "replicationcontrollers/cassandra") {
-		t.Errorf("did not set resources: %s", buf.String())
+	for _, testCase := range testCases {
+		err := testCase.resourcesOptions.Complete(f, cmd, []string{""})
+		if err == nil {
+			err = testCase.resourcesOptions.Validate()
+		}
+		if err == nil {
+			err = testCase.resourcesOptions.Run()
+		}
+		if err != nil {
+			if err.Error() != testCase.expectErr {
+				t.Errorf("expected error: %v but got %v", testCase.expectErr, err.Error())
+			}
+		}
+		if testCase.expectOut != "" {
+			if !strings.Contains(buf.String(), "replicationcontrollers/cassandra") {
+				t.Errorf("did not set resources: %s", buf.String())
+			}
+		}
 	}
 }
