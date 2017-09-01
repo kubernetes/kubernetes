@@ -368,7 +368,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				},
 			}
 
-			var betaTest *storageClassTest
+			var Test *storageClassTest
 			for i, t := range tests {
 				// Beware of clojure, use local variables instead of those from
 				// outer scope
@@ -380,7 +380,7 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				}
 
 				// Remember the last supported test for subsequent test of beta API
-				betaTest = &test
+				Test = &test
 
 				By("Testing " + test.name)
 				suffix := fmt.Sprintf("%d", i)
@@ -390,20 +390,17 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 				testDynamicProvisioning(test, c, claim, class)
 			}
 
-			// Run the last test with storage.k8s.io/v1beta1 and beta annotation on pvc
-			if betaTest != nil {
-				By("Testing " + betaTest.name + " with beta volume provisioning")
-				class := newBetaStorageClass(*betaTest, "beta")
+			// Run the last test with storage.k8s.io/v1 on pvc
+			if Test != nil {
+				By("Testing " + Test.name + " with volume provisioning")
+				class := newStorageClass(*Test, ns, "beta")
 				// we need to create the class manually, testDynamicProvisioning does not accept beta class
-				class, err := c.StorageV1beta1().StorageClasses().Create(class)
+				class, err := c.StorageV1().StorageClasses().Create(class)
 				Expect(err).NotTo(HaveOccurred())
 				defer deleteStorageClass(c, class.Name)
 
-				claim := newClaim(*betaTest, ns, "beta")
-				claim.Annotations = map[string]string{
-					v1.BetaStorageClassAnnotation: class.Name,
-				}
-				testDynamicProvisioning(*betaTest, c, claim, nil)
+				claim := newClaim(*Test, ns, "beta")
+				testDynamicProvisioning(*Test, c, claim, nil)
 			}
 		})
 
@@ -784,30 +781,6 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 		ObjectMeta: metav1.ObjectMeta{
 			// Name must be unique, so let's base it on namespace name
 			Name: ns + "-" + suffix,
-		},
-		Provisioner: pluginName,
-		Parameters:  t.parameters,
-	}
-}
-
-// TODO: remove when storage.k8s.io/v1beta1 and beta storage class annotations
-// are removed.
-func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.StorageClass {
-	pluginName := t.provisioner
-
-	if pluginName == "" {
-		pluginName = getDefaultPluginName()
-	}
-	if suffix == "" {
-		suffix = "default"
-	}
-
-	return &storagebeta.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: suffix + "-",
 		},
 		Provisioner: pluginName,
 		Parameters:  t.parameters,
