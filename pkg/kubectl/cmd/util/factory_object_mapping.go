@@ -119,17 +119,22 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 }
 
 func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
-	var categoryExpander resource.CategoryExpander
-	categoryExpander = resource.LegacyCategoryExpander
+	legacyExpander := resource.LegacyCategoryExpander
+
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
-		// wrap with discovery based filtering
-		categoryExpander, err = resource.NewDiscoveryFilteredExpander(categoryExpander, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		// fallback is the legacy expander wrapped with discovery based filtering
+		fallbackExpander, err := resource.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
+
+		// by default use the expander that discovers based on "categories" field from the API
+		discoveryCategoryExpander, err := resource.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		CheckErr(err)
+
+		return discoveryCategoryExpander
 	}
 
-	return categoryExpander
+	return legacyExpander
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
