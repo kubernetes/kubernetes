@@ -86,7 +86,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 	}
 	if obj.ContainerRuntime == "" {
-		obj.ContainerRuntime = "docker"
+		obj.ContainerRuntime = kubetypes.DockerContainerRuntime
 	}
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
