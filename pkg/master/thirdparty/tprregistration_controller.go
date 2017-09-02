@@ -59,6 +59,8 @@ type tprRegistrationController struct {
 
 	syncHandler func(groupVersion schema.GroupVersion) error
 
+	syncedInitialSet chan struct{}
+
 	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors
 	// this is actually keyed by a groupVersion
 	queue workqueue.RateLimitingInterface
@@ -75,7 +77,8 @@ func NewAutoRegistrationController(tprInformer informers.ThirdPartyResourceInfor
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "tpr-autoregister"),
+		syncedInitialSet:       make(chan struct{}),
+		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "tpr-autoregister"),
 	}
 	c.syncHandler = c.handleVersionUpdate
 
@@ -145,9 +148,38 @@ func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	defer glog.Infof("Shutting down tpr-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !controller.WaitForCacheSync("tpr-autoregister", stopCh, c.tprSynced) {
+	if !controller.WaitForCacheSync("tpr-autoregister", stopCh, c.tprSynced, c.crdSynced) {
 		return
 	}
+
+	// process each tpr in the list once
+	if tprs, err := c.tprLister.List(labels.Everything()); err != nil {
+		utilruntime.HandleError(err)
+	} else {
+		for _, tpr := range tprs {
+			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(tpr)
+			if err != nil {
+				utilruntime.HandleError(err)
+				continue
+			}
+			for _, version := range tpr.Versions {
+				if err := c.syncHandler(schema.GroupVersion{Group: group, Version: version.Name}); err != nil {
+					utilruntime.HandleError(err)
+				}
+			}
+		}
+	}
+	// process each item in the list once
+	if crds, err := c.crdLister.List(labels.Everything()); err != nil {
+		utilruntime.HandleError(err)
+	} else {
+		for _, crd := range crds {
+			if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version}); err != nil {
+				utilruntime.HandleError(err)
+			}
+		}
+	}
+	close(c.syncedInitialSet)
 
 	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
 	for i := 0; i < threadiness; i++ {
@@ -158,6 +190,11 @@ func (c *tprRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 
 	// wait until we're told to stop
 	<-stopCh
+}
+
+// WaitForInitialSync blocks until the initial set of CRD resources has been processed
+func (c *tprRegistrationController) WaitForInitialSync() {
+	<-c.syncedInitialSet
 }
 
 func (c *tprRegistrationController) runWorker() {
