@@ -42,6 +42,11 @@ func (writer *StdWriter) WriteFile(filename string, data []byte, perm os.FileMod
 	return ioutil.WriteFile(filename, data, perm)
 }
 
+const (
+	nsenterCmd              = "nsenter"
+	hostProcMountsNamespace = "/rootfs/proc/1/ns/mnt"
+)
+
 // NsenterWriter is implementation of Writer interface that allows writing data
 // to file using nsenter command.
 // If a program (e.g. kubelet) runs in a container it may want to write data to
@@ -54,15 +59,14 @@ type NsenterWriter struct{}
 // WriteFile calls 'nsenter cat - > <the file>' and 'nsenter chmod' to create a
 // file on the host.
 func (writer *NsenterWriter) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	cmd := "nsenter"
 	baseArgs := []string{
-		"--mount=/rootfs/proc/1/ns/mnt",
+		fmt.Sprintf("--mount=%s", hostProcMountsNamespace),
 		"--",
 	}
 
 	echoArgs := append(baseArgs, "sh", "-c", fmt.Sprintf("cat > %s", filename))
-	glog.V(5).Infof("Command to write data to file: %v %v", cmd, echoArgs)
-	command := exec.Command(cmd, echoArgs...)
+	glog.V(5).Infof("Command to write data to file: %v %v", nsenterCmd, echoArgs)
+	command := exec.Command(nsenterCmd, echoArgs...)
 	command.Stdin = bytes.NewBuffer(data)
 	outputBytes, err := command.CombinedOutput()
 	if err != nil {
@@ -71,8 +75,8 @@ func (writer *NsenterWriter) WriteFile(filename string, data []byte, perm os.Fil
 	}
 
 	chmodArgs := append(baseArgs, "chmod", fmt.Sprintf("%o", perm), filename)
-	glog.V(5).Infof("Command to change permissions to file: %v %v", cmd, chmodArgs)
-	outputBytes, err = exec.Command(cmd, chmodArgs...).CombinedOutput()
+	glog.V(5).Infof("Command to change permissions to file: %v %v", nsenterCmd, chmodArgs)
+	outputBytes, err = exec.Command(nsenterCmd, chmodArgs...).CombinedOutput()
 	if err != nil {
 		glog.Errorf("Output from chmod command: %v", string(outputBytes))
 		return err
