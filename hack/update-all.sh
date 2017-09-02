@@ -63,7 +63,6 @@ fi
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
-	update-codecgen
 	update-generated-docs
 	update-generated-swagger-docs
 	update-swagger-spec

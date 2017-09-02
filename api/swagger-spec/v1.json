@@ -18724,7 +18724,7 @@
      },
      "operator": {
       "type": "string",
-      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist."
+      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
      },
      "values": {
       "type": "array",
@@ -22061,6 +22061,14 @@
      "namespaced": {
       "type": "boolean",
       "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "group": {
+      "type": "string",
+      "description": "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\"."
+     },
+     "version": {
+      "type": "string",
+      "description": "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\"."
      },
      "kind": {
       "type": "string",

@@ -128,10 +128,10 @@ func (s SecretForTLSGeneratorV1) validate() error {
 	// if no key/cert is given. The only requiredment is that we either get both
 	// or none. See test/e2e/ingress_utils for self signed cert generation.
 	if len(s.Key) == 0 {
-		return fmt.Errorf("key must be specified.")
+		return fmt.Errorf("key must be specified")
 	}
 	if len(s.Cert) == 0 {
-		return fmt.Errorf("certificate must be specified.")
+		return fmt.Errorf("certificate must be specified")
 	}
 	if _, err := tls.LoadX509KeyPair(s.Cert, s.Key); err != nil {
 		return fmt.Errorf("failed to load key pair %v", err)

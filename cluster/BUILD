@@ -46,3 +46,31 @@ pkg_tar(
         "//cluster/saltbase:salt-manifests",
     ],
 )
+
+# These tests just verify that bash can interpret the file.
+sh_test(
+    name = "common_test",
+    srcs = ["common.sh"],
+    data = [
+        ":all-srcs",
+    ],
+    deps = ["//hack/lib"],
+)
+
+sh_test(
+    name = "clientbin_test",
+    srcs = ["clientbin.sh"],
+    data = [
+        ":all-srcs",
+    ],
+    deps = ["//hack/lib"],
+)
+
+sh_test(
+    name = "kube-util_test",
+    srcs = ["kube-util.sh"],
+    data = [
+        ":all-srcs",
+    ],
+    deps = ["//hack/lib"],
+)

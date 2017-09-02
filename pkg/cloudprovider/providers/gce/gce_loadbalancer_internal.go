@@ -79,11 +79,21 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		return nil, err
 	}
 
+	// Determine IP which will be used for this LB. If no forwarding rule has been established
+	// or specified in the Service spec, then requestedIP = "".
+	requestedIP := determineRequestedIP(svc, existingFwdRule)
+	addrMgr := newAddressManager(gce, nm.String(), gce.Region(), gce.getInternalSubnetURL(), loadBalancerName, requestedIP, schemeInternal)
+	ipToUse, err := addrMgr.HoldAddress()
+	if err != nil {
+		return nil, err
+	}
+	glog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
+
 	// Ensure firewall rules if necessary
 	if gce.OnXPN() {
 		glog.V(2).Infof("ensureInternalLoadBalancer: cluster is on a cross-project network (XPN) network project %v, compute project %v - skipping firewall creation", gce.networkProjectID, gce.projectID)
 	} else {
-		if err = gce.ensureInternalFirewalls(loadBalancerName, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
+		if err = gce.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
 			return nil, err
 		}
 	}
@@ -91,7 +101,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	expectedFwdRule := &compute.ForwardingRule{
 		Name:                loadBalancerName,
 		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, nm.String()),
-		IPAddress:           svc.Spec.LoadBalancerIP,
+		IPAddress:           ipToUse,
 		BackendService:      backendServiceLink,
 		Ports:               ports,
 		IPProtocol:          string(protocol),
@@ -126,6 +136,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		if err = gce.CreateRegionForwardingRule(expectedFwdRule, gce.region); err != nil {
 			return nil, err
 		}
+		glog.V(2).Infof("ensureInternalLoadBalancer(%v): created forwarding rule", loadBalancerName)
 	}
 
 	// Delete the previous internal load balancer resources if necessary
@@ -133,14 +144,13 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		gce.clearPreviousInternalResources(loadBalancerName, existingBackendService, backendServiceName, hcName)
 	}
 
-	// Get the most recent forwarding rule for the new address.
-	existingFwdRule, err = gce.GetRegionForwardingRule(loadBalancerName, gce.region)
-	if err != nil {
-		return nil, err
+	// Now that the controller knows the forwarding rule exists, we can release the address.
+	if err := addrMgr.ReleaseAddress(); err != nil {
+		glog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: existingFwdRule.IPAddress}}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: ipToUse}}
 	return status, nil
 }
 
@@ -197,6 +207,9 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 
 	gce.sharedResourceLock.Lock()
 	defer gce.sharedResourceLock.Unlock()
+
+	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): attempting delete of region internal address", loadBalancerName)
+	ensureAddressDeleted(gce, loadBalancerName, gce.region)
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting region internal forwarding rule", loadBalancerName)
 	if err := gce.DeleteRegionForwardingRule(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
@@ -306,9 +319,9 @@ func (gce *GCECloud) ensureInternalFirewall(fwName, fwDesc string, sourceRanges 
 	return gce.UpdateFirewall(expectedFirewall)
 }
 
-func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
+func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
 	// First firewall is for ingress traffic
-	fwDesc := makeFirewallDescription(nm.String(), svc.Spec.LoadBalancerIP)
+	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	sourceRanges, err := v1_service.GetLoadBalancerSourceRanges(svc)
 	if err != nil {
@@ -632,6 +645,20 @@ func (gce *GCECloud) getBackendServiceLink(name string) string {
 	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", gce.region, "backendServices", name}, "/")
 }
 
+// getInternalSubnetURL first attempts to return the configured SubnetURL.
+// If subnetwork-name was not specified, then a best-effort generation is made.
+// Note subnet names might not be the network name for some auto networks.
+func (gce *GCECloud) getInternalSubnetURL() string {
+	if gce.SubnetworkURL() != "" {
+		return gce.SubnetworkURL()
+	}
+
+	networkName := getNameFromLink(gce.NetworkURL())
+	v := gceSubnetworkURL("", gce.NetworkProjectID(), gce.Region(), networkName)
+	glog.Warningf("Generating subnetwork URL based off network since subnet name/URL was not configured: %q", v)
+	return v
+}
+
 func getNameFromLink(link string) string {
 	if link == "" {
 		return ""
@@ -639,4 +666,16 @@ func getNameFromLink(link string) string {
 
 	fields := strings.Split(link, "/")
 	return fields[len(fields)-1]
+}
+
+func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) string {
+	if svc.Spec.LoadBalancerIP != "" {
+		return svc.Spec.LoadBalancerIP
+	}
+
+	if fwdRule != nil {
+		return fwdRule.IPAddress
+	}
+
+	return ""
 }

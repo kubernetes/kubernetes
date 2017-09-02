@@ -1213,12 +1213,27 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		setDaemonSetToleration(ds, noScheduleTolerations)
 		manager, podControl, _ := newTestController(ds)
-
-		node := newNode("untainted", nil)
-		manager.nodeStore.Add(node)
+		addNodes(manager.nodeStore, 0, 1, nil)
 		manager.dsStore.Add(ds)
 
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+	}
+}
+
+// DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
+func TestDaemonSetRespectsTermination(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _ := newTestController(ds)
+
+		addNodes(manager.nodeStore, 0, 1, simpleNodeLabel)
+		pod := newPod(fmt.Sprintf("%s-", "node-0"), "node-0", simpleDaemonSetLabel, ds)
+		dt := metav1.Now()
+		pod.DeletionTimestamp = &dt
+		manager.podStore.Add(pod)
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1837,12 +1852,6 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 			newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
 			newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
 			newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
-			func() *v1.Pod {
-				pod := newPod("matching-owned-2-but-set-for-deletion", "node-2", simpleDaemonSetLabel, ds)
-				now := metav1.Now()
-				pod.DeletionTimestamp = &now
-				return pod
-			}(),
 		}
 		for _, pod := range ignoredPods {
 			manager.podStore.Add(pod)

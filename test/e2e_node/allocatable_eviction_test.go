@@ -59,7 +59,6 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			kubeReserved.Sub(resource.MustParse("300Mi"))
 			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.CgroupsPerQOS = true
 		})
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.

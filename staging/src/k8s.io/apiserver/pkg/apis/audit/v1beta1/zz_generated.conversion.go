@@ -158,6 +158,7 @@ func autoConvert_v1beta1_ObjectReference_To_audit_ObjectReference(in *ObjectRefe
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.UID = types.UID(in.UID)
+	out.APIGroup = in.APIGroup
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
 	out.Subresource = in.Subresource
@@ -174,6 +175,7 @@ func autoConvert_audit_ObjectReference_To_v1beta1_ObjectReference(in *audit.Obje
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.UID = types.UID(in.UID)
+	out.APIGroup = in.APIGroup
 	out.APIVersion = in.APIVersion
 	out.ResourceVersion = in.ResourceVersion
 	out.Subresource = in.Subresource

@@ -300,7 +300,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
 	}
 	if !notMnt {

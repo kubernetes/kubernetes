@@ -111,6 +111,10 @@
 			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
 		},
 		{
+			"ImportPath": "github.com/json-iterator/go",
+			"Rev": "36b14963da70d11297d313183d7e6388c8510e1e"
+		},
+		{
 			"ImportPath": "github.com/juju/ratelimit",
 			"Rev": "5b9ff866471762aa2ab2dced63c9fb6f53921342"
 		},
@@ -133,10 +137,6 @@
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
-		},
-		{
-			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2",

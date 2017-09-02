@@ -232,10 +232,15 @@ type ObjectReference struct {
 	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 	// +optional
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	// APIGroup is the name of the API group that contains the referred object.
+	// The empty string represents the core API group.
 	// +optional
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,5,opt,name=apiGroup"`
+	// APIVersion is the version of the API group that contains the referred object.
 	// +optional
-	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,6,opt,name=apiVersion"`
 	// +optional
-	Subresource string `json:"subresource,omitempty" protobuf:"bytes,7,opt,name=subresource"`
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,7,opt,name=resourceVersion"`
+	// +optional
+	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
 }

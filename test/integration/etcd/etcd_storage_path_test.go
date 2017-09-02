@@ -43,7 +43,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
-	kclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -655,6 +654,13 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 	storageConfigValue := atomic.Value{}
 
 	go func() {
+		// Catch panics that occur in this go routine so we get a comprehensible failure
+		defer func() {
+			if err := recover(); err != nil {
+				t.Errorf("Unexpected panic trying to start API master: %#v", err)
+			}
+		}()
+
 		for {
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
@@ -695,26 +701,35 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 				t.Log(err)
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Second)
 		}
 	}()
 
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		obj := kubeClientConfigValue.Load()
 		if obj == nil {
 			return false, nil
 		}
 		kubeClientConfig := kubeClientConfigValue.Load().(*restclient.Config)
-		kubeClient, err := kclient.NewForConfig(kubeClientConfig)
+		// make a copy so we can mutate it to set GroupVersion and NegotiatedSerializer
+		cfg := *kubeClientConfig
+		cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
+		cfg.ContentConfig.NegotiatedSerializer = kapi.Codecs
+		privilegedClient, err := restclient.RESTClientFor(&cfg)
 		if err != nil {
 			// this happens because we race the API server start
 			t.Log(err)
 			return false, nil
 		}
-		if _, err := kubeClient.Discovery().ServerVersion(); err != nil {
+		// wait for the server to be healthy
+		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		if errResult := result.Error(); errResult != nil {
+			t.Log(errResult)
 			return false, nil
 		}
-		return true, nil
+		var status int
+		result.StatusCode(&status)
+		return status == http.StatusOK, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
