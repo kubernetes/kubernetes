@@ -340,8 +340,7 @@ function do-node-upgrade() {
   for group in ${INSTANCE_GROUPS[@]}; do
     old_templates+=($(gcloud compute instance-groups managed list \
         --project="${PROJECT}" \
-        --zones="${ZONE}" \
-        --regexp="${group}" \
+        --filter="name ~ '${group}' AND zone:(${ZONE})" \
         --format='value(instanceTemplate)' || true))
     set_instance_template_out=$(gcloud compute instance-groups managed set-instance-template "${group}" \
       --template="${template_name}" \
