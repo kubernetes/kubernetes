@@ -48,6 +48,11 @@ func (apiServerStrategy) NamespaceScoped() bool {
 func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	apiservice := obj.(*apiregistration.APIService)
 	apiservice.Status = apiregistration.APIServiceStatus{}
+
+	// mark local API services as immediately available on create
+	if apiservice.Spec.Service == nil {
+		apiregistration.SetAPIServiceCondition(apiservice, apiregistration.NewLocalAvailableAPIServiceCondition())
+	}
 }
 
 func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
