@@ -595,6 +595,15 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
 			}
 		}
+
+		initialCapacity := kl.containerManager.GetCapacity()
+		if initialCapacity != nil {
+			for k, v := range initialCapacity {
+				if v1helper.IsExtendedResourceName(k) {
+					node.Status.Capacity[k] = v
+				}
+			}
+		}
 	}
 
 	// Set Allocatable.

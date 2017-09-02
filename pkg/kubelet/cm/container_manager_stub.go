@@ -19,6 +19,8 @@ package cm
 import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type containerManagerStub struct{}
@@ -64,6 +66,10 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
+}
+
+func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error) {
+	return &kubecontainer.RunContainerOptions{}, nil
 }
 
 func NewStubContainerManager() ContainerManager {
