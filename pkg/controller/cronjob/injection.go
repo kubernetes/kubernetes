@@ -216,11 +216,11 @@ type realPodControl struct {
 var _ podControlInterface = &realPodControl{}
 
 func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-	return r.KubeClient.Core().Pods(namespace).List(opts)
+	return r.KubeClient.CoreV1().Pods(namespace).List(opts)
 }
 
 func (r realPodControl) DeletePod(namespace string, name string) error {
-	return r.KubeClient.Core().Pods(namespace).Delete(name, nil)
+	return r.KubeClient.CoreV1().Pods(namespace).Delete(name, nil)
 }
 
 type fakePodControl struct {
@@ -235,6 +235,9 @@ var _ podControlInterface = &fakePodControl{}
 func (f *fakePodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
 	f.Lock()
 	defer f.Unlock()
+	if f.Err != nil {
+		return nil, f.Err
+	}
 	return &v1.PodList{Items: f.Pods}, nil
 }
 
