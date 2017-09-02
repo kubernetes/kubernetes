@@ -1551,6 +1551,9 @@ function start-kube-controller-manager {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
+  fi
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
