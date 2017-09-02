@@ -145,7 +145,7 @@ func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 		return "", err
 	}
 
-	return az.InstanceID(name)
+	return az.InstanceType(name)
 }
 
 // InstanceType returns the type of the specified instance.
