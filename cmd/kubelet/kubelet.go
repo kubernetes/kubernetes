@@ -97,7 +97,7 @@ func main() {
 
 	// start the experimental docker shim, if enabled
 	if kubeletFlags.ExperimentalDockershim {
-		if err := app.RunDockershim(kubeletConfig, &kubeletFlags.ContainerRuntimeOptions); err != nil {
+		if err := app.RunDockershim(kubeletFlags, kubeletConfig); err != nil {
 			die(err)
 		}
 	}
