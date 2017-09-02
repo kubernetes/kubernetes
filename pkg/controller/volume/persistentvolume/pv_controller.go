@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	addtionaltags "k8s.io/kubernetes/pkg/util/tags"
+	additionaltags "k8s.io/kubernetes/pkg/util/tags"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -1310,7 +1310,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	}
 
 	// Gather provisioning options
-	tags := addtionaltags.GetAdditionalTagsFromAnnotation(claim.Annotations, VolumeClaimAnnotationAdditionalTags)
+	tags := additionaltags.GetAdditionalTagsFromAnnotation(claim.Annotations, VolumeClaimAnnotationAdditionalTags)
 	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
 	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
 	tags[CloudVolumeCreatedForVolumeNameTag] = pvName

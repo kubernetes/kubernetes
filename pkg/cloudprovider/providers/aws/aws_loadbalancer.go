@@ -29,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	addtionaltags "k8s.io/kubernetes/pkg/util/tags"
+	additionaltags "k8s.io/kubernetes/pkg/util/tags"
 )
 
 const ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
@@ -59,7 +59,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
 
 		// Get additional tags set by the user
-		tags := addtionaltags.GetAdditionalTagsFromAnnotation(annotations, ServiceAnnotationLoadBalancerAdditionalTags)
+		tags := additionaltags.GetAdditionalTagsFromAnnotation(annotations, ServiceAnnotationLoadBalancerAdditionalTags)
 
 		// Add default tags
 		tags[TagNameKubernetesService] = namespacedName.String()
