@@ -448,6 +448,19 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
 	}
 
+	if attachablePlugin != nil {
+		if isNotMount, mountCheckErr := rc.mounter.IsLikelyNotMountPoint(volume.mountPath); mountCheckErr != nil {
+			return nil, fmt.Errorf("Could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				mountCheckErr)
+		} else if isNotMount {
+			return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
+		}
+	}
+
 	volumeMounter, newMounterErr := plugin.NewMounter(
 		volumeSpec,
 		pod,
@@ -531,7 +544,9 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 				glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
 				continue
 			}
+			glog.Infof("Volume: %v is mounted", volume.volumeName)
 		}
+
 		_, err = rc.desiredStateOfWorld.AddPodToVolume(volume.podName,
 			volume.pod,
 			volume.volumeSpec,
