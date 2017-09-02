@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Versioner abstracts setting and retrieving metadata fields from database response
@@ -185,4 +186,8 @@ type Interface interface {
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+
+	// BeginStaleWatch starts a background goroutine to monitor data in this storage, and re-write
+	// it if it is stale. Responds to the stale information provided by the underlying transformer.
+	BeginStaleWatch(newFunc func() runtime.Object, keyRootFunc func(genericapirequest.Context) string)
 }

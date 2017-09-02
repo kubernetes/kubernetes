@@ -1345,6 +1345,8 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		)
 	}
 
+	e.Storage.BeginStaleWatch(e.NewFunc, e.KeyRootFunc)
+
 	return nil
 }
 
