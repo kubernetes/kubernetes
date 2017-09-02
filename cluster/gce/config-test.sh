@@ -194,7 +194,7 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
-# To avoid running Calico on a node that is not configured appropriately, 
+# To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
@@ -366,6 +366,9 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"
 # TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
 # Optional: Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
+
+# Optional: duration of cluster signed certificates.
+CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-30m}"
 
 # Optional: enable pod priority
 ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"

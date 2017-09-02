@@ -867,6 +867,11 @@ EOF
 ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
 EOF
     fi
+    if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
+      cat >>$file <<EOF
+CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
+EOF
+    fi
 
   else
     # Node-only env vars.
