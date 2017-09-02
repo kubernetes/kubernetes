@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_APIVersion = map[string]string{
 	"":     "An APIVersion represents a single concrete version of an object model.",
-	"name": "Name of this version (e.g. 'v1').",
+	"name": "Version (e.g. 'v1').",
 }
 
 func (APIVersion) SwaggerDoc() map[string]string {
@@ -37,8 +37,8 @@ func (APIVersion) SwaggerDoc() map[string]string {
 }
 
 var map_AllowedHostPath = map[string]string{
-	"":           "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
-	"pathPrefix": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
+	"":           "Defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+	"pathPrefix": "Is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`",
 }
 
 func (AllowedHostPath) SwaggerDoc() map[string]string {
@@ -65,7 +65,7 @@ func (CustomMetricTarget) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSet = map[string]string{
-	"":         "DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for more information. DaemonSet represents the configuration of a daemon set.",
+	"":         "DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for more information. Represents the configuration of a daemon set.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 	"status":   "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
@@ -76,7 +76,7 @@ func (DaemonSet) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetList = map[string]string{
-	"":         "DaemonSetList is a collection of daemon sets.",
+	"":         "Collection of daemon sets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"items":    "A list of daemon sets.",
 }
@@ -86,7 +86,7 @@ func (DaemonSetList) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetSpec = map[string]string{
-	"":                     "DaemonSetSpec is the specification of a daemon set.",
+	"":                     "Specification of a daemon set.",
 	"selector":             "A label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 	"template":             "An object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 	"updateStrategy":       "An update strategy to replace existing DaemonSet pods with new pods.",
@@ -100,7 +100,7 @@ func (DaemonSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DaemonSetStatus = map[string]string{
-	"": "DaemonSetStatus represents the current status of a daemon set.",
+	"": "Represents the current status of a daemon set.",
 	"currentNumberScheduled": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"numberMisscheduled":     "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
 	"desiredNumberScheduled": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
@@ -126,7 +126,7 @@ func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"":         "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. Deployment enables declarative updates for Pods and ReplicaSets.",
+	"":         "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. It enables declarative updates for Pods and ReplicaSets.",
 	"metadata": "Standard object metadata.",
 	"spec":     "Specification of the desired behavior of the Deployment.",
 	"status":   "Most recently observed status of the Deployment.",
@@ -137,7 +137,7 @@ func (Deployment) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentCondition = map[string]string{
-	"":                   "DeploymentCondition describes the state of a deployment at a certain point.",
+	"":                   "Describes the state of a deployment at a certain point.",
 	"type":               "Type of deployment condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastUpdateTime":     "The last time this condition was updated.",
@@ -151,9 +151,9 @@ func (DeploymentCondition) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentList = map[string]string{
-	"":         "DeploymentList is a list of Deployments.",
+	"":         "List of Deployments.",
 	"metadata": "Standard list metadata.",
-	"items":    "Items is the list of Deployments.",
+	"items":    "List of Deployments.",
 }
 
 func (DeploymentList) SwaggerDoc() map[string]string {
@@ -161,9 +161,9 @@ func (DeploymentList) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentRollback = map[string]string{
-	"":                   "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
+	"":                   "DEPRECATED. Stores the information required to rollback a deployment.",
 	"name":               "Required: This must match the Name of a deployment.",
-	"updatedAnnotations": "The annotations to be updated to a deployment",
+	"updatedAnnotations": "The annotations to be updated to a deployment.",
 	"rollbackTo":         "The config of this deployment rollback.",
 }
 
@@ -172,10 +172,10 @@ func (DeploymentRollback) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentSpec = map[string]string{
-	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+	"":                        "Specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 	"selector":                "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-	"template":                "Template describes the pods that will be created.",
+	"template":                "Describes the pods that will be created.",
 	"strategy":                "The deployment strategy to use to replace existing pods with new ones.",
 	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified.",
@@ -189,7 +189,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStatus = map[string]string{
-	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"":                    "Most recently observed status of the Deployment.",
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
@@ -205,7 +205,7 @@ func (DeploymentStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStrategy = map[string]string{
-	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
+	"":              "Describes how to replace existing pods with new ones.",
 	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
 }
@@ -215,9 +215,9 @@ func (DeploymentStrategy) SwaggerDoc() map[string]string {
 }
 
 var map_FSGroupStrategyOptions = map[string]string{
-	"":       "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
-	"rule":   "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.",
-	"ranges": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
+	"":       "Defines the strategy type and options used to create the strategy.",
+	"rule":   "The strategy that will dictate what FSGroup is used in the SecurityContext.",
+	"ranges": "The allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.",
 }
 
 func (FSGroupStrategyOptions) SwaggerDoc() map[string]string {
@@ -225,9 +225,9 @@ func (FSGroupStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_HTTPIngressPath = map[string]string{
-	"":        "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
-	"path":    "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend.",
-	"backend": "Backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+	"":        "Associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
+	"path":    "An extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend.",
+	"backend": "Defines the referenced service endpoint to which the traffic will be forwarded to.",
 }
 
 func (HTTPIngressPath) SwaggerDoc() map[string]string {
@@ -235,7 +235,7 @@ func (HTTPIngressPath) SwaggerDoc() map[string]string {
 }
 
 var map_HTTPIngressRuleValue = map[string]string{
-	"":      "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://<host>/<path>?<searchpart> -> backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+	"":      "List of http selectors pointing to backends. In the example: http://<host>/<path>?<searchpart> -> backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
 	"paths": "A collection of paths that map requests to backends.",
 }
 
@@ -244,9 +244,9 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 }
 
 var map_HostPortRange = map[string]string{
-	"":    "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
-	"min": "min is the start of the range, inclusive.",
-	"max": "max is the end of the range, inclusive.",
+	"":    "Defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+	"min": "The start of the range, inclusive.",
+	"max": "The end of the range, inclusive.",
 }
 
 func (HostPortRange) SwaggerDoc() map[string]string {
@@ -254,9 +254,9 @@ func (HostPortRange) SwaggerDoc() map[string]string {
 }
 
 var map_IDRange = map[string]string{
-	"":    "ID Range provides a min/max of an allowed range of IDs.",
-	"min": "Min is the start of the range, inclusive.",
-	"max": "Max is the end of the range, inclusive.",
+	"":    "Provides a min/max of an allowed range of IDs.",
+	"min": "The start of the range, inclusive.",
+	"max": "The end of the range, inclusive.",
 }
 
 func (IDRange) SwaggerDoc() map[string]string {
@@ -264,9 +264,9 @@ func (IDRange) SwaggerDoc() map[string]string {
 }
 
 var map_IPBlock = map[string]string{
-	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
-	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\"",
-	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range",
+	"":       "Describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+	"cidr":   "String representing the IP Block Valid examples are \"192.168.1.1/24\"",
+	"except": "Slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range",
 }
 
 func (IPBlock) SwaggerDoc() map[string]string {
@@ -274,10 +274,10 @@ func (IPBlock) SwaggerDoc() map[string]string {
 }
 
 var map_Ingress = map[string]string{
-	"":         "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
+	"":         "Collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "Spec is the desired state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is the current state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"spec":     "Desired state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"status":   "Current state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 }
 
 func (Ingress) SwaggerDoc() map[string]string {
@@ -285,7 +285,7 @@ func (Ingress) SwaggerDoc() map[string]string {
 }
 
 var map_IngressBackend = map[string]string{
-	"":            "IngressBackend describes all endpoints for a given service and port.",
+	"":            "Describes all endpoints for a given service and port.",
 	"serviceName": "Specifies the name of the referenced service.",
 	"servicePort": "Specifies the port of the referenced service.",
 }
@@ -295,9 +295,9 @@ func (IngressBackend) SwaggerDoc() map[string]string {
 }
 
 var map_IngressList = map[string]string{
-	"":         "IngressList is a collection of Ingress.",
+	"":         "Collection of Ingress.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of Ingress.",
+	"items":    "List of Ingress.",
 }
 
 func (IngressList) SwaggerDoc() map[string]string {
@@ -305,8 +305,8 @@ func (IngressList) SwaggerDoc() map[string]string {
 }
 
 var map_IngressRule = map[string]string{
-	"":     "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
-	"host": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue.",
+	"":     "Represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
+	"host": "The fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue.",
 }
 
 func (IngressRule) SwaggerDoc() map[string]string {
@@ -314,7 +314,7 @@ func (IngressRule) SwaggerDoc() map[string]string {
 }
 
 var map_IngressRuleValue = map[string]string{
-	"": "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"": "Represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
 }
 
 func (IngressRuleValue) SwaggerDoc() map[string]string {
@@ -322,7 +322,7 @@ func (IngressRuleValue) SwaggerDoc() map[string]string {
 }
 
 var map_IngressSpec = map[string]string{
-	"":        "IngressSpec describes the Ingress the user wishes to exist.",
+	"":        "Describes the Ingress the user wishes to exist.",
 	"backend": "A default backend capable of servicing requests that don't match any rule. At least one of 'backend' or 'rules' must be specified. This field is optional to allow the loadbalancer controller or defaulting logic to specify a global default.",
 	"tls":     "TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI.",
 	"rules":   "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.",
@@ -333,8 +333,8 @@ func (IngressSpec) SwaggerDoc() map[string]string {
 }
 
 var map_IngressStatus = map[string]string{
-	"":             "IngressStatus describe the current state of the Ingress.",
-	"loadBalancer": "LoadBalancer contains the current status of the load-balancer.",
+	"":             "The current state of the Ingress.",
+	"loadBalancer": "Contains the current status of the load-balancer.",
 }
 
 func (IngressStatus) SwaggerDoc() map[string]string {
@@ -342,9 +342,9 @@ func (IngressStatus) SwaggerDoc() map[string]string {
 }
 
 var map_IngressTLS = map[string]string{
-	"":           "IngressTLS describes the transport layer security associated with an Ingress.",
-	"hosts":      "Hosts are a list of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified.",
-	"secretName": "SecretName is the name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing.",
+	"":           "Describes the transport layer security associated with an Ingress.",
+	"hosts":      "List of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified.",
+	"secretName": "Name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing.",
 }
 
 func (IngressTLS) SwaggerDoc() map[string]string {
@@ -352,7 +352,7 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkPolicy = map[string]string{
-	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
+	"":         "Describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
 }
@@ -372,7 +372,7 @@ func (NetworkPolicyEgressRule) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkPolicyIngressRule = map[string]string{
-	"":      "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+	"":      "Matches traffic if and only if the traffic matches both ports AND from.",
 	"ports": "List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
 	"from":  "List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least on item, this rule allows traffic only if the traffic matches at least one item in the from list.",
 }
@@ -382,9 +382,9 @@ func (NetworkPolicyIngressRule) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkPolicyList = map[string]string{
-	"":         "Network Policy List is a list of NetworkPolicy objects.",
+	"":         "List of NetworkPolicy objects.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of schema objects.",
+	"items":    "List of schema objects.",
 }
 
 func (NetworkPolicyList) SwaggerDoc() map[string]string {
@@ -394,7 +394,7 @@ func (NetworkPolicyList) SwaggerDoc() map[string]string {
 var map_NetworkPolicyPeer = map[string]string{
 	"podSelector":       "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
 	"namespaceSelector": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
-	"ipBlock":           "IPBlock defines policy on a particular IPBlock",
+	"ipBlock":           "Defines policy on a particular IPBlock",
 }
 
 func (NetworkPolicyPeer) SwaggerDoc() map[string]string {
@@ -422,9 +422,9 @@ func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicy = map[string]string{
-	"":         "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+	"":         "Governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "spec defines the policy enforced.",
+	"spec":     "Defines the policy enforced.",
 }
 
 func (PodSecurityPolicy) SwaggerDoc() map[string]string {
@@ -432,9 +432,9 @@ func (PodSecurityPolicy) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicyList = map[string]string{
-	"":         "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+	"":         "List of PodSecurityPolicy objects.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"items":    "Items is a list of schema objects.",
+	"items":    "List of schema objects.",
 }
 
 func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
@@ -442,24 +442,24 @@ func (PodSecurityPolicyList) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySpec = map[string]string{
-	"":                                "Pod Security Policy Spec defines the policy enforced.",
-	"privileged":                      "privileged determines if a pod can request to be run as privileged.",
-	"defaultAddCapabilities":          "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
-	"requiredDropCapabilities":        "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
-	"allowedCapabilities":             "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
-	"volumes":                         "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
-	"hostNetwork":                     "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.",
-	"hostPorts":                       "hostPorts determines which host port ranges are allowed to be exposed.",
-	"hostPID":                         "hostPID determines if the policy allows the use of HostPID in the pod spec.",
-	"hostIPC":                         "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
-	"seLinux":                         "seLinux is the strategy that will dictate the allowable labels that may be set.",
-	"runAsUser":                       "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
-	"supplementalGroups":              "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
-	"fsGroup":                         "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
-	"readOnlyRootFilesystem":          "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
-	"defaultAllowPrivilegeEscalation": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
-	"allowPrivilegeEscalation":        "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
-	"allowedHostPaths":                "is a white list of allowed host paths. Empty indicates that all host paths may be used.",
+	"":                                "Defines the policy enforced.",
+	"privileged":                      "Determines if a pod can request to be run as privileged.",
+	"defaultAddCapabilities":          "Default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
+	"requiredDropCapabilities":        "Capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.",
+	"allowedCapabilities":             "List of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.",
+	"volumes":                         "A white list of allowed volume plugins.  Empty indicates that all plugins may be used.",
+	"hostNetwork":                     "Determines if the policy allows the use of HostNetwork in the pod spec.",
+	"hostPorts":                       "Determines which host port ranges are allowed to be exposed.",
+	"hostPID":                         "Determines if the policy allows the use of HostPID in the pod spec.",
+	"hostIPC":                         "Determines if the policy allows the use of HostIPC in the pod spec.",
+	"seLinux":                         "The strategy that will dictate the allowable labels that may be set.",
+	"runAsUser":                       "The strategy that will dictate the allowable RunAsUser values that may be set.",
+	"supplementalGroups":              "The strategy that will dictate what supplemental groups are used by the SecurityContext.",
+	"fsGroup":                         "The strategy that will dictate what fs group is used by the SecurityContext.",
+	"readOnlyRootFilesystem":          "When set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
+	"defaultAllowPrivilegeEscalation": "Controls the default setting for whether a process can gain more privileges than its parent process.",
+	"allowPrivilegeEscalation":        "Determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
+	"allowedHostPaths":                "Is a white list of allowed host paths. Empty indicates that all host paths may be used.",
 }
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
@@ -467,10 +467,10 @@ func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSet = map[string]string{
-	"":         "DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for more information. ReplicaSet ensures that a specified number of pod replicas are running at any given time.",
+	"":         "DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for more information. Ensures that a specified number of pod replicas are running at any given time.",
 	"metadata": "If the Labels of a ReplicaSet are empty, they are defaulted to be the same as the Pod(s) that the ReplicaSet manages. Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"spec":     "Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
-	"status":   "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"spec":     "Defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+	"status":   "Is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
 }
 
 func (ReplicaSet) SwaggerDoc() map[string]string {
@@ -478,7 +478,7 @@ func (ReplicaSet) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetCondition = map[string]string{
-	"":                   "ReplicaSetCondition describes the state of a replica set at a certain point.",
+	"":                   "Describes the state of a replica set at a certain point.",
 	"type":               "Type of replica set condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
@@ -491,7 +491,7 @@ func (ReplicaSetCondition) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetList = map[string]string{
-	"":         "ReplicaSetList is a collection of ReplicaSets.",
+	"":         "Collection of ReplicaSets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller",
 }
@@ -501,11 +501,11 @@ func (ReplicaSetList) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetSpec = map[string]string{
-	"":                "ReplicaSetSpec is the specification of a ReplicaSet.",
-	"replicas":        "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+	"":                "Specification of a ReplicaSet.",
+	"replicas":        "Number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"minReadySeconds": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
-	"selector":        "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
-	"template":        "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+	"selector":        "A label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+	"template":        "The object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
 }
 
 func (ReplicaSetSpec) SwaggerDoc() map[string]string {
@@ -513,12 +513,12 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetStatus = map[string]string{
-	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
-	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+	"":                     "Represents the current status of a ReplicaSet.",
+	"replicas":             "The most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
 	"readyReplicas":        "The number of ready replicas for this replica set.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
-	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
+	"observedGeneration":   "Reflects the generation of the most recently observed ReplicaSet.",
 	"conditions":           "Represents the latest available observations of a replica set's current state.",
 }
 
@@ -527,7 +527,7 @@ func (ReplicaSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicationControllerDummy = map[string]string{
-	"": "Dummy definition",
+	"": "Dummy definition.",
 }
 
 func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
@@ -563,9 +563,9 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 }
 
 var map_RunAsUserStrategyOptions = map[string]string{
-	"":       "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
-	"rule":   "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
-	"ranges": "Ranges are the allowed ranges of uids that may be used.",
+	"":       "Defines the strategy type and any options used to create the strategy.",
+	"rule":   "Strategy that will dictate the allowable RunAsUser values that may be set.",
+	"ranges": "Allowed ranges of uids that may be used.",
 }
 
 func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
@@ -573,8 +573,8 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_SELinuxStrategyOptions = map[string]string{
-	"":               "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
-	"rule":           "type is the strategy that will dictate the allowable labels that may be set.",
+	"":               "Defines the strategy type and any options used to create the strategy.",
+	"rule":           "The strategy that will dictate the allowable labels that may be set.",
 	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
 }
 
@@ -583,10 +583,10 @@ func (SELinuxStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_Scale = map[string]string{
-	"":         "represents a scaling request for a resource.",
+	"":         "Represents a scaling request for a resource.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
-	"spec":     "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
-	"status":   "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.",
+	"spec":     "Defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
+	"status":   "Current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.",
 }
 
 func (Scale) SwaggerDoc() map[string]string {
@@ -594,7 +594,7 @@ func (Scale) SwaggerDoc() map[string]string {
 }
 
 var map_ScaleSpec = map[string]string{
-	"":         "describes the attributes of a scale subresource",
+	"":         "Describes the attributes of a scale subresource.",
 	"replicas": "desired number of instances for the scaled object.",
 }
 
@@ -603,10 +603,10 @@ func (ScaleSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ScaleStatus = map[string]string{
-	"":               "represents the current status of a scale subresource.",
-	"replicas":       "actual number of observed instances of the scaled object.",
-	"selector":       "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-	"targetSelector": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+	"":               "Represents the current status of a scale subresource.",
+	"replicas":       "Actual number of observed instances of the scaled object.",
+	"selector":       "Label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors.",
+	"targetSelector": "Label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 }
 
 func (ScaleStatus) SwaggerDoc() map[string]string {
@@ -614,9 +614,9 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 }
 
 var map_SupplementalGroupsStrategyOptions = map[string]string{
-	"":       "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
-	"rule":   "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.",
-	"ranges": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
+	"":       "Defines the strategy type and options used to create the strategy.",
+	"rule":   "The strategy that will dictate what supplemental groups is used in the SecurityContext.",
+	"ranges": "The allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.",
 }
 
 func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
@@ -624,10 +624,10 @@ func (SupplementalGroupsStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ThirdPartyResource = map[string]string{
-	"":            "A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
-	"metadata":    "Standard object metadata",
-	"description": "Description is the description of this object.",
-	"versions":    "Versions are versions for this third party object",
+	"":            "A generic representation of a resource, it is used by add-ons and plugins to add new resource types to the API.  It consists of one or more Versions of the api.",
+	"metadata":    "Standard object metadata.",
+	"description": "Description of this object.",
+	"versions":    "Versions for this third party object.",
 }
 
 func (ThirdPartyResource) SwaggerDoc() map[string]string {
@@ -637,7 +637,7 @@ func (ThirdPartyResource) SwaggerDoc() map[string]string {
 var map_ThirdPartyResourceData = map[string]string{
 	"":         "An internal object, used for versioned storage in etcd.  Not exposed to the end user.",
 	"metadata": "Standard object metadata.",
-	"data":     "Data is the raw JSON data for this data.",
+	"data":     "Raw JSON data for this data.",
 }
 
 func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
@@ -645,9 +645,9 @@ func (ThirdPartyResourceData) SwaggerDoc() map[string]string {
 }
 
 var map_ThirdPartyResourceDataList = map[string]string{
-	"":         "ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.",
+	"":         "List of ThirdPartyResourceData.",
 	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
-	"items":    "Items is the list of ThirdpartyResourceData.",
+	"items":    "List of ThirdpartyResourceData.",
 }
 
 func (ThirdPartyResourceDataList) SwaggerDoc() map[string]string {
@@ -655,9 +655,9 @@ func (ThirdPartyResourceDataList) SwaggerDoc() map[string]string {
 }
 
 var map_ThirdPartyResourceList = map[string]string{
-	"":         "ThirdPartyResourceList is a list of ThirdPartyResources.",
+	"":         "List of ThirdPartyResources.",
 	"metadata": "Standard list metadata.",
-	"items":    "Items is the list of ThirdPartyResources.",
+	"items":    "List of ThirdPartyResources.",
 }
 
 func (ThirdPartyResourceList) SwaggerDoc() map[string]string {

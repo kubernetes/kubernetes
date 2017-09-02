@@ -6850,7 +6850,7 @@
   "models": {
    "v1beta1.DaemonSetList": {
     "id": "v1beta1.DaemonSetList",
-    "description": "DaemonSetList is a collection of daemon sets.",
+    "description": "Collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -6896,7 +6896,7 @@
    },
    "v1beta1.DaemonSet": {
     "id": "v1beta1.DaemonSet",
-    "description": "DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for more information. DaemonSet represents the configuration of a daemon set.",
+    "description": "DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for more information. Represents the configuration of a daemon set.",
     "properties": {
      "kind": {
       "type": "string",
@@ -7160,7 +7160,7 @@
    },
    "v1beta1.DaemonSetSpec": {
     "id": "v1beta1.DaemonSetSpec",
-    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "description": "Specification of a daemon set.",
     "required": [
      "template"
     ],
@@ -9246,7 +9246,7 @@
    },
    "v1beta1.DaemonSetStatus": {
     "id": "v1beta1.DaemonSetStatus",
-    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "description": "Represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -9372,7 +9372,7 @@
    },
    "v1beta1.DeploymentList": {
     "id": "v1beta1.DeploymentList",
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "List of Deployments.",
     "required": [
      "items"
     ],
@@ -9394,13 +9394,13 @@
       "items": {
        "$ref": "v1beta1.Deployment"
       },
-      "description": "Items is the list of Deployments."
+      "description": "List of Deployments."
      }
     }
    },
    "v1beta1.Deployment": {
     "id": "v1beta1.Deployment",
-    "description": "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. It enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9426,7 +9426,7 @@
    },
    "v1beta1.DeploymentSpec": {
     "id": "v1beta1.DeploymentSpec",
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "Specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -9442,7 +9442,7 @@
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template describes the pods that will be created."
+      "description": "Describes the pods that will be created."
      },
      "strategy": {
       "$ref": "v1beta1.DeploymentStrategy",
@@ -9475,7 +9475,7 @@
    },
    "v1beta1.DeploymentStrategy": {
     "id": "v1beta1.DeploymentStrategy",
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "Describes how to replace existing pods with new ones.",
     "properties": {
      "type": {
       "type": "string",
@@ -9514,7 +9514,7 @@
    },
    "v1beta1.DeploymentStatus": {
     "id": "v1beta1.DeploymentStatus",
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "Most recently observed status of the Deployment.",
     "properties": {
      "observedGeneration": {
       "type": "integer",
@@ -9562,7 +9562,7 @@
    },
    "v1beta1.DeploymentCondition": {
     "id": "v1beta1.DeploymentCondition",
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "Describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -9596,7 +9596,7 @@
    },
    "v1beta1.DeploymentRollback": {
     "id": "v1beta1.DeploymentRollback",
-    "description": "DEPRECATED. DeploymentRollback stores the information required to rollback a deployment.",
+    "description": "DEPRECATED. Stores the information required to rollback a deployment.",
     "required": [
      "name",
      "rollbackTo"
@@ -9616,7 +9616,7 @@
      },
      "updatedAnnotations": {
       "type": "object",
-      "description": "The annotations to be updated to a deployment"
+      "description": "The annotations to be updated to a deployment."
      },
      "rollbackTo": {
       "$ref": "v1beta1.RollbackConfig",
@@ -9626,7 +9626,7 @@
    },
    "v1beta1.Scale": {
     "id": "v1beta1.Scale",
-    "description": "represents a scaling request for a resource.",
+    "description": "Represents a scaling request for a resource.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9642,17 +9642,17 @@
      },
      "spec": {
       "$ref": "v1beta1.ScaleSpec",
-      "description": "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status."
+      "description": "Defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status."
      },
      "status": {
       "$ref": "v1beta1.ScaleStatus",
-      "description": "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only."
+      "description": "Current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only."
      }
     }
    },
    "v1beta1.ScaleSpec": {
     "id": "v1beta1.ScaleSpec",
-    "description": "describes the attributes of a scale subresource",
+    "description": "Describes the attributes of a scale subresource.",
     "properties": {
      "replicas": {
       "type": "integer",
@@ -9663,7 +9663,7 @@
    },
    "v1beta1.ScaleStatus": {
     "id": "v1beta1.ScaleStatus",
-    "description": "represents the current status of a scale subresource.",
+    "description": "Represents the current status of a scale subresource.",
     "required": [
      "replicas"
     ],
@@ -9671,21 +9671,21 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "actual number of observed instances of the scaled object."
+      "description": "Actual number of observed instances of the scaled object."
      },
      "selector": {
       "type": "object",
-      "description": "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
+      "description": "Label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors."
      },
      "targetSelector": {
       "type": "string",
-      "description": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
+      "description": "Label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
      }
     }
    },
    "v1beta1.IngressList": {
     "id": "v1beta1.IngressList",
-    "description": "IngressList is a collection of Ingress.",
+    "description": "Collection of Ingress.",
     "required": [
      "items"
     ],
@@ -9707,13 +9707,13 @@
       "items": {
        "$ref": "v1beta1.Ingress"
       },
-      "description": "Items is the list of Ingress."
+      "description": "List of Ingress."
      }
     }
    },
    "v1beta1.Ingress": {
     "id": "v1beta1.Ingress",
-    "description": "Ingress is a collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
+    "description": "Collection of rules that allow inbound connections to reach the endpoints defined by a backend. An Ingress can be configured to give services externally-reachable urls, load balance traffic, terminate SSL, offer name based virtual hosting etc.",
     "properties": {
      "kind": {
       "type": "string",
@@ -9729,17 +9729,17 @@
      },
      "spec": {
       "$ref": "v1beta1.IngressSpec",
-      "description": "Spec is the desired state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
+      "description": "Desired state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta1.IngressStatus",
-      "description": "Status is the current state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
+      "description": "Current state of the Ingress. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
      }
     }
    },
    "v1beta1.IngressSpec": {
     "id": "v1beta1.IngressSpec",
-    "description": "IngressSpec describes the Ingress the user wishes to exist.",
+    "description": "Describes the Ingress the user wishes to exist.",
     "properties": {
      "backend": {
       "$ref": "v1beta1.IngressBackend",
@@ -9763,7 +9763,7 @@
    },
    "v1beta1.IngressBackend": {
     "id": "v1beta1.IngressBackend",
-    "description": "IngressBackend describes all endpoints for a given service and port.",
+    "description": "Describes all endpoints for a given service and port.",
     "required": [
      "serviceName",
      "servicePort"
@@ -9781,28 +9781,28 @@
    },
    "v1beta1.IngressTLS": {
     "id": "v1beta1.IngressTLS",
-    "description": "IngressTLS describes the transport layer security associated with an Ingress.",
+    "description": "Describes the transport layer security associated with an Ingress.",
     "properties": {
      "hosts": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Hosts are a list of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified."
+      "description": "List of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified."
      },
      "secretName": {
       "type": "string",
-      "description": "SecretName is the name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing."
+      "description": "Name of the secret used to terminate SSL traffic on 443. Field is left optional to allow SSL routing based on SNI hostname alone. If the SNI host in a listener conflicts with the \"Host\" header field used by an IngressRule, the SNI host is used for termination and value of the Host header is used for routing."
      }
     }
    },
    "v1beta1.IngressRule": {
     "id": "v1beta1.IngressRule",
-    "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
+    "description": "Represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
     "properties": {
      "host": {
       "type": "string",
-      "description": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue."
+      "description": "The fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in the RFC: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the\n\t  IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue."
      },
      "http": {
       "$ref": "v1beta1.HTTPIngressRuleValue"
@@ -9811,7 +9811,7 @@
    },
    "v1beta1.HTTPIngressRuleValue": {
     "id": "v1beta1.HTTPIngressRuleValue",
-    "description": "HTTPIngressRuleValue is a list of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
+    "description": "List of http selectors pointing to backends. In the example: http://\u003chost\u003e/\u003cpath\u003e?\u003csearchpart\u003e -\u003e backend where where parts of the url correspond to RFC 3986, this resource will be used to match against everything after the last '/' and before the first '?' or '#'.",
     "required": [
      "paths"
     ],
@@ -9827,28 +9827,28 @@
    },
    "v1beta1.HTTPIngressPath": {
     "id": "v1beta1.HTTPIngressPath",
-    "description": "HTTPIngressPath associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
+    "description": "Associates a path regex with a backend. Incoming urls matching the path are forwarded to the backend.",
     "required": [
      "backend"
     ],
     "properties": {
      "path": {
       "type": "string",
-      "description": "Path is an extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
+      "description": "An extended POSIX regex as defined by IEEE Std 1003.1, (i.e this follows the egrep/unix syntax, not the perl syntax) matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. If unspecified, the path defaults to a catch all sending traffic to the backend."
      },
      "backend": {
       "$ref": "v1beta1.IngressBackend",
-      "description": "Backend defines the referenced service endpoint to which the traffic will be forwarded to."
+      "description": "Defines the referenced service endpoint to which the traffic will be forwarded to."
      }
     }
    },
    "v1beta1.IngressStatus": {
     "id": "v1beta1.IngressStatus",
-    "description": "IngressStatus describe the current state of the Ingress.",
+    "description": "The current state of the Ingress.",
     "properties": {
      "loadBalancer": {
       "$ref": "v1.LoadBalancerStatus",
-      "description": "LoadBalancer contains the current status of the load-balancer."
+      "description": "Contains the current status of the load-balancer."
      }
     }
    },
@@ -9881,7 +9881,7 @@
    },
    "v1beta1.NetworkPolicyList": {
     "id": "v1beta1.NetworkPolicyList",
-    "description": "Network Policy List is a list of NetworkPolicy objects.",
+    "description": "List of NetworkPolicy objects.",
     "required": [
      "items"
     ],
@@ -9903,13 +9903,13 @@
       "items": {
        "$ref": "v1beta1.NetworkPolicy"
       },
-      "description": "Items is a list of schema objects."
+      "description": "List of schema objects."
      }
     }
    },
    "v1beta1.NetworkPolicy": {
     "id": "v1beta1.NetworkPolicy",
-    "description": "NetworkPolicy describes what network traffic is allowed for a set of Pods",
+    "description": "Describes what network traffic is allowed for a set of Pods",
     "properties": {
      "kind": {
       "type": "string",
@@ -9964,7 +9964,7 @@
    },
    "v1beta1.NetworkPolicyIngressRule": {
     "id": "v1beta1.NetworkPolicyIngressRule",
-    "description": "This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.",
+    "description": "Matches traffic if and only if the traffic matches both ports AND from.",
     "properties": {
      "ports": {
       "type": "array",
@@ -10012,27 +10012,27 @@
      },
      "ipBlock": {
       "$ref": "v1beta1.IPBlock",
-      "description": "IPBlock defines policy on a particular IPBlock"
+      "description": "Defines policy on a particular IPBlock"
      }
     }
    },
    "v1beta1.IPBlock": {
     "id": "v1beta1.IPBlock",
-    "description": "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+    "description": "Describes a particular CIDR (Ex. \"192.168.1.1/24\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
     "required": [
      "cidr"
     ],
     "properties": {
      "cidr": {
       "type": "string",
-      "description": "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\""
+      "description": "String representing the IP Block Valid examples are \"192.168.1.1/24\""
      },
      "except": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range"
+      "description": "Slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" Except values will be rejected if they are outside the CIDR range"
      }
     }
    },
@@ -10062,7 +10062,7 @@
    },
    "v1beta1.PodSecurityPolicyList": {
     "id": "v1beta1.PodSecurityPolicyList",
-    "description": "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+    "description": "List of PodSecurityPolicy objects.",
     "required": [
      "items"
     ],
@@ -10084,13 +10084,13 @@
       "items": {
        "$ref": "v1beta1.PodSecurityPolicy"
       },
-      "description": "Items is a list of schema objects."
+      "description": "List of schema objects."
      }
     }
    },
    "v1beta1.PodSecurityPolicy": {
     "id": "v1beta1.PodSecurityPolicy",
-    "description": "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "description": "Governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
     "properties": {
      "kind": {
       "type": "string",
@@ -10106,13 +10106,13 @@
      },
      "spec": {
       "$ref": "v1beta1.PodSecurityPolicySpec",
-      "description": "spec defines the policy enforced."
+      "description": "Defines the policy enforced."
      }
     }
    },
    "v1beta1.PodSecurityPolicySpec": {
     "id": "v1beta1.PodSecurityPolicySpec",
-    "description": "Pod Security Policy Spec defines the policy enforced.",
+    "description": "Defines the policy enforced.",
     "required": [
      "seLinux",
      "runAsUser",
@@ -10122,89 +10122,89 @@
     "properties": {
      "privileged": {
       "type": "boolean",
-      "description": "privileged determines if a pod can request to be run as privileged."
+      "description": "Determines if a pod can request to be run as privileged."
      },
      "defaultAddCapabilities": {
       "type": "array",
       "items": {
        "$ref": "v1.Capability"
       },
-      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities."
+      "description": "Default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities."
      },
      "requiredDropCapabilities": {
       "type": "array",
       "items": {
        "$ref": "v1.Capability"
       },
-      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added."
+      "description": "Capabilities that will be dropped from the container.  These are required to be dropped and cannot be added."
      },
      "allowedCapabilities": {
       "type": "array",
       "items": {
        "$ref": "v1.Capability"
       },
-      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities."
+      "description": "List of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities."
      },
      "volumes": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.FSType"
       },
-      "description": "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used."
+      "description": "A white list of allowed volume plugins.  Empty indicates that all plugins may be used."
      },
      "hostNetwork": {
       "type": "boolean",
-      "description": "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec."
+      "description": "Determines if the policy allows the use of HostNetwork in the pod spec."
      },
      "hostPorts": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.HostPortRange"
       },
-      "description": "hostPorts determines which host port ranges are allowed to be exposed."
+      "description": "Determines which host port ranges are allowed to be exposed."
      },
      "hostPID": {
       "type": "boolean",
-      "description": "hostPID determines if the policy allows the use of HostPID in the pod spec."
+      "description": "Determines if the policy allows the use of HostPID in the pod spec."
      },
      "hostIPC": {
       "type": "boolean",
-      "description": "hostIPC determines if the policy allows the use of HostIPC in the pod spec."
+      "description": "Determines if the policy allows the use of HostIPC in the pod spec."
      },
      "seLinux": {
       "$ref": "v1beta1.SELinuxStrategyOptions",
-      "description": "seLinux is the strategy that will dictate the allowable labels that may be set."
+      "description": "The strategy that will dictate the allowable labels that may be set."
      },
      "runAsUser": {
       "$ref": "v1beta1.RunAsUserStrategyOptions",
-      "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set."
+      "description": "The strategy that will dictate the allowable RunAsUser values that may be set."
      },
      "supplementalGroups": {
       "$ref": "v1beta1.SupplementalGroupsStrategyOptions",
-      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
+      "description": "The strategy that will dictate what supplemental groups are used by the SecurityContext."
      },
      "fsGroup": {
       "$ref": "v1beta1.FSGroupStrategyOptions",
-      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext."
+      "description": "The strategy that will dictate what fs group is used by the SecurityContext."
      },
      "readOnlyRootFilesystem": {
       "type": "boolean",
-      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to."
+      "description": "When set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to."
      },
      "defaultAllowPrivilegeEscalation": {
       "type": "boolean",
-      "description": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process."
+      "description": "Controls the default setting for whether a process can gain more privileges than its parent process."
      },
      "allowPrivilegeEscalation": {
       "type": "boolean",
-      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true."
+      "description": "Determines if a pod can request to allow privilege escalation. If unspecified, defaults to true."
      },
      "allowedHostPaths": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.AllowedHostPath"
       },
-      "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used."
+      "description": "Is a white list of allowed host paths. Empty indicates that all host paths may be used."
      }
     }
    },
@@ -10214,7 +10214,7 @@
    },
    "v1beta1.HostPortRange": {
     "id": "v1beta1.HostPortRange",
-    "description": "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "description": "Defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
     "required": [
      "min",
      "max"
@@ -10223,25 +10223,25 @@
      "min": {
       "type": "integer",
       "format": "int32",
-      "description": "min is the start of the range, inclusive."
+      "description": "The start of the range, inclusive."
      },
      "max": {
       "type": "integer",
       "format": "int32",
-      "description": "max is the end of the range, inclusive."
+      "description": "The end of the range, inclusive."
      }
     }
    },
    "v1beta1.SELinuxStrategyOptions": {
     "id": "v1beta1.SELinuxStrategyOptions",
-    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "Defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
     "properties": {
      "rule": {
       "type": "string",
-      "description": "type is the strategy that will dictate the allowable labels that may be set."
+      "description": "The strategy that will dictate the allowable labels that may be set."
      },
      "seLinuxOptions": {
       "$ref": "v1.SELinuxOptions",
@@ -10251,27 +10251,27 @@
    },
    "v1beta1.RunAsUserStrategyOptions": {
     "id": "v1beta1.RunAsUserStrategyOptions",
-    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "Defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
     "properties": {
      "rule": {
       "type": "string",
-      "description": "Rule is the strategy that will dictate the allowable RunAsUser values that may be set."
+      "description": "Strategy that will dictate the allowable RunAsUser values that may be set."
      },
      "ranges": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.IDRange"
       },
-      "description": "Ranges are the allowed ranges of uids that may be used."
+      "description": "Allowed ranges of uids that may be used."
      }
     }
    },
    "v1beta1.IDRange": {
     "id": "v1beta1.IDRange",
-    "description": "ID Range provides a min/max of an allowed range of IDs.",
+    "description": "Provides a min/max of an allowed range of IDs.",
     "required": [
      "min",
      "max"
@@ -10280,62 +10280,62 @@
      "min": {
       "type": "integer",
       "format": "int64",
-      "description": "Min is the start of the range, inclusive."
+      "description": "The start of the range, inclusive."
      },
      "max": {
       "type": "integer",
       "format": "int64",
-      "description": "Max is the end of the range, inclusive."
+      "description": "The end of the range, inclusive."
      }
     }
    },
    "v1beta1.SupplementalGroupsStrategyOptions": {
     "id": "v1beta1.SupplementalGroupsStrategyOptions",
-    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "Defines the strategy type and options used to create the strategy.",
     "properties": {
      "rule": {
       "type": "string",
-      "description": "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext."
+      "description": "The strategy that will dictate what supplemental groups is used in the SecurityContext."
      },
      "ranges": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.IDRange"
       },
-      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end."
+      "description": "The allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end."
      }
     }
    },
    "v1beta1.FSGroupStrategyOptions": {
     "id": "v1beta1.FSGroupStrategyOptions",
-    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "Defines the strategy type and options used to create the strategy.",
     "properties": {
      "rule": {
       "type": "string",
-      "description": "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext."
+      "description": "The strategy that will dictate what FSGroup is used in the SecurityContext."
      },
      "ranges": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.IDRange"
       },
-      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
+      "description": "The allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
      }
     }
    },
    "v1beta1.AllowedHostPath": {
     "id": "v1beta1.AllowedHostPath",
-    "description": "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "description": "Defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
     "properties": {
      "pathPrefix": {
       "type": "string",
-      "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
+      "description": "Is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
      }
     }
    },
    "v1beta1.ReplicaSetList": {
     "id": "v1beta1.ReplicaSetList",
-    "description": "ReplicaSetList is a collection of ReplicaSets.",
+    "description": "Collection of ReplicaSets.",
     "required": [
      "items"
     ],
@@ -10363,7 +10363,7 @@
    },
    "v1beta1.ReplicaSet": {
     "id": "v1beta1.ReplicaSet",
-    "description": "DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for more information. ReplicaSet ensures that a specified number of pod replicas are running at any given time.",
+    "description": "DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for more information. Ensures that a specified number of pod replicas are running at any given time.",
     "properties": {
      "kind": {
       "type": "string",
@@ -10379,22 +10379,22 @@
      },
      "spec": {
       "$ref": "v1beta1.ReplicaSetSpec",
-      "description": "Spec defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
+      "description": "Defines the specification of the desired behavior of the ReplicaSet. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta1.ReplicaSetStatus",
-      "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
+      "description": "Is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status"
      }
     }
    },
    "v1beta1.ReplicaSetSpec": {
     "id": "v1beta1.ReplicaSetSpec",
-    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "Specification of a ReplicaSet.",
     "properties": {
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller"
+      "description": "Number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller"
      },
      "minReadySeconds": {
       "type": "integer",
@@ -10403,17 +10403,17 @@
      },
      "selector": {
       "$ref": "v1.LabelSelector",
-      "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
+      "description": "A label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
      },
      "template": {
       "$ref": "v1.PodTemplateSpec",
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template"
+      "description": "The object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template"
      }
     }
    },
    "v1beta1.ReplicaSetStatus": {
     "id": "v1beta1.ReplicaSetStatus",
-    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "Represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
     ],
@@ -10421,7 +10421,7 @@
      "replicas": {
       "type": "integer",
       "format": "int32",
-      "description": "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller"
+      "description": "The most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller"
      },
      "fullyLabeledReplicas": {
       "type": "integer",
@@ -10441,7 +10441,7 @@
      "observedGeneration": {
       "type": "integer",
       "format": "int64",
-      "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
+      "description": "Reflects the generation of the most recently observed ReplicaSet."
      },
      "conditions": {
       "type": "array",
@@ -10454,7 +10454,7 @@
    },
    "v1beta1.ReplicaSetCondition": {
     "id": "v1beta1.ReplicaSetCondition",
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "Describes the state of a replica set at a certain point.",
     "required": [
      "type",
      "status"
