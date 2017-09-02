@@ -115,9 +115,6 @@ func GetHollowKubeletConfig(
 		CloudProvider:    kubeletv1alpha1.AutoDetectCloudProvider,
 		// Use the default runtime options.
 		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
-		MinimumGCAge:            metav1.Duration{Duration: 1 * time.Minute},
-		MaxContainerCount:       100,
-		MaxPerPodContainerCount: 2,
 		RegisterSchedulable:     true,
 	}
 

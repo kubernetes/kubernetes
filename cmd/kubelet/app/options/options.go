@@ -140,15 +140,6 @@ type KubeletFlags struct {
 	ExperimentalQOSReserved kubeletconfig.ConfigurationMap
 
 	// DEPRECATED FLAGS
-	// minimumGCAge is the minimum age for a finished container before it is
-	// garbage collected.
-	MinimumGCAge metav1.Duration
-	// maxPerPodContainerCount is the maximum number of old instances to
-	// retain per container. Each container takes up some disk space.
-	MaxPerPodContainerCount int32
-	// maxContainerCount is the maximum number of old instances of containers
-	// to retain globally. Each container takes up some disk space.
-	MaxContainerCount int32
 	// masterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
@@ -182,9 +173,6 @@ func NewKubeletFlags() *KubeletFlags {
 		CertDirectory:                       "/var/run/kubernetes",
 		RootDirectory:                       v1alpha1.DefaultRootDir,
 		MasterServiceNamespace:              metav1.NamespaceDefault,
-		MaxContainerCount:                   -1,
-		MaxPerPodContainerCount:             1,
-		MinimumGCAge:                        metav1.Duration{Duration: 0},
 		NonMasqueradeCIDR:                   "10.0.0.0/8",
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
@@ -314,12 +302,6 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&f.ExperimentalQOSReserved, "experimental-qos-reserved", "A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe how pod resource requests are reserved at the QoS level. Currently only memory is supported. [default=none]")
 
 	// DEPRECATED FLAGS
-	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
-	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
-	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
-	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.StringVar(&f.MasterServiceNamespace, "master-service-namespace", f.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")
 	fs.BoolVar(&f.RegisterSchedulable, "register-schedulable", f.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
