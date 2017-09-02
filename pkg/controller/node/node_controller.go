@@ -44,7 +44,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/node/ipam"
@@ -488,7 +487,7 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				zone := utilnode.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
 			}
-			_, condition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+			_, condition := utilnode.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
 			oppositeTaint := v1.Taint{}
@@ -869,7 +868,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	var err error
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
-	_, currentReadyCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, currentReadyCondition := utilnode.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -909,9 +908,9 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *v1.NodeCondition
 	if found {
-		_, savedCondition = v1node.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
+		_, savedCondition = utilnode.GetNodeCondition(&savedNodeStatus.status, v1.NodeReady)
 	}
-	_, observedCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+	_, observedCondition := utilnode.GetNodeCondition(&node.Status, v1.NodeReady)
 	if !found {
 		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
 		savedNodeStatus = nodeStatusData{
@@ -993,7 +992,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		nowTimestamp := nc.now()
 		for _, nodeConditionType := range remainingNodeConditionTypes {
-			_, currentCondition := v1node.GetNodeCondition(&node.Status, nodeConditionType)
+			_, currentCondition := utilnode.GetNodeCondition(&node.Status, nodeConditionType)
 			if currentCondition == nil {
 				glog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
 				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
@@ -1016,7 +1015,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 			}
 		}
 
-		_, currentCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
+		_, currentCondition := utilnode.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
 			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
