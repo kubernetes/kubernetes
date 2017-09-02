@@ -67,6 +67,9 @@ type Interface interface {
 	// GetDeviceNameFromMount finds the device name by checking the mount path
 	// to get the global mount path which matches its plugin directory
 	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
+	// MakeRShared checks that given path is on a mount with 'rshared' mount
+	// propagation. If not, it bind-mounts the path as rshared.
+	MakeRShared(path string) error
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
