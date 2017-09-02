@@ -194,27 +194,12 @@ type Bootstrap interface {
 type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *options.ContainerRuntimeOptions,
-	hostnameOverride string,
-	nodeIP string,
-	providerID string,
-	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
-	allowedUnsafeSysctls []string,
-	containerized bool,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	experimentalMounterPath string,
-	experimentalKernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
-	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
-	masterServiceNamespace string,
-	registerSchedulable bool,
-	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool) (Bootstrap, error)
+	hostnameOverride,
+	nodeIP,
+	providerID,
+	cloudProvider,
+	certDirectory,
+	rootDirectory string) (Bootstrap, error)
 
 // Dependencies is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
@@ -297,12 +282,12 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	return cfg, nil
 }
 
-func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
-	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
+func getRuntimeAndImageServices(config *kubeletconfiginternal.KubeletConfiguration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	rs, err := remote.NewRemoteRuntimeService(config.RemoteRuntimeEndpoint, config.RuntimeRequestTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
 	}
-	is, err := remote.NewRemoteImageService(remoteImageEndpoint, runtimeRequestTimeout.Duration)
+	is, err := remote.NewRemoteImageService(config.RemoteImageEndpoint, config.RuntimeRequestTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -314,27 +299,12 @@ func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoin
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *options.ContainerRuntimeOptions,
-	hostnameOverride string,
-	nodeIP string,
-	providerID string,
-	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
-	allowedUnsafeSysctls []string,
-	containerized bool,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	experimentalMounterPath string,
-	experimentalKernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
-	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
-	masterServiceNamespace string,
-	registerSchedulable bool,
-	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool) (*Kubelet, error) {
+	hostnameOverride,
+	nodeIP,
+	providerID,
+	cloudProvider,
+	certDirectory,
+	rootDirectory string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -402,9 +372,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
-		MinAge:             minimumGCAge.Duration,
-		MaxPerPodContainer: int(maxPerPodContainerCount),
-		MaxContainers:      int(maxContainerCount),
+		MinAge:             kubeCfg.MinimumGCAge.Duration,
+		MaxPerPodContainer: int(kubeCfg.MaxPerPodContainerCount),
+		MaxContainers:      int(kubeCfg.MaxContainerCount),
 	}
 
 	daemonEndpoints := &v1.NodeDaemonEndpoints{
@@ -418,7 +388,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
-	if experimentalNodeAllocatableIgnoreEvictionThreshold {
+	if kubeCfg.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
 		// Do not provide kubeCfg.EnforceNodeAllocatable to eviction threshold parsing if we are not enforcing Evictions
 		enforceNodeAllocatable = []string{}
 	}
@@ -430,7 +400,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
 		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
 		Thresholds:               thresholds,
-		KernelMemcgNotification:  experimentalKernelMemcgNotification,
+		KernelMemcgNotification:  kubeCfg.ExperimentalKernelMemcgNotification,
 	}
 
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
@@ -483,12 +453,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                   kubeCfg.RegisterNode,
-		registerSchedulable:            registerSchedulable,
+		registerSchedulable:            kubeCfg.RegisterSchedulable,
 		clusterDomain:                  kubeCfg.ClusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
 		nodeInfo:                       nodeInfo,
-		masterServiceNamespace:         masterServiceNamespace,
+		masterServiceNamespace:         kubeCfg.MasterServiceNamespace,
 		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
@@ -519,7 +489,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
-		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -552,7 +521,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.Warningf("Failed to close iptables lock file: %v", err)
 	}
 
-	plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, nonMasqueradeCIDR, int(crOptions.NetworkPluginMTU))
+	plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, kubeCfg.NonMasqueradeCIDR, int(crOptions.NetworkPluginMTU))
 	if err != nil {
 		return nil, err
 	}
@@ -571,10 +540,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient), secretManager, configMapManager)
 
-	if remoteRuntimeEndpoint != "" {
-		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
-		if remoteImageEndpoint == "" {
-			remoteImageEndpoint = remoteRuntimeEndpoint
+	if kubeCfg.RemoteRuntimeEndpoint != "" {
+		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
+		if kubeCfg.RemoteImageEndpoint == "" {
+			kubeCfg.RemoteImageEndpoint = kubeCfg.RemoteRuntimeEndpoint
 		}
 	}
 
@@ -585,7 +554,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       hairpinMode,
-		NonMasqueradeCIDR: nonMasqueradeCIDR,
+		NonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		PluginName:        crOptions.NetworkPluginName,
 		PluginConfDir:     crOptions.CNIConfDir,
 		PluginBinDir:      binDir,
@@ -627,10 +596,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 			// The unix socket for kubelet <-> dockershim communication.
 			glog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
-				remoteRuntimeEndpoint,
-				remoteImageEndpoint)
+				kubeCfg.RemoteRuntimeEndpoint,
+				kubeCfg.RemoteImageEndpoint)
 			glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-			server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
+			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, ds)
 			if err := server.Start(); err != nil {
 				return nil, err
 			}
@@ -649,7 +618,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		default:
 			return nil, fmt.Errorf("unsupported CRI runtime: %q", kubeCfg.ContainerRuntime)
 		}
-		runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
+		runtimeService, imageService, err := getRuntimeAndImageServices(kubeCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -787,8 +756,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
-	if len(experimentalMounterPath) != 0 {
-		experimentalCheckNodeCapabilitiesBeforeMount = false
+	if len(kubeCfg.ExperimentalMounterPath) != 0 {
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
 	}
 	// setup volumeManager
 	klet.volumeManager = volumemanager.NewVolumeManager(
@@ -802,8 +771,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Mounter,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
-		experimentalCheckNodeCapabilitiesBeforeMount,
-		keepTerminatedPodVolumes)
+		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount,
+		kubeCfg.KeepTerminatedPodVolumes)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -835,7 +804,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec
 	// Hence, we concatenate those two lists.
-	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), kubeCfg.AllowedUnsafeSysctls...)
 	unsafeWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls, v1.UnsafeSysctlsPodAnnotationKey)
 	if err != nil {
 		return nil, err
@@ -1154,13 +1123,6 @@ type Kubelet struct {
 
 	// StatsProvider provides the node and the container stats.
 	*stats.StatsProvider
-
-	// containerized should be set to true if the kubelet is running in a container
-	containerized bool
-
-	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
-	// This can be useful for debugging volume related issues.
-	keepTerminatedPodVolumes bool // DEPRECATED
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {

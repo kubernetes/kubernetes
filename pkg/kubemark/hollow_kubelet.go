@@ -19,7 +19,6 @@ package kubemark
 import (
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -115,10 +114,6 @@ func GetHollowKubeletConfig(
 		CloudProvider:    kubeletv1alpha1.AutoDetectCloudProvider,
 		// Use the default runtime options.
 		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
-		MinimumGCAge:            metav1.Duration{Duration: 1 * time.Minute},
-		MaxContainerCount:       100,
-		MaxPerPodContainerCount: 2,
-		RegisterSchedulable:     true,
 	}
 
 	// Config struct
@@ -134,6 +129,7 @@ func GetHollowKubeletConfig(
 	c.PodManifestPath = manifestFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
+	c.MinimumGCAge.Duration = 1 * time.Minute
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
@@ -156,8 +152,11 @@ func GetHollowKubeletConfig(
 	// what the "real" kubelet currently does, because there's no way to
 	// set promiscuous mode on docker0.
 	c.HairpinMode = kubeletconfig.HairpinVeth
+	c.MaxContainerCount = 100
 	c.MaxOpenFiles = 1024
+	c.MaxPerPodContainerCount = 2
 	c.RegisterNode = true
+	c.RegisterSchedulable = true
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault

@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"path/filepath"
+	"runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,11 +143,27 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(80)
 		obj.ImageGCLowThresholdPercent = &temp
 	}
+	if obj.MasterServiceNamespace == "" {
+		obj.MasterServiceNamespace = metav1.NamespaceDefault
+	}
+	if obj.MaxContainerCount == nil {
+		temp := int32(-1)
+		obj.MaxContainerCount = &temp
+	}
+	if obj.MaxPerPodContainerCount == 0 {
+		obj.MaxPerPodContainerCount = 1
+	}
 	if obj.MaxOpenFiles == 0 {
 		obj.MaxOpenFiles = 1000000
 	}
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
+	}
+	if obj.MinimumGCAge == zeroDuration {
+		obj.MinimumGCAge = metav1.Duration{Duration: 0}
+	}
+	if obj.NonMasqueradeCIDR == "" {
+		obj.NonMasqueradeCIDR = "10.0.0.0/8"
 	}
 	if obj.VolumePluginDir == "" {
 		obj.VolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
@@ -166,6 +183,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = boolVar(true)
+	}
+	if obj.RegisterSchedulable == nil {
+		obj.RegisterSchedulable = boolVar(true)
 	}
 	if obj.RegistryBurst == 0 {
 		obj.RegistryBurst = 10
@@ -209,11 +229,17 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
+	if obj.ExperimentalKernelMemcgNotification == nil {
+		obj.ExperimentalKernelMemcgNotification = boolVar(false)
+	}
 	if obj.SystemReserved == nil {
 		obj.SystemReserved = make(map[string]string)
 	}
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
+	}
+	if obj.ExperimentalQOSReserved == nil {
+		obj.ExperimentalQOSReserved = make(map[string]string)
 	}
 	if obj.MakeIPTablesUtilChains == nil {
 		obj.MakeIPTablesUtilChains = boolVar(true)
@@ -235,6 +261,13 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = defaultNodeAllocatableEnforcement
+	}
+	if obj.RemoteRuntimeEndpoint == "" {
+		if runtime.GOOS == "linux" {
+			obj.RemoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
+		} else if runtime.GOOS == "windows" {
+			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
+		}
 	}
 }
 

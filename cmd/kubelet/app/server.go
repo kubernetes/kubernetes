@@ -38,7 +38,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -673,30 +672,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := builder(kubeCfg,
-		kubeDeps,
-		&kubeFlags.ContainerRuntimeOptions,
-		kubeFlags.HostnameOverride,
-		kubeFlags.NodeIP,
-		kubeFlags.ProviderID,
-		kubeFlags.CloudProvider,
-		kubeFlags.CertDirectory,
-		kubeFlags.RootDirectory,
-		kubeFlags.AllowedUnsafeSysctls,
-		kubeFlags.Containerized,
-		kubeFlags.RemoteRuntimeEndpoint,
-		kubeFlags.RemoteImageEndpoint,
-		kubeFlags.ExperimentalMounterPath,
-		kubeFlags.ExperimentalKernelMemcgNotification,
-		kubeFlags.ExperimentalCheckNodeCapabilitiesBeforeMount,
-		kubeFlags.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
-		kubeFlags.MinimumGCAge,
-		kubeFlags.MaxPerPodContainerCount,
-		kubeFlags.MaxContainerCount,
-		kubeFlags.MasterServiceNamespace,
-		kubeFlags.RegisterSchedulable,
-		kubeFlags.NonMasqueradeCIDR,
-		kubeFlags.KeepTerminatedPodVolumes)
+	k, err := builder(kubeCfg, kubeDeps, &kubeFlags.ContainerRuntimeOptions, kubeFlags.HostnameOverride, kubeFlags.NodeIP, kubeFlags.ProviderID, kubeFlags.CloudProvider, kubeFlags.CertDirectory, kubeFlags.RootDirectory)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
@@ -743,54 +719,16 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *options.ContainerRuntimeOptions,
-	hostnameOverride string,
-	nodeIP string,
-	providerID string,
-	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
-	allowedUnsafeSysctls []string,
-	containerized bool,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
-	experimentalMounterPath string,
-	experimentalKernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
-	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
-	masterServiceNamespace string,
-	registerSchedulable bool,
-	nonMasqueradeCIDR string,
-	keepTerminatedPodVolumes bool) (k kubelet.Bootstrap, err error) {
+	hostnameOverride,
+	nodeIP,
+	providerID,
+	cloudProvider,
+	certDirectory,
+	rootDirectory string) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(kubeCfg,
-		kubeDeps,
-		crOptions,
-		hostnameOverride,
-		nodeIP,
-		providerID,
-		cloudProvider,
-		certDirectory,
-		rootDirectory,
-		allowedUnsafeSysctls,
-		containerized,
-		remoteRuntimeEndpoint,
-		remoteImageEndpoint,
-		experimentalMounterPath,
-		experimentalKernelMemcgNotification,
-		experimentalCheckNodeCapabilitiesBeforeMount,
-		experimentalNodeAllocatableIgnoreEvictionThreshold,
-		minimumGCAge,
-		maxPerPodContainerCount,
-		maxContainerCount,
-		masterServiceNamespace,
-		registerSchedulable,
-		nonMasqueradeCIDR,
-		keepTerminatedPodVolumes)
+	k, err = kubelet.NewMainKubelet(kubeCfg, kubeDeps, crOptions, hostnameOverride, nodeIP, providerID, cloudProvider, certDirectory, rootDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -864,8 +802,7 @@ func BootstrapKubeletConfigController(defaultConfig *kubeletconfiginternal.Kubel
 
 // RunDockershim only starts the dockershim in current process. This is only used for cri validate testing purpose
 // TODO(random-liu): Move this to a separate binary.
-func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConfiguration) error {
-	r := &f.ContainerRuntimeOptions
+func RunDockershim(c *kubeletconfiginternal.KubeletConfiguration, r *options.ContainerRuntimeOptions) error {
 	// Create docker client.
 	dockerClient := libdocker.ConnectToDockerOrDie(r.DockerEndpoint, c.RuntimeRequestTimeout.Duration,
 		r.ImagePullProgressDeadline.Duration)
@@ -878,7 +815,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),
-		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
+		NonMasqueradeCIDR: c.NonMasqueradeCIDR,
 		PluginName:        r.NetworkPluginName,
 		PluginConfDir:     r.CNIConfDir,
 		PluginBinDir:      binDir,
@@ -906,7 +843,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 
 	glog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
+	server := dockerremote.NewDockerServer(c.RemoteRuntimeEndpoint, ds)
 	if err := server.Start(); err != nil {
 		return err
 	}
