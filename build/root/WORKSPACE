@@ -5,11 +5,9 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_go/archive/82483596ec203eb9c1849937636f4cbed83733eb.tar.gz"],
 )
 
-http_archive(
+local_repository(
     name = "io_kubernetes_build",
-    sha256 = "5da78568ffb9a323410c701618c23da8c93f4bf4aea76eee41ac244dbd8c8f95",
-    strip_prefix = "repo-infra-4eaf9e671bbb549fb4ec292cf251f921d7ef80ac",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/4eaf9e671bbb549fb4ec292cf251f921d7ef80ac.tar.gz"],
+    path = "/usr/local/google/home/mikedanese/go/src/k8s.io/repo-infra",
 )
 
 ETCD_VERSION = "3.0.17"

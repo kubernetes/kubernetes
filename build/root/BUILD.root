@@ -66,6 +66,7 @@ filegroup(
         "//hack:all-srcs",
         "//pkg:all-srcs",
         "//plugin:all-srcs",
+        "//scratch:all-srcs",
         "//staging:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
