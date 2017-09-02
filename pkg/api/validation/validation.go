@@ -1027,6 +1027,38 @@ func validatePathNoBacksteps(targetPath string, fldPath *field.Path) field.Error
 	return allErrs
 }
 
+// validateMountPropagation verifies that MountPropagation field is valid and
+// allowed for given container.
+func validateMountPropagation(mountPropagation *api.MountPropagationMode, container *api.Container, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if mountPropagation == nil {
+		return allErrs
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "mount propagation is disabled by feature-gate"))
+		return allErrs
+	}
+
+	supportedMountPropagations := sets.NewString(string(api.MountPropagationBidirectional), string(api.MountPropagationHostToContainer))
+	if !supportedMountPropagations.Has(string(*mountPropagation)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, *mountPropagation, supportedMountPropagations.List()))
+	}
+
+	if container == nil {
+		// The container is not available yet, e.g. during validation of
+		// PodPreset. Stop validation now, Pod validation will refuse final
+		// Pods with Bidirectional propagation in non-privileged containers.
+		return allErrs
+	}
+
+	privileged := container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged
+	if *mountPropagation == api.MountPropagationBidirectional && !privileged {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Bidirectional mount propagation is available only to privileged containers"))
+	}
+	return allErrs
+}
+
 // This validate will make sure targetPath:
 // 1. is not abs path
 // 2. does not contain any '..' elements
@@ -1845,7 +1877,7 @@ func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) fi
 	return allErrs
 }
 
-func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, container *api.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.NewString()
 
@@ -1868,6 +1900,10 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
+
+		if mnt.MountPropagation != nil {
+			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 	}
 	return allErrs
@@ -2135,7 +2171,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
-		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
+		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, &ctr, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)

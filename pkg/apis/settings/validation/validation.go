@@ -47,7 +47,7 @@ func ValidatePodPresetSpec(spec *settings.PodPresetSpec, fldPath *field.Path) fi
 	allErrs = append(allErrs, vErrs...)
 	allErrs = append(allErrs, apivalidation.ValidateEnv(spec.Env, fldPath.Child("env"))...)
 	allErrs = append(allErrs, apivalidation.ValidateEnvFrom(spec.EnvFrom, fldPath.Child("envFrom"))...)
-	allErrs = append(allErrs, apivalidation.ValidateVolumeMounts(spec.VolumeMounts, volumes, fldPath.Child("volumeMounts"))...)
+	allErrs = append(allErrs, apivalidation.ValidateVolumeMounts(spec.VolumeMounts, volumes, nil, fldPath.Child("volumeMounts"))...)
 
 	return allErrs
 }

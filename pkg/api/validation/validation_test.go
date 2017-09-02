@@ -3405,6 +3405,10 @@ func TestValidateEnvFrom(t *testing.T) {
 
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := sets.NewString("abc", "123", "abc-123")
+	container := api.Container{
+		SecurityContext: nil,
+	}
+	propagation := api.MountPropagationBidirectional
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
@@ -3415,26 +3419,152 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 	}
-	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, volumes, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]api.VolumeMount{
-		"empty name":          {{Name: "", MountPath: "/foo"}},
-		"name not found":      {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":     {{Name: "abc", MountPath: ""}},
-		"relative mountpath":  {{Name: "abc", MountPath: "bar"}},
-		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..": {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"empty name":                             {{Name: "", MountPath: "/foo"}},
+		"name not found":                         {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
+		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
+		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, volumes, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
+}
+
+func TestValidateMountPropagation(t *testing.T) {
+	bTrue := true
+	bFalse := false
+	privilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bTrue,
+		},
+	}
+	nonPrivilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bFalse,
+		},
+	}
+	defaultContainer := &api.Container{}
+
+	propagationBidirectional := api.MountPropagationBidirectional
+	propagationHostToContainer := api.MountPropagationHostToContainer
+	propagationInvalid := api.MountPropagationMode("invalid")
+
+	tests := []struct {
+		mount       api.VolumeMount
+		container   *api.Container
+		expectError bool
+	}{
+		{
+			// implicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			defaultContainer,
+			false,
+		},
+		{
+			// implicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			defaultContainer,
+			false,
+		},
+		{
+			// error: implicitly non-privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			defaultContainer,
+			true,
+		},
+		{
+			// explicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nonPrivilegedContainer,
+			true,
+		},
+		{
+			// privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			privilegedContainer,
+			false,
+		},
+		{
+			// error: privileged container + invalid mount propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationInvalid},
+			privilegedContainer,
+			true,
+		},
+		{
+			// no container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nil,
+			false,
+		},
+	}
+
+	// Enable MountPropagation for this test
+	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
+	defer func() {
+		var err error
+		// restoring the old value
+		if priorityEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
+		}
+	}()
+	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
+		return
+	}
+
+	for i, test := range tests {
+		volumes := sets.NewString("foo")
+		errs := ValidateVolumeMounts([]api.VolumeMount{test.mount}, volumes, test.container, field.NewPath("field"))
+		if test.expectError && len(errs) == 0 {
+			t.Errorf("test %d expected error, got none", i)
+		}
+		if !test.expectError && len(errs) != 0 {
+			t.Errorf("test %d expected success, got error: %v", i, errs)
+		}
+	}
+
 }
 
 func TestValidateProbe(t *testing.T) {

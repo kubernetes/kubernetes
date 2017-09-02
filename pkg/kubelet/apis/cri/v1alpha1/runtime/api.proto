@@ -150,6 +150,16 @@ message PortMapping {
     string host_ip = 4;
 }
 
+enum MountPropagation {
+    // No mount propagation ("private" in Linux terminology).
+    PROPAGATION_PRIVATE = 0;
+    // Mounts get propagated from the host to the container ("rslave" in Linux).
+    PROPAGATION_HOST_TO_CONTAINER = 1;
+    // Mounts get propagated from the host to the container and from the
+    // container to the host ("rshared" in Linux).
+    PROPAGATION_BIDIRECTIONAL = 2;
+}
+
 // Mount specifies a host volume to mount into a container.
 message Mount {
     // Path of the mount within the container.
@@ -160,6 +170,8 @@ message Mount {
     bool readonly = 3;
     // If set, the mount needs SELinux relabeling.
     bool selinux_relabel = 4;
+    // Requested propagation mode.
+    MountPropagation propagation = 5;
 }
 
 // NamespaceOption provides options for Linux namespaces.
