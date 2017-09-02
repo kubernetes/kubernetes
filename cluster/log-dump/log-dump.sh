@@ -37,13 +37,14 @@ else
   readonly use_custom_instance_list=
 fi
 
-readonly master_ssh_supported_providers="gce aws kubemark"
-readonly node_ssh_supported_providers="gce gke aws kubemark"
+readonly master_ssh_supported_providers="gce aws"
+readonly node_ssh_supported_providers="gce gke aws"
+readonly gcloud_supported_providers="gce gke"
 
 readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
 readonly node_logfiles="kube-proxy fluentd node-problem-detector"
 readonly node_systemd_services="node-problem-detector"
-readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-*"
+readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-hollow-node-*"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
@@ -55,11 +56,6 @@ readonly systemd_services="kubelet docker"
 # file descriptors for large clusters.
 readonly max_scp_processes=25
 
-# This template spits out the external IPs and images for each node in the cluster in a format like so:
-# 52.32.7.85 gcr.io/google_containers/kube-apiserver:1355c18c32d7bef16125120bce194fad gcr.io/google_containers/kube-controller-manager:46365cdd8d28b8207950c3c21d1f3900 [...]
-echo "Obtaining IPs and images for cluster nodes"
-readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
-
 function setup() {
   if [[ -z "${use_custom_instance_list}" ]]; then
     KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
@@ -68,6 +64,8 @@ function setup() {
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     echo "Detecting project"
     detect-project 2>&1
+  elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
@@ -105,20 +103,17 @@ function copy-logs-from-node() {
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
     local -r scp_files="{$(printf "%s," "${files[@]}")}"
 
-    if [[ -n "${use_custom_instance_list}" ]]; then
+    if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+      # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
+      gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
+      gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+    elif  [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      local ip=$(get_ssh_hostname "${node}")
+      scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+    elif  [[ -n "${use_custom_instance_list}" ]]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
-      case "${KUBERNETES_PROVIDER}" in
-        gce|gke|kubemark)
-          # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
-          gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-          gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
-          ;;
-        aws)
-          local ip=$(get_ssh_hostname "${node}")
-          scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
-          ;;
-      esac
+      echo "Unknown cloud-provider '${KUBERNETES_PROVIDER}' and use_custom_instance_list is unset too - skipping logdump for '${node}'"
     fi
 }
 
@@ -140,11 +135,8 @@ function save-logs() {
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke|kubemark)
+        gce|gke)
           files="${files} ${gce_logfiles}"
-          if [[ "${KUBERNETES_PROVIDER}" == "kubemark" && "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
-            files="${files} ${hollow_node_logfiles}"
-          fi
           ;;
         aws)
           files="${files} ${aws_logfiles}"
@@ -240,6 +232,11 @@ function dump_nodes() {
     return
   fi
 
+  node_logfiles_all="${node_logfiles}"
+  if [[ "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
+    node_logfiles_all="${node_logfiles_all} ${hollow_node_logfiles}"
+  fi
+
   nodes_selected_for_logs=()
   if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
     # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
@@ -257,7 +254,7 @@ function dump_nodes() {
     mkdir -p "${node_dir}"
     # Save logs in the background. This speeds up things when there are
     # many nodes.
-    save-logs "${node_name}" "${node_dir}" "${node_logfiles}" "${node_systemd_services}" &
+    save-logs "${node_name}" "${node_dir}" "${node_logfiles_all}" "${node_systemd_services}" &
 
     # We don't want to run more than ${max_scp_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
