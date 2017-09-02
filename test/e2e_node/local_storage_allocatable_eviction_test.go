@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 							RestartPolicy: v1.RestartPolicyNever,
 							Containers: []v1.Container{
 								{
-									Image:   "gcr.io/google_containers/busybox:1.24",
+									Image:   busyboxImage,
 									Name:    "container-disk-hog-pod",
 									Command: []string{"sh", "-c", command},
 								},
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 							RestartPolicy: v1.RestartPolicyNever,
 							Containers: []v1.Container{
 								{
-									Image: "gcr.io/google_containers/busybox:1.24",
+									Image: busyboxImage,
 									Name:  "idle-pod",
 									Command: []string{"sh", "-c",
 										fmt.Sprintf("while true; do sleep 5; done")},

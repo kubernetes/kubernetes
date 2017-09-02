@@ -10,6 +10,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google_containers/nginx-slim:0.7
+        image: {{.NginxSlimImage}}
         ports:
         - containerPort: 80

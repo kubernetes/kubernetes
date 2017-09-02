@@ -28,10 +28,13 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 
 var serviceAccountTokenNamespaceVersion = utilversion.MustParseSemantic("v1.2.0")
 
@@ -200,14 +203,14 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "token-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: mountImage,
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey),
 						},
 					},
 					{
 						Name:  "root-ca-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: mountImage,
 						Args: []string{
 							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey),
 						},
@@ -221,7 +224,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		if supportsTokenNamespace {
 			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 				Name:  "namespace-test",
-				Image: "gcr.io/google_containers/mounttest:0.8",
+				Image: mountImage,
 				Args: []string{
 					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
 				},
@@ -356,7 +359,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: tc.PodName},
 				Spec: v1.PodSpec{
-					Containers:                   []v1.Container{{Name: "token-test", Image: "gcr.io/google_containers/mounttest:0.8"}},
+					Containers:                   []v1.Container{{Name: "token-test", Image: mountImage}},
 					RestartPolicy:                v1.RestartPolicyNever,
 					ServiceAccountName:           tc.ServiceAccountName,
 					AutomountServiceAccountToken: tc.AutomountPodSpec,

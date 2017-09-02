@@ -37,6 +37,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -50,8 +51,6 @@ const (
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
-	resourceConsumerImage           = "gcr.io/google_containers/resource_consumer:beta4"
-	resourceConsumerControllerImage = "gcr.io/google_containers/resource_consumer/controller:beta4"
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
 	rsIsNil                         = "ERROR: replicaset = nil"
@@ -59,6 +58,11 @@ const (
 	customMetricName                = "QPS"
 	serviceInitializationTimeout    = 2 * time.Minute
 	serviceInitializationInterval   = 15 * time.Second
+)
+
+var (
+	resourceConsumerImage           = imageutils.GetE2EImage(imageutils.ResourceConsumer)
+	resourceConsumerControllerImage = imageutils.GetE2EImage(imageutils.ResourceController)
 )
 
 const (

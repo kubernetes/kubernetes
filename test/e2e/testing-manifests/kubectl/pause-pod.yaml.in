@@ -7,6 +7,6 @@ metadata:
 spec:
   containers:
   - name: pause
-    image: gcr.io/google-containers/pause:2.0
+    image: {{.PauseImage}}
     ports:
     - containerPort: 80

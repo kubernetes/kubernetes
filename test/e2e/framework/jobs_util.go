@@ -73,7 +73,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{

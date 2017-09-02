@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -286,7 +287,7 @@ func gceUpgradeScript() string {
 func waitForSSHTunnels() {
 	Logf("Waiting for SSH tunnels to establish")
 	RunKubectl("run", "ssh-tunnel-test",
-		"--image=gcr.io/google_containers/busybox:1.24",
+		"--image="+imageutils.GetBusyBoxImage(),
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")

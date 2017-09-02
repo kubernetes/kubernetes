@@ -39,6 +39,7 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -64,7 +65,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 			Containers: []v1.Container{
 				{
 					Name:  "readiness",
-					Image: "gcr.io/google_containers/netexec:1.7",
+					Image: imageutils.GetE2EImage(imageutils.Netexec),
 					ReadinessProbe: &v1.Probe{
 						Handler: v1.Handler{
 							Exec: &v1.ExecAction{
@@ -79,7 +80,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 				},
 				{
 					Name:  "portforwardtester",
-					Image: "gcr.io/google_containers/portforwardtester:1.2",
+					Image: imageutils.GetE2EImage(imageutils.PortForwardTester),
 					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",

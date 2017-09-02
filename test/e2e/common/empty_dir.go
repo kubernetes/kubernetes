@@ -26,12 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	testImageRootUid    = "gcr.io/google_containers/mounttest:0.8"
-	testImageNonRootUid = "gcr.io/google_containers/mounttest-user:0.5"
-	volumePath          = "/test-volume"
+	volumePath = "/test-volume"
+)
+
+var (
+	testImageRootUid    = imageutils.GetE2EImage(imageutils.Mounttest)
+	testImageNonRootUid = imageutils.GetE2EImage(imageutils.MounttestUser)
 )
 
 var _ = framework.KubeDescribe("EmptyDir volumes", func() {

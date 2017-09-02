@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   busyboxImage,
 							Name:    "container-inode-hog-container",
 							Command: getInodeConsumingCommand(""),
 						},
@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   busyboxImage,
 							Name:    "volume-inode-hog-container",
 							Command: getInodeConsumingCommand(volumeMountPath),
 							VolumeMounts: []v1.VolumeMount{
@@ -329,7 +329,7 @@ func getInnocentPod() *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Image: "gcr.io/google_containers/busybox:1.24",
+					Image: busyboxImage,
 					Name:  "innocent-container",
 					Command: []string{
 						"sh",
