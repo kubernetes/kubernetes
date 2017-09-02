@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
@@ -234,4 +235,105 @@ func (r sortedGCIgnoredResources) Less(i, j int) bool {
 
 func (r sortedGCIgnoredResources) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func TestValidate(t *testing.T) {
+	allControllers := []string{
+		"attachdetach",
+		"bootstrapsigner",
+		"cronjob",
+		"csrapproving",
+		"csrsigning",
+		"daemonset",
+		"deployment",
+		"disruption",
+		"endpoint",
+		"garbagecollector",
+		"horizontalpodautoscaling",
+		"job",
+		"namespace",
+		"node",
+		"persistentvolume-binder",
+		"podgc",
+		"replicaset",
+		"replicationcontroller",
+		"resourcequota",
+		"route",
+		"service",
+		"serviceaccount",
+		"serviceaccount-token",
+		"statefulset",
+		"tokencleaner",
+		"ttl",
+	}
+	disabledByDefaultControllers := []string{
+		"bootstrapsigner",
+		"tokencleaner",
+	}
+
+	successCase := &CMServer{
+		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+			Controllers:                  []string{"*"},
+			ConcurrentDeploymentSyncs:    10,
+			ConcurrentEndpointSyncs:      10,
+			ConcurrentGCSyncs:            10,
+			ConcurrentNamespaceSyncs:     10,
+			ConcurrentRSSyncs:            10,
+			ConcurrentResourceQuotaSyncs: 10,
+			ConcurrentServiceSyncs:       10,
+			ConcurrentSATokenSyncs:       10,
+			ConcurrentRCSyncs:            10,
+			KubeAPIBurst:                 10,
+			KubeAPIQPS:                   10,
+			LargeClusterSizeThreshold:    10,
+			NodeCIDRMaskSize:             10,
+			NodeEvictionRate:             10,
+			Port:                         10,
+			VolumeConfiguration: componentconfig.VolumeConfiguration{
+				PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+					IncrementTimeoutNFS:      10,
+					MinimumTimeoutHostPath:   10,
+					MinimumTimeoutNFS:        10,
+					IncrementTimeoutHostPath: 10,
+				},
+			},
+			SecondaryNodeEvictionRate: 10,
+		},
+	}
+	if allErrors := successCase.Validate(allControllers, disabledByDefaultControllers); allErrors != nil {
+		t.Errorf("expect no errors got %v", allErrors)
+	}
+
+	errorCase := &CMServer{
+		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+			Controllers:                  []string{"invalid-controller"},
+			ConcurrentDeploymentSyncs:    -10,
+			ConcurrentEndpointSyncs:      -10,
+			ConcurrentGCSyncs:            -10,
+			ConcurrentNamespaceSyncs:     -10,
+			ConcurrentRSSyncs:            -10,
+			ConcurrentResourceQuotaSyncs: -10,
+			ConcurrentServiceSyncs:       -10,
+			ConcurrentSATokenSyncs:       -10,
+			ConcurrentRCSyncs:            -10,
+			KubeAPIBurst:                 -10,
+			KubeAPIQPS:                   -10,
+			LargeClusterSizeThreshold:    -10,
+			NodeCIDRMaskSize:             -10,
+			NodeEvictionRate:             -10,
+			Port:                         0,
+			VolumeConfiguration: componentconfig.VolumeConfiguration{
+				PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+					IncrementTimeoutNFS:      -10,
+					MinimumTimeoutHostPath:   -10,
+					MinimumTimeoutNFS:        -10,
+					IncrementTimeoutHostPath: -10,
+				},
+			},
+			SecondaryNodeEvictionRate: -10,
+		},
+	}
+	if allErrors := errorCase.Validate(allControllers, disabledByDefaultControllers); len(allErrors.(utilerrors.Aggregate).Errors()) != 21 {
+		t.Errorf("expect 21 errors got %v", len(allErrors.(utilerrors.Aggregate).Errors()))
+	}
 }
