@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: nginx-daemonset
+  labels:
+    run: nginx-daemonset
+spec:
+  selector: # is this needed?
+    matchLabels:
+       run: nginx-daemonset
+  template:
+    metadata:
+      labels:
+        run: nginx-daemonset
+    spec:
+      containers:
+      - name: nginx
+        image: gcr.io/google_containers/nginx-slim:0.8
+        ports:
+        - containerPort: 80

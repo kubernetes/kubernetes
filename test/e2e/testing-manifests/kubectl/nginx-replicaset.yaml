@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: ReplicaSet
+metadata:
+  name: nginx-replicaset
+  labels:
+    run: nginx-replicaset
+spec:
+  template:
+    metadata:
+      labels:
+        run: nginx-replicaset
+    spec:
+      containers:
+      - name: nginx
+        image: gcr.io/google_containers/nginx-slim:0.8
+        ports:
+        - containerPort: 80
