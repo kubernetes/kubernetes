@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
