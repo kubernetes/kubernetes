@@ -182,7 +182,8 @@ spec:
       - hostPath:
           path: /etc/pki
         name: ca-certs-etc-pki
-  updateStrategy: {}
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -330,7 +331,8 @@ spec:
       - hostPath:
           path: /etc/pki
         name: ca-certs-etc-pki
-  updateStrategy: {}
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -430,7 +432,8 @@ spec:
           path: /etc/kubernetes/scheduler.conf
           type: FileOrCreate
         name: kubeconfig
-  updateStrategy: {}
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -471,7 +474,7 @@ func TestBuildDaemonSet(t *testing.T) {
 			t.Fatalf("couldn't load the specified Pod")
 		}
 
-		ds := buildDaemonSet(rt.component, podSpec, getDefaultMutators())
+		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
 		dsBytes, err := yaml.Marshal(ds)
 		if err != nil {
 			t.Fatalf("failed to marshal daemonset to YAML: %v", err)
