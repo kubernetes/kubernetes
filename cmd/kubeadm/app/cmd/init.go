@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
@@ -80,6 +81,23 @@ var (
 
 		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
 
+		`)))
+
+	kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+		Unfortunately, an error has occurred:
+			{{ .Error }}
+
+		This error is likely caused by that:
+			- The kubelet is not running
+			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+			- There is no internet connection; so the kubelet can't pull the following control plane images:
+				- {{ .APIServerImage }}
+				- {{ .ControllerManagerImage }}
+				- {{ .SchedulerImage }}
+
+		You can troubleshoot this for example with the following commands if you're on a systemd-powered system:
+			- 'systemctl status kubelet'
+			- 'journalctl -xeu kubelet'
 		`)))
 )
 
@@ -325,12 +343,17 @@ func (i *Init) Run(out io.Writer) error {
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	waiter := getWaiter(i.dryRun, client)
 
-	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
-	fmt.Println("[init] This process often takes about a minute to perform or longer if the control plane images have to be pulled...")
-	// TODO: Adjust this timeout or start polling the kubelet API
-	// TODO: Make this timeout more realistic when we do create some more complex logic about the interaction with the kubelet
-	if err := waiter.WaitForAPI(); err != nil {
-		return err
+	if err := waitForAPIAndKubelet(waiter); err != nil {
+		ctx := map[string]string{
+			"Error":                  fmt.Sprintf("%v", err),
+			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+		}
+
+		kubeletFailTempl.Execute(out, ctx)
+
+		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
 	}
 
 	// Upload currently used configuration to the cluster
@@ -472,11 +495,43 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
 }
 
-// getWaiter gets the right waiter implementation
+// getWaiter gets the right waiter implementation for the right occasion
 func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	// TODO: Adjust this timeout slightly?
 	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+}
+
+// waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet
+// /healthz and /healthz/syncloop endpoints continuously are unhealthy, kubeadm will error out after a period of
+// backoffing exponentially
+func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
+	errorChan := make(chan error)
+
+	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] This often takes around a minute; or longer if the control plane images have to be pulled.")
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10255/healthz"); err != nil {
+			errC <- err
+		}
+	}(errorChan, waiter)
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
+		if err := waiter.WaitForHealthyKubelet(60*time.Second, "http://localhost:10255/healthz/syncloop"); err != nil {
+			errC <- err
+		}
+	}(errorChan, waiter)
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This main goroutine sends whatever WaitForAPI returns (error or not) to the channel
+		// This in order to continue on success (nil error), or just fail if
+		errC <- waiter.WaitForAPI()
+	}(errorChan, waiter)
+
+	// This call is blocking until one of the goroutines sends to errorChan
+	return <-errorChan
 }

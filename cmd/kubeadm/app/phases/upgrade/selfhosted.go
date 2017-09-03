@@ -43,7 +43,7 @@ const (
 	selfHostingWaitTimeout = 2 * time.Minute
 
 	// selfHostingFailureThreshold describes how many times kubeadm will retry creating the DaemonSets
-	selfHostingFailureThreshold uint8 = 10
+	selfHostingFailureThreshold int = 10
 )
 
 // controlPlaneComponentResources holds the relevant Pod and DaemonSet associated with a control plane component

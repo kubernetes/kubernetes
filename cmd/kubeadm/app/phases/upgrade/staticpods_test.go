@@ -113,6 +113,11 @@ func (w *fakeWaiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) erro
 	return w.errsToReturn[waitForHashChange]
 }
 
+// WaitForHealthyKubelet returns a dummy nil just to implement the interface
+func (w *fakeWaiter) WaitForHealthyKubelet(_ time.Duration, _ string) error {
+	return nil
+}
+
 type fakeStaticPodPathManager struct {
 	realManifestDir   string
 	tempManifestDir   string

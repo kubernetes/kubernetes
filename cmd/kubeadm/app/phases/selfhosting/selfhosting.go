@@ -39,7 +39,7 @@ const (
 	selfHostingWaitTimeout = 2 * time.Minute
 
 	// selfHostingFailureThreshold describes how many times kubeadm will retry creating the DaemonSets
-	selfHostingFailureThreshold uint8 = 5
+	selfHostingFailureThreshold int = 5
 )
 
 // CreateSelfHostedControlPlane is responsible for turning a Static Pod-hosted control plane to a self-hosted one
