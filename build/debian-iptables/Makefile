@@ -19,7 +19,7 @@ IMAGE=debian-iptables
 TAG=v8
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v2.7.0
+QEMUVERSION=v2.9.1
 
 ifeq ($(ARCH),arm)
 	QEMUARCH=arm
