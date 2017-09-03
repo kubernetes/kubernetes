@@ -18,9 +18,13 @@ package rbd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -242,5 +246,86 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
+	}
+}
+
+func TestPersistAndLoadRBD(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testcases := []struct {
+		rbdMounter               rbdMounter
+		expectedJSONStr          string
+		expectedLoadedRBDMounter rbdMounter
+	}{
+		{
+			rbdMounter{},
+			`{"Mon":null,"Id":"","Keyring":"","Secret":""}`,
+			rbdMounter{},
+		},
+		{
+			rbdMounter{
+				rbd: &rbd{
+					podUID:          "poduid",
+					Pool:            "kube",
+					Image:           "some-test-image",
+					ReadOnly:        false,
+					MetricsProvider: volume.NewMetricsStatFS("/tmp"),
+				},
+				Mon:     []string{"127.0.0.1"},
+				Id:      "kube",
+				Keyring: "",
+				Secret:  "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ==",
+			},
+			`
+{
+	"Pool": "kube",
+	"Image": "some-test-image",
+	"ReadOnly": false,
+	"Mon": ["127.0.0.1"],
+	"Id": "kube",
+	"Keyring": "",
+	"Secret": "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ=="
+}
+			`,
+			rbdMounter{
+				rbd: &rbd{
+					Pool:     "kube",
+					Image:    "some-test-image",
+					ReadOnly: false,
+				},
+				Mon:     []string{"127.0.0.1"},
+				Id:      "kube",
+				Keyring: "",
+				Secret:  "QVFEcTdKdFp4SmhtTFJBQUNwNDI3UnhGRzBvQ1Y0SUJwLy9pRUE9PQ==",
+			},
+		},
+	}
+
+	util := &RBDUtil{}
+	for _, c := range testcases {
+		err = util.persistRBD(c.rbdMounter, tmpDir)
+		if err != nil {
+			t.Errorf("failed to persist rbd: %v, err: %v", c.rbdMounter, err)
+		}
+		jsonFile := filepath.Join(tmpDir, "rbd.json")
+		jsonData, err := ioutil.ReadFile(jsonFile)
+		if err != nil {
+			t.Errorf("failed to read json file %s: %v", jsonFile, err)
+		}
+		if !assert.JSONEq(t, c.expectedJSONStr, string(jsonData)) {
+			t.Errorf("json file does not match expected one: %s, should be %s", string(jsonData), c.expectedJSONStr)
+		}
+		tmpRBDMounter := rbdMounter{}
+		err = util.loadRBD(&tmpRBDMounter, tmpDir)
+		if err != nil {
+			t.Errorf("faild to load rbd: %v", err)
+		}
+		if !reflect.DeepEqual(tmpRBDMounter, c.expectedLoadedRBDMounter) {
+			t.Errorf("loaded rbd does not equal to expected one: %v, should be %v", tmpRBDMounter, c.rbdMounter)
+		}
 	}
 }
