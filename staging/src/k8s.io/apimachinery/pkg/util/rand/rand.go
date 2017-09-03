@@ -83,3 +83,13 @@ func String(length int) string {
 	}
 	return string(b)
 }
+
+// SafeEncodeString encodes s using the same characters as rand.String. This reduces the chances of bad words and
+// ensures that strings generated from hash functions appear consistent throughout the API.
+func SafeEncodeString(s string) string {
+	r := make([]rune, len(s))
+	for i, b := range []rune(s) {
+		r[i] = alphanums[(int(b) % len(alphanums))]
+	}
+	return string(r)
+}
