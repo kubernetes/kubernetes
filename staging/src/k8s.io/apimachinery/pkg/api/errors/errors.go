@@ -174,6 +174,17 @@ func NewGone(message string) *StatusError {
 	}}
 }
 
+// NewResourceExpired creates an error that indicates that the requested resource content has expired from
+// the server (usually due to a resourceVersion that is too old).
+func NewResourceExpired(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusGone,
+		Reason:  metav1.StatusReasonExpired,
+		Message: message,
+	}}
+}
+
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorList) *StatusError {
 	causes := make([]metav1.StatusCause, 0, len(errs))
@@ -394,10 +405,26 @@ func IsInvalid(err error) bool {
 	return reasonForError(err) == metav1.StatusReasonInvalid
 }
 
+// IsGone is true if the error indicates the requested resource is no longer available.
+func IsGone(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonGone
+}
+
+// IsResourceExpired is true if the error indicates the resource has expired and the current action is
+// no longer possible.
+func IsResourceExpired(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonExpired
+}
+
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 func IsMethodNotSupported(err error) bool {
 	return reasonForError(err) == metav1.StatusReasonMethodNotAllowed
+}
+
+// IsServiceUnavailable is true if the error indicates the underlying service is no longer available.
+func IsServiceUnavailable(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonServiceUnavailable
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.

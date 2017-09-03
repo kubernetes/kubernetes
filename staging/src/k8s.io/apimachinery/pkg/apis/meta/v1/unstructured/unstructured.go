@@ -468,6 +468,14 @@ func (u *Unstructured) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
+func (u *Unstructured) GetContinue() string {
+	return getNestedString(u.Object, "metadata", "continue")
+}
+
+func (u *Unstructured) SetContinue(c string) {
+	u.setNestedField(c, "metadata", "continue")
+}
+
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
@@ -650,6 +658,14 @@ func (u *UnstructuredList) GetSelfLink() string {
 
 func (u *UnstructuredList) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
+}
+
+func (u *UnstructuredList) GetContinue() string {
+	return getNestedString(u.Object, "metadata", "continue")
+}
+
+func (u *UnstructuredList) SetContinue(c string) {
+	u.setNestedField(c, "metadata", "continue")
 }
 
 func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
