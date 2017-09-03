@@ -124,6 +124,7 @@ func TestControllerSyncJob(t *testing.T) {
 		parallelism int32
 		completions int32
 		deleting    bool
+		podLimit    int
 
 		// pod setup
 		podControllerError error
@@ -141,94 +142,99 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedComplete  bool
 	}{
 		"job start": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, false,
 		},
 		"WQ job start": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, false,
 		},
 		"pending pods": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 2, 0, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
 		"correct # of pods": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
 		"WQ job: correct # of pods": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, false,
 		},
 		"too few active pods": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 1, 1, 0,
 			1, 0, 2, 1, 0, false,
 		},
 		"too few active pods with a dynamic job": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 1, 0, 0,
 			1, 0, 2, 0, 0, false,
 		},
 		"too few active pods, with controller error": {
-			2, 5, false,
+			2, 5, false, 0,
 			fmt.Errorf("Fake error"), 0, 1, 1, 0,
 			1, 0, 1, 1, 0, false,
 		},
 		"too many active pods": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 3, 0, 0,
 			0, 1, 2, 0, 0, false,
 		},
 		"too many active pods, with controller error": {
-			2, 5, false,
+			2, 5, false, 0,
 			fmt.Errorf("Fake error"), 0, 3, 0, 0,
 			0, 1, 3, 0, 0, false,
 		},
 		"failed pod": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 1, 1, 1,
 			1, 0, 2, 1, 1, false,
 		},
 		"job finish": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 0, 5, 0,
 			0, 0, 0, 5, 0, true,
 		},
 		"WQ job finishing": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 1, 1, 0,
 			0, 0, 1, 1, 0, false,
 		},
 		"WQ job all finished": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 0, 2, 0,
 			0, 0, 0, 2, 0, true,
 		},
 		"WQ job all finished despite one failure": {
-			2, -1, false,
+			2, -1, false, 0,
 			nil, 0, 0, 1, 1,
 			0, 0, 0, 1, 1, true,
 		},
 		"more active pods than completions": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 10, 0, 0,
 			0, 8, 2, 0, 0, false,
 		},
 		"status change": {
-			2, 5, false,
+			2, 5, false, 0,
 			nil, 0, 2, 2, 0,
 			0, 0, 2, 2, 0, false,
 		},
 		"deleting job": {
-			2, 5, true,
+			2, 5, true, 0,
 			nil, 1, 1, 1, 0,
 			0, 0, 2, 1, 0, false,
+		},
+		"limited pods": {
+			100, 200, false, 10,
+			nil, 0, 0, 0, 0,
+			10, 0, 10, 0, 0, false,
 		},
 	}
 
@@ -236,7 +242,7 @@ func TestControllerSyncJob(t *testing.T) {
 		// job manager setup
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 		manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
-		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
+		fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
 		manager.jobStoreSynced = alwaysReady
@@ -276,7 +282,7 @@ func TestControllerSyncJob(t *testing.T) {
 				t.Errorf("%s: Syncing jobs would return error when podController exception", name)
 			}
 		} else {
-			if err != nil {
+			if err != nil && (tc.podLimit == 0 || fakePodControl.CreateCallCount < tc.podLimit) {
 				t.Errorf("%s: unexpected error when syncing jobs %v", name, err)
 			}
 		}
@@ -326,6 +332,14 @@ func TestControllerSyncJob(t *testing.T) {
 		// validate conditions
 		if tc.expectedComplete && !getCondition(actual, batch.JobComplete) {
 			t.Errorf("%s: expected completion condition.  Got %#v", name, actual.Status.Conditions)
+		}
+		// validate slow start
+		expectedLimit := 0
+		for pass := uint8(0); expectedLimit <= tc.podLimit; pass++ {
+			expectedLimit += controller.SlowStartInitialBatchSize << pass
+		}
+		if tc.podLimit > 0 && fakePodControl.CreateCallCount > expectedLimit {
+			t.Errorf("%s: Unexpected number of create calls.  Expected <= %d, saw %d\n", name, fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
 		}
 	}
 }
