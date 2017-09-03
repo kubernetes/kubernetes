@@ -62,7 +62,7 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 						Name: "",
 					},
 				}),
-			expectedError: `initializers[1].name: Invalid value: "k8s.io": should be a domain with at least two dots, initializers[2].name: Required value`,
+			expectedError: `initializers[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, initializers[2].name: Required value`,
 		},
 		{
 			name: "APIGroups must not be empty or nil",
@@ -260,7 +260,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						Name: "",
 					},
 				}),
-			expectedError: `externalAdmissionHooks[1].name: Invalid value: "k8s.io": should be a domain with at least two dots, externalAdmissionHooks[2].name: Required value`,
+			expectedError: `externalAdmissionHooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, externalAdmissionHooks[2].name: Required value`,
 		},
 		{
 			name: "Operations must not be empty or nil",
