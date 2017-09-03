@@ -718,9 +718,12 @@ func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
 		for _, i := range t.Items {
 			items = append(items, i.Object)
 		}
-		t.Object["items"] = items
-		defer func() { delete(t.Object, "items") }()
-		return json.NewEncoder(w).Encode(t.Object)
+		listObj := make(map[string]interface{}, len(t.Object)+1)
+		for k, v := range t.Object { // Make a shallow copy
+			listObj[k] = v
+		}
+		listObj["items"] = items
+		return json.NewEncoder(w).Encode(listObj)
 	case *runtime.Unknown:
 		// TODO: Unstructured needs to deal with ContentType.
 		_, err := w.Write(t.Raw)
