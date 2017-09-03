@@ -54,7 +54,7 @@ var (
 	getLong = templates.LongDesc(`
 		Display one or many resources.
 
-		` + validResources + `
+		` + "%s" + `
 
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
@@ -113,10 +113,13 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 
+	validResources, err := cmdutil.ValidResources(f)
+	cmdutil.CheckErr(err)
+
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   i18n.T("Display one or many resources"),
-		Long:    getLong,
+		Long:    fmt.Sprintf(getLong, validResources),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, errOut, cmd, args, options)
@@ -184,6 +187,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
+		validResources, err := cmdutil.ValidResources(f)
+		if err != nil {
+			return err
+		}
 		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
 
 		fullCmdName := cmd.Parent().CommandPath()
