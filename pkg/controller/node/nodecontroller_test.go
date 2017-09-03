@@ -61,12 +61,12 @@ const (
 func alwaysReady() bool { return true }
 
 type nodeController struct {
-	*NodeController
+	*Controller
 	nodeInformer      coreinformers.NodeInformer
 	daemonSetInformer extensionsinformers.DaemonSetInformer
 }
 
-func NewNodeControllerFromClient(
+func newNodeControllerFromClient(
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
@@ -597,7 +597,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := NewNodeControllerFromClient(
+		nodeController, _ := newNodeControllerFromClient(
 			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
@@ -643,8 +643,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		for _, zone := range zones {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
 				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
-					nodeUid, _ := value.UID.(string)
-					util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetInformer.Lister())
+					nodeUID, _ := value.UID.(string)
+					util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -763,7 +763,7 @@ func TestPodStatusChange(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
+		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler,
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
@@ -788,8 +788,8 @@ func TestPodStatusChange(t *testing.T) {
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
-				nodeUid, _ := value.UID.(string)
-				util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+				nodeUID, _ := value.UID.(string)
+				util.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -846,8 +846,8 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		nodeList                []*v1.Node
 		podList                 []v1.Pod
 		updatedNodeStatuses     []v1.NodeStatus
-		expectedInitialStates   map[string]zoneState
-		expectedFollowingStates map[string]zoneState
+		expectedInitialStates   map[string]ZoneState
+		expectedFollowingStates map[string]ZoneState
 		expectedEvictPods       bool
 		description             string
 	}{
@@ -901,8 +901,8 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				unhealthyNodeNewStatus,
 				unhealthyNodeNewStatus,
 			},
-			expectedInitialStates:   map[string]zoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
-			expectedFollowingStates: map[string]zoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
+			expectedInitialStates:   map[string]ZoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
+			expectedFollowingStates: map[string]ZoneState{testutil.CreateZoneID("region1", "zone1"): stateFullDisruption},
 			expectedEvictPods:       false,
 			description:             "Network Disruption: Only zone is down - eviction shouldn't take place.",
 		},
@@ -957,11 +957,11 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				unhealthyNodeNewStatus,
 				unhealthyNodeNewStatus,
 			},
-			expectedInitialStates: map[string]zoneState{
+			expectedInitialStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
 			},
-			expectedFollowingStates: map[string]zoneState{
+			expectedFollowingStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region2", "zone2"): stateFullDisruption,
 			},
@@ -1018,11 +1018,11 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
-			expectedInitialStates: map[string]zoneState{
+			expectedInitialStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
-			expectedFollowingStates: map[string]zoneState{
+			expectedFollowingStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
@@ -1079,10 +1079,10 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
-			expectedInitialStates: map[string]zoneState{
+			expectedInitialStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 			},
-			expectedFollowingStates: map[string]zoneState{
+			expectedFollowingStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 			},
 			expectedEvictPods: false,
@@ -1139,11 +1139,11 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				unhealthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
-			expectedInitialStates: map[string]zoneState{
+			expectedInitialStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region1", "zone2"): stateFullDisruption,
 			},
-			expectedFollowingStates: map[string]zoneState{
+			expectedFollowingStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): stateFullDisruption,
 				testutil.CreateZoneID("region1", "zone2"): stateNormal,
 			},
@@ -1264,10 +1264,10 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				healthyNodeNewStatus,
 				healthyNodeNewStatus,
 			},
-			expectedInitialStates: map[string]zoneState{
+			expectedInitialStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
 			},
-			expectedFollowingStates: map[string]zoneState{
+			expectedFollowingStates: map[string]ZoneState{
 				testutil.CreateZoneID("region1", "zone1"): statePartialDisruption,
 			},
 			expectedEvictPods: true,
@@ -1280,7 +1280,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 			Existing:  item.nodeList,
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
-		nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler,
+		nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler,
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
@@ -1384,7 +1384,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
 		DeleteWaitChan: make(chan struct{}),
 	}
-	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
+	nodeController, _ := newNodeControllerFromClient(nil, fnh, 10*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false, false)
@@ -1654,7 +1654,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
+		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
@@ -1888,7 +1888,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
+		nodeController, _ := newNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() metav1.Time { return fakeNow }
@@ -1999,7 +1999,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	originalTaint := UnreachableTaintTemplate
 	updatedTaint := NotReadyTaintTemplate
 
-	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler,
+	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler,
 		evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
 	nodeController.now = func() metav1.Time { return fakeNow }
@@ -2092,7 +2092,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
-	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
+	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, evictionTimeout,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold, testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, true)
 	nodeController.now = func() metav1.Time { return fakeNow }
@@ -2270,7 +2270,7 @@ func TestNodeEventGeneration(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
 
-	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
+	nodeController, _ := newNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealthyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false, false)
@@ -2384,7 +2384,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc, _ := NewNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false, false)
+	nc, _ := newNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false, false)
 	nc.nodeInformer.Informer().GetStore().Add(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "new",
