@@ -36,7 +36,7 @@ type ConfigOverrides struct {
 	Timeout         string
 }
 
-// ConfigOverrideFlags holds the flag names to be used for binding command line flags.  Notice that this structure tightly
+// ConfigOverrideFlags holds the flag names to be used for binding command line flags. Notice that this structure tightly
 // corresponds to ConfigOverrides
 type ConfigOverrideFlags struct {
 	AuthOverrideFlags    AuthOverrideFlags
