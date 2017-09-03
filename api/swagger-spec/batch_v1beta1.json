@@ -1440,7 +1440,12 @@
      "activeDeadlineSeconds": {
       "type": "integer",
       "format": "int64",
-      "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
+      "description": "Specifies the duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
+     },
+     "backoffLimit": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Specifies the number of retries before marking this job failed. Defaults to 6"
      },
      "selector": {
       "$ref": "v1.LabelSelector",
