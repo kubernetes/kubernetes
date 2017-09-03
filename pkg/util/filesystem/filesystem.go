@@ -18,6 +18,7 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -29,10 +30,13 @@ type Filesystem interface {
 	Rename(oldpath, newpath string) error
 	MkdirAll(path string, perm os.FileMode) error
 	Chtimes(name string, atime time.Time, mtime time.Time) error
+	RemoveAll(path string) error
 
 	// from "io/ioutil"
 	ReadFile(filename string) ([]byte, error)
 	TempFile(dir, prefix string) (File, error)
+	ReadDir(dirname string) ([]os.FileInfo, error)
+	Walk(root string, walkFn filepath.WalkFunc) error
 }
 
 // File is an interface that we can use to mock various filesystem operations typically

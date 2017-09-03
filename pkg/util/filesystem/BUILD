@@ -11,8 +11,12 @@ go_library(
         "defaultfs.go",
         "fakefs.go",
         "filesystem.go",
+        "watcher.go",
     ],
-    deps = ["//vendor/github.com/spf13/afero:go_default_library"],
+    deps = [
+        "//vendor/github.com/fsnotify/fsnotify:go_default_library",
+        "//vendor/github.com/spf13/afero:go_default_library",
+    ],
 )
 
 filegroup(
