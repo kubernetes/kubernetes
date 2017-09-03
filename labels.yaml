@@ -162,6 +162,16 @@ labels:
   color: bfe5bf
 - name: do-not-merge
   color: e11d21
+- name: do-not-merge/work-in-progress
+  color: e11d21
+- name: do-not-merge/hold
+  color: e11d21
+- name: do-not-merge/cherry-pick-not-approved
+  color: e11d21
+- name: do-not-merge/release-note-label-needed
+  color: e11d21
+- name: do-not-merge/blocked-paths
+  color: e11d21
 - name: flake-has-meta
   color: fbca04
 - name: for-new-contributors
