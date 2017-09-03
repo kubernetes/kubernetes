@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1alpha1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 )
