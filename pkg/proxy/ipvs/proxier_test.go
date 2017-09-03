@@ -19,6 +19,7 @@ limitations under the License.
 package ipvs
 
 import (
+	"bytes"
 	"net"
 	"reflect"
 	"testing"
@@ -112,6 +113,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs
 		healthChecker:    newFakeHealthChecker(),
 		ipvsScheduler:    DefaultScheduler,
 		ipGetter:         &fakeIPGetter{nodeIPs: nodeIPs},
+		iptablesData:     bytes.NewBuffer(nil),
+		natChains:        bytes.NewBuffer(nil),
+		natRules:         bytes.NewBuffer(nil),
 	}
 }
 
