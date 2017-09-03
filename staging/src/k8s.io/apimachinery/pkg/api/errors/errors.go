@@ -28,6 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	// StatusTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again.
+	StatusTooManyRequests = 429
+)
+
 // StatusError is an error intended for consumption by a REST API server; it can also be
 // reconstructed by clients from a REST response. Public to allow easy type switches.
 type StatusError struct {
@@ -306,6 +312,18 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 		Details: &metav1.StatusDetails{
 			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
+	}}
+}
+
+// NewTooManyRequestsError returns an error indicating that the request was rejected because
+// the server has received too many requests. Client should wait and retry. But if the request
+// is perishable, then the client should not retry the request.
+func NewTooManyRequestsError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    StatusTooManyRequests,
+		Reason:  metav1.StatusReasonTooManyRequests,
+		Message: fmt.Sprintf("Too many requests: %s", message),
 	}}
 }
 

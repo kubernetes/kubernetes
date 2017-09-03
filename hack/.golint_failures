@@ -466,6 +466,8 @@ pkg/volume/util
 pkg/volume/vsphere_volume
 plugin/cmd/kube-scheduler/app
 plugin/pkg/admission/antiaffinity
+plugin/pkg/admission/eventratelimit/apis/eventratelimit
+plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialization
 plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
