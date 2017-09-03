@@ -8375,6 +8375,33 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///old",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
+			},
+		}, false},
 	}
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
