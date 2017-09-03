@@ -97,6 +97,12 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 	return nil
 }
 
+// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
+	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
+	return nil
+}
+
 // SetTimeout is a no-op; we don't wait in this implementation
 func (w *Waiter) SetTimeout(_ time.Duration) {}
 

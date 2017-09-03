@@ -40,10 +40,13 @@ type Waiter interface {
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
 	WaitForPodToDisappear(staticPodName string) error
-	// WaitForStaticPodControlPlaneHashes
+	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
-	// WaitForStaticPodControlPlaneHashChange
+	// WaitForStaticPodControlPlaneHashChange waits for the given static pod component's static pod hash to get updated.
+	// By doing that we can be sure that the kubelet has restarted the given Static Pod
 	WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error
+	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+	WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error
 	// SetTimeout adjusts the timeout to the specified duration
 	SetTimeout(timeout time.Duration)
 }
@@ -123,6 +126,26 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	})
 }
 
+// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
+func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
+	time.Sleep(initalTimeout)
+	return TryRunCommand(func() error {
+		resp, err := http.Get(healthzEndpoint)
+		if err != nil {
+			fmt.Printf("[kubelet-check] It seems like the kubelet isn't running or healthy.\n")
+			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' failed with error: %v.\n", healthzEndpoint, err)
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			fmt.Printf("[kubelet-check] It seems like the kubelet isn't running or healthy.")
+			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
+			return fmt.Errorf("the kubelet healthz endpoint is unhealthy")
+		}
+		return nil
+	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds
+}
+
 // SetTimeout adjusts the timeout to the specified duration
 func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 	w.timeout = timeout
@@ -184,20 +207,19 @@ func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string)
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned
-func TryRunCommand(f func() error, failureThreshold uint8) error {
-	var numFailures uint8
-	return wait.PollImmediate(5*time.Second, 20*time.Minute, func() (bool, error) {
+func TryRunCommand(f func() error, failureThreshold int) error {
+	backoff := wait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   2, // double the timeout for every failure
+		Steps:    failureThreshold,
+	}
+	return wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err := f()
 		if err != nil {
-			numFailures++
-			// If we've reached the maximum amount of failures, error out
-			if numFailures == failureThreshold {
-				return false, err
-			}
-			// Retry
+			// Retry until the timeout
 			return false, nil
 		}
-		// The last f() call was a success!
+		// The last f() call was a success, return cleanly
 		return true, nil
 	})
 }
