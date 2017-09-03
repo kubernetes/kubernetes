@@ -27,6 +27,8 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
+// test
+
 type FakeCloudAddressService struct {
 	count int
 	// reservedAddrs tracks usage of IP addresses
@@ -70,7 +72,16 @@ func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha
 	}
 
 	if cas.reservedAddrs[addr.Address] {
-		return makeGoogleAPIError(http.StatusConflict, "IP in use")
+		msg := "IP in use"
+		// When the IP is already in use, this call returns an error code based
+		// on the type (internal vs external) of the address. This is to be
+		// consistent with actual GCE API.
+		switch lbScheme(addr.AddressType) {
+		case schemeExternal:
+			return makeGoogleAPIError(http.StatusBadRequest, msg)
+		default:
+			return makeGoogleAPIError(http.StatusConflict, msg)
+		}
 	}
 
 	if _, exists := cas.addrsByRegionAndName[region]; !exists {
@@ -133,6 +144,7 @@ func (cas *FakeCloudAddressService) DeleteRegionAddress(name, region string) err
 	if !exists {
 		return makeGoogleAPINotFoundError("")
 	}
+
 	delete(cas.reservedAddrs, addr.Address)
 	delete(cas.addrsByRegionAndName[region], name)
 	return nil
@@ -167,6 +179,14 @@ func (cas *FakeCloudAddressService) GetRegionAddressByIP(name, region string) (*
 	return nil, err
 }
 
+func (cas *FakeCloudAddressService) getNetworkTierFromAddress(name, region string) (string, error) {
+	addr, err := cas.GetAlphaRegionAddress(name, region)
+	if err != nil {
+		return "", err
+	}
+	return addr.NetworkTier, nil
+}
+
 func convertToV1Address(object gceObject) *compute.Address {
 	enc, err := object.MarshalJSON()
 	if err != nil {
@@ -188,6 +208,8 @@ func convertToAlphaAddress(object gceObject) *computealpha.Address {
 	if err := json.Unmarshal(enc, &addr); err != nil {
 		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to alpha address: %v", object, err))
 	}
+	// Set the default values for the Alpha fields.
+	addr.NetworkTier = NetworkTierDefault.ToGCEValue()
 	return &addr
 }
 

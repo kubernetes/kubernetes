@@ -102,6 +102,14 @@ func (f *FakeCloudForwardingRuleService) GetRegionForwardingRule(name, region st
 	return nil, err
 }
 
+func (f *FakeCloudForwardingRuleService) getNetworkTierFromForwardingRule(name, region string) (string, error) {
+	fwdRule, err := f.GetAlphaRegionForwardingRule(name, region)
+	if err != nil {
+		return "", err
+	}
+	return fwdRule.NetworkTier, nil
+}
+
 func convertToV1ForwardingRule(object gceObject) *compute.ForwardingRule {
 	enc, err := object.MarshalJSON()
 	if err != nil {
@@ -123,5 +131,8 @@ func convertToAlphaForwardingRule(object gceObject) *computealpha.ForwardingRule
 	if err := json.Unmarshal(enc, &fwdRule); err != nil {
 		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to alpha fwdRuleess: %v", object, err))
 	}
+	// Set the default values for the Alpha fields.
+	fwdRule.NetworkTier = NetworkTierDefault.ToGCEValue()
+
 	return &fwdRule
 }
