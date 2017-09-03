@@ -124,29 +124,40 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 
 // generateMountBindings converts the mount list to a list of strings that
 // can be understood by docker.
-// Each element in the string is in the form of:
-// '<HostPath>:<ContainerPath>', or
-// '<HostPath>:<ContainerPath>:ro', if the path is read only, or
-// '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
-// relabeling and the pod provides an SELinux label
+// '<HostPath>:<ContainerPath>[:options]', where 'options'
+// is a comma-separated list of the following strings:
+// 'ro', if the path is read only
+// 'Z', if the volume requires SELinux relabeling
+// propagation mode such as 'rslave'
 func generateMountBindings(mounts []*runtimeapi.Mount) []string {
 	result := make([]string, 0, len(mounts))
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
-		readOnly := m.Readonly
-		if readOnly {
-			bind += ":ro"
+		var attrs []string
+		if m.Readonly {
+			attrs = append(attrs, "ro")
 		}
 		// Only request relabeling if the pod provides an SELinux context. If the pod
 		// does not provide an SELinux context relabeling will label the volume with
 		// the container's randomly allocated MCS label. This would restrict access
 		// to the volume to the container which mounts it first.
 		if m.SelinuxRelabel {
-			if readOnly {
-				bind += ",Z"
-			} else {
-				bind += ":Z"
-			}
+			attrs = append(attrs, "Z")
+		}
+		switch m.Propagation {
+		case runtimeapi.MountPropagation_PROPAGATION_PRIVATE:
+			// noop, private is default
+		case runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL:
+			attrs = append(attrs, "rshared")
+		case runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
+			attrs = append(attrs, "rslave")
+		default:
+			glog.Warningf("unknown propagation mode for hostPath %q", m.HostPath)
+			// Falls back to "private"
+		}
+
+		if len(attrs) > 0 {
+			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attrs, ","))
 		}
 		result = append(result, bind)
 	}

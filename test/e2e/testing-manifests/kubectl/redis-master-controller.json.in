@@ -25,7 +25,7 @@
             "containers":[
                {
                   "name":"redis-master",
-		  "image": "gcr.io/k8s-testimages/redis:e2e",
+                  "image": "{{.RedisImage}}",
                   "ports":[
                      {
                         "name":"redis-server",

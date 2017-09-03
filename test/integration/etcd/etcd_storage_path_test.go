@@ -393,6 +393,8 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
 
+	// SRR objects that are not stored in etcd
+	gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"),
@@ -401,6 +403,8 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1
 
+	// SRR objects that are not stored in etcd
+	gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"),

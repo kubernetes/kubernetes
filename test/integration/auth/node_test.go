@@ -74,7 +74,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		AuthorizationModes: []string{"Node", "RBAC"},
 		InformerFactory:    informerFactory,
 	}
-	nodeRBACAuthorizer, err := authorizerConfig.New()
+	nodeRBACAuthorizer, _, err := authorizerConfig.New()
 	if err != nil {
 		t.Fatal(err)
 	}

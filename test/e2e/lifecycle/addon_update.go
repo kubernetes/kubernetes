@@ -32,6 +32,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -56,7 +57,7 @@ spec:
         k8s-app: addon-reconcile-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: %s
         name: addon-reconcile-test
         ports:
         - containerPort: 9376
@@ -85,7 +86,7 @@ spec:
         k8s-app: addon-reconcile-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: %s
         name: addon-reconcile-test
         ports:
         - containerPort: 9376
@@ -188,7 +189,7 @@ spec:
         k8s-app: invalid-addon-test
     spec:
       containers:
-      - image: gcr.io/google_containers/serve_hostname:v1.4
+      - image: %s
         name: invalid-addon-test
         ports:
         - containerPort: 9376
@@ -200,6 +201,8 @@ const (
 	addonTestPollTimeout  = 5 * time.Minute
 	addonNsName           = metav1.NamespaceSystem
 )
+
+var serveHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
 
 type stringPair struct {
 	data, fileName string
@@ -259,13 +262,13 @@ var _ = SIGDescribe("Addon update", func() {
 		svcAddonEnsureExistsUpdated := "addon-ensure-exists-service-updated.yaml"
 
 		var remoteFiles []stringPair = []stringPair{
-			{fmt.Sprintf(reconcile_addon_controller, addonNsName), rcAddonReconcile},
-			{fmt.Sprintf(reconcile_addon_controller_updated, addonNsName), rcAddonReconcileUpdated},
+			{fmt.Sprintf(reconcile_addon_controller, addonNsName, serveHostnameImage), rcAddonReconcile},
+			{fmt.Sprintf(reconcile_addon_controller_updated, addonNsName, serveHostnameImage), rcAddonReconcileUpdated},
 			{fmt.Sprintf(deprecated_label_addon_service, addonNsName), svcAddonDeprecatedLabel},
 			{fmt.Sprintf(deprecated_label_addon_service_updated, addonNsName), svcAddonDeprecatedLabelUpdated},
 			{fmt.Sprintf(ensure_exists_addon_service, addonNsName), svcAddonEnsureExists},
 			{fmt.Sprintf(ensure_exists_addon_service_updated, addonNsName), svcAddonEnsureExistsUpdated},
-			{fmt.Sprintf(invalid_addon_controller, addonNsName), rcInvalid},
+			{fmt.Sprintf(invalid_addon_controller, addonNsName, serveHostnameImage), rcInvalid},
 		}
 
 		for _, p := range remoteFiles {

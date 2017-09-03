@@ -160,6 +160,7 @@ func newTestKubeletWithImageList(
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
+	kubelet.mounter = &mount.FakeMounter{}
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = types.NodeName(testKubeletHostname)

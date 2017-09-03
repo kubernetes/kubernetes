@@ -39,7 +39,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  authorization.GroupName,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:            sets.NewString("SubjectAccessReview", "SelfSubjectAccessReview"),
+			RootScopedKinds:            sets.NewString("SubjectAccessReview", "SelfSubjectAccessReview", "SelfSubjectRulesReview"),
 			AddInternalObjectsToScheme: authorization.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

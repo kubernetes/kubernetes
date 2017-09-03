@@ -36,6 +36,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -402,7 +403,7 @@ func discoverService(f *fedframework.Framework, name string, exists bool, podNam
 			Containers: []v1.Container{
 				{
 					Name:    "federated-service-discovery-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetBusyBoxImage(),
 					Command: command,
 				},
 			},

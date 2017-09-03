@@ -73,6 +73,13 @@ const (
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
 
+	// owner: @jiayingz
+	// alpha: v1.8
+	//
+	// Enables support for Device Plugins
+	// Only Nvidia GPUs are tested as of v1.8.
+	DevicePlugins utilfeature.Feature = "DevicePlugins"
+
 	// owner: @gmarek
 	// alpha: v1.6
 	//
@@ -137,6 +144,12 @@ const (
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
+
+	// owner: @jsafrane
+	// alpha: v1.8
+	//
+	// Enable mount propagation of volumes.
+	MountPropagation utilfeature.Feature = "MountPropagation"
 )
 
 func init() {
@@ -155,6 +168,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
@@ -164,6 +178,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
+	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

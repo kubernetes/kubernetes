@@ -83,6 +83,10 @@ func (sp *summaryProviderImpl) Get() (*statsapi.Summary, error) {
 		statsapi.SystemContainerMisc:    nodeConfig.SystemCgroupsName,
 	}
 	for sys, name := range systemContainers {
+		// skip if cgroup name is undefined (not all system containers are required)
+		if name == "" {
+			continue
+		}
 		s, _, err := sp.provider.GetCgroupStats(name)
 		if err != nil {
 			glog.Errorf("Failed to get system container stats for %q: %v", name, err)

@@ -32,6 +32,7 @@ filegroup(
         "//pkg/registry/authorization/localsubjectaccessreview:all-srcs",
         "//pkg/registry/authorization/rest:all-srcs",
         "//pkg/registry/authorization/selfsubjectaccessreview:all-srcs",
+        "//pkg/registry/authorization/selfsubjectrulesreview:all-srcs",
         "//pkg/registry/authorization/subjectaccessreview:all-srcs",
         "//pkg/registry/authorization/util:all-srcs",
         "//pkg/registry/autoscaling/horizontalpodautoscaler:all-srcs",

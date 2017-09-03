@@ -21,6 +21,7 @@ import (
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 
 	"fmt"
@@ -66,6 +67,10 @@ type ContainerManager interface {
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
 	UpdateQOSCgroups() error
+
+	// Returns RunContainerOptions with devices, mounts, and env fields populated for
+	// extended resources required by container.
+	GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error)
 }
 
 type NodeConfig struct {

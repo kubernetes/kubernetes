@@ -81,7 +81,6 @@ package_group(
 package_group(
     name = "KUBEADM_BAD",
     packages = [
-        "//cmd/kubeadm/app",
         "//cmd/kubeadm/app/cmd",
     ],
 )

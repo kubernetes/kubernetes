@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: nginx-deployment
 spec:
+  replicas: 2
   template:
     metadata:
       labels:
@@ -10,6 +11,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: gcr.io/google_containers/nginx-slim:0.8
+        image: {{.NginxSlimNewImage}}
         ports:
         - containerPort: 80

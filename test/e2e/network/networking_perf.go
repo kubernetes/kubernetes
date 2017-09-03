@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -63,7 +64,7 @@ var _ = SIGDescribe("Networking IPerf [Experimental] [Slow] [Feature:Networking-
 				return v1.PodSpec{
 					Containers: []v1.Container{{
 						Name:  "iperf-server",
-						Image: "gcr.io/google_containers/iperf:e2e",
+						Image: imageutils.GetE2EImage(imageutils.Iperf),
 						Args: []string{
 							"/bin/sh",
 							"-c",
@@ -91,7 +92,7 @@ var _ = SIGDescribe("Networking IPerf [Experimental] [Slow] [Feature:Networking-
 					Containers: []v1.Container{
 						{
 							Name:  "iperf-client",
-							Image: "gcr.io/google_containers/iperf:e2e",
+							Image: imageutils.GetE2EImage(imageutils.Iperf),
 							Args: []string{
 								"/bin/sh",
 								"-c",

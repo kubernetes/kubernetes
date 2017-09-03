@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -44,8 +45,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-
-		TestReplicationControllerServeImageOrFail(f, "private", "gcr.io/k8s-authenticated-test/serve_hostname:v1.4")
+		privateimage := imageutils.ServeHostname
+		privateimage.SetRegistry(imageutils.PrivateRegistry)
+		TestReplicationControllerServeImageOrFail(f, "private", imageutils.GetE2EImage(privateimage))
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {

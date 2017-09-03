@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -114,7 +115,7 @@ var _ = SIGDescribe("Proxy", func() {
 			cfg := testutils.RCConfig{
 				Client:         f.ClientSet,
 				InternalClient: f.InternalClientset,
-				Image:          "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+				Image:          imageutils.GetE2EImage(imageutils.Porter),
 				Name:           service.Name,
 				Namespace:      f.Namespace.Name,
 				Replicas:       1,

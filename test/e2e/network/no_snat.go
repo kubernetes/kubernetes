@@ -31,15 +31,17 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	// . "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	testPodPort  = 8080
-	testPodImage = "gcr.io/google_containers/no-snat-test-amd64:1.0.1"
+	testPodPort = 8080
 
-	testProxyPort  = 31235 // Firewall rule allows external traffic on ports 30000-32767. I just picked a random one.
-	testProxyImage = "gcr.io/google_containers/no-snat-test-proxy-amd64:1.0.1"
+	testProxyPort = 31235 // Firewall rule allows external traffic on ports 30000-32767. I just picked a random one.
 )
+
+var testPodImage = imageutils.GetE2EImage(imageutils.NoSnatTest)
+var testProxyImage = imageutils.GetE2EImage(imageutils.NoSnatTestProxy)
 
 var (
 	testPod = v1.Pod{

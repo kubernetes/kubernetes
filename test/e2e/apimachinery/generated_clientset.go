@@ -34,6 +34,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func stagingClientPod(name, value string) v1.Pod {
@@ -49,7 +50,7 @@ func stagingClientPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 				},
 			},
@@ -70,7 +71,7 @@ func testingPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					LivenessProbe: &v1.Probe{
 						Handler: v1.Handler{
@@ -243,7 +244,7 @@ func newTestingCronJob(name string, value string) *batchv2alpha1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: "gcr.io/google_containers/busybox:1.24",
+									Image: imageutils.GetBusyBoxImage(),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

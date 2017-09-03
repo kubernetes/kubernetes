@@ -279,7 +279,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
-	if kl.keepTerminatedPodVolumes {
+	if kl.kubeletConfiguration.KeepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
@@ -593,6 +593,15 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			initialCapacity := kl.containerManager.GetCapacity()
 			if initialCapacity != nil {
 				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
+			}
+		}
+
+		initialCapacity := kl.containerManager.GetCapacity()
+		if initialCapacity != nil {
+			for k, v := range initialCapacity {
+				if v1helper.IsExtendedResourceName(k) {
+					node.Status.Capacity[k] = v
+				}
 			}
 		}
 	}

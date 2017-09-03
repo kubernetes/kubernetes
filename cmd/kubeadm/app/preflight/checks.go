@@ -431,6 +431,32 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// SwapCheck warns if swap is enabled
+type SwapCheck struct{}
+
+func (swc SwapCheck) Check() (warnings, errors []error) {
+	f, err := os.Open("/proc/swaps")
+	if err != nil {
+		// /proc/swaps not available, thus no reasons to warn
+		return nil, nil
+	}
+	defer f.Close()
+	var buf []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		buf = append(buf, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, []error{fmt.Errorf("error parsing /proc/swaps: %v", err)}
+	}
+
+	if len(buf) > 1 {
+		return []error{fmt.Errorf("Running with swap on is not supported. Please disable swap or set kubelet's --fail-swap-on flag to false.")}, nil
+	}
+
+	return nil, nil
+}
+
 type etcdVersionResponse struct {
 	Etcdserver  string `json:"etcdserver"`
 	Etcdcluster string `json:"etcdcluster"`
@@ -586,6 +612,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+		SwapCheck{},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -646,6 +673,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+		SwapCheck{},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
