@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
@@ -434,29 +433,4 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
-}
-
-type stubVolume struct {
-	path string
-	volume.MetricsNil
-}
-
-func (f *stubVolume) GetPath() string {
-	return f.path
-}
-
-func (f *stubVolume) GetAttributes() volume.Attributes {
-	return volume.Attributes{}
-}
-
-func (f *stubVolume) CanMount() error {
-	return nil
-}
-
-func (f *stubVolume) SetUp(fsGroup *int64) error {
-	return nil
-}
-
-func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
-	return nil
 }

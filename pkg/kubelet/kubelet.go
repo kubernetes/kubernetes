@@ -135,9 +135,6 @@ const (
 	// TODO ensure this is in sync with internal cadvisor housekeeping.
 	evictionMonitoringPeriod = time.Second * 10
 
-	// The path in containers' filesystems where the hosts file is mounted.
-	etcHostsPath = "/etc/hosts"
-
 	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity = 1000
