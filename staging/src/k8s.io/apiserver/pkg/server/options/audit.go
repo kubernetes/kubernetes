@@ -239,7 +239,7 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	// TODO: switch to beta
+	// TODO: switch to preferred version
 	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, o.Mode, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)
