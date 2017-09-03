@@ -31,6 +31,7 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// DEPRECATED.
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
 // their internal state.
@@ -53,6 +54,7 @@ message ControllerRevision {
   optional int64 revision = 3;
 }
 
+// DEPRECATED.
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.
 message ControllerRevisionList {
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -63,6 +65,7 @@ message ControllerRevisionList {
   repeated ControllerRevision items = 2;
 }
 
+// DEPRECATED.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
@@ -78,6 +81,7 @@ message Deployment {
   optional DeploymentStatus status = 3;
 }
 
+// DEPRECATED.
 // DeploymentCondition describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
@@ -99,6 +103,7 @@ message DeploymentCondition {
   optional string message = 5;
 }
 
+// DEPRECATED.
 // DeploymentList is a list of Deployments.
 message DeploymentList {
   // Standard list metadata.
@@ -123,6 +128,7 @@ message DeploymentRollback {
   optional RollbackConfig rollbackTo = 3;
 }
 
+// DEPRECATED.
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
@@ -173,6 +179,7 @@ message DeploymentSpec {
   optional int32 progressDeadlineSeconds = 9;
 }
 
+// DEPRECATED.
 // DeploymentStatus is the most recently observed status of the Deployment.
 message DeploymentStatus {
   // The generation observed by the deployment controller.
@@ -213,6 +220,7 @@ message DeploymentStatus {
   optional int32 collisionCount = 8;
 }
 
+// DEPRECATED.
 // DeploymentStrategy describes how to replace existing pods with new ones.
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
@@ -235,6 +243,7 @@ message RollbackConfig {
   optional int64 revision = 1;
 }
 
+// DEPRECATED.
 // Spec to control the desired behavior of rolling update.
 message RollingUpdateDeployment {
   // The maximum number of pods that can be unavailable during the update.
@@ -265,6 +274,7 @@ message RollingUpdateDeployment {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
+// DEPRECATED.
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 message RollingUpdateStatefulSetStrategy {
   // Partition indicates the ordinal at which the StatefulSet should be
@@ -313,6 +323,7 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
+// DEPRECATED.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
@@ -333,6 +344,7 @@ message StatefulSet {
   optional StatefulSetStatus status = 3;
 }
 
+// DEPRECATED.
 // StatefulSetList is a collection of StatefulSets.
 message StatefulSetList {
   // +optional
@@ -341,6 +353,7 @@ message StatefulSetList {
   repeated StatefulSet items = 2;
 }
 
+// DEPRECATED.
 // A StatefulSetSpec is the specification of a StatefulSet.
 message StatefulSetSpec {
   // replicas is the desired number of replicas of the given Template.
@@ -403,6 +416,7 @@ message StatefulSetSpec {
   optional int32 revisionHistoryLimit = 8;
 }
 
+// DEPRECATED.
 // StatefulSetStatus represents the current state of a StatefulSet.
 message StatefulSetStatus {
   // observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the
@@ -439,6 +453,7 @@ message StatefulSetStatus {
   optional int32 collisionCount = 9;
 }
 
+// DEPRECATED.
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.

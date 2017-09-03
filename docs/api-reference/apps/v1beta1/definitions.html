@@ -403,7 +403,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_deploymentstatus">v1beta1.DeploymentStatus</h3>
 <div class="paragraph">
-<p>DeploymentStatus is the most recently observed status of the Deployment.</p>
+<p>DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -589,7 +589,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_rollingupdatestatefulsetstrategy">v1beta1.RollingUpdateStatefulSetStrategy</h3>
 <div class="paragraph">
-<p>RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.</p>
+<p>DEPRECATED. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1158,7 +1158,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_rollingupdatedeployment">v1beta1.RollingUpdateDeployment</h3>
 <div class="paragraph">
-<p>Spec to control the desired behavior of rolling update.</p>
+<p>DEPRECATED. Spec to control the desired behavior of rolling update.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1547,7 +1547,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_statefulsetspec">v1beta1.StatefulSetSpec</h3>
 <div class="paragraph">
-<p>A StatefulSetSpec is the specification of a StatefulSet.</p>
+<p>DEPRECATED. A StatefulSetSpec is the specification of a StatefulSet.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1819,7 +1819,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_deployment">v1beta1.Deployment</h3>
 <div class="paragraph">
-<p>Deployment enables declarative updates for Pods and ReplicaSets.</p>
+<p>DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2939,7 +2939,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_statefulset">v1beta1.StatefulSet</h3>
 <div class="paragraph">
-<p>StatefulSet represents a set of pods with consistent identities. Identities are defined as:<br>
+<p>DEPRECATED. StatefulSet represents a set of pods with consistent identities. Identities are defined as:<br>
  - Network: A single stable DNS and hostname.<br>
  - Storage: As many VolumeClaims as requested.<br>
 The StatefulSet guarantees that a given network identity will always map to the same storage identity.</p>
@@ -3447,7 +3447,7 @@ The StatefulSet guarantees that a given network identity will always map to the 
 <div class="sect2">
 <h3 id="_v1beta1_deploymentspec">v1beta1.DeploymentSpec</h3>
 <div class="paragraph">
-<p>DeploymentSpec is the specification of the desired behavior of the Deployment.</p>
+<p>DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4107,7 +4107,7 @@ The StatefulSet guarantees that a given network identity will always map to the 
 <div class="sect2">
 <h3 id="_v1beta1_statefulsetlist">v1beta1.StatefulSetList</h3>
 <div class="paragraph">
-<p>StatefulSetList is a collection of StatefulSets.</p>
+<p>DEPRECATED. StatefulSetList is a collection of StatefulSets.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4276,7 +4276,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_controllerrevision">v1beta1.ControllerRevision</h3>
 <div class="paragraph">
-<p>ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.</p>
+<p>DEPRECATED. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4834,7 +4834,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_deploymentlist">v1beta1.DeploymentList</h3>
 <div class="paragraph">
-<p>DeploymentList is a list of Deployments.</p>
+<p>DEPRECATED. DeploymentList is a list of Deployments.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5095,7 +5095,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_statefulsetstatus">v1beta1.StatefulSetStatus</h3>
 <div class="paragraph">
-<p>StatefulSetStatus represents the current state of a StatefulSet.</p>
+<p>DEPRECATED. StatefulSetStatus represents the current state of a StatefulSet.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5182,7 +5182,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_deploymentstrategy">v1beta1.DeploymentStrategy</h3>
 <div class="paragraph">
-<p>DeploymentStrategy describes how to replace existing pods with new ones.</p>
+<p>DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -5695,7 +5695,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_controllerrevisionlist">v1beta1.ControllerRevisionList</h3>
 <div class="paragraph">
-<p>ControllerRevisionList is a resource containing a list of ControllerRevision objects.</p>
+<p>DEPRECATED. ControllerRevisionList is a resource containing a list of ControllerRevision objects.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6525,7 +6525,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_deploymentcondition">v1beta1.DeploymentCondition</h3>
 <div class="paragraph">
-<p>DeploymentCondition describes the state of a deployment at a certain point.</p>
+<p>DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6700,7 +6700,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1beta1_statefulsetupdatestrategy">v1beta1.StatefulSetUpdateStrategy</h3>
 <div class="paragraph">
-<p>StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.</p>
+<p>DEPRECATED. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>

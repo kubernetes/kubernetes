@@ -59961,7 +59961,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.ControllerRevision": {
-    "description": "ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
+    "description": "DEPRECATED. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
     "required": [
      "revision"
     ],
@@ -59997,7 +59997,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.ControllerRevisionList": {
-    "description": "ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
+    "description": "DEPRECATED. ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
     "required": [
      "items"
     ],
@@ -60031,7 +60031,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.Deployment": {
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -60063,7 +60063,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.DeploymentCondition": {
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -60096,7 +60096,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.DeploymentList": {
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "DEPRECATED. DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -60169,7 +60169,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.DeploymentSpec": {
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -60217,7 +60217,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.DeploymentStatus": {
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
@@ -60266,7 +60266,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.DeploymentStrategy": {
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "rollingUpdate": {
       "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
@@ -60289,7 +60289,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.RollingUpdateDeployment": {
-    "description": "Spec to control the desired behavior of rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
       "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
@@ -60302,7 +60302,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.RollingUpdateStatefulSetStrategy": {
-    "description": "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+    "description": "DEPRECATED. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
     "properties": {
      "partition": {
       "description": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
@@ -60378,7 +60378,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.StatefulSet": {
-    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "description": "DEPRECATED. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -60409,7 +60409,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.StatefulSetList": {
-    "description": "StatefulSetList is a collection of StatefulSets.",
+    "description": "DEPRECATED. StatefulSetList is a collection of StatefulSets.",
     "required": [
      "items"
     ],
@@ -60441,7 +60441,7 @@
     ]
    },
    "io.k8s.api.apps.v1beta1.StatefulSetSpec": {
-    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "description": "DEPRECATED. A StatefulSetSpec is the specification of a StatefulSet.",
     "required": [
      "template",
      "serviceName"
@@ -60487,7 +60487,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.StatefulSetStatus": {
-    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "description": "DEPRECATED. StatefulSetStatus represents the current state of a StatefulSet.",
     "required": [
      "replicas"
     ],
@@ -60533,7 +60533,7 @@
     }
    },
    "io.k8s.api.apps.v1beta1.StatefulSetUpdateStrategy": {
-    "description": "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+    "description": "DEPRECATED. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
     "properties": {
      "rollingUpdate": {
       "description": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
@@ -67855,7 +67855,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DaemonSet": {
-    "description": "DaemonSet represents the configuration of a daemon set.",
+    "description": "DEPRECATED. DaemonSet represents the configuration of a daemon set.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -67887,7 +67887,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DaemonSetList": {
-    "description": "DaemonSetList is a collection of daemon sets.",
+    "description": "DEPRECATED. DaemonSetList is a collection of daemon sets.",
     "required": [
      "items"
     ],
@@ -67921,7 +67921,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DaemonSetSpec": {
-    "description": "DaemonSetSpec is the specification of a daemon set.",
+    "description": "DEPRECATED. DaemonSetSpec is the specification of a daemon set.",
     "required": [
      "template"
     ],
@@ -67956,7 +67956,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DaemonSetStatus": {
-    "description": "DaemonSetStatus represents the current status of a daemon set.",
+    "description": "DEPRECATED. DaemonSetStatus represents the current status of a daemon set.",
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
@@ -68012,6 +68012,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DaemonSetUpdateStrategy": {
+    "description": "DEPRECATED.",
     "properties": {
      "rollingUpdate": {
       "description": "Rolling update config params. Present only if type = \"RollingUpdate\".",
@@ -68024,7 +68025,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.Deployment": {
-    "description": "Deployment enables declarative updates for Pods and ReplicaSets.",
+    "description": "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -68056,7 +68057,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DeploymentCondition": {
-    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "description": "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
     "required": [
      "type",
      "status"
@@ -68089,7 +68090,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DeploymentList": {
-    "description": "DeploymentList is a list of Deployments.",
+    "description": "DEPRECATED. DeploymentList is a list of Deployments.",
     "required": [
      "items"
     ],
@@ -68162,7 +68163,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.DeploymentSpec": {
-    "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+    "description": "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
      "template"
     ],
@@ -68211,7 +68212,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DeploymentStatus": {
-    "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "description": "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
@@ -68260,7 +68261,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.DeploymentStrategy": {
-    "description": "DeploymentStrategy describes how to replace existing pods with new ones.",
+    "description": "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
     "properties": {
      "rollingUpdate": {
       "description": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
@@ -68806,7 +68807,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSet": {
-    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
@@ -68838,7 +68839,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSetCondition": {
-    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "description": "DEPRECATED. ReplicaSetCondition describes the state of a replica set at a certain point.",
     "required": [
      "type",
      "status"
@@ -68867,7 +68868,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSetList": {
-    "description": "ReplicaSetList is a collection of ReplicaSets.",
+    "description": "DEPRECATED. ReplicaSetList is a collection of ReplicaSets.",
     "required": [
      "items"
     ],
@@ -68901,7 +68902,7 @@
     ]
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSetSpec": {
-    "description": "ReplicaSetSpec is the specification of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSetSpec is the specification of a ReplicaSet.",
     "properties": {
      "minReadySeconds": {
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
@@ -68924,7 +68925,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.ReplicaSetStatus": {
-    "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
+    "description": "DEPRECATED. ReplicaSetStatus represents the current status of a ReplicaSet.",
     "required": [
      "replicas"
     ],
@@ -68976,7 +68977,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RollingUpdateDaemonSet": {
-    "description": "Spec to control the desired behavior of daemon set rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of daemon set rolling update.",
     "properties": {
      "maxUnavailable": {
       "description": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
@@ -68985,7 +68986,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RollingUpdateDeployment": {
-    "description": "Spec to control the desired behavior of rolling update.",
+    "description": "DEPRECATED. Spec to control the desired behavior of rolling update.",
     "properties": {
      "maxSurge": {
       "description": "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. By default, a value of 1 is used. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",

@@ -28,7 +28,7 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ControllerRevision = map[string]string{
-	"":         "ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
+	"":         "DEPRECATED. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"data":     "Data is the serialized representation of the state.",
 	"revision": "Revision indicates the revision of the state represented by Data.",
@@ -39,7 +39,7 @@ func (ControllerRevision) SwaggerDoc() map[string]string {
 }
 
 var map_ControllerRevisionList = map[string]string{
-	"":         "ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
+	"":         "DEPRECATED. ControllerRevisionList is a resource containing a list of ControllerRevision objects.",
 	"metadata": "More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"items":    "Items is the list of ControllerRevisions",
 }
@@ -49,7 +49,7 @@ func (ControllerRevisionList) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"":         "Deployment enables declarative updates for Pods and ReplicaSets.",
+	"":         "DEPRECATED. Deployment enables declarative updates for Pods and ReplicaSets.",
 	"metadata": "Standard object metadata.",
 	"spec":     "Specification of the desired behavior of the Deployment.",
 	"status":   "Most recently observed status of the Deployment.",
@@ -60,7 +60,7 @@ func (Deployment) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentCondition = map[string]string{
-	"":                   "DeploymentCondition describes the state of a deployment at a certain point.",
+	"":                   "DEPRECATED. DeploymentCondition describes the state of a deployment at a certain point.",
 	"type":               "Type of deployment condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastUpdateTime":     "The last time this condition was updated.",
@@ -74,7 +74,7 @@ func (DeploymentCondition) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentList = map[string]string{
-	"":         "DeploymentList is a list of Deployments.",
+	"":         "DEPRECATED. DeploymentList is a list of Deployments.",
 	"metadata": "Standard list metadata.",
 	"items":    "Items is the list of Deployments.",
 }
@@ -95,7 +95,7 @@ func (DeploymentRollback) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentSpec = map[string]string{
-	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+	"":                        "DEPRECATED. DeploymentSpec is the specification of the desired behavior of the Deployment.",
 	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 	"selector":                "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
 	"template":                "Template describes the pods that will be created.",
@@ -112,7 +112,7 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStatus = map[string]string{
-	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"":                    "DEPRECATED. DeploymentStatus is the most recently observed status of the Deployment.",
 	"observedGeneration":  "The generation observed by the deployment controller.",
 	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
 	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
@@ -128,7 +128,7 @@ func (DeploymentStatus) SwaggerDoc() map[string]string {
 }
 
 var map_DeploymentStrategy = map[string]string{
-	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
+	"":              "DEPRECATED. DeploymentStrategy describes how to replace existing pods with new ones.",
 	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
 	"rollingUpdate": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
 }
@@ -147,7 +147,7 @@ func (RollbackConfig) SwaggerDoc() map[string]string {
 }
 
 var map_RollingUpdateDeployment = map[string]string{
-	"":               "Spec to control the desired behavior of rolling update.",
+	"":               "DEPRECATED. Spec to control the desired behavior of rolling update.",
 	"maxUnavailable": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
 	"maxSurge":       "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
 }
@@ -157,7 +157,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 }
 
 var map_RollingUpdateStatefulSetStrategy = map[string]string{
-	"":          "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+	"":          "DEPRECATED. RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
 	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned.",
 }
 
@@ -197,7 +197,7 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSet = map[string]string{
-	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+	"":       "DEPRECATED. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
 	"spec":   "Spec defines the desired identities of pods in this set.",
 	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
 }
@@ -207,7 +207,7 @@ func (StatefulSet) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetList = map[string]string{
-	"": "StatefulSetList is a collection of StatefulSets.",
+	"": "DEPRECATED. StatefulSetList is a collection of StatefulSets.",
 }
 
 func (StatefulSetList) SwaggerDoc() map[string]string {
@@ -215,7 +215,7 @@ func (StatefulSetList) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetSpec = map[string]string{
-	"":                     "A StatefulSetSpec is the specification of a StatefulSet.",
+	"":                     "DEPRECATED. A StatefulSetSpec is the specification of a StatefulSet.",
 	"replicas":             "replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
 	"selector":             "selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 	"template":             "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
@@ -231,7 +231,7 @@ func (StatefulSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetStatus = map[string]string{
-	"":                   "StatefulSetStatus represents the current state of a StatefulSet.",
+	"":                   "DEPRECATED. StatefulSetStatus represents the current state of a StatefulSet.",
 	"observedGeneration": "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server.",
 	"replicas":           "replicas is the number of Pods created by the StatefulSet controller.",
 	"readyReplicas":      "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.",
@@ -247,7 +247,7 @@ func (StatefulSetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetUpdateStrategy = map[string]string{
-	"":              "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+	"":              "DEPRECATED. StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
 	"type":          "Type indicates the type of the StatefulSetUpdateStrategy.",
 	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
 }
