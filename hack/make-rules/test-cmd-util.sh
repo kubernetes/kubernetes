@@ -3571,7 +3571,7 @@ run_kubectl_create_error_tests() {
   ERROR_FILE="${KUBE_TEMP}/validation-error"
   kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
   # Post-condition: should get an error reporting the empty string
-  if grep -q "unexpected nil value for field" "${ERROR_FILE}"; then
+  if grep -q "unknown object type \"nil\" in ReplicationController" "${ERROR_FILE}"; then
     kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat ${ERROR_FILE})"
   else
     kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat ${ERROR_FILE})"
