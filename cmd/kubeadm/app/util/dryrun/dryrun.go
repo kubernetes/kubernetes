@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -98,3 +99,18 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 
 // SetTimeout is a no-op; we don't wait in this implementation
 func (w *Waiter) SetTimeout(_ time.Duration) {}
+
+// WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images; WaitForStaticPodControlPlaneHashChange won't block in any case
+// but the empty strings there are needed
+func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
+	return map[string]string{
+		constants.KubeAPIServer:         "",
+		constants.KubeControllerManager: "",
+		constants.KubeScheduler:         "",
+	}, nil
+}
+
+// WaitForStaticPodControlPlaneHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
+func (w *Waiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) error {
+	return nil
+}

@@ -26,10 +26,13 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -39,11 +42,12 @@ type upgradeVariables struct {
 	client        clientset.Interface
 	cfg           *kubeadmapiext.MasterConfiguration
 	versionGetter upgrade.VersionGetter
+	waiter        apiclient.Waiter
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(kubeConfigPath, cfgPath string, printConfig bool) (*upgradeVariables, error) {
-	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigPath)
+func enforceRequirements(kubeConfigPath, cfgPath string, printConfig, dryRun bool) (*upgradeVariables, error) {
+	client, err := getClient(kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", kubeConfigPath, err)
 	}
@@ -69,6 +73,8 @@ func enforceRequirements(kubeConfigPath, cfgPath string, printConfig bool) (*upg
 		cfg:    cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
 		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
+		// Use the waiter conditionally based on the dryrunning variable
+		waiter: getWaiter(dryRun, client),
 	}, nil
 }
 
@@ -99,6 +105,46 @@ func runPreflightChecks(skipPreFlight bool) error {
 
 	fmt.Println("[preflight] Running pre-flight checks")
 	return preflight.RunRootCheckOnly()
+}
+
+// getClient gets a real or fake client depending on whether the user is dry-running or not
+func getClient(file string, dryRun bool) (clientset.Interface, error) {
+	if dryRun {
+		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
+		if err != nil {
+			return nil, err
+		}
+
+		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
+		// real version; we have to do some clever API machinery tricks. First, we get the real
+		// API Server's version
+		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get server version: %v", err)
+		}
+
+		// Get the fake clientset
+		fakeclient := apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
+		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
+		// we can convert it to that struct.
+		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
+		if !ok {
+			return nil, fmt.Errorf("couldn't set fake discovery's server version")
+		}
+		// Lastly, set the right server version to be used
+		fakeclientDiscovery.FakedServerVersion = realServerVersion
+		// return the fake clientset used for dry-running
+		return fakeclient, nil
+	}
+	return kubeconfigutil.ClientSetFromFile(file)
+}
+
+// getWaiter gets the right waiter implementation
+func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
+	if dryRun {
+		return dryrunutil.NewWaiter()
+	}
+	return apiclient.NewKubeWaiter(client, upgradeManifestTimeout, os.Stdout)
 }
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.

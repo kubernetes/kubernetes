@@ -17,14 +17,60 @@ limitations under the License.
 package upgrade
 
 import (
+	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
+	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(_ clientset.Interface, _ *kubeadmapi.MasterConfiguration, _ *version.Version) error {
-	// No-op; don't do anything here yet
-	return nil
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) error {
+	errs := []error{}
+
+	// Upload currently used configuration to the cluster
+	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
+	// depend on centralized information from this source in the future
+	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
+	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
+		errs = append(errs, err)
+	}
+	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
+	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
+		errs = append(errs, err)
+	}
+
+	// TODO: Is this needed to do here? I think that updating cluster info should probably be separate from a normal upgrade
+	// Create the cluster-info ConfigMap with the associated RBAC rules
+	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
+	// 	return err
+	//}
+	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
+	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
+		errs = append(errs, err)
+	}
+
+	// TODO: This call is deprecated
+	if err := apiconfig.CreateRBACRules(client, k8sVersion); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Upgrade kube-dns and kube-proxy
+	if err := dns.EnsureDNSAddon(cfg, client, k8sVersion); err != nil {
+		errs = append(errs, err)
+	}
+	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.NewAggregate(errs)
 }

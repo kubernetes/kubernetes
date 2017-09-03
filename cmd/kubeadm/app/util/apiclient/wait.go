@@ -17,6 +17,8 @@ limitations under the License.
 package apiclient
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,6 +40,10 @@ type Waiter interface {
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
 	WaitForPodToDisappear(staticPodName string) error
+	// WaitForStaticPodControlPlaneHashes
+	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
+	// WaitForStaticPodControlPlaneHashChange
+	WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error
 	// SetTimeout adjusts the timeout to the specified duration
 	SetTimeout(timeout time.Duration)
 }
@@ -110,7 +116,7 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[apiclient] The Static Pod %q is now removed\n", podName)
+			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
 			return true, nil
 		}
 		return false, nil
@@ -120,6 +126,61 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 // SetTimeout adjusts the timeout to the specified duration
 func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 	w.timeout = timeout
+}
+
+// WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map for all components and their Static Pods
+func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
+
+	var mirrorPodHashes map[string]string
+	err := wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+
+		hashes, err := getStaticPodControlPlaneHashes(w.client, nodeName)
+		if err != nil {
+			return false, nil
+		}
+		mirrorPodHashes = hashes
+		return true, nil
+	})
+	return mirrorPodHashes, err
+}
+
+// WaitForStaticPodControlPlaneHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
+// This implicitely means this function blocks until the kubelet has restarted the Static Pod in question
+func (w *KubeWaiter) WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error {
+	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+
+		hashes, err := getStaticPodControlPlaneHashes(w.client, nodeName)
+		if err != nil {
+			return false, nil
+		}
+		// We should continue polling until the UID changes
+		if hashes[component] == previousHash {
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
+// getStaticPodControlPlaneHashes computes hashes for all the control plane's Static Pod resources
+func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string) (map[string]string, error) {
+
+	mirrorPodHashes := map[string]string{}
+	for _, component := range constants.MasterComponents {
+		staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
+		staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		podBytes, err := json.Marshal(staticPod)
+		if err != nil {
+			return nil, err
+		}
+
+		mirrorPodHashes[component] = fmt.Sprintf("%x", sha256.Sum256(podBytes))
+	}
+	return mirrorPodHashes, nil
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned

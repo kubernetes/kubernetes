@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // VersionGetter defines an interface for fetching different versions.
@@ -43,11 +47,8 @@ type KubeVersionGetter struct {
 	w      io.Writer
 }
 
-// Make sure KubeVersionGetter implements the VersionGetter interface
-var _ VersionGetter = &KubeVersionGetter{}
-
 // NewKubeVersionGetter returns a new instance of KubeVersionGetter
-func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) *KubeVersionGetter {
+func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) VersionGetter {
 	return &KubeVersionGetter{
 		client: client,
 		w:      writer,
@@ -56,28 +57,68 @@ func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) *KubeVer
 
 // ClusterVersion gets API server version
 func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, error) {
-	fmt.Fprintf(g.w, "[upgrade/versions] Cluster version: ")
-	fmt.Fprintln(g.w, "v1.7.0")
+	clusterVersionInfo, err := g.client.Discovery().ServerVersion()
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't fetch cluster version from the API Server: %v", err)
+	}
+	fmt.Fprintf(g.w, "[upgrade/versions] Cluster version: %s\n", clusterVersionInfo.String())
 
-	return "v1.7.0", versionutil.MustParseSemantic("v1.7.0"), nil
+	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't parse cluster version: %v", err)
+	}
+	return clusterVersionInfo.String(), clusterVersion, nil
 }
 
 // KubeadmVersion gets kubeadm version
 func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, error) {
-	fmt.Fprintf(g.w, "[upgrade/versions] kubeadm version: %s\n", "v1.8.0")
+	kubeadmVersionInfo := version.Get()
+	fmt.Fprintf(g.w, "[upgrade/versions] kubeadm version: %s\n", kubeadmVersionInfo.String())
 
-	return "v1.8.0", versionutil.MustParseSemantic("v1.8.0"), nil
+	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't parse kubeadm version: %v", err)
+	}
+	return kubeadmVersionInfo.String(), kubeadmVersion, nil
 }
 
-// VersionFromCILabel resolves different labels like "stable" to action semver versions using the Kubernetes CI uploads to GCS
-func (g *KubeVersionGetter) VersionFromCILabel(_, _ string) (string, *versionutil.Version, error) {
-	return "v1.8.1", versionutil.MustParseSemantic("v1.8.0"), nil
+// VersionFromCILabel resolves a version label like "latest" or "stable" to an actual version using the public Kubernetes CI uploads
+func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
+	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't fetch latest %s version from the internet: %v", description, err)
+	}
+
+	if description != "" {
+		fmt.Fprintf(g.w, "[upgrade/versions] Latest %s: %s\n", description, versionStr)
+	}
+
+	ver, err := versionutil.ParseSemantic(versionStr)
+	if err != nil {
+		return "", nil, fmt.Errorf("Couldn't parse latest %s version: %v", description, err)
+	}
+	return versionStr, ver, nil
 }
 
 // KubeletVersions gets the versions of the kubelets in the cluster
 func (g *KubeVersionGetter) KubeletVersions() (map[string]uint16, error) {
-	// This tells kubeadm that there are two nodes in the cluster; both on the v1.7.1 version currently
-	return map[string]uint16{
-		"v1.7.1": 2,
-	}, nil
+	nodes, err := g.client.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't list all nodes in cluster")
+	}
+	return computeKubeletVersions(nodes.Items), nil
+}
+
+// computeKubeletVersions returns a string-int map that describes how many nodes are of a specific version
+func computeKubeletVersions(nodes []v1.Node) map[string]uint16 {
+	kubeletVersions := map[string]uint16{}
+	for _, node := range nodes {
+		kver := node.Status.NodeInfo.KubeletVersion
+		if _, found := kubeletVersions[kver]; !found {
+			kubeletVersions[kver] = 1
+			continue
+		}
+		kubeletVersions[kver]++
+	}
+	return kubeletVersions
 }

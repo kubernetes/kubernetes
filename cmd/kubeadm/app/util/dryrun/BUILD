@@ -5,6 +5,7 @@ go_library(
     srcs = ["dryrun.go"],
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
