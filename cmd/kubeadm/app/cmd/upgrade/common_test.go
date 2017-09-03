@@ -41,21 +41,15 @@ func TestPrintConfiguration(t *testing.T) {
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
-	apiServerCertSANs: null
-	apiServerExtraArgs: null
-	authorizationModes: null
 	certificatesDir: ""
 	cloudProvider: ""
-	controllerManagerExtraArgs: null
 	etcd:
 	  caFile: ""
 	  certFile: ""
 	  dataDir: ""
 	  endpoints: null
-	  extraArgs: null
 	  image: ""
 	  keyFile: ""
-	featureGates: null
 	imageRepository: ""
 	kubernetesVersion: v1.7.1
 	networking:
@@ -63,9 +57,8 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: ""
 	nodeName: ""
-	schedulerExtraArgs: null
 	token: ""
-	tokenTTL: 0
+	tokenTTL: 0s
 	unifiedControlPlaneImage: ""
 `),
 		},
@@ -80,21 +73,15 @@ func TestPrintConfiguration(t *testing.T) {
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
-	apiServerCertSANs: null
-	apiServerExtraArgs: null
-	authorizationModes: null
 	certificatesDir: ""
 	cloudProvider: ""
-	controllerManagerExtraArgs: null
 	etcd:
 	  caFile: ""
 	  certFile: ""
 	  dataDir: ""
 	  endpoints: null
-	  extraArgs: null
 	  image: ""
 	  keyFile: ""
-	featureGates: null
 	imageRepository: ""
 	kubernetesVersion: v1.7.1
 	networking:
@@ -102,9 +89,8 @@ func TestPrintConfiguration(t *testing.T) {
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	nodeName: ""
-	schedulerExtraArgs: null
 	token: ""
-	tokenTTL: 0
+	tokenTTL: 0s
 	unifiedControlPlaneImage: ""
 `),
 		},
