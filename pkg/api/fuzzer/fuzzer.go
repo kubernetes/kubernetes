@@ -439,6 +439,19 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					ss.Ports[i].TargetPort.StrVal = "x" + ss.Ports[i].TargetPort.StrVal // non-empty
 				}
 			}
+			types := []api.ServiceAffinity{api.ServiceAffinityNone, api.ServiceAffinityClientIP}
+			ss.SessionAffinity = types[c.Rand.Intn(len(types))]
+			switch ss.SessionAffinity {
+			case api.ServiceAffinityClientIP:
+				timeoutSeconds := int32(c.Rand.Intn(int(api.MaxClientIPServiceAffinitySeconds)))
+				ss.SessionAffinityConfig = &api.SessionAffinityConfig{
+					ClientIP: &api.ClientIPConfig{
+						TimeoutSeconds: &timeoutSeconds,
+					},
+				}
+			case api.ServiceAffinityNone:
+				ss.SessionAffinityConfig = nil
+			}
 		},
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)

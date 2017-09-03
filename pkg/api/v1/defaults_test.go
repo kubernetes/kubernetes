@@ -667,8 +667,50 @@ func TestSetDefaultService(t *testing.T) {
 	if svc2.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		t.Errorf("Expected default session affinity type:%s, got: %s", v1.ServiceAffinityNone, svc2.Spec.SessionAffinity)
 	}
+	if svc2.Spec.SessionAffinityConfig != nil {
+		t.Errorf("Expected empty session affinity config when session affinity type: %s, got: %v", v1.ServiceAffinityNone, svc2.Spec.SessionAffinityConfig)
+	}
 	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
+	testCases := map[string]v1.Service{
+		"SessionAffinityConfig is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity:       v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: nil,
+			},
+		},
+		"ClientIP is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity: v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: &v1.SessionAffinityConfig{
+					ClientIP: nil,
+				},
+			},
+		},
+		"TimeoutSeconds is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity: v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: &v1.SessionAffinityConfig{
+					ClientIP: &v1.ClientIPConfig{
+						TimeoutSeconds: nil,
+					},
+				},
+			},
+		},
+	}
+	for name, test := range testCases {
+		obj2 := roundTrip(t, runtime.Object(&test))
+		svc2 := obj2.(*v1.Service)
+		if svc2.Spec.SessionAffinityConfig == nil || svc2.Spec.SessionAffinityConfig.ClientIP == nil || svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds == nil {
+			t.Fatalf("Case: %s, unexpected empty SessionAffinityConfig/ClientIP/TimeoutSeconds when session affinity type: %s, got: %v", name, v1.ServiceAffinityClientIP, svc2.Spec.SessionAffinityConfig)
+		}
+		if *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds != v1.DefaultClientIPServiceAffinitySeconds {
+			t.Errorf("Case: %s, default TimeoutSeconds should be %d when session affinity type: %s, got: %d", name, v1.DefaultClientIPServiceAffinitySeconds, v1.ServiceAffinityClientIP, *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		}
 	}
 }
 
