@@ -368,8 +368,8 @@ type rbd struct {
 	plugin   *rbdPlugin
 	mounter  *mount.SafeFormatAndMount
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager diskManager
-	volume.MetricsProvider
+	manager                diskManager
+	volume.MetricsProvider `json:"-"`
 }
 
 func (rbd *rbd) GetPath() string {
