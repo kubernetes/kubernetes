@@ -389,24 +389,36 @@ EOF
 api-endpoint = ${GCE_API_ENDPOINT}
 EOF
   fi
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+  if [[ -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
-project-id = ${PROJECT_ID}
-network-name = ${NODE_NETWORK}
 EOF
-    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
-        cat <<EOF >>/etc/gce.conf
+  fi
+  if [[ -n "${PROJECT_ID:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+project-id = ${PROJECT_ID}
+EOF
+  fi
+  if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
 network-project-id = ${NETWORK_PROJECT_ID}
 EOF
-    fi
-    if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
-      cat <<EOF >>/etc/gce.conf
+  fi
+  if [[ -n "${NODE_NETWORK:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+network-name = ${NODE_NETWORK}
+EOF
+  fi
+  if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}
 EOF
-    fi
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"

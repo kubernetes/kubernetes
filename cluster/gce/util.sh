@@ -86,6 +86,7 @@ fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 NODE_TAGS="${NODE_TAG}"
+NODE_NETWORK="${NETWORK}"
 
 ALLOCATE_NODE_CIDRS=true
 PREEXISTING_NETWORK=false
@@ -806,12 +807,28 @@ function expand-default-subnetwork() {
     --quiet
 }
 
+
+# Vars set:
+#   NODE_SUBNETWORK
 function create-subnetworks() {
+  NODE_SUBNETWORK=$(gcloud beta compute networks subnets list \
+      --network=${NETWORK} \
+      --regions=${REGION} \
+      --project=${PROJECT} \
+      --limit=1 \
+      --format='value(name)' 2>/dev/null)
+
+  if [[ -z ${NODE_SUBNETWORK:-} ]]; then
+    echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${PROJECT}"
+    exit 1
+  fi
+  echo "Found subnet for region ${REGION} in network ${NETWORK}: ${NODE_SUBNETWORK}"
+
   case ${ENABLE_IP_ALIASES} in
     true) echo "IP aliases are enabled. Creating subnetworks.";;
     false)
       echo "IP aliases are disabled."
-      if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then 
+      if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
         if [[  "${PREEXISTING_NETWORK}" != "true" ]]; then
           expand-default-subnetwork
         else
@@ -822,6 +839,9 @@ function create-subnetworks() {
     *) echo "${color_red}Invalid argument to ENABLE_IP_ALIASES${color_norm}"
        exit 1;;
   esac
+
+  NODE_SUBNETWORK=${IP_ALIAS_SUBNETWORK}
+  echo "Using IP Aliases subnet ${NODE_SUBNETWORK}"
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
