@@ -24,6 +24,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/api"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // FakeReplicationControllers implements ReplicationControllerInterface
@@ -135,4 +136,26 @@ func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data
 		return nil, err
 	}
 	return obj.(*api.ReplicationController), err
+}
+
+// GetScale takes name of the replicationController, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
 }
