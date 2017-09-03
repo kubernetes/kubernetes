@@ -34,7 +34,7 @@ var (
 	explainLong = templates.LongDesc(`
 		Documentation of resources.
 
-		` + validResources)
+		`)
 
 	explainExamples = templates.Examples(i18n.T(`
 		# Get the documentation of the resource and its fields
@@ -46,10 +46,13 @@ var (
 
 // NewCmdExplain returns a cobra command for swagger docs
 func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+	validResources, err := cmdutil.ValidResources(f)
+	cmdutil.CheckErr(err)
+
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   i18n.T("Documentation of resources"),
-		Long:    explainLong,
+		Long:    explainLong + validResources,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExplain(f, out, cmdErr, cmd, args)
@@ -65,6 +68,10 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
+		validResources, err := cmdutil.ValidResources(f)
+		if err != nil {
+			return err
+		}
 		fmt.Fprintf(cmdErr, "You must specify the type of resource to explain. %s\n", validResources)
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}

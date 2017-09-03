@@ -72,7 +72,7 @@ var (
 		* If --overwrite is true, then existing annotations can be overwritten, otherwise attempting to overwrite an annotation will result in an error.
 		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
 
-		` + validResources)
+		`)
 
 	annotateExample = templates.Examples(i18n.T(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'.
@@ -110,10 +110,13 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		argAliases = kubectl.ResourceAliases(validArgs)
 	}
 
+	validResources, err := cmdutil.ValidResources(f)
+	cmdutil.CheckErr(err)
+
 	cmd := &cobra.Command{
 		Use:     "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   i18n.T("Update the annotations on a resource"),
-		Long:    annotateLong,
+		Long:    annotateLong + validResources,
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(out, cmd, args); err != nil {

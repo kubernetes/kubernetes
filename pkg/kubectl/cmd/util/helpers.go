@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -852,4 +853,67 @@ func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) b
 		shouldIncludeUninitialized = GetFlagBool(cmd, IncludeUninitializedFlag)
 	}
 	return shouldIncludeUninitialized
+}
+
+type ValidResource struct {
+	shortNames []string
+	name       string
+	apiGroup   string
+}
+
+func (vr ValidResource) String() string {
+	aka := ""
+	if len(vr.shortNames) > 0 {
+		aka = fmt.Sprintf(" (aka '%s')", strings.Join(vr.shortNames, ","))
+	}
+	return fmt.Sprintf("%s%s", vr.name, aka)
+}
+
+func ValidResources(f Factory) (string, error) {
+	discoveryclient, err := f.DiscoveryClient()
+	if err != nil {
+		return "", nil
+	}
+
+	lists, err := discoveryclient.ServerPreferredResources()
+	if err != nil {
+		return "", fmt.Errorf("Couldn't get available api resources from server: %v", err)
+	}
+
+	resources := []ValidResource{}
+	for _, list := range lists {
+		if len(list.APIResources) == 0 {
+			continue
+		}
+		apiGroup := strings.SplitN(list.GroupVersion, "/", 2)[0]
+		for _, resource := range list.APIResources {
+			if len(resource.Verbs) == 0 {
+				continue
+			}
+			resources = append(resources, ValidResource{
+				name:       resource.Name,
+				shortNames: resource.ShortNames,
+				apiGroup:   apiGroup,
+			})
+		}
+	}
+
+	uvr := unqiueValidResources(resources)
+	sort.Strings(uvr)
+	uvr = append([]string{"Valid resource types include:\n"}, uvr...)
+	return strings.Join(uvr, "\n    *"), nil
+}
+
+// unqiueValidResources returns an array of unique valid resources
+func unqiueValidResources(vr []ValidResource) []string {
+	seen := make(map[string]struct{}, len(vr))
+	uniqueVR := []string{}
+	for _, resource := range vr {
+		if _, ok := seen[resource.String()]; ok {
+			continue
+		}
+		seen[resource.String()] = struct{}{}
+		uniqueVR = append(uniqueVR, resource.String())
+	}
+	return uniqueVR
 }

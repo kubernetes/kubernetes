@@ -268,6 +268,9 @@ func NewTestFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Neg
 }
 
 func (f *FakeFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	if f.tf.ClientConfig == nil {
+		return nil, fmt.Errorf("nil pointer for FakeFactory.ClientConfig")
+	}
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(f.tf.ClientConfig)
 	if err != nil {
 		return nil, err
@@ -647,6 +650,9 @@ func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
 }
 
 func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	if f.tf.Client == nil {
+		return nil, fmt.Errorf("nil pointer for TestFactory.Client")
+	}
 	fakeClient := f.tf.Client.(*fake.RESTClient)
 	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.tf.ClientConfig)
 	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client

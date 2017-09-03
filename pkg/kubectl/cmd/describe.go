@@ -48,7 +48,7 @@ var (
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.
 
-		` + validResources)
+		`)
 
 	describe_example = templates.Examples(i18n.T(`
 		# Describe a node
@@ -80,10 +80,13 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	validArgs := printersinternal.DescribableResources()
 	argAliases := kubectl.ResourceAliases(validArgs)
 
+	validResources, err := cmdutil.ValidResources(f)
+	cmdutil.CheckErr(err)
+
 	cmd := &cobra.Command{
 		Use:     "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		Short:   i18n.T("Show details of a specific resource or group of resources"),
-		Long:    describe_long,
+		Long:    describe_long + validResources,
 		Example: describe_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmdErr, cmd, args, options, describerSettings)
@@ -113,6 +116,10 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 		enforceNamespace = false
 	}
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
+		validResources, err := cmdutil.ValidResources(f)
+		if err != nil {
+			return err
+		}
 		fmt.Fprint(cmdErr, "You must specify the type of resource to describe. ", validResources)
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}

@@ -319,3 +319,54 @@ func TestDumpReaderToFile(t *testing.T) {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
 	}
 }
+
+func TestUnqiueValidResources(t *testing.T) {
+	vr := []ValidResource{
+		{
+			shortNames: []string{},
+			name:       "tokenreviews",
+			apiGroup:   "authentication.k8s.io",
+		},
+		{
+			shortNames: []string{},
+			name:       "localsubjectaccessreviews",
+			apiGroup:   "authorization.k8s.io",
+		},
+		{
+			shortNames: []string{},
+			name:       "selfsubjectaccessreviews",
+			apiGroup:   "authorization.k8s.io",
+		},
+		{
+			shortNames: []string{"rs"},
+			name:       "replicasets",
+			apiGroup:   "extensions",
+		},
+		{
+			shortNames: []string{"deploy"},
+			name:       "deployments",
+			apiGroup:   "extensions",
+		},
+		{
+			shortNames: []string{"psp"},
+			name:       "podsecuritypolicies",
+			apiGroup:   "extensions",
+		},
+		{
+			shortNames: []string{"rs"},
+			name:       "replicasets",
+			apiGroup:   "apps",
+		},
+		{
+			shortNames: []string{"deploy"},
+			name:       "deployments",
+			apiGroup:   "apps",
+		},
+	}
+
+	expected := "[tokenreviews localsubjectaccessreviews selfsubjectaccessreviews replicasets (aka 'rs') deployments (aka 'deploy') podsecuritypolicies (aka 'psp')]"
+	uvr := unqiueValidResources(vr)
+	if fmt.Sprintf("%s", uvr) != expected {
+		t.Errorf("Got: %s, expected: %s", uvr, expected)
+	}
+}
