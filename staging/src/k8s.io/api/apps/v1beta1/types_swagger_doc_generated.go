@@ -28,7 +28,7 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_ControllerRevision = map[string]string{
-	"":         "ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
+	"":         "DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1beta2/ControllerRevision. See the release notes for more information. ControllerRevision implements an immutable snapshot of state data. Clients are responsible for serializing and deserializing the objects that contain their internal state. Once a ControllerRevision has been successfully created, it can not be updated. The API Server will fail validation of all requests that attempt to mutate the Data field. ControllerRevisions may, however, be deleted. Note that, due to its use by both the DaemonSet and StatefulSet controllers for update and rollback, this object is beta. However, it may be subject to name and representation changes in future releases, and clients should not depend on its stability. It is primarily for internal use by controllers.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"data":     "Data is the serialized representation of the state.",
 	"revision": "Revision indicates the revision of the state represented by Data.",
@@ -49,7 +49,7 @@ func (ControllerRevisionList) SwaggerDoc() map[string]string {
 }
 
 var map_Deployment = map[string]string{
-	"":         "Deployment enables declarative updates for Pods and ReplicaSets.",
+	"":         "DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for more information. Deployment enables declarative updates for Pods and ReplicaSets.",
 	"metadata": "Standard object metadata.",
 	"spec":     "Specification of the desired behavior of the Deployment.",
 	"status":   "Most recently observed status of the Deployment.",
@@ -197,7 +197,7 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSet = map[string]string{
-	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+	"":       "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
 	"spec":   "Spec defines the desired identities of pods in this set.",
 	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
 }

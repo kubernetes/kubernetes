@@ -31,6 +31,8 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1beta2/ControllerRevision. See the
+// release notes for more information.
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
 // their internal state.
@@ -63,6 +65,8 @@ message ControllerRevisionList {
   repeated ControllerRevision items = 2;
 }
 
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
@@ -313,6 +317,8 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
+// DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for
+// more information.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.

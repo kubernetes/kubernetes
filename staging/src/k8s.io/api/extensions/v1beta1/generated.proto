@@ -77,6 +77,8 @@ message CustomMetricTargetList {
   repeated CustomMetricTarget items = 1;
 }
 
+// DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
+// more information.
 // DaemonSet represents the configuration of a daemon set.
 message DaemonSet {
   // Standard object's metadata.
@@ -212,6 +214,8 @@ message DaemonSetUpdateStrategy {
   optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
@@ -776,6 +780,8 @@ message PodSecurityPolicySpec {
   repeated AllowedHostPath allowedHostPaths = 17;
 }
 
+// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
+// more information.
 // ReplicaSet represents the configuration of a ReplicaSet.
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
