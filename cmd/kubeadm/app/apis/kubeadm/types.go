@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,7 +34,7 @@ type MasterConfiguration struct {
 	AuthorizationModes []string
 
 	Token    string
-	TokenTTL time.Duration
+	TokenTTL metav1.Duration
 
 	APIServerExtraArgs         map[string]string
 	ControllerManagerExtraArgs map[string]string
