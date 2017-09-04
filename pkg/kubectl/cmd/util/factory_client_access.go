@@ -32,7 +32,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -569,6 +572,50 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	}
 
 	return generator
+}
+
+// fallbackGeneratorNameIfNecessary returns the name of the old generator
+// if server does not support new generator. Otherwise, the
+// generator string is returned unchanged.
+//
+// If the generator name is changed, print a warning message to let the user
+// know.
+func FallbackGeneratorNameIfNecessary(
+	generatorName string,
+	resourcesList []*metav1.APIResourceList,
+	cmdErr io.Writer,
+) string {
+	switch generatorName {
+	case DeploymentBasicAppsV1Beta1GeneratorName:
+		if !Contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+			warning(cmdErr, DeploymentBasicAppsV1Beta1GeneratorName, DeploymentBasicV1Beta1GeneratorName)
+
+			return DeploymentBasicV1Beta1GeneratorName
+		}
+	case CronJobV2Alpha1GeneratorName:
+		if !Contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
+			warning(cmdErr, CronJobV2Alpha1GeneratorName, JobV1GeneratorName)
+
+			return JobV1GeneratorName
+		}
+	}
+	return generatorName
+}
+
+func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
+	fmt.Fprintf(cmdErr, "WARNING: New deployments generator %q specified, "+
+		"but it isn't available. "+
+		"Falling back to %q.\n",
+		newGeneratorName,
+		oldGeneratorName,
+	)
+}
+
+func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
+	resources := discovery.FilteredBy(discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
+		return resource.GroupVersion().String() == gv && resource.Resource == r.Name
+	}), resourcesList)
+	return len(resources) != 0
 }
 
 func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
