@@ -31,6 +31,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
+	_ "k8s.io/kubernetes/test/e2e/multicluster"
 	_ "k8s.io/kubernetes/test/e2e/network"
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scalability"
