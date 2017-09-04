@@ -3099,27 +3099,27 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/aggregator",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "80f07ef71bb4f781233c65aa8d0369e4ecafab87"
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		},
 		{
 			"ImportPath": "k8s.io/utils/exec",

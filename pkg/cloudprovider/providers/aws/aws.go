@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
+	"path"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -600,18 +601,6 @@ func stringPointerArray(orig []string) []*string {
 	return aws.StringSlice(orig)
 }
 
-// isNilOrEmpty returns true if the value is nil or ""
-// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether where possible)
-func isNilOrEmpty(s *string) bool {
-	return s == nil || *s == ""
-}
-
-// orEmpty returns the string value, or "" if the pointer is nil
-// Deprecated: prefer aws.StringValue
-func orEmpty(s *string) string {
-	return aws.StringValue(s)
-}
-
 func newEc2Filter(name string, values ...string) *ec2.Filter {
 	filter := &ec2.Filter{
 		Name: aws.String(name),
@@ -650,7 +639,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		}
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -702,7 +691,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		results = append(results, response.Volumes...)
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -1010,11 +999,27 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
 		addresses := []v1.NodeAddress{}
 
-		internalIP, err := c.metadata.GetMetadata("local-ipv4")
+		macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
 		if err != nil {
-			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "local-ipv4", err)
+			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "network/interfaces/macs", err)
 		}
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+
+		for _, macID := range strings.Split(macs, "\n") {
+			if macID == "" {
+				continue
+			}
+			macPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
+			internalIPs, err := c.metadata.GetMetadata(macPath)
+			if err != nil {
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", macPath, err)
+			}
+			for _, internalIP := range strings.Split(internalIPs, "\n") {
+				if internalIP == "" {
+					continue
+				}
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+			}
+		}
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -1063,13 +1068,22 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 
 	addresses := []v1.NodeAddress{}
 
-	privateIPAddress := aws.StringValue(instance.PrivateIpAddress)
-	if privateIPAddress != "" {
-		ip := net.ParseIP(privateIPAddress)
-		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", aws.StringValue(instance.InstanceId), privateIPAddress)
+	// handle internal network interfaces
+	for _, networkInterface := range instance.NetworkInterfaces {
+		// skip network interfaces that are not currently in use
+		if aws.StringValue(networkInterface.Status) != ec2.NetworkInterfaceStatusInUse {
+			continue
 		}
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+
+		for _, internalIP := range networkInterface.PrivateIpAddresses {
+			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
+				ip := net.ParseIP(ipAddress)
+				if ip == nil {
+					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
+				}
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+			}
+		}
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
@@ -1127,7 +1141,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	if instance == nil {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return orEmpty(instance.InstanceId), nil
+	return aws.StringValue(instance.InstanceId), nil
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
@@ -1147,7 +1161,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
 	}
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	return "/" + aws.StringValue(inst.Placement.AvailabilityZone) + "/" + aws.StringValue(inst.InstanceId), nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -2457,7 +2471,7 @@ func (c *Cloud) ensureSecurityGroup(name string, description string) (string, er
 			}
 			time.Sleep(1 * time.Second)
 		} else {
-			groupID = orEmpty(createResponse.GroupId)
+			groupID = aws.StringValue(createResponse.GroupId)
 			break
 		}
 	}
@@ -3012,13 +3026,13 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
+	err = c.ensureLoadBalancerInstances(aws.StringValue(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
 		glog.Warningf("Error registering instances with the load balancer: %q", err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, orEmpty(loadBalancer.DNSName))
+	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, aws.StringValue(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
 
@@ -3045,9 +3059,9 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.Lo
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 
-	if !isNilOrEmpty(lb.DNSName) {
+	if aws.StringValue(lb.DNSName) != "" {
 		var ingress v1.LoadBalancerIngress
-		ingress.Hostname = orEmpty(lb.DNSName)
+		ingress.Hostname = aws.StringValue(lb.DNSName)
 		status.Ingress = []v1.LoadBalancerIngress{ingress}
 	}
 
@@ -3133,17 +3147,17 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupID := ""
 	for _, securityGroup := range lb.SecurityGroups {
-		if isNilOrEmpty(securityGroup) {
+		if aws.StringValue(securityGroup) == "" {
 			continue
 		}
 		if loadBalancerSecurityGroupID != "" {
 			// We create LBs with one SG
-			glog.Warningf("Multiple security groups for load balancer: %q", orEmpty(lb.LoadBalancerName))
+			glog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
 		}
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", orEmpty(lb.LoadBalancerName))
+		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -3187,7 +3201,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		}
 
 		if securityGroup == nil {
-			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
+			glog.Warning("Ignoring instance without security group: ", aws.StringValue(instance.InstanceId))
 			continue
 		}
 		id := aws.StringValue(securityGroup.GroupId)
@@ -3303,7 +3317,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 				//We don't want to delete a security group that was defined in the Cloud Configurationn.
 				continue
 			}
-			if isNilOrEmpty(securityGroupID) {
+			if aws.StringValue(securityGroupID) == "" {
 				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
 			}
@@ -3419,7 +3433,7 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	}
 
 	for _, instance := range instances {
-		instanceID := orEmpty(instance.InstanceId)
+		instanceID := aws.StringValue(instance.InstanceId)
 		if instanceID == "" {
 			continue
 		}

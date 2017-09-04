@@ -10,8 +10,8 @@ go_library(
     srcs = ["backend.go"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",
     ],
 )

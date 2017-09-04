@@ -226,6 +226,7 @@ func verifyJob(fedJob, localJob *batchv1.Job) bool {
 	localJob.Spec.ManualSelector = fedJob.Spec.ManualSelector
 	localJob.Spec.Completions = fedJob.Spec.Completions
 	localJob.Spec.Parallelism = fedJob.Spec.Parallelism
+	localJob.Spec.BackoffLimit = fedJob.Spec.BackoffLimit
 	return fedutil.ObjectMetaAndSpecEquivalent(fedJob, localJob)
 }
 

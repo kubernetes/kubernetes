@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -26,10 +27,18 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/version"
+)
+
+const (
+	upgradeManifestTimeout = 1 * time.Minute
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -102,7 +111,7 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	upgradeVars, err := enforceRequirements(flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig)
+	upgradeVars, err := enforceRequirements(flags.parent.kubeConfigPath, flags.parent.cfgPath, flags.parent.printConfig, flags.dryRun)
 	if err != nil {
 		return err
 	}
@@ -126,16 +135,24 @@ func RunApply(flags *applyFlags) error {
 		}
 	}
 
-	// TODO: Implement a prepulling mechanism here
+	// Use a prepuller implementation based on creating DaemonSets
+	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
+	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, internalcfg)
+	upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout)
 
 	// Now; perform the upgrade procedure
-	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, internalcfg); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, internalcfg); err != nil {
 		return fmt.Errorf("[upgrade/apply] FATAL: %v", err)
 	}
 
 	// Upgrade RBAC rules and addons. Optionally, if needed, perform some extra task for a specific version
 	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion); err != nil {
-		return fmt.Errorf("[upgrade/postupgrade] FATAL: %v", err)
+		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
+	}
+
+	if flags.dryRun {
+		fmt.Println("[dryrun] Finished dryrunning successfully!")
+		return nil
 	}
 
 	fmt.Println("")
@@ -182,7 +199,7 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag
 			if !flags.force {
-				return fmt.Errorf("The --version argument is invalid due to these errors: %v. Can be bypassed if you pass the --force flag", versionSkewErrs.Mandatory)
+				return fmt.Errorf("The --version argument is invalid due to these errors: %v. Can be bypassed if you pass the --force flag", versionSkewErrs.Skippable)
 			}
 			// Soft errors found, but --force was specified
 			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: %v\n", len(versionSkewErrs.Skippable), versionSkewErrs.Skippable)
@@ -192,21 +209,60 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 }
 
 // PerformControlPlaneUpgrade actually performs the upgrade procedure for the cluster of your type (self-hosted or static-pod-hosted)
-func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, internalcfg *kubeadmapi.MasterConfiguration) error {
+func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration) error {
 
 	// Check if the cluster is self-hosted and act accordingly
 	if upgrade.IsControlPlaneSelfHosted(client) {
 		fmt.Printf("[upgrade/apply] Upgrading your Self-Hosted control plane to version %q...\n", flags.newK8sVersionStr)
 
-		// Upgrade a self-hosted cluster
-		// TODO(luxas): Implement this later when we have the new upgrade strategy
-		return fmt.Errorf("not implemented")
+		// Upgrade the self-hosted cluster
+		return upgrade.SelfHostedControlPlane(client, waiter, internalcfg, flags.newK8sVersion)
 	}
 
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", flags.newK8sVersionStr)
 
-	if err := upgrade.PerformStaticPodControlPlaneUpgrade(client, internalcfg, flags.newK8sVersion); err != nil {
+	if flags.dryRun {
+		return DryRunStaticPodUpgrade(internalcfg)
+	}
+	return PerformStaticPodUpgrade(client, waiter, internalcfg)
+}
+
+// PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
+func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration) error {
+	pathManager, err := upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory())
+	if err != nil {
+		return err
+	}
+
+	if err := upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DryRunStaticPodUpgrade fakes an upgrade of the control plane
+func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.MasterConfiguration) error {
+
+	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dryRunManifestDir)
+
+	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg); err != nil {
+		return err
+	}
+
+	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
+	files := []dryrunutil.FileToPrint{}
+	for _, component := range constants.MasterComponents {
+		realPath := constants.GetStaticPodFilepath(component, dryRunManifestDir)
+		outputPath := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
+		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
+	}
+
+	if err := dryrunutil.PrintDryRunFiles(files, os.Stdout); err != nil {
 		return err
 	}
 	return nil

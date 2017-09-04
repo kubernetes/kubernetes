@@ -114,11 +114,12 @@ func TestReadAWSCloudConfig(t *testing.T) {
 }
 
 type FakeAWSServices struct {
-	region                  string
-	instances               []*ec2.Instance
-	selfInstance            *ec2.Instance
-	networkInterfacesMacs   []string
-	networkInterfacesVpcIDs []string
+	region                      string
+	instances                   []*ec2.Instance
+	selfInstance                *ec2.Instance
+	networkInterfacesMacs       []string
+	networkInterfacesPrivateIPs [][]string
+	networkInterfacesVpcIDs     []string
 
 	ec2      *FakeEC2
 	elb      *FakeELB
@@ -366,6 +367,13 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 					}
 				}
 			}
+			if len(keySplit) == 5 && keySplit[4] == "local-ipv4s" {
+				for i, macElem := range self.aws.networkInterfacesMacs {
+					if macParam == macElem {
+						return strings.Join(self.aws.networkInterfacesPrivateIPs[i], "/\n"), nil
+					}
+				}
+			}
 			return "", nil
 		}
 	} else {
@@ -569,6 +577,16 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
 	instance0.PublicDnsName = aws.String("instance-same.ec2.external")
 	instance0.PublicIpAddress = aws.String("1.2.3.4")
+	instance0.NetworkInterfaces = []*ec2.InstanceNetworkInterface{
+		{
+			Status: aws.String(ec2.NetworkInterfaceStatusInUse),
+			PrivateIpAddresses: []*ec2.InstancePrivateIpAddress{
+				{
+					PrivateIpAddress: aws.String("192.168.0.1"),
+				},
+			},
+		},
+	}
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
 	state0 := ec2.InstanceState{
@@ -614,6 +632,8 @@ func TestNodeAddresses(t *testing.T) {
 	}
 
 	aws3, _ := mockInstancesResp(&instance0, instances[0:1])
+	// change node name so it uses the instance instead of metadata
+	aws3.selfAWSInstance.nodeName = "foo"
 	addrs3, err3 := aws3.NodeAddresses("instance-same.ec2.internal")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
@@ -625,18 +645,34 @@ func TestNodeAddresses(t *testing.T) {
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
 	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
+}
 
-	// Fetch from metadata
-	aws4, fakeServices := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
-	fakeServices.selfInstance.PublicIpAddress = aws.String("2.3.4.5")
-	fakeServices.selfInstance.PrivateIpAddress = aws.String("192.168.0.2")
+func TestNodeAddressesWithMetadata(t *testing.T) {
+	var instance ec2.Instance
 
-	addrs4, err4 := aws4.NodeAddresses(mapInstanceToNodeName(&instance0))
-	if err4 != nil {
-		t.Errorf("unexpected error: %v", err4)
+	instanceName := "instance.ec2.internal"
+	instance.InstanceId = aws.String("i-0")
+	instance.PrivateDnsName = &instanceName
+	instance.PublicIpAddress = aws.String("2.3.4.5")
+	instance.InstanceType = aws.String("c3.large")
+	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	state := ec2.InstanceState{
+		Name: aws.String("running"),
 	}
-	testHasNodeAddress(t, addrs4, v1.NodeInternalIP, "192.168.0.2")
-	testHasNodeAddress(t, addrs4, v1.NodeExternalIP, "2.3.4.5")
+	instance.State = &state
+
+	instances := []*ec2.Instance{&instance}
+	awsCloud, awsServices := mockInstancesResp(&instance, instances)
+
+	awsServices.networkInterfacesMacs = []string{"0a:26:89:f3:9c:f6", "0a:77:64:c4:6a:48"}
+	awsServices.networkInterfacesPrivateIPs = [][]string{{"192.168.0.1"}, {"192.168.0.2"}}
+	addrs, err := awsCloud.NodeAddresses("")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.2")
+	testHasNodeAddress(t, addrs, v1.NodeExternalIP, "2.3.4.5")
 }
 
 func TestGetRegion(t *testing.T) {

@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -112,6 +114,8 @@ type groupResourceOverrides struct {
 	decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
 	// transformer is optional and shall encrypt that resource at rest.
 	transformer value.Transformer
+	// disablePaging will prevent paging on the provided resource.
+	disablePaging bool
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
@@ -138,6 +142,9 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if o.transformer != nil {
 		config.Transformer = o.transformer
 	}
+	if o.disablePaging {
+		config.Paging = false
+	}
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -157,6 +164,7 @@ var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
 }
 
 func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
@@ -182,6 +190,14 @@ func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResour
 func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
+	s.Overrides[groupResource] = overrides
+}
+
+// SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
+// exposure of key names in continuations. This may be overriden by feature gates.
+func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
+	overrides := s.Overrides[groupResource]
+	overrides.disablePaging = true
 	s.Overrides[groupResource] = overrides
 }
 

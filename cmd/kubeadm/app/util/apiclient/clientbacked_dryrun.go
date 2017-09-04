@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
@@ -33,7 +34,7 @@ import (
 
 // ClientBackedDryRunGetter implements the DryRunGetter interface for use in NewDryRunClient() and proxies all GET and LIST requests to the backing API server reachable via rest.Config
 type ClientBackedDryRunGetter struct {
-	baseConfig    *rest.Config
+	client        clientset.Interface
 	dynClientPool dynamic.ClientPool
 }
 
@@ -41,11 +42,16 @@ type ClientBackedDryRunGetter struct {
 var _ DryRunGetter = &ClientBackedDryRunGetter{}
 
 // NewClientBackedDryRunGetter creates a new ClientBackedDryRunGetter instance based on the rest.Config object
-func NewClientBackedDryRunGetter(config *rest.Config) *ClientBackedDryRunGetter {
-	return &ClientBackedDryRunGetter{
-		baseConfig:    config,
-		dynClientPool: dynamic.NewDynamicClientPool(config),
+func NewClientBackedDryRunGetter(config *rest.Config) (*ClientBackedDryRunGetter, error) {
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
 	}
+
+	return &ClientBackedDryRunGetter{
+		client:        client,
+		dynClientPool: dynamic.NewDynamicClientPool(config),
+	}, nil
 }
 
 // NewClientBackedDryRunGetterFromKubeconfig creates a new ClientBackedDryRunGetter instance from the given KubeConfig file
@@ -58,7 +64,7 @@ func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRun
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client configuration from kubeconfig: %v", err)
 	}
-	return NewClientBackedDryRunGetter(clientConfig), nil
+	return NewClientBackedDryRunGetter(clientConfig)
 }
 
 // HandleGetAction handles GET actions to the dryrun clientset this interface supports
@@ -104,6 +110,11 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 		return true, nil, err
 	}
 	return true, newObj, err
+}
+
+// Client gets the backing clientset.Interface
+func (clg *ClientBackedDryRunGetter) Client() clientset.Interface {
+	return clg.client
 }
 
 // actionToResourceClient returns the ResourceInterface for the given action

@@ -174,7 +174,6 @@ pkg/controller/garbagecollector/metaonly
 pkg/controller/job
 pkg/controller/namespace
 pkg/controller/namespace/deletion
-pkg/controller/node
 pkg/controller/podautoscaler
 pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
@@ -467,6 +466,8 @@ pkg/volume/util
 pkg/volume/vsphere_volume
 plugin/cmd/kube-scheduler/app
 plugin/pkg/admission/antiaffinity
+plugin/pkg/admission/eventratelimit/apis/eventratelimit
+plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialization
 plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
@@ -786,7 +787,7 @@ staging/src/k8s.io/kube-aggregator/pkg/controllers/status
 staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice
 staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
-staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1
+staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/metrics
 staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1
 staging/src/k8s.io/metrics/pkg/client/custom_metrics

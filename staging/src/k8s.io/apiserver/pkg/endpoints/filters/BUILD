@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "audit_test.go",
         "authentication_test.go",
+        "authn_audit_test.go",
         "authorization_test.go",
         "impersonation_test.go",
         "legacy_audit_test.go",
@@ -46,6 +47,7 @@ go_library(
     srcs = [
         "audit.go",
         "authentication.go",
+        "authn_audit.go",
         "authorization.go",
         "doc.go",
         "impersonation.go",

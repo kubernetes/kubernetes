@@ -80,7 +80,7 @@ genrule(
     cmd = """
 grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
     | awk '{print $$2}' \
-    | sed -e 's/^v//' -e 's/[\+-]/_/g' \
+    | sed -e 's/^v//' -Ee 's/-([a-z]+)/~\\1/' -e 's/-/+/g' \
     >$@
 """,
     stamp = 1,

@@ -27,6 +27,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister:all-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/controllers/status:all-srcs",
     ],
     tags = ["automanaged"],

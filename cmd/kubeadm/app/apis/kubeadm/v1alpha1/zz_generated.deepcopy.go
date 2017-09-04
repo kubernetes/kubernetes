@@ -114,6 +114,7 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	out.TokenTTL = in.TokenTTL
 	if in.APIServerExtraArgs != nil {
 		in, out := &in.APIServerExtraArgs, &out.APIServerExtraArgs
 		*out = make(map[string]string, len(*in))

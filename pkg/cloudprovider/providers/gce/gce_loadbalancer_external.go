@@ -31,6 +31,7 @@ import (
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
 	"github.com/golang/glog"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -67,6 +68,19 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		loadBalancerName, gce.region, requestedIP, portStr, hostNames, serviceName, apiService.Annotations)
+
+	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
+	// Check the current and the desired network tiers. If they do not match,
+	// tear down the existing resources with the wrong tier.
+	netTier, err := gce.getServiceNetworkTier(apiService)
+	if err != nil {
+		glog.Errorf("EnsureLoadBalancer(%s): failed to get the desired network tier: %v", lbRefStr, err)
+		return nil, err
+	}
+	glog.V(4).Infof("EnsureLoadBalancer(%s): desired network tier %q ", lbRefStr, netTier)
+	if gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
+		gce.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
+	}
 
 	// Check if the forwarding rule exists, and if so, what its IP is.
 	fwdRuleExists, fwdRuleNeedsUpdate, fwdRuleIP, err := gce.forwardingRuleNeedsUpdate(loadBalancerName, gce.region, requestedIP, ports)
@@ -121,11 +135,10 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 	}()
 
-	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 	if requestedIP != "" {
 		// If user requests a specific IP address, verify first. No mutation to
 		// the GCE resources will be performed in the verification process.
-		isUserOwnedIP, err = verifyUserRequestedIP(gce, gce.region, requestedIP, fwdRuleIP, lbRefStr)
+		isUserOwnedIP, err = verifyUserRequestedIP(gce, gce.region, requestedIP, fwdRuleIP, lbRefStr, netTier)
 		if err != nil {
 			return nil, err
 		}
@@ -135,11 +148,11 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	if !isUserOwnedIP {
 		// If we are not using the user-owned IP, either promote the
 		// emphemeral IP used by the fwd rule, or create a new static IP.
-		ipAddr, existed, err := ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP)
+		ipAddr, existed, err := ensureStaticIP(gce, loadBalancerName, serviceName.String(), gce.region, fwdRuleIP, netTier)
 		if err != nil {
 			return nil, fmt.Errorf("failed to ensure a static IP for the LB: %v", err)
 		}
-		glog.V(4).Infof("EnsureLoadBalancer(%s): ensured IP address %s", lbRefStr, ipAddr)
+		glog.V(4).Infof("EnsureLoadBalancer(%s): ensured IP address %s (tier: %s)", lbRefStr, ipAddr, netTier)
 		// If the IP was not owned by the user, but it already existed, it
 		// could indicate that the previous update cycle failed. We can use
 		// this IP and try to run through the process again, but we should
@@ -282,8 +295,8 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		}
 	}
 	if tpNeedsUpdate || fwdRuleNeedsUpdate {
-		glog.Infof("EnsureLoadBalancer(%v(%v)): creating forwarding rule, IP %s", loadBalancerName, serviceName, ipAddressToUse)
-		if err := gce.createForwardingRule(loadBalancerName, serviceName.String(), gce.region, ipAddressToUse, ports); err != nil {
+		glog.Infof("EnsureLoadBalancer(%v(%v)): creating forwarding rule, IP %s (tier: %s)", loadBalancerName, serviceName, ipAddressToUse, netTier)
+		if err := createForwardingRule(gce, loadBalancerName, serviceName.String(), gce.region, ipAddressToUse, gce.targetPoolURL(loadBalancerName), ports, netTier); err != nil {
 			return nil, fmt.Errorf("failed to create forwarding rule %s: %v", loadBalancerName, err)
 		}
 		// End critical section.  It is safe to release the static IP (which
@@ -423,10 +436,12 @@ func (gce *GCECloud) DeleteExternalTargetPoolAndChecks(name, region, clusterID s
 	return nil
 }
 
-// verifyUserRequestedIP checks the user-provided IP  to see whether it can be
-// used for the LB.  It also returns whether the IP is considered owned by the
-// user.
-func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP, lbRef string) (isUserOwnedIP bool, err error) {
+// verifyUserRequestedIP checks the user-provided IP to see whether it meets
+// all the expected attributes for the load balancer, and returns an error if
+// the verification failed. It also returns a boolean to indicate whether the
+// IP address is considered owned by the user (i.e., not managed by the
+// controller.
+func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP, lbRef string, desiredNetTier NetworkTier) (isUserOwnedIP bool, err error) {
 	if requestedIP == "" {
 		return false, nil
 	}
@@ -442,7 +457,19 @@ func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP
 	}
 	if err == nil {
 		// The requested IP is a static IP, owned and managed by the user.
-		glog.V(4).Infof("verifyUserRequestedIP: the requested static IP %q (name: %s) for LB %s exists.", requestedIP, existingAddress.Name, lbRef)
+
+		// Check if the network tier of the static IP matches the desired
+		// network tier.
+		netTierStr, err := s.getNetworkTierFromAddress(existingAddress.Name, region)
+		if err != nil {
+			return false, fmt.Errorf("failed to check the network tier of the IP %q: %v", requestedIP, err)
+		}
+		netTier := NetworkTierGCEValueToType(netTierStr)
+		if netTier != desiredNetTier {
+			glog.Errorf("verifyUserRequestedIP: requested static IP %q (name: %s) for LB %s has network tier %s, need %s.", requestedIP, existingAddress.Name, lbRef, netTier, desiredNetTier)
+			return false, fmt.Errorf("requrested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
+		}
+		glog.V(4).Infof("verifyUserRequestedIP: the requested static IP %q (name: %s, tier: %s) for LB %s exists.", requestedIP, existingAddress.Name, netTier, lbRef)
 		return true, nil
 	}
 	if requestedIP == fwdRuleIP {
@@ -544,8 +571,8 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 	return nil
 }
 
-func (gce *GCECloud) targetPoolURL(name, region string) string {
-	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", region, "targetPools", name}, "/")
+func (gce *GCECloud) targetPoolURL(name string) string {
+	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", gce.region, "targetPools", name}, "/")
 }
 
 func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck {
@@ -804,23 +831,42 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(serviceName, ipAddress, regio
 	return nil
 }
 
-func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress string, ports []v1.ServicePort) error {
+func createForwardingRule(s CloudForwardingRuleService, name, serviceName, region, ipAddress, target string, ports []v1.ServicePort, netTier NetworkTier) error {
 	portRange, err := loadBalancerPortRange(ports)
 	if err != nil {
 		return err
 	}
-	req := &compute.ForwardingRule{
-		Name:        name,
-		Description: fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
-		IPAddress:   ipAddress,
-		IPProtocol:  string(ports[0].Protocol),
-		PortRange:   portRange,
-		Target:      gce.targetPoolURL(name, region),
+	desc := makeServiceDescription(serviceName)
+	ipProtocol := string(ports[0].Protocol)
+
+	switch netTier {
+	case NetworkTierPremium:
+		rule := &compute.ForwardingRule{
+			Name:        name,
+			Description: desc,
+			IPAddress:   ipAddress,
+			IPProtocol:  ipProtocol,
+			PortRange:   portRange,
+			Target:      target,
+		}
+		err = s.CreateRegionForwardingRule(rule, region)
+	default:
+		rule := &computealpha.ForwardingRule{
+			Name:        name,
+			Description: desc,
+			IPAddress:   ipAddress,
+			IPProtocol:  ipProtocol,
+			PortRange:   portRange,
+			Target:      target,
+			NetworkTier: netTier.ToGCEValue(),
+		}
+		err = s.CreateAlphaRegionForwardingRule(rule, region)
 	}
 
-	if err = gce.CreateRegionForwardingRule(req, region); err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return err
 	}
+
 	return nil
 }
 
@@ -883,26 +929,43 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string) (ipAddress string, existing bool, err error) {
+func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string, netTier NetworkTier) (ipAddress string, existing bool, err error) {
 	// If the address doesn't exist, this will create it.
 	// If the existingIP exists but is ephemeral, this will promote it to static.
 	// If the address already exists, this will harmlessly return a StatusConflict
 	// and we'll grab the IP before returning.
 	existed := false
-	addressObj := &compute.Address{
-		Name:        name,
-		Description: fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
-	}
+	desc := makeServiceDescription(serviceName)
 
-	if existingIP != "" {
-		addressObj.Address = existingIP
-	}
-
-	if err = s.ReserveRegionAddress(addressObj, region); err != nil {
-		if !isHTTPErrorCode(err, http.StatusConflict) {
-			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
+	var creationErr error
+	switch netTier {
+	case NetworkTierPremium:
+		addressObj := &compute.Address{
+			Name:        name,
+			Description: desc,
 		}
-		// StatusConflict == the IP exists already.
+		if existingIP != "" {
+			addressObj.Address = existingIP
+		}
+		creationErr = s.ReserveRegionAddress(addressObj, region)
+	default:
+		addressObj := &computealpha.Address{
+			Name:        name,
+			Description: desc,
+			NetworkTier: netTier.ToGCEValue(),
+		}
+		if existingIP != "" {
+			addressObj.Address = existingIP
+		}
+		creationErr = s.ReserveAlphaRegionAddress(addressObj, region)
+	}
+
+	if creationErr != nil {
+		// GCE returns StatusConflict if the name conflicts; it returns
+		// StatusBadRequest if the IP conflicts.
+		if !isHTTPErrorCode(creationErr, http.StatusConflict) && !isHTTPErrorCode(creationErr, http.StatusBadRequest) {
+			return "", false, fmt.Errorf("error creating gce static IP address: %v", creationErr)
+		}
 		existed = true
 	}
 
@@ -912,4 +975,74 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 	}
 
 	return addr.Address, existed, nil
+}
+
+func (gce *GCECloud) getServiceNetworkTier(svc *v1.Service) (NetworkTier, error) {
+	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
+		return NetworkTierDefault, nil
+	}
+	tier, err := GetServiceNetworkTier(svc)
+	if err != nil {
+		// Returns an error if the annotation is invalid.
+		return NetworkTier(""), err
+	}
+	return tier, nil
+}
+
+func (gce *GCECloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredNetTier NetworkTier) error {
+	logPrefix := fmt.Sprintf("deleteWrongNetworkTieredResources:(%s)", lbRef)
+	if err := deleteFWDRuleWithWrongTier(gce, gce.region, lbName, logPrefix, desiredNetTier); err != nil {
+		return err
+	}
+	if err := deleteAddressWithWrongTier(gce, gce.region, lbName, logPrefix, desiredNetTier); err != nil {
+		return err
+	}
+	return nil
+}
+
+// deleteFWDRuleWithWrongTier checks the network tier of existing forwarding
+// rule and delete the rule if the tier does not matched the desired tier.
+func deleteFWDRuleWithWrongTier(s CloudForwardingRuleService, region, name, logPrefix string, desiredNetTier NetworkTier) error {
+	tierStr, err := s.getNetworkTierFromForwardingRule(name, region)
+	if isNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	existingTier := NetworkTierGCEValueToType(tierStr)
+	if existingTier == desiredNetTier {
+		return nil
+	}
+	glog.V(2).Infof("%s: Network tiers do not match; existing forwarding rule: %q, desired: %q. Deleting the forwarding rule",
+		logPrefix, existingTier, desiredNetTier)
+	err = s.DeleteRegionForwardingRule(name, region)
+	return ignoreNotFound(err)
+}
+
+// deleteAddressWithWrongTier checks the network tier of existing address
+// and delete the address if the tier does not matched the desired tier.
+func deleteAddressWithWrongTier(s CloudAddressService, region, name, logPrefix string, desiredNetTier NetworkTier) error {
+	// We only check the IP address matching the reserved name that the
+	// controller assigned to the LB. We make the assumption that an address of
+	// such name is owned by the controller and is safe to release. Whether an
+	// IP is owned by the user is not clearly defined in the current code, and
+	// this assumption may not match some of the existing logic in the code.
+	// However, this is okay since network tiering is still Alpha and will be
+	// properly gated.
+	// TODO(#51665): Re-evaluate the "ownership" of the IP address to ensure
+	// we don't release IP unintentionally.
+	tierStr, err := s.getNetworkTierFromAddress(name, region)
+	if isNotFound(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	existingTier := NetworkTierGCEValueToType(tierStr)
+	if existingTier == desiredNetTier {
+		return nil
+	}
+	glog.V(2).Infof("%s: Network tiers do not match; existing address: %q, desired: %q. Deleting the address",
+		logPrefix, existingTier, desiredNetTier)
+	err = s.DeleteRegionAddress(name, region)
+	return ignoreNotFound(err)
 }

@@ -3476,6 +3476,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDR"), "node updates may not change podCIDR except from \"\" to valid"))
 		}
 	}
+
+	// Allow controller manager updating provider ID when not set
+	if len(oldNode.Spec.ProviderID) == 0 {
+		oldNode.Spec.ProviderID = node.Spec.ProviderID
+	} else {
+		if oldNode.Spec.ProviderID != node.Spec.ProviderID {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
+		}
+	}
+
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
 	oldNode.ObjectMeta = node.ObjectMeta

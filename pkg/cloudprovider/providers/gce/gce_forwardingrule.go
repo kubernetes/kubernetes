@@ -141,3 +141,15 @@ func (gce *GCECloud) DeleteRegionForwardingRule(name, region string) error {
 
 	return gce.waitForRegionOp(op, region, mc)
 }
+
+// TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
+func (gce *GCECloud) getNetworkTierFromForwardingRule(name, region string) (string, error) {
+	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
+		return NetworkTierDefault.ToGCEValue(), nil
+	}
+	fwdRule, err := gce.GetAlphaRegionForwardingRule(name, region)
+	if err != nil {
+		return handleAlphaNetworkTierGetError(err)
+	}
+	return fwdRule.NetworkTier, nil
+}

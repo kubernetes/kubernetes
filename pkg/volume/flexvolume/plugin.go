@@ -53,7 +53,13 @@ type flexVolumeAttachablePlugin struct {
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
-func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
+type PluginFactory interface {
+	NewFlexVolumePlugin(pluginDir, driverName string) (volume.VolumePlugin, error)
+}
+
+type pluginFactory struct{}
+
+func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapePluginName(name)

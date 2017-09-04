@@ -32,54 +32,6 @@ function setup-os-params {
   echo "core.%e.%p.%t" > /proc/sys/kernel/core_pattern
 }
 
-# Vars assumed:
-#   NUM_NODES
-function get-calico-node-cpu {
-  local suggested_calico_cpus=100m
-  if [[ "${NUM_NODES}" -gt "10" ]]; then
-    suggested_calico_cpus=250m
-  fi
-  if [[ "${NUM_NODES}" -gt "100" ]]; then
-    suggested_calico_cpus=500m
-  fi
-  if [[ "${NUM_NODES}" -gt "500" ]]; then
-    suggested_calico_cpus=1000m
-  fi
-  echo "${suggested_calico_cpus}"
-}
-
-# Vars assumed:
-#    NUM_NODES
-function get-calico-typha-replicas {
-  local typha_count=1
-  if [[ "${NUM_NODES}" -gt "10" ]]; then
-    typha_count=2
-  fi
-  if [[ "${NUM_NODES}" -gt "100" ]]; then
-    typha_count=3
-  fi
-  if [[ "${NUM_NODES}" -gt "250" ]]; then
-    typha_count=4
-  fi
-  if [[ "${NUM_NODES}" -gt "500" ]]; then
-    typha_count=5
-  fi
-  echo "${typha_count}"
-}
-
-# Vars assumed:
-#    NUM_NODES
-function get-calico-typha-cpu {
-  local typha_cpu=200m
-  if [[ "${NUM_NODES}" -gt "10" ]]; then
-    typha_cpu=500m
-  fi
-  if [[ "${NUM_NODES}" -gt "100" ]]; then
-    typha_cpu=1000m
-  fi
-  echo "${typha_cpu}"
-}
-
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
   # The GCI image has host firewall which drop most inbound/forwarded packets.
@@ -389,24 +341,36 @@ EOF
 api-endpoint = ${GCE_API_ENDPOINT}
 EOF
   fi
-  if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
+  if [[ -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
-project-id = ${PROJECT_ID}
-network-name = ${NODE_NETWORK}
 EOF
-    if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
-        cat <<EOF >>/etc/gce.conf
+  fi
+  if [[ -n "${PROJECT_ID:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+project-id = ${PROJECT_ID}
+EOF
+  fi
+  if [[ -n "${NETWORK_PROJECT_ID:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
 network-project-id = ${NETWORK_PROJECT_ID}
 EOF
-    fi
-    if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
-      cat <<EOF >>/etc/gce.conf
+  fi
+  if [[ -n "${NODE_NETWORK:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+network-name = ${NODE_NETWORK}
+EOF
+  fi
+  if [[ -n "${NODE_SUBNETWORK:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
 subnetwork-name = ${NODE_SUBNETWORK}
 EOF
-    fi
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
@@ -430,6 +394,12 @@ EOF
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
 alpha-features = ${GCE_ALPHA_FEATURES}
+EOF
+  fi
+  if [[ -n "${SECONDARY_RANGE_NAME:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >> /etc/gce.conf
+secondary-range-name = ${SECONDARY-RANGE-NAME}
 EOF
   fi
   if [[ "${use_cloud_config}" != "true" ]]; then
@@ -1071,6 +1041,10 @@ function prepare-kube-proxy-manifest-variables {
     kube_cache_mutation_detector_env_name="- name: KUBE_CACHE_MUTATION_DETECTOR"
     kube_cache_mutation_detector_env_value="value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
   fi
+  local pod_priority=""
+  if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
+    pod_priority="priorityClassName: system-node-critical"
+  fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
@@ -1078,6 +1052,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" ${src_file}
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" ${src_file}
+  sed -i -e "s@{{pod_priority}}@${pod_priority}@g" ${src_file}
   sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -1802,20 +1777,9 @@ function start-kube-addons {
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
-    # Configure Calico based on cluster size and image type.
+    # Configure Calico CNI directory.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
-    local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
-    sed -i -e "s@__CALICO_NODE_CPU__@$(get-calico-node-cpu)@g" "${ds_file}"
-    sed -i -e "s@__CALICO_TYPHA_CPU__@$(get-calico-typha-cpu)@g" "${typha_dep_file}"
-    sed -i -e "s@__CALICO_TYPHA_REPLICAS__@$(get-calico-typha-replicas)@g" "${typha_dep_file}"
-  else
-    # If not configured to use Calico, the set the typha replica count to 0, but only if the
-    # addon is present.
-    local -r typha_dep_file="${dst_dir}/calico-policy-controller/typha-deployment.yaml"
-    if [[ -e $typha_dep_file ]]; then
-      sed -i -e "s@__CALICO_TYPHA_REPLICAS__@0@g" "${typha_dep_file}"
-    fi
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"

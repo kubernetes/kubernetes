@@ -41,6 +41,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "compact.go",
+        "errors.go",
         "event.go",
         "store.go",
         "watcher.go",
@@ -51,8 +52,8 @@ go_library(
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

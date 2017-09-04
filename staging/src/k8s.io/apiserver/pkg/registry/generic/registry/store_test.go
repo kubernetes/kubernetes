@@ -60,6 +60,8 @@ import (
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
+const validInitializerName = "test.k8s.io"
+
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	example.AddToScheme(scheme)
@@ -399,7 +401,7 @@ func TestStoreCreateInitialized(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 		Spec: example.PodSpec{NodeName: "machine"},
@@ -427,7 +429,7 @@ func TestStoreCreateInitialized(t *testing.T) {
 		defer w.Stop()
 		event := <-w.ResultChan()
 		pod := event.Object.(*example.Pod)
-		if event.Type != watch.Added || !hasInitializers(pod, "Test") {
+		if event.Type != watch.Added || !hasInitializers(pod, validInitializerName) {
 			t.Fatalf("unexpected event: %s %#v", event.Type, event.Object)
 		}
 
@@ -504,7 +506,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 		Spec: example.PodSpec{NodeName: "machine"},
@@ -526,7 +528,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 		}
 		event := <-w.ResultChan()
 		pod := event.Object.(*example.Pod)
-		if event.Type != watch.Added || !hasInitializers(pod, "Test") {
+		if event.Type != watch.Added || !hasInitializers(pod, validInitializerName) {
 			t.Fatalf("unexpected event: %s %#v", event.Type, event.Object)
 		}
 		pod.Initializers.Pending = nil
@@ -856,7 +858,7 @@ func TestStoreDelete(t *testing.T) {
 
 func TestStoreDeleteUninitialized(t *testing.T) {
 	podA := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Testing"}}}},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: validInitializerName}}}},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 
@@ -1002,7 +1004,7 @@ func TestFailedInitializationStoreUpdate(t *testing.T) {
 
 	initialGeneration := int64(1)
 	podInitializing := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Test"}}}, Generation: initialGeneration},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: validInitializerName}}}, Generation: initialGeneration},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 
@@ -1617,7 +1619,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "baz",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 	}

@@ -23,6 +23,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -95,6 +96,15 @@ func CreateOrUpdateDaemonSet(client clientset.Interface, ds *extensions.DaemonSe
 		}
 	}
 	return nil
+}
+
+// DeleteDaemonSetForeground deletes the specified DaemonSet in foreground mode; i.e. it blocks until/makes sure all the managed Pods are deleted
+func DeleteDaemonSetForeground(client clientset.Interface, namespace, name string) error {
+	foregroundDelete := metav1.DeletePropagationForeground
+	deleteOptions := &metav1.DeleteOptions{
+		PropagationPolicy: &foregroundDelete,
+	}
+	return client.ExtensionsV1beta1().DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.

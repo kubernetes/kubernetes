@@ -34,6 +34,11 @@
 
 {% set throttles = "--iptables-sync-period=1m --iptables-min-sync-period=10s" -%}
 
+{% set pod_priority = "" -%}
+{% if pillar.get('enable_pod_priority', '').lower() == 'true' -%}
+  {% set pod_priority = "priorityClassName: system-node-critical" -%}
+{% endif -%}
+
 # test_args should always go last to overwrite prior configuration
 {% set params = log_level + " " + throttles + " " + feature_gates + " " + test_args -%}
 
@@ -58,6 +63,7 @@ metadata:
     tier: node
     component: kube-proxy
 spec:
+  {{pod_priority}}
   hostNetwork: true
   initContainers:
   - name: touch-lock

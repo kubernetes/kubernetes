@@ -13,7 +13,6 @@ go_library(
         "portforward.go",
     ],
     deps = [
-        "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/version:go_default_library",

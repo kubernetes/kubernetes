@@ -24,7 +24,7 @@ import (
 	"github.com/robfig/cron"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +36,7 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(sj batchv2alpha1.CronJob, uid types.UID) bool {
+func inActiveList(sj batchv1beta1.CronJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
 			return true
@@ -45,7 +45,7 @@ func inActiveList(sj batchv2alpha1.CronJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
+func deleteFromActiveList(sj *batchv1beta1.CronJob, uid types.UID) {
 	if sj == nil {
 		return
 	}
@@ -111,7 +111,7 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
@@ -170,7 +170,7 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 }
 
 // getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
 	// scheduled-job-name=$SJ_NAME -- for user convenience

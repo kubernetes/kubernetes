@@ -65,6 +65,21 @@ const (
 	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
 	// latency/pod at the scale of 3000 pods over 100 nodes.
 	ExpectationsTimeout = 5 * time.Minute
+	// When batching pod creates, SlowStartInitialBatchSize is the size of the
+	// inital batch.  The size of each successive batch is twice the size of
+	// the previous batch.  For example, for a value of 1, batch sizes would be
+	// 1, 2, 4, 8, ...  and for a value of 10, batch sizes would be
+	// 10, 20, 40, 80, ...  Setting the value higher means that quota denials
+	// will result in more doomed API calls and associated event spam.  Setting
+	// the value lower will result in more API call round trip periods for
+	// large batches.
+	//
+	// Given a number of pods to start "N":
+	// The number of doomed calls per sync once quota is exceeded is given by:
+	//      min(N,SlowStartInitialBatchSize)
+	// The number of batches is given by:
+	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
+	SlowStartInitialBatchSize = 1
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -606,11 +621,13 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 
 type FakePodControl struct {
 	sync.Mutex
-	Templates      []v1.PodTemplateSpec
-	ControllerRefs []metav1.OwnerReference
-	DeletePodName  []string
-	Patches        [][]byte
-	Err            error
+	Templates       []v1.PodTemplateSpec
+	ControllerRefs  []metav1.OwnerReference
+	DeletePodName   []string
+	Patches         [][]byte
+	Err             error
+	CreateLimit     int
+	CreateCallCount int
 }
 
 var _ PodControlInterface = &FakePodControl{}
@@ -628,6 +645,10 @@ func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
+	f.CreateCallCount++
+	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
+		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+	}
 	f.Templates = append(f.Templates, *spec)
 	if f.Err != nil {
 		return f.Err
@@ -638,6 +659,10 @@ func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, 
 func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
+	f.CreateCallCount++
+	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
+		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+	}
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
@@ -649,6 +674,10 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
+	f.CreateCallCount++
+	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
+		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+	}
 	f.Templates = append(f.Templates, *template)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
@@ -674,6 +703,8 @@ func (f *FakePodControl) Clear() {
 	f.Templates = []v1.PodTemplateSpec{}
 	f.ControllerRefs = []metav1.OwnerReference{}
 	f.Patches = [][]byte{}
+	f.CreateLimit = 0
+	f.CreateCallCount = 0
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.

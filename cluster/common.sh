@@ -610,6 +610,8 @@ ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
 NODE_TAGS: $(yaml-quote ${NODE_TAGS:-})
+NODE_NETWORK: $(yaml-quote ${NODE_NETWORK:-})
+NODE_SUBNETWORK: $(yaml-quote ${NODE_SUBNETWORK:-})
 CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${server_binary_tar_url})
 SERVER_BINARY_TAR_HASH: $(yaml-quote ${SERVER_BINARY_TAR_HASH})
@@ -672,6 +674,7 @@ GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
+ENABLE_POD_PRIORITY: $(yaml-quote ${ENABLE_POD_PRIORITY:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF

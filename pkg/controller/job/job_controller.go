@@ -18,6 +18,7 @@ package job
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"sync"
@@ -39,6 +40,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -48,6 +50,13 @@ import (
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
+
+const (
+	// DefaultJobBackOff is the max backoff period, exported for the e2e test
+	DefaultJobBackOff = 10 * time.Second
+	// MaxJobBackOff is the max backoff period, exported for the e2e test
+	MaxJobBackOff = 360 * time.Second
+)
 
 type JobController struct {
 	kubeClient clientset.Interface
@@ -95,7 +104,7 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "job"),
+		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
 		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 	}
 
@@ -117,6 +126,7 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
+
 	return jm
 }
 
@@ -311,7 +321,7 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	if err != nil {
 		return
 	}
-	jm.queue.Add(key)
+	jm.enqueueController(curJob)
 	// check if need to add a new rsync for ActiveDeadlineSeconds
 	if curJob.Status.StartTime != nil {
 		curADS := curJob.Spec.ActiveDeadlineSeconds
@@ -332,12 +342,15 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 }
 
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
-func (jm *JobController) enqueueController(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+func (jm *JobController) enqueueController(job interface{}) {
+	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", job, err))
 		return
 	}
+
+	// Retrieves the backoff duration for this Job
+	backoff := getBackoff(jm.queue, key)
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
 	// deterministically avoid syncing controllers that fight over pods. Currently, we only
@@ -345,7 +358,7 @@ func (jm *JobController) enqueueController(obj interface{}) {
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	jm.queue.Add(key)
+	jm.queue.AddAfter(key, backoff)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -431,6 +444,15 @@ func (jm *JobController) syncJob(key string) error {
 	}
 	job := *sharedJob
 
+	// if job was finished previously, we don't want to redo the termination
+	if IsJobFinished(&job) {
+		jm.queue.Forget(key)
+		return nil
+	}
+
+	// retrieve the previous number of retry
+	previousRetry := jm.queue.NumRequeues(key)
+
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
@@ -456,34 +478,28 @@ func (jm *JobController) syncJob(key string) error {
 			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
 		}
 	}
-	// if job was finished previously, we don't want to redo the termination
-	if IsJobFinished(&job) {
-		return nil
-	}
 
 	var manageJobErr error
-	if pastActiveDeadline(&job) {
-		// TODO: below code should be replaced with pod termination resulting in
-		// pod failures, rather than killing pods. Unfortunately none such solution
-		// exists ATM. There's an open discussion in the topic in
-		// https://github.com/kubernetes/kubernetes/issues/14602 which might give
-		// some sort of solution to above problem.
-		// kill remaining active pods
-		wait := sync.WaitGroup{}
-		errCh := make(chan error, int(active))
-		wait.Add(int(active))
-		for i := int32(0); i < active; i++ {
-			go func(ix int32) {
-				defer wait.Done()
-				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, &job); err != nil {
-					defer utilruntime.HandleError(err)
-					glog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", activePods[ix].Name, job.Namespace, job.Name)
-					errCh <- err
-				}
-			}(i)
-		}
-		wait.Wait()
+	jobFailed := false
+	var failureReason string
+	var failureMessage string
 
+	jobHaveNewFailure := failed > job.Status.Failed
+
+	// check if the number of failed jobs increased since the last syncJob
+	if jobHaveNewFailure && (int32(previousRetry)+1 > *job.Spec.BackoffLimit) {
+		jobFailed = true
+		failureReason = "BackoffLimitExceeded"
+		failureMessage = "Job has reach the specified backoff limit"
+	} else if pastActiveDeadline(&job) {
+		jobFailed = true
+		failureReason = "DeadlineExceeded"
+		failureMessage = "Job was active longer than specified deadline"
+	}
+
+	if jobFailed {
+		errCh := make(chan error, active)
+		jm.deleteJobPods(&job, activePods, errCh)
 		select {
 		case manageJobErr = <-errCh:
 			if manageJobErr != nil {
@@ -495,8 +511,8 @@ func (jm *JobController) syncJob(key string) error {
 		// update status values accordingly
 		failed += active
 		active = 0
-		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-		jm.recorder.Event(&job, v1.EventTypeNormal, "DeadlineExceeded", "Job was active longer than specified deadline")
+		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, failureReason, failureMessage))
+		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
@@ -545,7 +561,39 @@ func (jm *JobController) syncJob(key string) error {
 			return err
 		}
 	}
+
+	if jobHaveNewFailure {
+		// re-enqueue Job after the backoff period
+		jm.queue.AddRateLimited(key)
+	} else {
+		// if no new Failure the job backoff period can be reset
+		jm.queue.Forget(key)
+	}
+
 	return manageJobErr
+}
+
+func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh chan<- error) {
+	// TODO: below code should be replaced with pod termination resulting in
+	// pod failures, rather than killing pods. Unfortunately none such solution
+	// exists ATM. There's an open discussion in the topic in
+	// https://github.com/kubernetes/kubernetes/issues/14602 which might give
+	// some sort of solution to above problem.
+	// kill remaining active pods
+	wait := sync.WaitGroup{}
+	nbPods := len(pods)
+	wait.Add(nbPods)
+	for i := int32(0); i < int32(nbPods); i++ {
+		go func(ix int32) {
+			defer wait.Done()
+			if err := jm.podControl.DeletePod(job.Namespace, pods[ix].Name, job); err != nil {
+				defer utilruntime.HandleError(err)
+				glog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", pods[ix].Name, job.Namespace, job.Name)
+				errCh <- err
+			}
+		}(i)
+	}
+	wait.Wait()
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -652,34 +700,60 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 
 		active += diff
 		wait := sync.WaitGroup{}
-		wait.Add(int(diff))
-		for i := int32(0); i < diff; i++ {
-			go func() {
-				defer wait.Done()
-				err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
-				if err != nil && errors.IsTimeout(err) {
-					// Pod is created but its initialization has timed out.
-					// If the initialization is successful eventually, the
-					// controller will observe the creation via the informer.
-					// If the initialization fails, or if the pod keeps
-					// uninitialized for a long time, the informer will not
-					// receive any update, and the controller will create a new
-					// pod when the expectation expires.
-					return
-				}
-				if err != nil {
-					defer utilruntime.HandleError(err)
+
+		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
+		// and double with each successful iteration in a kind of "slow start".
+		// This handles attempts to start large numbers of pods that would
+		// likely all fail with the same error. For example a project with a
+		// low quota that attempts to create a large number of pods will be
+		// prevented from spamming the API service with the pod create requests
+		// after one of its pods fails.  Conveniently, this also prevents the
+		// event spam that those failures would generate.
+		for batchSize := int32(integer.IntMin(int(diff), controller.SlowStartInitialBatchSize)); diff > 0; batchSize = integer.Int32Min(2*batchSize, diff) {
+			errorCount := len(errCh)
+			wait.Add(int(batchSize))
+			for i := int32(0); i < batchSize; i++ {
+				go func() {
+					defer wait.Done()
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
+					if err != nil && errors.IsTimeout(err) {
+						// Pod is created but its initialization has timed out.
+						// If the initialization is successful eventually, the
+						// controller will observe the creation via the informer.
+						// If the initialization fails, or if the pod keeps
+						// uninitialized for a long time, the informer will not
+						// receive any update, and the controller will create a new
+						// pod when the expectation expires.
+						return
+					}
+					if err != nil {
+						defer utilruntime.HandleError(err)
+						// Decrement the expected number of creates because the informer won't observe this pod
+						glog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
+						jm.expectations.CreationObserved(jobKey)
+						activeLock.Lock()
+						active--
+						activeLock.Unlock()
+						errCh <- err
+					}
+				}()
+			}
+			wait.Wait()
+			// any skipped pods that we never attempted to start shouldn't be expected.
+			skippedPods := diff - batchSize
+			if errorCount < len(errCh) && skippedPods > 0 {
+				glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q", skippedPods, job.Namespace, job.Name)
+				active -= skippedPods
+				for i := int32(0); i < skippedPods; i++ {
 					// Decrement the expected number of creates because the informer won't observe this pod
-					glog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
 					jm.expectations.CreationObserved(jobKey)
-					activeLock.Lock()
-					active--
-					activeLock.Unlock()
-					errCh <- err
 				}
-			}()
+				// The skipped pods will be retried later. The next controller resync will
+				// retry the slow start process.
+				break
+			}
+			diff -= batchSize
 		}
-		wait.Wait()
 	}
 
 	select {
@@ -697,6 +771,26 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
 	_, err := jm.kubeClient.Batch().Jobs(job.Namespace).UpdateStatus(job)
 	return err
+}
+
+func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Duration {
+	exp := queue.NumRequeues(key)
+
+	if exp <= 0 {
+		return time.Duration(0)
+	}
+
+	// The backoff is capped such that 'calculated' value never overflows.
+	backoff := float64(DefaultJobBackOff.Nanoseconds()) * math.Pow(2, float64(exp-1))
+	if backoff > math.MaxInt64 {
+		return MaxJobBackOff
+	}
+
+	calculated := time.Duration(backoff)
+	if calculated > MaxJobBackOff {
+		return MaxJobBackOff
+	}
+	return calculated
 }
 
 // filterPods returns pods based on their phase.

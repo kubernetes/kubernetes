@@ -51,26 +51,26 @@ pkg_tar(
 sh_test(
     name = "common_test",
     srcs = ["common.sh"],
-    data = [
-        ":all-srcs",
+    deps = [
+        "//cluster/lib",
+        "//hack/lib",
     ],
-    deps = ["//hack/lib"],
 )
 
 sh_test(
     name = "clientbin_test",
     srcs = ["clientbin.sh"],
-    data = [
-        ":all-srcs",
+    deps = [
+        "//cluster/lib",
+        "//hack/lib",
     ],
-    deps = ["//hack/lib"],
 )
 
 sh_test(
     name = "kube-util_test",
     srcs = ["kube-util.sh"],
-    data = [
-        ":all-srcs",
+    deps = [
+        "//cluster/lib",
+        "//hack/lib",
     ],
-    deps = ["//hack/lib"],
 )

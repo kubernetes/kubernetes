@@ -24,7 +24,6 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	time "time"
 	unsafe "unsafe"
 )
 
@@ -120,7 +119,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
-	out.TokenTTL = time.Duration(in.TokenTTL)
+	out.TokenTTL = in.TokenTTL
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -152,7 +151,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
-	out.TokenTTL = time.Duration(in.TokenTTL)
+	out.TokenTTL = in.TokenTTL
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))

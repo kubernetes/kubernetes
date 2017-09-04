@@ -19,12 +19,15 @@ package cache
 import (
 	"time"
 
+	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/pager"
 )
 
 // ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
@@ -46,8 +49,9 @@ type WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
 // It is a convenience function for users of NewReflector, etc.
 // ListFunc and WatchFunc must not be nil
 type ListWatch struct {
-	ListFunc  ListFunc
-	WatchFunc WatchFunc
+	ListFunc      ListFunc
+	WatchFunc     WatchFunc
+	DisablePaging bool
 }
 
 // Getter interface knows how to access Get method from RESTClient.
@@ -87,6 +91,9 @@ func timeoutFromListOptions(options metav1.ListOptions) time.Duration {
 
 // List a set of apiserver resources
 func (lw *ListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
+	if !lw.DisablePaging {
+		return pager.New(pager.SimplePageFunc(lw.ListFunc)).List(context.TODO(), options)
+	}
 	return lw.ListFunc(options)
 }
 

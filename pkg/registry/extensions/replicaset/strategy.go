@@ -37,6 +37,7 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -67,6 +68,8 @@ func (rsStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Ob
 	rs.Status = extensions.ReplicaSetStatus{}
 
 	rs.Generation = 1
+
+	pod.DropDisabledAlphaFields(&rs.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -75,6 +78,9 @@ func (rsStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set status
 	newRS.Status = oldRS.Status
+
+	pod.DropDisabledAlphaFields(&newRS.Spec.Template.Spec)
+	pod.DropDisabledAlphaFields(&oldRS.Spec.Template.Spec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push

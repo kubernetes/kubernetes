@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const kubeletFile = "kubelet"
