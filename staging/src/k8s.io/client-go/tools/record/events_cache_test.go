@@ -181,6 +181,7 @@ func TestEventCorrelator(t *testing.T) {
 		newEvent        v1.Event
 		expectedEvent   v1.Event
 		intervalSeconds int
+		expectedSkip    bool
 	}{
 		"create-a-single-event": {
 			previousEvents:  []v1.Event{},
@@ -198,7 +199,13 @@ func TestEventCorrelator(t *testing.T) {
 			previousEvents:  makeEvents(defaultAggregateMaxEvents, duplicateEvent),
 			newEvent:        duplicateEvent,
 			expectedEvent:   setCount(duplicateEvent, defaultAggregateMaxEvents+1),
-			intervalSeconds: 5,
+			intervalSeconds: 30, // larger interval induces aggregation but not spam.
+		},
+		"the-same-event-is-spam-if-happens-too-frequently": {
+			previousEvents:  makeEvents(defaultSpamBurst+1, duplicateEvent),
+			newEvent:        duplicateEvent,
+			expectedSkip:    true,
+			intervalSeconds: 1,
 		},
 		"create-many-unique-events": {
 			previousEvents:  makeUniqueEvents(30),
@@ -245,7 +252,10 @@ func TestEventCorrelator(t *testing.T) {
 			if err != nil {
 				t.Errorf("scenario %v: unexpected error playing back prevEvents %v", testScenario, err)
 			}
-			correlator.UpdateState(result.Event)
+			// if we are skipping the event, we can avoid updating state
+			if !result.Skip {
+				correlator.UpdateState(result.Event)
+			}
 		}
 
 		// update the input to current clock value
@@ -257,6 +267,18 @@ func TestEventCorrelator(t *testing.T) {
 			t.Errorf("scenario %v: unexpected error correlating input event %v", testScenario, err)
 		}
 
+		// verify we did not get skip from filter function unexpectedly...
+		if result.Skip != testInput.expectedSkip {
+			t.Errorf("scenario %v: expected skip %v, but got %v", testScenario, testInput.expectedSkip, result.Skip)
+			continue
+		}
+
+		// we wanted to actually skip, so no event is needed to validate
+		if testInput.expectedSkip {
+			continue
+		}
+
+		// validate event
 		_, err = validateEvent(testScenario, result.Event, &testInput.expectedEvent, t)
 		if err != nil {
 			t.Errorf("scenario %v: unexpected error validating result %v", testScenario, err)
