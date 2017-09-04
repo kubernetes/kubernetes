@@ -55,16 +55,6 @@ func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
 	}
 }
 
-//EnsureVirtualServerAddressBind is an empty implementation
-func (*FakeIPVS) EnsureVirtualServerAddressBind(serv *utilipvs.VirtualServer, dev string) (exist bool, err error) {
-	return true, nil
-}
-
-//UnbindVirtualServerAddress is an empty implementation
-func (*FakeIPVS) UnbindVirtualServerAddress(serv *utilipvs.VirtualServer, dev string) error {
-	return nil
-}
-
 //AddVirtualServer is a fake implementation, it simply adds the VirtualServer into the cache store.
 func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {

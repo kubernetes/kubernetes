@@ -36,14 +36,6 @@ func (runner *runner) Flush() error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 
-func (runner *runner) EnsureVirtualServerAddressBind(*VirtualServer, string) (bool, error) {
-	return false, fmt.Errorf("IPVS not supported for this platform")
-}
-
-func (runner *runner) UnbindVirtualServerAddress(*VirtualServer, string) error {
-	return fmt.Errorf("IPVS not supported for this platform")
-}
-
 func (runner *runner) AddVirtualServer(*VirtualServer) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }

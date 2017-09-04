@@ -25,10 +25,6 @@ import (
 type Interface interface {
 	// Flush clears all virtual servers in system. return occurred error immediately.
 	Flush() error
-	// EnsureVirtualServerAddressBind checks if virtual server's address is bound to dummy interface and, if not, binds it. If the address is already bound, return true.
-	EnsureVirtualServerAddressBind(serv *VirtualServer, dev string) (exist bool, err error)
-	// UnbindVirtualServerAddress checks if virtual server's address is bound to dummy interface and, if so, unbinds it.
-	UnbindVirtualServerAddress(serv *VirtualServer, dev string) error
 	// AddVirtualServer creates the specified virtual server.
 	AddVirtualServer(*VirtualServer) error
 	// UpdateVirtualServer updates an already existing virtual server.  If the virtual server does not exist, return error.
