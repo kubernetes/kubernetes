@@ -9142,6 +9142,45 @@
      "capacity": {
       "type": "object",
       "description": "Represents the actual resources of the underlying volume."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PersistentVolumeClaimCondition"
+      },
+      "description": "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'."
+     }
+    }
+   },
+   "v1.PersistentVolumeClaimCondition": {
+    "id": "v1.PersistentVolumeClaimCondition",
+    "description": "PersistentVolumeClaimCondition contails details about state of pvc",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "description": "Last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized."
+     },
+     "message": {
+      "type": "string",
+      "description": "Human-readable message indicating details about last transition."
      }
     }
    },

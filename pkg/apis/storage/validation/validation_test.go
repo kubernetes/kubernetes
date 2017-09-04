@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
@@ -122,4 +123,37 @@ func TestValidateStorageClass(t *testing.T) {
 			t.Errorf("Expected failure for test: %s", testName)
 		}
 	}
+}
+
+func TestAlphaExpandPersistentVolumesFeatureValidation(t *testing.T) {
+	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
+	falseVar := false
+	testSC := &storage.StorageClass{
+		// empty parameters
+		ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
+		Provisioner:          "kubernetes.io/foo-provisioner",
+		Parameters:           map[string]string{},
+		ReclaimPolicy:        &deleteReclaimPolicy,
+		AllowVolumeExpansion: &falseVar,
+	}
+
+	// Enable alpha feature ExpandPersistentVolumes
+	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
+		return
+	}
+	if errs := ValidateStorageClass(testSC); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+	// Disable alpha feature ExpandPersistentVolumes
+	err = utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
+		return
+	}
+	if errs := ValidateStorageClass(testSC); len(errs) == 0 {
+		t.Errorf("expected failure, but got no error")
+	}
+
 }

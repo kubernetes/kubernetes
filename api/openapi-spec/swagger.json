@@ -65753,6 +65753,37 @@
      }
     ]
    },
+   "io.k8s.api.core.v1.PersistentVolumeClaimCondition": {
+    "description": "PersistentVolumeClaimCondition contails details about state of pvc",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.PersistentVolumeClaimList": {
     "description": "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
     "required": [
@@ -65831,6 +65862,15 @@
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
       }
+     },
+     "conditions": {
+      "description": "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaimCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
      },
      "phase": {
       "description": "Phase represents the current phase of PersistentVolumeClaim.",
@@ -70708,6 +70748,10 @@
      "provisioner"
     ],
     "properties": {
+     "allowVolumeExpansion": {
+      "description": "AllowVolumeExpansion shows whether the storage class allow volume expand",
+      "type": "boolean"
+     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
@@ -70791,6 +70835,10 @@
      "provisioner"
     ],
     "properties": {
+     "allowVolumeExpansion": {
+      "description": "AllowVolumeExpansion shows whether the storage class allow volume expand",
+      "type": "boolean"
+     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"

@@ -547,6 +547,27 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 }
 
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of Pvc
+const (
+	// An user trigger resize of pvc has been started
+	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
+)
+
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
+
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	// +optional
@@ -557,6 +578,8 @@ type PersistentVolumeClaimStatus struct {
 	// Represents the actual resources of the underlying volume
 	// +optional
 	Capacity ResourceList
+	// +optional
+	Conditions []PersistentVolumeClaimCondition
 }
 
 type PersistentVolumeAccessMode string

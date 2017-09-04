@@ -59,6 +59,10 @@ message StorageClass {
   // mount of the PVs will simply fail if one is invalid.
   // +optional
   repeated string mountOptions = 5;
+
+  // AllowVolumeExpansion shows whether the storage class allow volume expand
+  // +optional
+  optional bool allowVolumeExpansion = 6;
 }
 
 // StorageClassList is a collection of storage classes.
