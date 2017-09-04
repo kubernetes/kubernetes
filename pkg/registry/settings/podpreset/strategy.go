@@ -22,6 +22,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/settings/validation"
 )
@@ -44,12 +45,17 @@ func (podPresetStrategy) NamespaceScoped() bool {
 func (podPresetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	pip := obj.(*settings.PodPreset)
 	pip.Generation = 1
+
+	pod.DropDisabledVolumeMountsAlphaFields(pip.Spec.VolumeMounts)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podPresetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
 	newPodPreset := obj.(*settings.PodPreset)
 	oldPodPreset := old.(*settings.PodPreset)
+
+	pod.DropDisabledVolumeMountsAlphaFields(oldPodPreset.Spec.VolumeMounts)
+	pod.DropDisabledVolumeMountsAlphaFields(newPodPreset.Spec.VolumeMounts)
 
 	// Update is not allowed
 	newPodPreset.Spec = oldPodPreset.Spec
