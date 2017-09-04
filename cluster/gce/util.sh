@@ -86,7 +86,6 @@ fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 NODE_TAGS="${NODE_TAG}"
-NODE_NETWORK="${NETWORK}"
 
 ALLOCATE_NODE_CIDRS=true
 PREEXISTING_NETWORK=false
@@ -133,11 +132,14 @@ function verify-prereqs() {
 #
 # Vars set:
 #   PROJECT
+#   NETWORK_PROJECT
 #   PROJECT_REPORTED
 function detect-project() {
   if [[ -z "${PROJECT-}" ]]; then
     PROJECT=$(gcloud config list project --format 'value(core.project)')
   fi
+
+  NETWORK_PROJECT=${NETWORK_PROJECT:-${PROJECT}}
 
   if [[ -z "${PROJECT-}" ]]; then
     echo "Could not detect Google Cloud Platform project.  Set the default project using " >&2
@@ -146,6 +148,7 @@ function detect-project() {
   fi
   if [[ -z "${PROJECT_REPORTED-}" ]]; then
     echo "Project: ${PROJECT}" >&2
+    echo "Network Project: ${NETWORK_PROJECT}" >&2
     echo "Zone: ${ZONE}" >&2
     PROJECT_REPORTED=true
   fi
@@ -479,7 +482,7 @@ function create-firewall-rule() {
   local attempt=0
   while true; do
     if ! gcloud compute firewall-rules create "$1" \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "$2" \
       --target-tags "$3" \
@@ -499,28 +502,30 @@ function create-firewall-rule() {
 
 # Format the string argument for gcloud network.
 function make-gcloud-network-argument() {
-  local network="$1"
-  local address="$2"          # optional
-  local enable_ip_alias="$3"  # optional
-  local alias_subnetwork="$4" # optional
-  local alias_size="$5"       # optional
+  local network_project="$1"
+  local region="$2"
+  local network="$3"
+  local subnet="$4"
+  local address="$5"          # optional
+  local enable_ip_alias="$6"  # optional
+  local alias_size="$7"       # optional
+
+  local networkURL="projects/${network_project}/global/networks/${network}"
+  local subnetURL="projects/${network_project}/regions/${region}/subnetworks/${subnet}"
 
   local ret=""
 
   if [[ "${enable_ip_alias}" == 'true' ]]; then
     ret="--network-interface"
-    ret="${ret} network=${network}"
+    ret="${ret} network=${networkURL}"
     # If address is omitted, instance will not receive an external IP.
     ret="${ret},address=${address:-}"
-    ret="${ret},subnet=${alias_subnetwork}"
+    ret="${ret},subnet=${subnetURL}"
     ret="${ret},aliases=pods-default:${alias_size}"
     ret="${ret} --no-can-ip-forward"
   else
-    if [[ ${ENABLE_BIG_CLUSTER_SUBNETS} != "true" || (${PREEXISTING_NETWORK} = "true" && "${PREEXISTING_NETWORK_MODE}" != "custom") ]]; then
-      ret="--network ${network}"
-    else
-      ret="--subnet=${network}"
-    fi
+    ret="${ret} --network ${networkURL}"
+    ret="${ret} --subnet ${subnetURL}"
     ret="${ret} --can-ip-forward"
     if [[ -n ${address:-} ]]; then
       ret="${ret} --address ${address}"
@@ -587,9 +592,12 @@ function create-node-template() {
   fi
 
   local network=$(make-gcloud-network-argument \
-    "${NETWORK}" "" \
+    "${NETWORK_PROJECT}" \
+    "${REGION}" \
+    "${NETWORK}" \
+    "${SUBNETWORK}" \
+    "" \
     "${ENABLE_IP_ALIASES:-}" \
-    "${IP_ALIAS_SUBNETWORK:-}" \
     "${IP_ALIAS_SIZE:-}")
 
   local attempt=1
@@ -757,38 +765,38 @@ function check-existing() {
 }
 
 function create-network() {
-  if ! gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" &>/dev/null; then
+  if ! gcloud compute networks --project "${NETWORK_PROJECT}" describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --mode=auto
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode=auto
   else
     PREEXISTING_NETWORK=true
-    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list ${NETWORK} --format='value(x_gcloud_mode)' || true)"
+    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list ${NETWORK} --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
     echo "Found existing network ${NETWORK} in ${PREEXISTING_NETWORK_MODE} mode."
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${CLUSTER_NAME}-default-internal-master" &>/dev/null; then
+  if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${CLUSTER_NAME}-default-internal-master" &>/dev/null; then
     gcloud compute firewall-rules create "${CLUSTER_NAME}-default-internal-master" \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
       --allow "tcp:1-2379,tcp:2382-65535,udp:1-65535,icmp" \
       --target-tags "${MASTER_TAG}"&
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${CLUSTER_NAME}-default-internal-node" &>/dev/null; then
+  if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${CLUSTER_NAME}-default-internal-node" &>/dev/null; then
     gcloud compute firewall-rules create "${CLUSTER_NAME}-default-internal-node" \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
       --allow "tcp:1-65535,udp:1-65535,icmp" \
       --target-tags "${NODE_TAG}"&
   fi
 
-  if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
+  if ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
     gcloud compute firewall-rules create "${NETWORK}-default-ssh" \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "0.0.0.0/0" \
       --allow "tcp:22" &
@@ -798,31 +806,31 @@ function create-network() {
 function expand-default-subnetwork() {
   gcloud compute networks switch-mode "${NETWORK}" \
     --mode custom \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \
     --region="${REGION}" \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --prefix-length=19 \
     --quiet
 }
 
 
 # Vars set:
-#   NODE_SUBNETWORK
+#   SUBNETWORK
 function create-subnetworks() {
-  NODE_SUBNETWORK=$(gcloud beta compute networks subnets list \
+  SUBNETWORK=$(gcloud beta compute networks subnets list \
       --network=${NETWORK} \
       --regions=${REGION} \
-      --project=${PROJECT} \
+      --project=${NETWORK_PROJECT} \
       --limit=1 \
       --format='value(name)' 2>/dev/null)
 
-  if [[ -z ${NODE_SUBNETWORK:-} ]]; then
-    echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${PROJECT}"
+  if [[ -z ${SUBNETWORK:-} ]]; then
+    echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${NETWORK_PROJECT}"
     exit 1
   fi
-  echo "Found subnet for region ${REGION} in network ${NETWORK}: ${NODE_SUBNETWORK}"
+  echo "Found subnet for region ${REGION} in network ${NETWORK}: ${SUBNETWORK}"
 
   case ${ENABLE_IP_ALIASES} in
     true) echo "IP aliases are enabled. Creating subnetworks.";;
@@ -840,13 +848,13 @@ function create-subnetworks() {
        exit 1;;
   esac
 
-  NODE_SUBNETWORK=${IP_ALIAS_SUBNETWORK}
-  echo "Using IP Aliases subnet ${NODE_SUBNETWORK}"
+  SUBNETWORK=${IP_ALIAS_SUBNETWORK}
+  echo "Using IP Alias subnet ${SUBNETWORK}"
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
   local subnet=$(gcloud beta compute networks subnets describe \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
   if [[ -z ${subnet} ]]; then
@@ -865,7 +873,7 @@ function create-subnetworks() {
     gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network ${NETWORK} \
       --region ${REGION} \
       --range ${NODE_IP_RANGE} \
@@ -882,8 +890,8 @@ function create-subnetworks() {
 
 function delete-firewall-rules() {
   for fw in $@; do
-    if [[ -n $(gcloud compute firewall-rules --project "${PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
-      gcloud compute firewall-rules delete --project "${PROJECT}" --quiet "${fw}" &
+    if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
+      gcloud compute firewall-rules delete --project "${NETWORK_PROJECT}" --quiet "${fw}" &
     fi
   done
   kube::util::wait-for-jobs || {
@@ -892,10 +900,10 @@ function delete-firewall-rules() {
 }
 
 function delete-network() {
-  if [[ -n $(gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" --format='value(name)' 2>/dev/null || true) ]]; then
-    if ! gcloud compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
+  if [[ -n $(gcloud compute networks --project "${NETWORK_PROJECT}" describe "${NETWORK}" --format='value(name)' 2>/dev/null || true) ]]; then
+    if ! gcloud compute networks delete --project "${NETWORK_PROJECT}" --quiet "${NETWORK}"; then
       echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
-      gcloud compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
+      gcloud compute firewall-rules --project "${NETWORK_PROJECT}" list --filter="network=${NETWORK}"
       return 1
     fi
   fi
@@ -905,13 +913,13 @@ function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
       # If running in custom mode network we need to delete subnets
-      mode="$(gcloud compute networks list ${NETWORK} --format='value(x_gcloud_mode)' || true)"
+      mode="$(gcloud compute networks list ${NETWORK} --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
       if [[ "${mode}" == "custom" ]]; then
         echo "Deleting default subnets..."
         # This value should be kept in sync with number of regions.
         local parallelism=9
-        gcloud compute networks subnets list --network="${NETWORK}" --format='value(region.basename())' | \
-          xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --region="{}" || true
+        gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
+          xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
       fi
     fi
     return
@@ -921,11 +929,11 @@ function delete-subnetworks() {
   if [[ ${IP_ALIAS_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-default ]]; then
     echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
     if [[ -n $(gcloud beta compute networks subnets describe \
-          --project "${PROJECT}" \
+          --project "${NETWORK_PROJECT}" \
           --region ${REGION} \
           ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
       gcloud beta --quiet compute networks subnets delete \
-        --project "${PROJECT}" \
+        --project "${NETWORK_PROJECT}" \
         --region ${REGION} \
         ${IP_ALIAS_SUBNETWORK}
     fi
@@ -970,7 +978,7 @@ function create-etcd-certs {
 function create-master() {
   echo "Starting master and configuring firewalls"
   gcloud compute firewall-rules create "${MASTER_NAME}-https" \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --network "${NETWORK}" \
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
@@ -993,9 +1001,9 @@ function create-master() {
   fi
 
   # Create rule for accessing and securing etcd servers.
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+  if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
     gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
-      --project "${PROJECT}" \
+      --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
       --source-tags "${MASTER_TAG}" \
       --allow "tcp:2380,tcp:2381" \
@@ -1290,6 +1298,8 @@ function create-nodes() {
 # Assumes:
 # - NODE_INSTANCE_PREFIX
 # - PROJECT
+# - NETWORK_PROJECT
+# - REGION
 # - ZONE
 # - HEAPSTER_MACHINE_TYPE
 # - NODE_DISK_TYPE
@@ -1299,13 +1309,16 @@ function create-nodes() {
 # - NODE_TAG
 # - NETWORK
 # - ENABLE_IP_ALIASES
-# - IP_ALIAS_SUBNETWORK
+# - SUBNETWORK
 # - IP_ALIAS_SIZE
 function create-heapster-node() {
   local network=$(make-gcloud-network-argument \
-      "${NETWORK}" "" \
+      "${NETWORK_PROJECT}" \
+      "${REGION}" \
+      "${NETWORK}"
+      "${SUBNETWORK}" \
+      "" \
       "${ENABLE_IP_ALIASES:-}" \
-      "${IP_ALIAS_SUBNETWORK:-}" \
       "${IP_ALIAS_SIZE:-}")
 
   gcloud compute instances \
@@ -1656,13 +1669,13 @@ function kube-down() {
     # Note that this is currently a noop, as synchronously deleting the node MIG
     # first allows the master to cleanup routes itself.
     local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
-    routes=( $(gcloud compute routes list --project "${PROJECT}" \
+    routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
       --filter="name ~ '${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}'" \
       --format='value(name)') )
     while (( "${#routes[@]}" > 0 )); do
       echo Deleting routes "${routes[*]::${batch}}"
       gcloud compute routes delete \
-        --project "${PROJECT}" \
+        --project "${NETWORK_PROJECT}" \
         --quiet \
         "${routes[@]::${batch}}"
       routes=( "${routes[@]:${batch}}" )
@@ -1846,18 +1859,18 @@ function check-resources() {
     return 1
   fi
 
-  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-https"
     return 1
   fi
 
-  if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Firewall rules for ${MASTER_NAME}-all"
     return 1
   fi
 
   local -a routes
-  routes=( $(gcloud compute routes list --project "${PROJECT}" \
+  routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
     --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)') )
   if (( "${#routes[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
@@ -2036,16 +2049,16 @@ function test-setup() {
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
   local start=`date +%s`
   gcloud compute firewall-rules create \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --target-tags "${NODE_TAG}" \
     --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
     "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
+  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null; do
     if [[ $(($start + 1200)) -lt `date +%s` ]]; then
-      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${PROJECT}" >&2
+      echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-http-alt in ${NETWORK_PROJECT}" >&2
       exit 1
     fi
     sleep 5
@@ -2055,14 +2068,14 @@ function test-setup() {
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
   start=`date +%s`
   gcloud compute firewall-rules create \
-    --project "${PROJECT}" \
+    --project "${NETWORK_PROJECT}" \
     --target-tags "${NODE_TAG}" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --network "${NETWORK}" \
     "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
-  while ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
+  while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null; do
     if [[ $(($start + 1200)) -lt `date +%s` ]]; then
       echo -e "${color_red}Failed to create firewall ${NODE_TAG}-${INSTANCE_PREFIX}-nodeports in ${PROJECT}" >&2
       exit 1
