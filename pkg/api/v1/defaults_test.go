@@ -350,7 +350,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 		return nil
 	}
 
-	cpu, _ := resource.ParseQuantity("100Gi")
+	cpu, _ := resource.ParseQuantity("100m")
 	mem, _ := resource.ParseQuantity("100Mi")
 
 	tests := []struct {
@@ -364,15 +364,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                        "name": "install",
-                                        "image": "busybox"
-                                    }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "install",
+									Image: "busybox",
+								},
 							},
 						},
 					},
@@ -390,26 +387,23 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "env": [
-                                      {
-                                        "name": "MY_POD_IP",
-                                        "valueFrom": {
-                                          "fieldRef": {
-                                            "apiVersion": "",
-                                            "fieldPath": "status.podIP"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Env: []v1.EnvVar{
+										{
+											Name: "MY_POD_IP",
+											ValueFrom: &v1.EnvVarSource{
+												FieldRef: &v1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "status.podIP",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -437,20 +431,17 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "ports": [
-                                      {
-                                        "name": "default"
-                                      }
-                                    ]
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Ports: []v1.ContainerPort{
+										{
+											Name: "default",
+										},
+									},
+								},
 							},
 						},
 					},
@@ -473,25 +464,22 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                  {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "resources": {
-                                        "limits": {
-                                            "cpu": "100Gi",
-                                            "memory": "100Mi"
-                                        },
-                                        "requests": {
-                                            "cpu": "100Gi",
-                                            "memory": "100Mi"
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Resources: v1.ResourceRequirements{
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+									},
+								},
 							},
 						},
 					},
@@ -514,29 +502,30 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			validators: []InitContainerValidator{assertResource},
 		},
 		{
-			name: "Prob",
+			name: "Probe",
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "livenessProbe": {
-                                        "httpGet": {
-                                            "host": "localhost"
-                                        }
-                                    },
-                                    "readinessProbe": {
-                                        "httpGet": {
-                                            "host": "localhost"
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									LivenessProbe: &v1.Probe{
+										Handler: v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+									ReadinessProbe: &v1.Probe{
+										Handler: v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -577,27 +566,29 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "lifecycle": {
-                                        "postStart": {
-                                            "httpGet": {
-                                                "host": "localhost"
-                                            }
-                                        },
-                                        "preStop": {
-                                            "httpGet": {
-                                                "host": "localhost"
-                                            }
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Ports: []v1.ContainerPort{
+										{
+											Name: "default",
+										},
+									},
+									Lifecycle: &v1.Lifecycle{
+										PostStart: &v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+										PreStop: &v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
