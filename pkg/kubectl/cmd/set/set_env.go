@@ -106,11 +106,13 @@ type EnvOptions struct {
 	Local       bool
 	Overwrite   bool
 	DryRun      bool
+	Record      bool
 
 	ResourceVersion   string
 	ContainerSelector string
 	Selector          string
 	Output            string
+	ChangeCause       string
 	From              string
 	Prefix            string
 
@@ -155,7 +157,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
-
+	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 
@@ -198,6 +200,8 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	o.From = cmdutil.GetFlagString(cmd, "from")
 	o.Prefix = cmdutil.GetFlagString(cmd, "prefix")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.Record = cmdutil.GetRecordFlag(cmd)
+	o.ChangeCause = f.Command(cmd, false)
 	o.PrintObject = f.PrintObject
 
 	o.EnvArgs = envArgs
@@ -412,6 +416,17 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v\n", err))
 			continue
 		}
+		info.Refresh(obj, true)
+
+		// record this change (for rollout history)
+		if o.Record || cmdutil.ContainsChangeCause(info) {
+			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
+				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
+				}
+			}
+		}
+
 		info.Refresh(obj, true)
 
 		// make sure arguments to set or replace environment variables are set
