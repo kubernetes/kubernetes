@@ -109,6 +109,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
 	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
+	cmd.AddCommand(NewCmdCreatePersistentVolumeClaim(f, out))
 	return cmd
 }
 
