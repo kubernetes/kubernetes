@@ -22,8 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -61,35 +59,6 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
 	cmd.MarkFlagRequired("image")
 	return cmd
-}
-
-// fallbackGeneratorNameIfNecessary returns the name of the old generator
-// (v1beta1) if server does not support apps/v1beta1 deployments. Otherwise, the
-// generator string is returned unchanged.
-//
-// If the generator name is changed, print a warning message to let the user
-// know.
-func fallbackGeneratorNameIfNecessary(
-	generatorName string,
-	resourcesList []*metav1.APIResourceList,
-	cmdErr io.Writer,
-) string {
-
-	if generatorName == cmdutil.DeploymentBasicAppsV1Beta1GeneratorName &&
-		!contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
-
-		fmt.Fprintf(cmdErr,
-			"WARNING: New deployments generator %q specified, "+
-				"but apps/v1beta1.Deployments are not available. "+
-				"Falling back to %q.\n",
-			cmdutil.DeploymentBasicAppsV1Beta1GeneratorName,
-			cmdutil.DeploymentBasicV1Beta1GeneratorName,
-		)
-
-		return cmdutil.DeploymentBasicV1Beta1GeneratorName
-	}
-
-	return generatorName
 }
 
 // generatorFromName returns the appropriate StructuredGenerator based on the
@@ -150,7 +119,7 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 
 	// It is possible we have to modify the user-provided generator name if
 	// the server does not have support for the requested generator.
-	generatorName = fallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
+	generatorName = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
 
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
 	generator, ok := generatorFromName(generatorName, imageNames, deploymentName)
