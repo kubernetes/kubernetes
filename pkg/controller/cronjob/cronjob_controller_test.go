@@ -18,7 +18,6 @@ package cronjob
 
 import (
 	"errors"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	// For the cronjob controller to do conversions.
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -524,7 +524,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 
 		// Create jobs
 		js := []batchv1.Job{}
-		jobsToDelete := []string{}
+		jobsToDelete := sets.NewString()
 		sj.Status.Active = []v1.ObjectReference{}
 
 		for i, spec := range tc.jobSpecs {
@@ -558,7 +558,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 
 			js = append(js, *job)
 			if spec.ExpectDelete {
-				jobsToDelete = append(jobsToDelete, job.Name)
+				jobsToDelete.Insert(job.Name)
 			}
 		}
 
@@ -576,12 +576,9 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		if len(jc.DeleteJobName) != len(jobsToDelete) {
 			t.Errorf("%s: expected %d job deleted, actually %d", name, len(jobsToDelete), len(jc.DeleteJobName))
 		} else {
-			sort.Strings(jobsToDelete)
-			sort.Strings(jc.DeleteJobName)
-			for i, expectedJobName := range jobsToDelete {
-				if expectedJobName != jc.DeleteJobName[i] {
-					t.Errorf("%s: expected job %s deleted, actually %v -- %v vs %v", name, expectedJobName, jc.DeleteJobName[i], jc.DeleteJobName, jobsToDelete)
-				}
+			jcDeleteJobName := sets.NewString(jc.DeleteJobName...)
+			if !jcDeleteJobName.Equal(jobsToDelete) {
+				t.Errorf("%s: expected jobs: %v deleted, actually: %v deleted", name, jobsToDelete, jcDeleteJobName)
 			}
 		}
 
