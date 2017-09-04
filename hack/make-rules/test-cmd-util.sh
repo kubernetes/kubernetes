@@ -1248,16 +1248,14 @@ run_kubectl_run_tests() {
   # Clean up
   kubectl delete deployment nginx-apps "${kube_flags[@]}"
 
-  # TODO: enable batch/v1beta1 by default before 1.8 release, after issues
-  # with CronJobs existing in multiple versions at once is solved
-  # # Pre-Condition: no Job exists
-  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # # Command
-  # kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
-  # # Post-Condition: CronJob "pi" is created
-  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
-  # # Clean up
-  # kubectl delete cronjobs pi "${kube_flags[@]}"
+  # Pre-Condition: no Job exists
+  kube::test::get_object_assert cronjob.v1beta1.batch "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: CronJob "pi" is created
+  kube::test::get_object_assert cronjob.v1beta1.batch "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete cronjob.v1beta1.batch pi "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit
