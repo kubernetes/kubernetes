@@ -207,6 +207,10 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string
+
+	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// An empty list means no restrictions will apply.
+	OmitStages []Stage
 }
 
 // GroupResources represents resource kinds in an API group.

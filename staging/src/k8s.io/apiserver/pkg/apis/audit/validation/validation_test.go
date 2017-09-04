@@ -43,6 +43,11 @@ func TestValidatePolicy(t *testing.T) {
 				"/metrics",
 				"*",
 			},
+		}, { // Omit RequestReceived stage
+			Level: audit.LevelMetadata,
+			OmitStages: []audit.Stage{
+				audit.Stage("RequestReceived"),
+			},
 		},
 	}
 	successCases := []audit.Policy{}
@@ -107,6 +112,12 @@ func TestValidatePolicy(t *testing.T) {
 			Verbs:      []string{"get"},
 			Resources:  []audit.GroupResources{{ResourceNames: []string{"leader"}}},
 			Namespaces: []string{"kube-system"},
+		},
+		{ // invalid omitStages
+			Level: audit.LevelMetadata,
+			OmitStages: []audit.Stage{
+				audit.Stage("foo"),
+			},
 		},
 	}
 	errorCases := []audit.Policy{}
