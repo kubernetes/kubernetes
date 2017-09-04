@@ -17,6 +17,8 @@ limitations under the License.
 package fuzzer
 
 import (
+	"strings"
+
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,7 +64,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				o.APIGroup = "rbac.authorization.k8s.io"
 				o.APIVersion = "v1beta1"
 			default:
-				// use random value.
+				// use random value, but without / as it is used as separator
+				o.APIGroup = strings.Replace(o.APIGroup, "/", "-", -1)
+				o.APIVersion = strings.Replace(o.APIVersion, "/", "-", -1)
 			}
 		},
 	}
