@@ -22,7 +22,9 @@ import (
 	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const saRolePrefix = "system:controller:"
@@ -121,6 +123,23 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "expand-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbac.NewRule("update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				// glusterfs
+				rbac.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+				rbac.NewRule("get").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+				rbac.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},
 		Rules: []rbac.PolicyRule{
