@@ -37,6 +37,7 @@ go_library(
         "//plugin/pkg/admission/namespace/exists:go_default_library",
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/admission/persistentvolume/label:go_default_library",
+        "//plugin/pkg/admission/persistentvolume/resize:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
         "//plugin/pkg/admission/podpreset:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",

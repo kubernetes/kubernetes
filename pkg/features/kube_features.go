@@ -114,6 +114,11 @@ const (
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
 
+	// owner: @gnufied
+	// alpha: v1.8
+	// Ability to Expand persistent volumes
+	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
+
 	// owner: @verb
 	// alpha: v1.8
 	//
@@ -179,6 +184,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
