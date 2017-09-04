@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -100,6 +101,8 @@ type OperationGenerator interface {
 		map[types.NodeName][]*volume.Spec,
 		string,
 		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (func() error, error)
+
+	GenerateExpandVolumeFunc(*expandcache.PVCWithResizeRequest, expandcache.VolumeResizeMap) (func() error, string, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
@@ -724,6 +727,59 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	// Volume is not marked as in use by node
 	glog.Infof(volumeToDetach.GenerateMsgDetailed("Verified volume is safe to detach", ""))
 	return nil
+}
+
+func (og *operationGenerator) GenerateExpandVolumeFunc(
+	pvcWithResizeRequest *expandcache.PVCWithResizeRequest,
+	resizeMap expandcache.VolumeResizeMap) (func() error, string, error) {
+
+	volumeSpec := volume.NewSpecFromPersistentVolume(pvcWithResizeRequest.PersistentVolume, false)
+
+	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
+
+	if err != nil {
+		return nil, "", fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+	}
+
+	expandFunc := func() error {
+		newSize := pvcWithResizeRequest.ExpectedSize
+		pvSize := pvcWithResizeRequest.PersistentVolume.Spec.Capacity[v1.ResourceStorage]
+		if pvSize.Cmp(newSize) < 0 {
+			updatedSize, expandErr := volumePlugin.ExpandVolumeDevice(
+				volumeSpec,
+				pvcWithResizeRequest.ExpectedSize,
+				pvcWithResizeRequest.CurrentSize)
+
+			if expandErr != nil {
+				glog.Errorf("Error expanding volume %q of plugin %s : %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
+				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, expandErr.Error())
+				return expandErr
+			}
+			newSize = updatedSize
+			updateErr := resizeMap.UpdatePVSize(pvcWithResizeRequest, newSize)
+
+			if updateErr != nil {
+				glog.V(4).Infof("Error updating PV spec capacity for volume %q with : %v", pvcWithResizeRequest.QualifiedName(), updateErr)
+				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, updateErr.Error())
+				return updateErr
+			}
+		}
+
+		// No Cloudprovider resize needed, lets mark resizing as done
+		if !volumePlugin.RequiresFSResize() {
+			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
+			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
+
+			if err != nil {
+				glog.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
+				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, err.Error())
+				return err
+			}
+		}
+		return nil
+
+	}
+	return expandFunc, volumePlugin.GetPluginName(), nil
 }
 
 func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {

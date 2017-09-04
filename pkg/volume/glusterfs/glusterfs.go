@@ -127,6 +127,10 @@ func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) RequiresFSResize() bool {
+	return false
+}
+
 func (plugin *glusterfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -1045,4 +1049,50 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 
 	}
 	return &cfg, nil
+}
+
+func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	pvSpec := spec.PersistentVolume.Spec
+	glog.V(2).Infof("Request to expand volume: %s ", pvSpec.Glusterfs.Path)
+	volumeName := pvSpec.Glusterfs.Path
+
+	// Fetch the volume for expansion.
+	volumeID := dstrings.TrimPrefix(volumeName, volPrefix)
+
+	//Get details of SC.
+	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
+	if err != nil {
+		return oldSize, err
+	}
+	cfg, err := parseClassParameters(class.Parameters, plugin.host.GetKubeClient())
+	if err != nil {
+		return oldSize, err
+	}
+
+	glog.V(4).Infof("Expanding volume %q with configuration %+v", volumeID, cfg)
+
+	//Create REST server connection
+	cli := gcli.NewClient(cfg.url, cfg.user, cfg.secretValue)
+	if cli == nil {
+		glog.Errorf("failed to create glusterfs rest client")
+		return oldSize, fmt.Errorf("failed to create glusterfs rest client, REST server authentication failed")
+	}
+
+	// Find out delta size
+	expansionSize := (newSize.Value() - oldSize.Value())
+	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1024*1024*1024))
+
+	// Make volume expansion request
+	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGB}
+
+	// Expand the volume
+	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
+	if err != nil {
+		glog.Errorf("error when expanding the volume :%v", err)
+		return oldSize, err
+	}
+
+	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeName, volumeInfoRes.Size)
+	newVolumeSize := resource.MustParse(fmt.Sprintf("%dG", volumeInfoRes.Size))
+	return newVolumeSize, nil
 }

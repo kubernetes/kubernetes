@@ -72,6 +72,7 @@ go_library(
         "//pkg/controller/statefulset:go_default_library",
         "//pkg/controller/ttl:go_default_library",
         "//pkg/controller/volume/attachdetach:go_default_library",
+        "//pkg/controller/volume/expand:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/quota/install:go_default_library",
