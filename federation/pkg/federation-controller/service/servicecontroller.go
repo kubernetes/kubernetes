@@ -565,6 +565,8 @@ func getOperationsToPerformOnCluster(informer fedutil.FederatedInformer, cluster
 				}
 			}
 		}
+		// ExternalIPs are not managed by Kubernetes, so retain the same if any while updating
+		desiredService.Spec.ExternalIPs = clusterService.Spec.ExternalIPs
 
 		// Update existing service, if needed.
 		if !Equivalent(desiredService, clusterService) {
