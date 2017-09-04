@@ -38,7 +38,7 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, requestContextMap
 		return failedHandler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_, ev, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
+		_, ev, omitStages, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
@@ -53,7 +53,7 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, requestContextMap
 		ev.ResponseStatus.Message = getAuthMethods(req)
 		ev.Stage = auditinternal.StageResponseStarted
 
-		rw := decorateResponseWriter(w, ev, sink)
+		rw := decorateResponseWriter(w, ev, sink, omitStages)
 		failedHandler.ServeHTTP(rw, req)
 	})
 }

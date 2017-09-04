@@ -31,7 +31,7 @@ const (
 // Checker exposes methods for checking the policy rules.
 type Checker interface {
 	// Check the audit level for a request with the given authorizer attributes.
-	Level(authorizer.Attributes) audit.Level
+	LevelAndStages(authorizer.Attributes) (audit.Level, []audit.Stage)
 }
 
 // NewChecker creates a new policy checker.
@@ -40,21 +40,21 @@ func NewChecker(policy *audit.Policy) Checker {
 }
 
 // FakeChecker creates a checker that returns a constant level for all requests (for testing).
-func FakeChecker(level audit.Level) Checker {
-	return &fakeChecker{level}
+func FakeChecker(level audit.Level, stage []audit.Stage) Checker {
+	return &fakeChecker{level, stage}
 }
 
 type policyChecker struct {
 	audit.Policy
 }
 
-func (p *policyChecker) Level(attrs authorizer.Attributes) audit.Level {
+func (p *policyChecker) LevelAndStages(attrs authorizer.Attributes) (audit.Level, []audit.Stage) {
 	for _, rule := range p.Rules {
 		if ruleMatches(&rule, attrs) {
-			return rule.Level
+			return rule.Level, rule.OmitStages
 		}
 	}
-	return DefaultAuditLevel
+	return DefaultAuditLevel, nil
 }
 
 // Check whether the rule matches the request attrs.
@@ -181,8 +181,9 @@ func hasString(slice []string, value string) bool {
 
 type fakeChecker struct {
 	level audit.Level
+	stage []audit.Stage
 }
 
-func (f *fakeChecker) Level(_ authorizer.Attributes) audit.Level {
-	return f.level
+func (f *fakeChecker) LevelAndStages(_ authorizer.Attributes) (audit.Level, []audit.Stage) {
+	return f.level, f.stage
 }
