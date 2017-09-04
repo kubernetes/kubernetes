@@ -176,6 +176,8 @@ function dump_masters() {
   elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
+  elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
+    master_names=( "${KUBEMARK_MASTER_NAME}" )
   else
     if ! (detect-master); then
       echo "Master not detected. Is the cluster up?"
