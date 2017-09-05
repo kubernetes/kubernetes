@@ -82,6 +82,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
+	"k8s.io/kubernetes/pkg/kubelet/privilege"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -833,6 +834,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.appArmorValidator = apparmor.NewValidator(kubeCfg.ContainerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
+	klet.softAdmitHandlers.AddPodAdmitHandler(privilege.NewPrivilegeAdmitHandler())
 	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
 		if kubeCfg.ContainerRuntime == kubetypes.DockerContainerRuntime {
 			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClient); err != nil {
@@ -1716,15 +1718,6 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 	for _, handler := range kl.softAdmitHandlers {
 		if result := handler.Admit(attrs); !result.Admit {
 			return result
-		}
-	}
-
-	// TODO: Refactor as a soft admit handler.
-	if err := canRunPod(pod); err != nil {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  "Forbidden",
-			Message: err.Error(),
 		}
 	}
 
