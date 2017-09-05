@@ -393,16 +393,16 @@ func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field
 	allErrs := field.ErrorList{}
 	// TODO: Perform a more thorough validation of spec.TLS.Hosts that takes
 	// the wildcard spec from RFC 6125 into account.
-	for _, itls := range spec.TLS {
-		for i, host := range itls.Hosts {
+	for i, itls := range spec.TLS {
+		for j, host := range itls.Hosts {
 			if strings.Contains(host, "*") {
 				for _, msg := range validation.IsWildcardDNS1123Subdomain(host) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts").Index(j), host, msg))
 				}
 				continue
 			}
 			for _, msg := range validation.IsDNS1123Subdomain(host) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts").Index(j), host, msg))
 			}
 		}
 	}
@@ -464,7 +464,7 @@ func validateIngressRules(ingressRules []extensions.IngressRule, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
 			}
 		}
-		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(0))...)
+		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(i))...)
 	}
 	return allErrs
 }
@@ -501,7 +501,7 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *extensions.HTTPIngressRu
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex"))
 			}
 		}
-		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("backend"))...)
+		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("paths").Index(i).Child("backend"))...)
 	}
 	return allErrs
 }

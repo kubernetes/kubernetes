@@ -1641,7 +1641,7 @@ func TestValidateIngressTLS(t *testing.T) {
 			Hosts: []string{wildcardHost},
 		},
 	}
-	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts: Invalid value: '%v'", wildcardHost)
+	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts[0]: Invalid value: '%v'", wildcardHost)
 	errorCases[badWildcardTLSErr] = badWildcardTLS
 
 	for k, v := range errorCases {
