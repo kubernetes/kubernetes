@@ -51,7 +51,7 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 	glog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return mediumMemory, !notMnt, nil
-	} else if buf.Type == linuxHugetlbfsMagic {
+	} else if int64(buf.Type) == linuxHugetlbfsMagic {
 		return mediumHugepages, !notMnt, nil
 	}
 	return mediumUnknown, !notMnt, nil
