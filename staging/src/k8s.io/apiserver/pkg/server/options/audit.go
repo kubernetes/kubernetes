@@ -57,8 +57,9 @@ type AuditOptions struct {
 	WebhookOptions AuditWebhookOptions
 }
 
-// AuditLogOptions holds the legacy audit log writer. If the AdvancedAuditing feature
-// is enabled, these options determine the output of the structured audit log.
+// AuditLogOptions determines the output of the structured audit log by default.
+// If the AdvancedAuditing feature is set to false, AuditLogOptions holds the legacy
+// audit log writer.
 type AuditLogOptions struct {
 	Path       string
 	MaxAge     int
