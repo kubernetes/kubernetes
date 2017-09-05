@@ -80,7 +80,8 @@ const (
 	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
 	gceHcUnhealthyThreshold = int64(5)
 
-	gceComputeAPIEndpoint = "https://www.googleapis.com/compute/v1/"
+	gceComputeAPIEndpoint      = "https://www.googleapis.com/compute/v1/"
+	gceComputeAPIEndpointAlpha = "https://www.googleapis.com/compute/alpha/"
 )
 
 // gceObject is an abstraction of all GCE API object in go client
@@ -135,16 +136,28 @@ type ServiceManager interface {
 		name string,
 		sizeGb int64,
 		tagsStr string,
-		diskTypeURI string,
+		diskType string,
 		zone string) (gceObject, error)
 
-	// Attach a persistent disk on GCE with the given disk spec to the specified instance.
-	AttachDisk(diskName string,
-		diskKind string,
-		diskZone string,
-		readWrite string,
-		source string,
+	// Creates a new regional persistent disk on GCE with the given disk spec.
+	CreateRegionalDisk(
+		name string,
+		sizeGb int64,
+		tagsStr string,
 		diskType string,
+		zones sets.String) (gceObject, error)
+
+	// Deletes the persistent disk from GCE with the given diskName.
+	DeleteDisk(zone string, disk string) (gceObject, error)
+
+	// Deletes the regional persistent disk from GCE with the given diskName.
+	DeleteRegionalDisk(diskName string) (gceObject, error)
+
+	// Attach a persistent disk on GCE with the given disk spec to the specified instance.
+	AttachDisk(
+		disk *GCEDisk,
+		readWrite string,
+		instanceZone string,
 		instanceName string) (gceObject, error)
 
 	// Detach a persistent disk on GCE with the given disk spec from the specified instance.
@@ -154,13 +167,16 @@ type ServiceManager interface {
 		devicePath string) (gceObject, error)
 
 	// Gets the persistent disk from GCE with the given diskName.
-	GetDisk(project string, zone string, diskName string) (*GCEDisk, error)
+	GetDisk(zone string, diskName string) (*GCEDisk, error)
 
-	// Deletes the persistent disk from GCE with the given diskName.
-	DeleteDisk(project string, zone string, disk string) (gceObject, error)
+	// Gets the regional persistent disk from GCE with the given diskName.
+	GetRegionalDisk(diskName string) (*GCEDisk, error)
 
 	// Waits until GCE reports the given operation in the given zone as done.
 	WaitForZoneOp(op gceObject, zone string, mc *metricContext) error
+
+	// Waits until GCE reports the given operation in the given region is done.
+	WaitForRegionalOp(op gceObject, mc *metricContext) error
 }
 
 type GCEServiceManager struct {
@@ -740,8 +756,14 @@ func (manager *GCEServiceManager) CreateDisk(
 	name string,
 	sizeGb int64,
 	tagsStr string,
-	diskTypeURI string,
+	diskType string,
 	zone string) (gceObject, error) {
+	diskTypeURI, err := manager.getDiskTypeURI(
+		manager.gce.region /* diskRegion */, singleZone{zone}, diskType)
+	if err != nil {
+		return nil, err
+	}
+
 	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
 		diskToCreateAlpha := &computealpha.Disk{
 			Name:        name,
@@ -749,7 +771,9 @@ func (manager *GCEServiceManager) CreateDisk(
 			Description: tagsStr,
 			Type:        diskTypeURI,
 		}
-		return manager.gce.serviceAlpha.Disks.Insert(manager.gce.projectID, zone, diskToCreateAlpha).Do()
+
+		return manager.gce.serviceAlpha.Disks.Insert(
+			manager.gce.projectID, zone, diskToCreateAlpha).Do()
 	}
 
 	diskToCreateV1 := &compute.Disk{
@@ -758,38 +782,72 @@ func (manager *GCEServiceManager) CreateDisk(
 		Description: tagsStr,
 		Type:        diskTypeURI,
 	}
-	return manager.gce.service.Disks.Insert(manager.gce.projectID, zone, diskToCreateV1).Do()
+	return manager.gce.service.Disks.Insert(
+		manager.gce.projectID, zone, diskToCreateV1).Do()
+}
+
+func (manager *GCEServiceManager) CreateRegionalDisk(
+	name string,
+	sizeGb int64,
+	tagsStr string,
+	diskType string,
+	replicaZones sets.String) (gceObject, error) {
+	diskTypeURI, err := manager.getDiskTypeURI(
+		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType)
+	if err != nil {
+		return nil, err
+	}
+	fullyQualifiedReplicaZones := []string{}
+	for _, replicaZone := range replicaZones.UnsortedList() {
+		fullyQualifiedReplicaZones = append(
+			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone))
+	}
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		diskToCreateAlpha := &computealpha.Disk{
+			Name:         name,
+			SizeGb:       sizeGb,
+			Description:  tagsStr,
+			Type:         diskTypeURI,
+			ReplicaZones: fullyQualifiedReplicaZones,
+		}
+		return manager.gce.serviceAlpha.RegionDisks.Insert(
+			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
+	}
+
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *GCEServiceManager) AttachDisk(
-	diskName string,
-	diskKind string,
-	diskZone string,
+	disk *GCEDisk,
 	readWrite string,
-	source string,
-	diskType string,
+	instanceZone string,
 	instanceName string) (gceObject, error) {
+	source, err := manager.getDiskSourceURI(disk)
+	if err != nil {
+		return nil, err
+	}
+
 	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
 		attachedDiskAlpha := &computealpha.AttachedDisk{
-			DeviceName: diskName,
-			Kind:       diskKind,
+			DeviceName: disk.Name,
+			Kind:       disk.Kind,
 			Mode:       readWrite,
 			Source:     source,
-			Type:       diskType,
+			Type:       diskTypePersistent,
 		}
 		return manager.gce.serviceAlpha.Instances.AttachDisk(
-			manager.gce.projectID, diskZone, instanceName, attachedDiskAlpha).Do()
+			manager.gce.projectID, instanceZone, instanceName, attachedDiskAlpha).Do()
 	}
 
 	attachedDiskV1 := &compute.AttachedDisk{
-		DeviceName: diskName,
-		Kind:       diskKind,
+		DeviceName: disk.Name,
+		Kind:       disk.Kind,
 		Mode:       readWrite,
 		Source:     source,
-		Type:       diskType,
+		Type:       disk.Type,
 	}
 	return manager.gce.service.Instances.AttachDisk(
-		manager.gce.projectID, diskZone, instanceName, attachedDiskV1).Do()
+		manager.gce.projectID, instanceZone, instanceName, attachedDiskV1).Do()
 }
 
 func (manager *GCEServiceManager) DetachDisk(
@@ -806,49 +864,270 @@ func (manager *GCEServiceManager) DetachDisk(
 }
 
 func (manager *GCEServiceManager) GetDisk(
-	project string,
 	zone string,
 	diskName string) (*GCEDisk, error) {
+	if zone == "" {
+		return nil, fmt.Errorf("Can not fetch disk %q. Zone is empty.", diskName)
+	}
+
+	if diskName == "" {
+		return nil, fmt.Errorf("Can not fetch disk. Zone is specified (%q). But disk name is empty.", zone)
+	}
 
 	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(project, zone, diskName).Do()
+		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(
+			manager.gce.projectID, zone, diskName).Do()
 		if err != nil {
 			return nil, err
 		}
 
+		var zoneInfo zoneType
+		if len(diskAlpha.ReplicaZones) > 1 {
+			zones := sets.NewString()
+			for _, zoneURI := range diskAlpha.ReplicaZones {
+				zones.Insert(lastComponent(zoneURI))
+			}
+			zoneInfo = multiZone{zones}
+		} else {
+			zoneInfo = singleZone{lastComponent(diskAlpha.Zone)}
+			if diskAlpha.Zone == "" {
+				zoneInfo = singleZone{lastComponent(zone)}
+			}
+		}
+
+		region := strings.TrimSpace(lastComponent(diskAlpha.Region))
+		if region == "" {
+			region, err = manager.getRegionFromZone(zoneInfo)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract region from zone for %q/%q err=%v", zone, diskName, err)
+			}
+		}
+
 		return &GCEDisk{
-			Zone: lastComponent(diskAlpha.Zone),
-			Name: diskAlpha.Name,
-			Kind: diskAlpha.Kind,
-			Type: diskAlpha.Type,
+			ZoneInfo: zoneInfo,
+			Region:   region,
+			Name:     diskAlpha.Name,
+			Kind:     diskAlpha.Kind,
+			Type:     diskAlpha.Type,
 		}, nil
 	}
 
-	diskStable, err := manager.gce.service.Disks.Get(project, zone, diskName).Do()
+	diskStable, err := manager.gce.service.Disks.Get(
+		manager.gce.projectID, zone, diskName).Do()
 	if err != nil {
 		return nil, err
 	}
 
+	zoneInfo := singleZone{strings.TrimSpace(lastComponent(diskStable.Zone))}
+	if zoneInfo.zone == "" {
+		zoneInfo = singleZone{zone}
+	}
+
+	region, err := manager.getRegionFromZone(zoneInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract region from zone for %q/%q err=%v", zone, diskName, err)
+	}
+
 	return &GCEDisk{
-		Zone: lastComponent(diskStable.Zone),
-		Name: diskStable.Name,
-		Kind: diskStable.Kind,
-		Type: diskStable.Type,
+		ZoneInfo: zoneInfo,
+		Region:   region,
+		Name:     diskStable.Name,
+		Kind:     diskStable.Kind,
+		Type:     diskStable.Type,
 	}, nil
 }
 
+func (manager *GCEServiceManager) GetRegionalDisk(
+	diskName string) (*GCEDisk, error) {
+
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		diskAlpha, err := manager.gce.serviceAlpha.RegionDisks.Get(
+			manager.gce.projectID, manager.gce.region, diskName).Do()
+		if err != nil {
+			return nil, err
+		}
+
+		zones := sets.NewString()
+		for _, zoneURI := range diskAlpha.ReplicaZones {
+			zones.Insert(lastComponent(zoneURI))
+		}
+
+		return &GCEDisk{
+			ZoneInfo: multiZone{zones},
+			Region:   lastComponent(diskAlpha.Region),
+			Name:     diskAlpha.Name,
+			Kind:     diskAlpha.Kind,
+			Type:     diskAlpha.Type,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+}
+
 func (manager *GCEServiceManager) DeleteDisk(
-	project string,
 	zone string,
 	diskName string) (gceObject, error) {
 
 	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
-		return manager.gce.serviceAlpha.Disks.Delete(project, zone, diskName).Do()
+		return manager.gce.serviceAlpha.Disks.Delete(
+			manager.gce.projectID, zone, diskName).Do()
 	}
 
-	return manager.gce.service.Disks.Delete(project, zone, diskName).Do()
+	return manager.gce.service.Disks.Delete(
+		manager.gce.projectID, zone, diskName).Do()
 }
 
-func (manager *GCEServiceManager) WaitForZoneOp(op gceObject, zone string, mc *metricContext) error {
+func (manager *GCEServiceManager) DeleteRegionalDisk(
+	diskName string) (gceObject, error) {
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		return manager.gce.serviceAlpha.RegionDisks.Delete(
+			manager.gce.projectID, manager.gce.region, diskName).Do()
+	}
+
+	return nil, fmt.Errorf("DeleteRegionalDisk is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+}
+
+func (manager *GCEServiceManager) WaitForZoneOp(
+	op gceObject, zone string, mc *metricContext) error {
 	return manager.gce.waitForZoneOp(op, zone, mc)
+}
+
+func (manager *GCEServiceManager) WaitForRegionalOp(
+	op gceObject, mc *metricContext) error {
+	return manager.gce.waitForRegionOp(op, manager.gce.region, mc)
+}
+
+func (manager *GCEServiceManager) getDiskSourceURI(disk *GCEDisk) (string, error) {
+	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
+	}
+
+	switch zoneInfo := disk.ZoneInfo.(type) {
+	case singleZone:
+		if zoneInfo.zone == "" || disk.Region == "" {
+			// Unexpected, but sanity-check
+			return "", fmt.Errorf("PD does not have zone/region information: %#v", disk)
+		}
+
+		return getProjectsAPIEndpoint + fmt.Sprintf(
+			diskSourceURITemplateSingleZone,
+			manager.gce.projectID,
+			zoneInfo.zone,
+			disk.Name), nil
+	case multiZone:
+		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
+			// Unexpected, but sanity-check
+			return "", fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", disk)
+		}
+		return getProjectsAPIEndpoint + fmt.Sprintf(
+			diskSourceURITemplateRegional,
+			manager.gce.projectID,
+			disk.Region,
+			disk.Name), nil
+	case nil:
+		// Unexpected, but sanity-check
+		return "", fmt.Errorf("PD did not have ZoneInfo: %v", disk)
+	default:
+		// Unexpected, but sanity-check
+		return "", fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
+	}
+}
+
+func (manager *GCEServiceManager) getDiskTypeURI(
+	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error) {
+	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
+	}
+
+	switch zoneInfo := diskZoneInfo.(type) {
+	case singleZone:
+		if zoneInfo.zone == "" {
+			return "", fmt.Errorf("zone is empty: %v", zoneInfo)
+		}
+
+		return getProjectsAPIEndpoint + fmt.Sprintf(
+			diskTypeURITemplateSingleZone,
+			manager.gce.projectID,
+			zoneInfo.zone,
+			diskType), nil
+	case multiZone:
+		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
+			return "", fmt.Errorf("zoneInfo is regional but does not have any replicaZones specified: %v", zoneInfo)
+		}
+		return getProjectsAPIEndpoint + fmt.Sprintf(
+			diskTypeURITemplateRegional,
+			manager.gce.projectID,
+			diskRegion,
+			diskType), nil
+	case nil:
+		return "", fmt.Errorf("zoneInfo nil")
+	default:
+		return "", fmt.Errorf("zoneInfo has unexpected type %T", zoneInfo)
+	}
+}
+
+func (manager *GCEServiceManager) getReplicaZoneURI(zone string) string {
+	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
+	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
+	}
+
+	return getProjectsAPIEndpoint + fmt.Sprintf(
+		replicaZoneURITemplateSingleZone,
+		manager.gce.projectID,
+		zone)
+}
+
+func (manager *GCEServiceManager) getProjectsAPIEndpoint() string {
+	projectsApiEndpoint := gceComputeAPIEndpoint + "projects/"
+	if manager.gce.service != nil {
+		projectsApiEndpoint = manager.gce.service.BasePath
+	}
+
+	return projectsApiEndpoint
+}
+
+func (manager *GCEServiceManager) getProjectsAPIEndpointAlpha() string {
+	projectsApiEndpoint := gceComputeAPIEndpointAlpha + "projects/"
+	if manager.gce.service != nil {
+		projectsApiEndpoint = manager.gce.serviceAlpha.BasePath
+	}
+
+	return projectsApiEndpoint
+}
+
+func (manager *GCEServiceManager) getRegionFromZone(zoneInfo zoneType) (string, error) {
+	var zone string
+	switch zoneInfo := zoneInfo.(type) {
+	case singleZone:
+		if zoneInfo.zone == "" {
+			// Unexpected, but sanity-check
+			return "", fmt.Errorf("PD is single zone, but zone is not specified: %#v", zoneInfo)
+		}
+
+		zone = zoneInfo.zone
+	case multiZone:
+		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
+			// Unexpected, but sanity-check
+			return "", fmt.Errorf("PD is regional but does not have any replicaZones specified: %v", zoneInfo)
+		}
+
+		zone = zoneInfo.replicaZones.UnsortedList()[0]
+	case nil:
+		// Unexpected, but sanity-check
+		return "", fmt.Errorf("zoneInfo is nil")
+	default:
+		// Unexpected, but sanity-check
+		return "", fmt.Errorf("zoneInfo has unexpected type %T", zoneInfo)
+	}
+
+	region, err := GetGCERegion(zone)
+	if err != nil {
+		glog.Warningf("failed to parse GCE region from zone %q: %v", zone, err)
+		region = manager.gce.region
+	}
+
+	return region, nil
 }
