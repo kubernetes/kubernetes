@@ -39,7 +39,7 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 		if a.GetVerb() == "delete" {
 			return false, "", nil
 		}
-		if a.GetVerb() == "update" && a.GetSubresource() == "/finalizers" {
+		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
 			return false, "", nil
 		}
 		return true, "", nil

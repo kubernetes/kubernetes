@@ -74,6 +74,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("cronjobs").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch", "create", "update", "delete", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("cronjobs/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(batchGroup).Resources("cronjobs/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
@@ -83,6 +84,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup, appsGroup).Resources("daemonsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("daemonsets/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("daemonsets/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding").RuleOrDie(),
@@ -95,6 +97,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/finalizers").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 			// TODO: remove "update" once
 			// https://github.com/kubernetes/kubernetes/issues/36897 is resolved.
@@ -168,6 +171,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbac.NewRule("update").Groups(batchGroup).Resources("jobs/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(batchGroup).Resources("jobs/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
@@ -225,6 +229,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup).Resources("replicasets/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(extensionsGroup).Resources("replicasets/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
@@ -235,6 +240,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			// 1.0 controllers needed get, update, so without these old controllers break on new servers
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
@@ -278,6 +284,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 			rbac.NewRule("update").Groups(appsGroup).Resources("statefulsets/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(appsGroup).Resources("statefulsets/finalizers").RuleOrDie(),
 			rbac.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbac.NewRule("get", "create", "delete", "update", "patch", "list", "watch").Groups(appsGroup).Resources("controllerrevisions").RuleOrDie(),
 			rbac.NewRule("get", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
