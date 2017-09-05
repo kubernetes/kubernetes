@@ -20,6 +20,9 @@ const (
 	Stdout
 	// Stderr represents standard error steam type.
 	Stderr
+	// Systemerr represents errors originating from the system that make it
+	// into the the multiplexed stream.
+	Systemerr
 
 	stdWriterPrefixLen = 8
 	stdWriterFdIndex   = 0
@@ -115,8 +118,9 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 			}
 		}
 
+		stream := StdType(buf[stdWriterFdIndex])
 		// Check the first byte to know where to write
-		switch StdType(buf[stdWriterFdIndex]) {
+		switch stream {
 		case Stdin:
 			fallthrough
 		case Stdout:
@@ -125,6 +129,11 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 		case Stderr:
 			// Write on stderr
 			out = dsterr
+		case Systemerr:
+			// If we're on Systemerr, we won't write anywhere.
+			// NB: if this code changes later, make sure you don't try to write
+			// to outstream if Systemerr is the stream
+			out = nil
 		default:
 			return 0, fmt.Errorf("Unrecognized input header: %d", buf[stdWriterFdIndex])
 		}
@@ -155,11 +164,18 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 			}
 		}
 
+		// we might have an error from the source mixed up in our multiplexed
+		// stream. if we do, return it.
+		if stream == Systemerr {
+			return written, fmt.Errorf("error from daemon in stream: %s", string(buf[stdWriterPrefixLen:frameSize+stdWriterPrefixLen]))
+		}
+
 		// Write the retrieved frame (without header)
 		nw, ew = out.Write(buf[stdWriterPrefixLen : frameSize+stdWriterPrefixLen])
 		if ew != nil {
 			return 0, ew
 		}
+
 		// If the frame has not been fully written: error
 		if nw != frameSize {
 			return 0, io.ErrShortWrite

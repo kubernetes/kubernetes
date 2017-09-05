@@ -5,8 +5,14 @@ go_library(
     srcs = [
         "utils.go",
         "utils_unix.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "cmsg.go",
+        ],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
+    deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
 )
 
 filegroup(

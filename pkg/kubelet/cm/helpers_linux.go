@@ -43,7 +43,7 @@ const (
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
-func MilliCPUToQuota(milliCPU int64) (quota int64, period int64) {
+func MilliCPUToQuota(milliCPU int64) (quota int64, period uint64) {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across)
 	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
@@ -69,7 +69,7 @@ func MilliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 }
 
 // MilliCPUToShares converts the milliCPU to CFS shares.
-func MilliCPUToShares(milliCPU int64) int64 {
+func MilliCPUToShares(milliCPU int64) uint64 {
 	if milliCPU == 0 {
 		// Docker converts zero milliCPU to unset, which maps to kernel default
 		// for unset: 1024. Return 2 here to really match kernel default for
@@ -81,7 +81,7 @@ func MilliCPUToShares(milliCPU int64) int64 {
 	if shares < MinShares {
 		return MinShares
 	}
-	return shares
+	return uint64(shares)
 }
 
 // HugePageLimits converts the API representation to a map
@@ -165,7 +165,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 			result.Memory = &memoryLimits
 		}
 	} else {
-		shares := int64(MinShares)
+		shares := uint64(MinShares)
 		result.CpuShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits

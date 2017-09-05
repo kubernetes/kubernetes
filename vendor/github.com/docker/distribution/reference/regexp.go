@@ -19,18 +19,18 @@ var (
 		alphaNumericRegexp,
 		optional(repeated(separatorRegexp, alphaNumericRegexp)))
 
-	// hostnameComponentRegexp restricts the registry hostname component of a
-	// repository name to start with a component as defined by hostnameRegexp
+	// domainComponentRegexp restricts the registry domain component of a
+	// repository name to start with a component as defined by DomainRegexp
 	// and followed by an optional port.
-	hostnameComponentRegexp = match(`(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`)
+	domainComponentRegexp = match(`(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])`)
 
-	// hostnameRegexp defines the structure of potential hostname components
+	// DomainRegexp defines the structure of potential domain components
 	// that may be part of image names. This is purposely a subset of what is
 	// allowed by DNS to ensure backwards compatibility with Docker image
 	// names.
-	hostnameRegexp = expression(
-		hostnameComponentRegexp,
-		optional(repeated(literal(`.`), hostnameComponentRegexp)),
+	DomainRegexp = expression(
+		domainComponentRegexp,
+		optional(repeated(literal(`.`), domainComponentRegexp)),
 		optional(literal(`:`), match(`[0-9]+`)))
 
 	// TagRegexp matches valid tag names. From docker/docker:graph/tags.go.
@@ -48,17 +48,17 @@ var (
 	anchoredDigestRegexp = anchored(DigestRegexp)
 
 	// NameRegexp is the format for the name component of references. The
-	// regexp has capturing groups for the hostname and name part omitting
+	// regexp has capturing groups for the domain and name part omitting
 	// the separating forward slash from either.
 	NameRegexp = expression(
-		optional(hostnameRegexp, literal(`/`)),
+		optional(DomainRegexp, literal(`/`)),
 		nameComponentRegexp,
 		optional(repeated(literal(`/`), nameComponentRegexp)))
 
 	// anchoredNameRegexp is used to parse a name value, capturing the
-	// hostname and trailing components.
+	// domain and trailing components.
 	anchoredNameRegexp = anchored(
-		optional(capture(hostnameRegexp), literal(`/`)),
+		optional(capture(DomainRegexp), literal(`/`)),
 		capture(nameComponentRegexp,
 			optional(repeated(literal(`/`), nameComponentRegexp))))
 
@@ -68,6 +68,25 @@ var (
 	ReferenceRegexp = anchored(capture(NameRegexp),
 		optional(literal(":"), capture(TagRegexp)),
 		optional(literal("@"), capture(DigestRegexp)))
+
+	// IdentifierRegexp is the format for string identifier used as a
+	// content addressable identifier using sha256. These identifiers
+	// are like digests without the algorithm, since sha256 is used.
+	IdentifierRegexp = match(`([a-f0-9]{64})`)
+
+	// ShortIdentifierRegexp is the format used to represent a prefix
+	// of an identifier. A prefix may be used to match a sha256 identifier
+	// within a list of trusted identifiers.
+	ShortIdentifierRegexp = match(`([a-f0-9]{6,64})`)
+
+	// anchoredIdentifierRegexp is used to check or match an
+	// identifier value, anchored at start and end of string.
+	anchoredIdentifierRegexp = anchored(IdentifierRegexp)
+
+	// anchoredShortIdentifierRegexp is used to check if a value
+	// is a possible identifier prefix, anchored at start and end
+	// of string.
+	anchoredShortIdentifierRegexp = anchored(ShortIdentifierRegexp)
 )
 
 // match compiles the string to a regular expression.

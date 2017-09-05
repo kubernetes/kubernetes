@@ -21,6 +21,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -152,7 +153,7 @@ func (in instrumentedInterface) PullImage(imageID string, auth dockertypes.AuthC
 	return err
 }
 
-func (in instrumentedInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
+func (in instrumentedInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
 	const operation = "remove_image"
 	defer recordOperation(operation, time.Now())
 
@@ -224,7 +225,7 @@ func (in instrumentedInterface) AttachToContainer(id string, opts dockertypes.Co
 	return err
 }
 
-func (in instrumentedInterface) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+func (in instrumentedInterface) ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error) {
 	const operation = "image_history"
 	defer recordOperation(operation, time.Now())
 

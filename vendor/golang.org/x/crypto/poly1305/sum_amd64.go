@@ -6,10 +6,8 @@
 
 package poly1305
 
-// This function is implemented in poly1305_amd64.s
-
+// This function is implemented in sum_amd64.s
 //go:noescape
-
 func poly1305(out *[16]byte, m *byte, mlen uint64, key *[32]byte)
 
 // Sum generates an authenticator for m using a one-time key and puts the

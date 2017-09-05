@@ -161,6 +161,8 @@ var (
 	procRegQueryValueExW                   = modadvapi32.NewProc("RegQueryValueExW")
 	procGetCurrentProcessId                = modkernel32.NewProc("GetCurrentProcessId")
 	procGetConsoleMode                     = modkernel32.NewProc("GetConsoleMode")
+	procSetConsoleMode                     = modkernel32.NewProc("SetConsoleMode")
+	procGetConsoleScreenBufferInfo         = modkernel32.NewProc("GetConsoleScreenBufferInfo")
 	procWriteConsoleW                      = modkernel32.NewProc("WriteConsoleW")
 	procReadConsoleW                       = modkernel32.NewProc("ReadConsoleW")
 	procCreateToolhelp32Snapshot           = modkernel32.NewProc("CreateToolhelp32Snapshot")
@@ -171,7 +173,11 @@ var (
 	procCreateHardLinkW                    = modkernel32.NewProc("CreateHardLinkW")
 	procGetCurrentThreadId                 = modkernel32.NewProc("GetCurrentThreadId")
 	procCreateEventW                       = modkernel32.NewProc("CreateEventW")
+	procCreateEventExW                     = modkernel32.NewProc("CreateEventExW")
+	procOpenEventW                         = modkernel32.NewProc("OpenEventW")
 	procSetEvent                           = modkernel32.NewProc("SetEvent")
+	procResetEvent                         = modkernel32.NewProc("ResetEvent")
+	procPulseEvent                         = modkernel32.NewProc("PulseEvent")
 	procWSAStartup                         = modws2_32.NewProc("WSAStartup")
 	procWSACleanup                         = modws2_32.NewProc("WSACleanup")
 	procWSAIoctl                           = modws2_32.NewProc("WSAIoctl")
@@ -1629,6 +1635,30 @@ func GetConsoleMode(console Handle, mode *uint32) (err error) {
 	return
 }
 
+func SetConsoleMode(console Handle, mode uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetConsoleMode.Addr(), 2, uintptr(console), uintptr(mode), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func GetConsoleScreenBufferInfo(console Handle, info *ConsoleScreenBufferInfo) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetConsoleScreenBufferInfo.Addr(), 2, uintptr(console), uintptr(unsafe.Pointer(info)), 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
 func WriteConsole(console Handle, buf *uint16, towrite uint32, written *uint32, reserved *byte) (err error) {
 	r1, _, e1 := syscall.Syscall6(procWriteConsoleW.Addr(), 5, uintptr(console), uintptr(unsafe.Pointer(buf)), uintptr(towrite), uintptr(unsafe.Pointer(written)), uintptr(unsafe.Pointer(reserved)), 0)
 	if r1 == 0 {
@@ -1732,8 +1762,40 @@ func GetCurrentThreadId() (id uint32) {
 	return
 }
 
-func CreateEvent(eventAttrs *syscall.SecurityAttributes, manualReset uint32, initialState uint32, name *uint16) (handle Handle, err error) {
+func CreateEvent(eventAttrs *SecurityAttributes, manualReset uint32, initialState uint32, name *uint16) (handle Handle, err error) {
 	r0, _, e1 := syscall.Syscall6(procCreateEventW.Addr(), 4, uintptr(unsafe.Pointer(eventAttrs)), uintptr(manualReset), uintptr(initialState), uintptr(unsafe.Pointer(name)), 0, 0)
+	handle = Handle(r0)
+	if handle == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func CreateEventEx(eventAttrs *SecurityAttributes, name *uint16, flags uint32, desiredAccess uint32) (handle Handle, err error) {
+	r0, _, e1 := syscall.Syscall6(procCreateEventExW.Addr(), 4, uintptr(unsafe.Pointer(eventAttrs)), uintptr(unsafe.Pointer(name)), uintptr(flags), uintptr(desiredAccess), 0, 0)
+	handle = Handle(r0)
+	if handle == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func OpenEvent(desiredAccess uint32, inheritHandle bool, name *uint16) (handle Handle, err error) {
+	var _p0 uint32
+	if inheritHandle {
+		_p0 = 1
+	} else {
+		_p0 = 0
+	}
+	r0, _, e1 := syscall.Syscall(procOpenEventW.Addr(), 3, uintptr(desiredAccess), uintptr(_p0), uintptr(unsafe.Pointer(name)))
 	handle = Handle(r0)
 	if handle == 0 {
 		if e1 != 0 {
@@ -1747,6 +1809,30 @@ func CreateEvent(eventAttrs *syscall.SecurityAttributes, manualReset uint32, ini
 
 func SetEvent(event Handle) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetEvent.Addr(), 1, uintptr(event), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func ResetEvent(event Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procResetEvent.Addr(), 1, uintptr(event), 0, 0)
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func PulseEvent(event Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procPulseEvent.Addr(), 1, uintptr(event), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)

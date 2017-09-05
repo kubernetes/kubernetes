@@ -7,16 +7,16 @@ go_library(
         "sum_ref.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "poly1305_amd64.s",
             "sum_amd64.go",
+            "sum_amd64.s",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "poly1305_amd64.s",
             "sum_amd64.go",
+            "sum_amd64.s",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "poly1305_amd64.s",
             "sum_amd64.go",
+            "sum_amd64.s",
         ],
         "//conditions:default": [],
     }),

@@ -7,6 +7,7 @@ import (
 	"unsafe"
 )
 
+// #cgo CFLAGS: -std=c99
 // #cgo LDFLAGS: -lkstat
 // #include <unistd.h>
 // #include <stdlib.h>

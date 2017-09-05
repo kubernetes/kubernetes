@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	dockerdigest "github.com/docker/distribution/digest"
 	dockerref "github.com/docker/distribution/reference"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
+	godigest "github.com/opencontainers/go-digest"
 )
 
 // ParseDockerTimestamp parses the timestamp returned by Interface from string to time.Time
@@ -40,7 +40,7 @@ func ParseDockerTimestamp(s string) (time.Time, error) {
 func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	// The image string follows the grammar specified here
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
-	named, err := dockerref.ParseNamed(image)
+	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
 		glog.V(4).Infof("couldn't parse image reference %q: %v", image, err)
 		return false
@@ -66,7 +66,7 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 
 	if isDigested {
 		for _, repoDigest := range inspected.RepoDigests {
-			named, err := dockerref.ParseNamed(repoDigest)
+			named, err := dockerref.ParseNormalizedNamed(repoDigest)
 			if err != nil {
 				glog.V(4).Infof("couldn't parse image RepoDigest reference %q: %v", repoDigest, err)
 				continue
@@ -80,7 +80,7 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 		}
 
 		// process the ID as a digest
-		id, err := dockerdigest.ParseDigest(inspected.ID)
+		id, err := godigest.Parse(inspected.ID)
 		if err != nil {
 			glog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
 			return false
@@ -116,7 +116,7 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 		return false
 	}
 
-	id, err := dockerdigest.ParseDigest(inspected.ID)
+	id, err := godigest.Parse(inspected.ID)
 	if err != nil {
 		glog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
 		return false
