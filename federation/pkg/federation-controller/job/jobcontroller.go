@@ -401,7 +401,7 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 	// delete job
 	if fjob.DeletionTimestamp != nil {
 		if err := fjc.delete(fjob); err != nil {
-			fjc.eventRecorder.Eventf(fjob, api.EventTypeNormal, "DeleteFailed", "Job delete failed: %v", err)
+			fjc.eventRecorder.Eventf(fjob, api.EventTypeWarning, "DeleteFailed", "Job delete failed: %v", err)
 			return statusError, err
 		}
 		return statusAllOk, nil
