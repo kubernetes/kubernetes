@@ -9,14 +9,21 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "metadata.go",
         "openstack.go",
         "openstack_client.go",
+        "openstack_instance_metadata.go",
         "openstack_instances.go",
-        "openstack_loadbalancer.go",
+        "openstack_loadbalancer_common.go",
+        "openstack_loadbalancer_v1.go",
+        "openstack_loadbalancer_v2.go",
         "openstack_metrics.go",
+        "openstack_options.go",
         "openstack_routes.go",
+        "openstack_utils.go",
+        "openstack_volume_v1.go",
+        "openstack_volume_v2.go",
         "openstack_volumes.go",
+        "openstack_zones.go",
     ],
     deps = [
         "//pkg/api/v1/helper:go_default_library",
@@ -66,9 +73,13 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "metadata_test.go",
+        "openstack_instance_metadata_test.go",
+        "openstack_instances_test.go",
+        "openstack_options_test.go",
         "openstack_routes_test.go",
         "openstack_test.go",
+        "openstack_utils_test.go",
+        "openstack_volumes_test.go",
     ],
     library = ":go_default_library",
     deps = [
