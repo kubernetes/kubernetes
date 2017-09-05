@@ -23,12 +23,14 @@ import (
 	"net"
 	"reflect"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
@@ -98,7 +100,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs
 		},
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
-	return &Proxier{
+	proxier := &Proxier{
 		exec:             fexec,
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
@@ -117,6 +119,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, nodeIPs
 		natChains:        bytes.NewBuffer(nil),
 		natRules:         bytes.NewBuffer(nil),
 	}
+	burstSyncs := 2
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, 10*time.Second, 60*time.Second, burstSyncs)
+	return proxier
 }
 
 func makeNSN(namespace, name string) types.NamespacedName {

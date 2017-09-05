@@ -853,12 +853,6 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
-type syncReason string
-
-const syncReasonServices syncReason = "ServicesUpdate"
-const syncReasonEndpoints syncReason = "EndpointsUpdate"
-const syncReasonForce syncReason = "Force"
-
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
