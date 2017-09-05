@@ -2759,6 +2759,106 @@ func TestValidateVolumes(t *testing.T) {
 	}
 }
 
+func TestAlphaHugePagesIsolation(t *testing.T) {
+	successCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	failureCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+		return
+	}
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) != 0 {
+			t.Errorf("Unexpected error for case[%d], err: %v", i, errs)
+		}
+	}
+	for i := range failureCases {
+		pod := &failureCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+		return
+	}
+	// Disable alpha feature HugePages and ensure all success cases fail
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
+}
+
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 
 	testCases := []api.VolumeSource{
@@ -7838,6 +7938,8 @@ func TestValidateNode(t *testing.T) {
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -8113,6 +8215,27 @@ func TestValidateNode(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
+		"multiple-pre-allocated-hugepages": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "abc",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "something"},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("10Gi"),
 				},
 			},
 			Spec: api.NodeSpec{

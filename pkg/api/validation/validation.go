@@ -2402,6 +2402,28 @@ func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	return allErrors
 }
 
+func toResourceNames(resources api.ResourceList) []api.ResourceName {
+	result := []api.ResourceName{}
+	for resourceName := range resources {
+		result = append(result, resourceName)
+	}
+	return result
+}
+
+func toSet(resourceNames []api.ResourceName) sets.String {
+	result := sets.NewString()
+	for _, resourceName := range resourceNames {
+		result.Insert(string(resourceName))
+	}
+	return result
+}
+
+func toContainerResourcesSet(ctr *api.Container) sets.String {
+	resourceNames := toResourceNames(ctr.Resources.Requests)
+	resourceNames = append(resourceNames, toResourceNames(ctr.Resources.Limits)...)
+	return toSet(resourceNames)
+}
+
 // validateContainersOnlyForPod does additional validation for containers on a pod versus a pod template
 // it only does additive validation of fields not covered in validateContainers
 func validateContainersOnlyForPod(containers []api.Container, fldPath *field.Path) field.ErrorList {
@@ -2428,6 +2450,21 @@ func ValidatePod(pod *api.Pod) field.ErrorList {
 
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		hugePageResources := sets.NewString()
+		for i := range pod.Spec.Containers {
+			resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+			for resourceStr := range resourceSet {
+				if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+					hugePageResources.Insert(resourceStr)
+				}
+			}
+		}
+		if len(hugePageResources) > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
+		}
+	}
 
 	return allErrs
 }
@@ -3445,7 +3482,10 @@ func ValidateNode(node *api.Node) field.ErrorList {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
 
-	// Only validate spec. All status fields are optional and can be updated later.
+	// Only validate spec.
+	// All status fields are optional and can be updated later.
+	// That said, if specified, we need to ensure they are valid.
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// external ID is required.
 	if len(node.Spec.ExternalID) == 0 {
@@ -3461,6 +3501,38 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	return allErrs
 }
 
+// ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
+func ValidateNodeResources(node *api.Node) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Validate resource quantities in capacity.
+	hugePageSizes := sets.NewString()
+	for k, v := range node.Status.Capacity {
+		resPath := field.NewPath("status", "capacity", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	// Validate resource quantities in allocatable.
+	hugePageSizes = sets.NewString()
+	for k, v := range node.Status.Allocatable {
+		resPath := field.NewPath("status", "allocatable", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	return allErrs
+}
+
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -3473,16 +3545,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
-	// Validate resource quantities in capacity.
-	for k, v := range node.Status.Capacity {
-		resPath := field.NewPath("status", "capacity", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
-	// Validate resource quantities in allocatable.
-	for k, v := range node.Status.Allocatable {
-		resPath := field.NewPath("status", "allocatable", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
@@ -3925,6 +3988,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		if resourceName == api.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
 		}
+		if helper.IsHugePageResourceName(resourceName) && !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+			allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
+		}
+
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))

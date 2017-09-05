@@ -26,6 +26,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
@@ -83,6 +84,23 @@ func MilliCPUToShares(milliCPU int64) int64 {
 	return shares
 }
 
+// HugePageLimits converts the API representation to a map
+// from huge page size (in bytes) to huge page limit (in bytes).
+func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
+	hugePageLimits := map[int64]int64{}
+	for k, v := range resourceList {
+		if v1helper.IsHugePageResourceName(k) {
+			pageSize, _ := v1helper.HugePageSizeFromResourceName(k)
+			if value, exists := hugePageLimits[pageSize.Value()]; exists {
+				hugePageLimits[pageSize.Value()] = value + v.Value()
+			} else {
+				hugePageLimits[pageSize.Value()] = v.Value()
+			}
+		}
+	}
+	return hugePageLimits
+}
+
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	// sum requests and limits.
@@ -108,12 +126,22 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
+	// map hugepage pagesize (bytes) to limits (bytes)
+	hugePageLimits := map[int64]int64{}
 	for _, container := range pod.Spec.Containers {
 		if container.Resources.Limits.Cpu().IsZero() {
 			cpuLimitsDeclared = false
 		}
 		if container.Resources.Limits.Memory().IsZero() {
 			memoryLimitsDeclared = false
+		}
+		containerHugePageLimits := HugePageLimits(container.Resources.Requests)
+		for k, v := range containerHugePageLimits {
+			if value, exists := hugePageLimits[k]; exists {
+				hugePageLimits[k] = value + v
+			} else {
+				hugePageLimits[k] = v
+			}
 		}
 	}
 
@@ -140,6 +168,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 		shares := int64(MinShares)
 		result.CpuShares = &shares
 	}
+	result.HugePageLimit = hugePageLimits
 	return result
 }
 

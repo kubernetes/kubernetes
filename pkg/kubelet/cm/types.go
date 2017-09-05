@@ -31,6 +31,8 @@ type ResourceConfig struct {
 	CpuQuota *int64
 	// CPU quota period.
 	CpuPeriod *int64
+	// HugePageLimit map from page size (in bytes) to limit (in bytes)
+	HugePageLimit map[int64]int64
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
