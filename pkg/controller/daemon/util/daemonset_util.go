@@ -71,6 +71,7 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
+	// TODO(#48843) OutOfDisk taints will be removed in 1.10
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 		kubelettypes.IsCritical(newTemplate.Namespace, newTemplate.Annotations) {
 		v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
