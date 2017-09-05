@@ -165,7 +165,7 @@ function copy-resource-files-to-master {
 # Make startup scripts executable and run start-kubemark-master.sh.
 function start-master-components {
   echo ""
-  MASTER_STARTUP_CMD="sudo bash /home/kubernetes/start-kubemark-master.sh"
+  MASTER_STARTUP_CMD="sudo ${START_KUBEMARK_MASTER_ENVS:-} bash /home/kubernetes/start-kubemark-master.sh"
   execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
   echo "The master has started and is now live."
 }
@@ -180,7 +180,7 @@ function create-and-upload-hollow-node-image {
     echo 'Cannot find cmd/kubemark binary'
     exit 1
   fi
-  
+
   echo "Copying kubemark binary to ${MAKE_DIR}"
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
@@ -341,7 +341,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   start=$(date +%s)
   nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
-  
+
   until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo -n "."
     sleep 1
