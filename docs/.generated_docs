@@ -188,6 +188,7 @@ docs/man/man1/kubectl-create-service-loadbalancer.1
 docs/man/man1/kubectl-create-service-nodeport.1
 docs/man/man1/kubectl-create-service.1
 docs/man/man1/kubectl-create-serviceaccount.1
+docs/man/man1/kubectl-create-statefulset.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
@@ -288,6 +289,7 @@ docs/user-guide/kubectl/kubectl_create_service_externalname.md
 docs/user-guide/kubectl/kubectl_create_service_loadbalancer.md
 docs/user-guide/kubectl/kubectl_create_service_nodeport.md
 docs/user-guide/kubectl/kubectl_create_serviceaccount.md
+docs/user-guide/kubectl/kubectl_create_statefulset.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
 docs/user-guide/kubectl/kubectl_drain.md
