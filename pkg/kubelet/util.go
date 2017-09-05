@@ -27,7 +27,7 @@ import (
 )
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *v1.Pod) error {
+func CanRunPod(pod *v1.Pod) error {
 	if !capabilities.Get().AllowPrivileged {
 		for _, container := range pod.Spec.Containers {
 			if securitycontext.HasPrivilegedRequest(&container) {
