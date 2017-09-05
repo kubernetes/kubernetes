@@ -29,6 +29,7 @@ type MonitorCallback func(resourceName string, added, updated, deleted []*plugin
 type Manager interface {
 	// Start starts the gRPC Registration service.
 	Start() error
+
 	// Devices is the map of devices that have registered themselves
 	// against the manager.
 	// The map key is the ResourceName of the device plugins.
@@ -40,6 +41,9 @@ type Manager interface {
 
 	// Stop stops the manager.
 	Stop() error
+
+	// Returns checkpoint file path.
+	CheckpointFile() string
 }
 
 // TODO: evaluate whether we need these error definitions.

@@ -63,7 +63,7 @@ func NewManagerImpl(socketPath string, f MonitorCallback) (*ManagerImpl, error) 
 	}, nil
 }
 
-func removeContents(dir string) error {
+func (m *ManagerImpl) removeContents(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
 		return err
@@ -74,13 +74,29 @@ func removeContents(dir string) error {
 		return err
 	}
 	for _, name := range names {
-		// TODO: skip checkpoint file and check for file type.
-		err = os.RemoveAll(filepath.Join(dir, name))
+		filePath := filepath.Join(dir, name)
+		if filePath == m.CheckpointFile() {
+			continue
+		}
+		stat, err := os.Stat(filePath)
+		if err != nil {
+			glog.Errorf("Failed to stat file %v: %v", filePath, err)
+			continue
+		}
+		if stat.IsDir() {
+			continue
+		}
+		err = os.RemoveAll(filePath)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// CheckpointFile returns device plugin checkpoint file path.
+func (m *ManagerImpl) CheckpointFile() string {
+	return filepath.Join(m.socketdir, "kubelet_internal_checkpoint")
 }
 
 // Start starts the Device Plugin Manager
@@ -92,7 +108,7 @@ func (m *ManagerImpl) Start() error {
 
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.
-	if err := removeContents(m.socketdir); err != nil {
+	if err := m.removeContents(m.socketdir); err != nil {
 		glog.Errorf("Fail to clean up stale contents under %s: %+v", m.socketdir, err)
 	}
 
