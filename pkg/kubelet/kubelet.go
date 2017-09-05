@@ -1938,6 +1938,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		kl.podManager.AddPod(pod)
 
 		if kubepod.IsMirrorPod(pod) {
+			kl.statusManager.Reconcile(types.UID(kl.podManager.TranslatePodUID(pod.UID)))
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -2002,9 +2003,8 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 // that should be reconciled.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	for _, pod := range pods {
-		// Update the pod in pod manager, status manager will do periodically reconcile according
-		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
+		kl.statusManager.Reconcile(pod.UID)
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
 		if eviction.PodIsEvicted(pod.Status) {
