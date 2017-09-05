@@ -151,6 +151,12 @@ const (
 	//
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
+
+	// owner: @ConnorDoyle
+	// alpha: v1.8
+	//
+	// Alternative container-level CPU affinity policies.
+	CPUManager utilfeature.Feature = "CPUManager"
 )
 
 func init() {
@@ -180,6 +186,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
