@@ -38,10 +38,7 @@ import (
 	networkingapiv1 "k8s.io/api/networking/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
-	settingv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -392,13 +389,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
-		// Don't copy this pattern. We enable rbac/v1alpha1 and settings/v1laph1
-		// by default only because they were enabled in previous releases.
-		// See https://github.com/kubernetes/kubernetes/pull/47690.
-		// TODO: disable rbac/v1alpha1 and settings/v1alpha1 by default in 1.8
-		rbacv1alpha1.SchemeGroupVersion,
-		settingv1alpha1.SchemeGroupVersion,
-		schedulingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
