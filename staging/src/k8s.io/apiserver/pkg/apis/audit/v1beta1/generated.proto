@@ -108,9 +108,9 @@ message GroupResources {
   optional string group = 1;
 
   // Resources is a list of resources within the API group. Subresources are
-  // matched using a "/" to indicate the subresource. For example, "pods/logs"
-  // would match request to the logs subresource of pods. The top level resource
-  // does not match subresources, "pods" doesn't match "pods/logs".
+  // matched using a "/" to indicate the subresource. For example, "pods/log"
+  // would match request to the log subresource of pods. The top level resource
+  // does not match subresources, "pods" doesn't match "pods/log".
   // +optional
   repeated string resources = 2;
 
