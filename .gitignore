@@ -120,5 +120,8 @@ zz_generated.openapi.go
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
 !\.drone\.sec
 
+# Godeps workspace
+/Godeps/_workspace
+
 /bazel-*
 *.pyc
