@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -70,6 +71,40 @@ func AddOutputFlags(cmd *cobra.Command) {
 // AddNoHeadersFlags adds no-headers flags to a command.
 func AddNoHeadersFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
+}
+
+// AddImageFlag adds images flag to a command.
+func AddImageFlag(cmd *cobra.Command) {
+	cmd.Flags().StringSlice("image", []string{}, "Image names to run.")
+}
+
+// AddReplicasFlag adds replicas flag to a command.
+func AddReplicasFlag(cmd *cobra.Command, defaultValue int32) {
+	cmd.Flags().Int32P("replicas", "r", defaultValue, fmt.Sprintf("Number of replicas to create for this container. Default is %d.", defaultValue))
+}
+
+// PrintSuccess prints message after finishing mutating operations
+func PrintSuccess(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource string, name string, dryRun bool, operation string) {
+	resource, _ = mapper.ResourceSingularizer(resource)
+	dryRunMsg := ""
+	if dryRun {
+		dryRunMsg = " (dry run)"
+	}
+	if shortOutput {
+		// -o name: prints resource/name
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s/%s\n", resource, name)
+		} else {
+			fmt.Fprintf(out, "%s\n", name)
+		}
+	} else {
+		// understandable output by default
+		if len(resource) > 0 {
+			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
+		} else {
+			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
+		}
+	}
 }
 
 // ValidateOutputArgs validates -o flag args for mutations
