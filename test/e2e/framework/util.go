@@ -1132,6 +1132,28 @@ func countRemainingPods(c clientset.Interface, namespace string) (int, int, erro
 	return numPods, missingTimestamp, nil
 }
 
+// isDynamicDiscoveryError returns true if the error is a group discovery error
+// only for groups expected to be created/deleted dynamically during e2e tests
+func isDynamicDiscoveryError(err error) bool {
+	if !discovery.IsGroupDiscoveryFailedError(err) {
+		return false
+	}
+	discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
+	for gv := range discoveryErr.Groups {
+		switch gv.Group {
+		case "mygroup.example.com":
+			// custom_resource_definition
+			// garbage_collector
+		case "wardle.k8s.io":
+			// aggregator
+		default:
+			Logf("discovery error for unexpected group: %#v", gv)
+			return false
+		}
+	}
+	return false
+}
+
 // hasRemainingContent checks if there is remaining content in the namespace via API discovery
 func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, namespace string) (bool, error) {
 	// some tests generate their own framework.Client rather than the default
@@ -1142,11 +1164,11 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 
 	// find out what content is supported on the server
 	resources, err := c.Discovery().ServerPreferredNamespacedResources()
-	if err != nil {
+	if err != nil && !isDynamicDiscoveryError(err) {
 		return false, err
 	}
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
-	if err != nil {
+	if err != nil && !isDynamicDiscoveryError(err) {
 		return false, err
 	}
 
