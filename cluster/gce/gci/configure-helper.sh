@@ -811,20 +811,26 @@ function assemble-docker-flags {
     # If using a network plugin, extend the docker configuration to always remove
     # the network checkpoint to avoid corrupt checkpoints.
     # (https://github.com/docker/docker/issues/18283).
-    echo "Extend the default docker.service configuration"
+    echo "Extend the docker.service configuration to remove the network checkpiont"
     mkdir -p /etc/systemd/system/docker.service.d
     cat <<EOF >/etc/systemd/system/docker.service.d/01network.conf
 [Service]
 ExecStartPre=/bin/sh -x -c "rm -rf /var/lib/docker/network"
 EOF
+  fi
+
+  # Ensure TasksMax is sufficient for docker.
+  # (https://github.com/kubernetes/kubernetes/issues/51977)
+  echo "Extend the docker.service configuration to set a higher pids limit"
+  mkdir -p /etc/systemd/system/docker.service.d
+  cat <<EOF >/etc/systemd/system/docker.service.d/02tasksmax.conf
+[Service]
+TasksMax=infinity
+EOF
 
     systemctl daemon-reload
-
-    # If using a network plugin, we need to explicitly restart docker daemon, because
-    # kubelet will not do it.
     echo "Docker command line is updated. Restart docker to pick it up"
     systemctl restart docker
-  fi
 }
 
 # This function assembles the kubelet systemd service file and starts it
