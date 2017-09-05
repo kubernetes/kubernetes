@@ -214,9 +214,9 @@ type GroupResources struct {
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/logs"
-	// would match request to the logs subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/logs".
+	// matched using a "/" to indicate the subresource. For example, "pods/log"
+	// would match request to the log subresource of pods. The top level resource
+	// does not match subresources, "pods" doesn't match "pods/log".
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.
