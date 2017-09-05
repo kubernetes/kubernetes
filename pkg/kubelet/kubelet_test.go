@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/privilege"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -312,6 +313,7 @@ func newTestKubeletWithImageList(
 		kubelet.podManager,
 		kubelet.runtimeCache,
 		fakeRuntime)
+	kubelet.softAdmitHandlers.AddPodAdmitHandler(privilege.NewPrivilegeAdmitHandler())
 	return &TestKubelet{kubelet, fakeRuntime, mockCadvisor, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
