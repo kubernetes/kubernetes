@@ -17,7 +17,10 @@ limitations under the License.
 package cm
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/golang/glog"
@@ -108,7 +111,7 @@ func NewDevicePluginHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*Devi
 	glog.V(2).Infof("Creating Device Plugin Handler")
 	handler := &DevicePluginHandlerImpl{
 		allDevices:       make(map[string]sets.String),
-		allocatedDevices: devicesInUse(),
+		allocatedDevices: make(map[string]podDevices),
 	}
 
 	deviceManagerMonitorCallback := func(resourceName string, added, updated, deleted []*pluginapi.Device) {
@@ -140,6 +143,11 @@ func NewDevicePluginHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*Devi
 
 	handler.devicePluginManager = mgr
 	handler.devicePluginManagerMonitorCallback = deviceManagerMonitorCallback
+	// Loads in allocatedDevices information from disk.
+	err = handler.readCheckpoint()
+	if err != nil {
+		glog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
+	}
 	return handler, nil
 }
 
@@ -202,14 +210,11 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		}
 		ret = append(ret, resp)
 	}
+	// Checkpoints device to container allocation information.
+	if err := h.writeCheckpoint(); err != nil {
+		return nil, err
+	}
 	return ret, nil
-}
-
-// devicesInUse returns a list of custom devices in use along with the
-// respective pods that are using them.
-func devicesInUse() map[string]podDevices {
-	// TODO: gets the initial state from checkpointing.
-	return make(map[string]podDevices)
 }
 
 // updateAllocatedDevices updates the list of GPUs in use.
@@ -228,4 +233,61 @@ func (h *DevicePluginHandlerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 		glog.V(5).Infof("pods to be removed: %v", podsToBeRemoved.List())
 		podDevs.delete(podsToBeRemoved.List())
 	}
+}
+
+type checkpointEntry struct {
+	PodUID        string
+	ContainerName string
+	ResourceName  string
+	DeviceID      string
+}
+
+// checkpointData struct is used to store pod to device allocation information
+// in a checkpoint file.
+// TODO: add version control when we need to change checkpoint format.
+type checkpointData struct {
+	Entries []checkpointEntry
+}
+
+// Checkpoints device to container allocation information to disk.
+func (h *DevicePluginHandlerImpl) writeCheckpoint() error {
+	filepath := h.devicePluginManager.CheckpointFile()
+	var data checkpointData
+	for resourceName, podDev := range h.allocatedDevices {
+		for podUID, conDev := range podDev {
+			for conName, devs := range conDev {
+				for _, devId := range devs.UnsortedList() {
+					data.Entries = append(data.Entries, checkpointEntry{podUID, conName, resourceName, devId})
+				}
+			}
+		}
+	}
+	dataJson, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filepath, dataJson, 0644)
+}
+
+// Reads device to container allocation information from disk, and populates
+// h.allocatedDevices accordingly.
+func (h *DevicePluginHandlerImpl) readCheckpoint() error {
+	filepath := h.devicePluginManager.CheckpointFile()
+	content, err := ioutil.ReadFile(filepath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read checkpoint file %q: %v", filepath, err)
+	}
+	glog.V(2).Infof("Read checkpoint file %s\n", filepath)
+	var data checkpointData
+	if err := json.Unmarshal(content, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal checkpoint data: %v", err)
+	}
+	for _, entry := range data.Entries {
+		glog.V(2).Infof("Get checkpoint entry: %v %v %v %v\n", entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceID)
+		if h.allocatedDevices[entry.ResourceName] == nil {
+			h.allocatedDevices[entry.ResourceName] = make(podDevices)
+		}
+		h.allocatedDevices[entry.ResourceName].insert(entry.PodUID, entry.ContainerName, entry.DeviceID)
+	}
+	return nil
 }
