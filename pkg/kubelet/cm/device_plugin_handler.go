@@ -196,7 +196,7 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		// requests may fail if we serve them in mixed order.
 		// TODO: may revisit this part later if we see inefficient resource allocation
 		// in real use as the result of this.
-		resp, err := h.devicePluginManager.Allocate(resource, append(devices.UnsortedList(), allocated...))
+		resp, err := h.devicePluginManager.Allocate(pod.Namespace, pod.Name, resource, append(devices.UnsortedList(), allocated...))
 		if err != nil {
 			return nil, err
 		}

@@ -188,8 +188,10 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
-func (e *endpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+func (e *endpoint) allocate(ns string, podName string, devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
+		Namespace:  ns,
+		PodName:    podName,
 		DevicesIDs: devs,
 	})
 }

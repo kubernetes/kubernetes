@@ -36,7 +36,7 @@ type Manager interface {
 
 	// Allocate takes resourceName and list of device Ids, and calls the
 	// gRPC Allocate on the device plugin matching the resourceName.
-	Allocate(string, []string) (*pluginapi.AllocateResponse, error)
+	Allocate(string, string, string, []string) (*pluginapi.AllocateResponse, error)
 
 	// Stop stops the manager.
 	Stop() error

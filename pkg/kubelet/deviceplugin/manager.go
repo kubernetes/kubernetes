@@ -132,7 +132,7 @@ func (m *ManagerImpl) Devices() map[string][]*pluginapi.Device {
 
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
-func (m *ManagerImpl) Allocate(resourceName string, devs []string) (*pluginapi.AllocateResponse, error) {
+func (m *ManagerImpl) Allocate(ns string, podName string, resourceName string, devs []string) (*pluginapi.AllocateResponse, error) {
 
 	if len(devs) == 0 {
 		return nil, nil
@@ -147,7 +147,7 @@ func (m *ManagerImpl) Allocate(resourceName string, devs []string) (*pluginapi.A
 		return nil, fmt.Errorf("Unknown Device Plugin %s", resourceName)
 	}
 
-	return e.allocate(devs)
+	return e.allocate(ns, podName, devs)
 }
 
 // Register registers a device plugin.
