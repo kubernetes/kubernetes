@@ -1312,6 +1312,12 @@ function create-nodes() {
 # - SUBNETWORK
 # - IP_ALIAS_SIZE
 function create-heapster-node() {
+  local gcloud="gcloud"
+
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    gcloud="gcloud beta"
+  fi
+
   local network=$(make-gcloud-network-argument \
       "${NETWORK_PROJECT}" \
       "${REGION}" \
@@ -1321,7 +1327,7 @@ function create-heapster-node() {
       "${ENABLE_IP_ALIASES:-}" \
       "${IP_ALIAS_SIZE:-}")
 
-  gcloud compute instances \
+  ${gcloud} compute instances \
       create "${NODE_INSTANCE_PREFIX}-heapster" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
