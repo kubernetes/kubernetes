@@ -42,6 +42,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"path"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
-	"path"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -1806,7 +1808,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 	}
 	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		if adminSetOfZones, err := volume.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
+		if adminSetOfZones, err := volumeutil.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
 			return "", err
 		} else {
 			createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)

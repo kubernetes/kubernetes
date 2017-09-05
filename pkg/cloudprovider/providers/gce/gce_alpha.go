@@ -29,7 +29,7 @@ const (
 	// tier to use. Currently supports "Standard" and "Premium" (default).
 	AlphaFeatureNetworkTiers = "NetworkTiers"
 
-	GCEDiskAlphaFeatureGate = "GCEDiskAlphaAPI"
+	GCEDiskAlphaFeatureGate = "DiskAlphaAPI"
 )
 
 // All known alpha features

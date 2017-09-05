@@ -530,6 +530,17 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 	}
 }
 
+func testVolumeClaimWithStatus(
+	name, namespace string,
+	spec api.PersistentVolumeClaimSpec,
+	status api.PersistentVolumeClaimStatus) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       spec,
+		Status:     status,
+	}
+}
+
 func testVolumeClaimStorageClass(name string, namespace string, annval string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	annotations := map[string]string{
 		v1.BetaStorageClassAnnotation: annval,
@@ -728,7 +739,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -738,7 +749,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
+
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadOnlyMany,
@@ -828,50 +842,125 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	validSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	invalidSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	unboundSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("12G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
 		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
+			enableResize:      false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
+			enableResize:      false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
+			enableResize:      false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
+			enableResize:      false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-disabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-enabled": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      true,
+		},
+		"invalid-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidSizeUpdate,
+			enableResize:      true,
+		},
+		"unbound-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          unboundSizeUpdate,
+			enableResize:      true,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
 		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -880,6 +969,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func togglePVExpandFeature(toggleFlag bool, t *testing.T) {
+	if toggleFlag {
+		// Enable alpha feature LocalStorageCapacityIsolation
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+		if err != nil {
+			t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
+			return
+		}
+	} else {
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+		if err != nil {
+			t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
+			return
 		}
 	}
 }
@@ -9230,6 +9336,68 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+	validConditionUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+		Conditions: []api.PersistentVolumeClaimCondition{
+			{Type: api.PersistentVolumeClaimResizing, Status: api.ConditionTrue},
+		},
+	})
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
+	}{
+		"condition-update-with-disabled-feature-gate": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      false,
+		},
+		"condition-update-with-enabled-feature-gate": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      true,
+		},
+	}
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
+		scenario.oldClaim.ResourceVersion = "1"
+		scenario.newClaim.ResourceVersion = "1"
+		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func TestValidateResourceQuota(t *testing.T) {

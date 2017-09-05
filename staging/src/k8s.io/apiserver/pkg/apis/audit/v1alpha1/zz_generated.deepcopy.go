@@ -327,6 +327,11 @@ func (in *PolicyRule) DeepCopyInto(out *PolicyRule) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.OmitStages != nil {
+		in, out := &in.OmitStages, &out.OmitStages
+		*out = make([]Stage, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

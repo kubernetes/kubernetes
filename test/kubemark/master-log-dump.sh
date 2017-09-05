@@ -14,15 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export KUBERNETES_PROVIDER="kubemark"
-export KUBE_CONFIG_FILE="config-default.sh"
-
 REPORT_DIR="${1:-_artifacts}"
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-source "${KUBE_ROOT}/cluster/kubemark/util.sh"
+source ${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh
+source ${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh
 
-detect-master
+export KUBEMARK_MASTER_NAME="${MASTER_NAME}"
 
-echo "Dumping logs for kubemark master: ${MASTER_NAME}"
+echo "Dumping logs for kubemark master: ${KUBEMARK_MASTER_NAME}"
 DUMP_ONLY_MASTER_LOGS=true ${KUBE_ROOT}/cluster/log-dump/log-dump.sh "${REPORT_DIR}"

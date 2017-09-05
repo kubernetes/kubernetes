@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
+	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -81,4 +82,5 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	webhook.Register(plugins)
+	resize.Register(plugins)
 }

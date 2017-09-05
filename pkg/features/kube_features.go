@@ -37,10 +37,6 @@ const (
 	// alpha: v1.4
 	ExternalTrafficLocalOnly utilfeature.Feature = "AllowExtTrafficLocalEndpoints"
 
-	// owner: @saad-ali
-	// alpha: v1.3
-	DynamicVolumeProvisioning utilfeature.Feature = "DynamicVolumeProvisioning"
-
 	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
@@ -114,6 +110,11 @@ const (
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
 
+	// owner: @gnufied
+	// alpha: v1.8
+	// Ability to Expand persistent volumes
+	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
+
 	// owner: @verb
 	// alpha: v1.8
 	//
@@ -150,6 +151,12 @@ const (
 	//
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
+
+	// owner: @ConnorDoyle
+	// alpha: v1.8
+	//
+	// Alternative container-level CPU affinity policies.
+	CPUManager utilfeature.Feature = "CPUManager"
 )
 
 func init() {
@@ -164,7 +171,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
@@ -179,6 +185,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
 	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

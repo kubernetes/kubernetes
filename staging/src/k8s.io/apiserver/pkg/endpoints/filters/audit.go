@@ -42,7 +42,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		ctx, ev, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
+		ctx, ev, omitStages, err := createAuditEventAndAttachToContext(requestContextMapper, req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
@@ -54,7 +54,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 		}
 
 		ev.Stage = auditinternal.StageRequestReceived
-		processAuditEvent(sink, ev)
+		processAuditEvent(sink, ev, omitStages)
 
 		// intercept the status code
 		var longRunningSink audit.Sink
@@ -64,7 +64,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 				longRunningSink = sink
 			}
 		}
-		respWriter := decorateResponseWriter(w, ev, longRunningSink)
+		respWriter := decorateResponseWriter(w, ev, longRunningSink, omitStages)
 
 		// send audit event when we leave this func, either via a panic or cleanly. In the case of long
 		// running requests, this will be the second audit event.
@@ -78,7 +78,7 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 					Reason:  metav1.StatusReasonInternalError,
 					Message: fmt.Sprintf("APIServer panic'd: %v", r),
 				}
-				processAuditEvent(sink, ev)
+				processAuditEvent(sink, ev, omitStages)
 				return
 			}
 
@@ -92,14 +92,14 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 			if ev.ResponseStatus == nil && longRunningSink != nil {
 				ev.ResponseStatus = fakedSuccessStatus
 				ev.Stage = auditinternal.StageResponseStarted
-				processAuditEvent(longRunningSink, ev)
+				processAuditEvent(longRunningSink, ev, omitStages)
 			}
 
 			ev.Stage = auditinternal.StageResponseComplete
 			if ev.ResponseStatus == nil {
 				ev.ResponseStatus = fakedSuccessStatus
 			}
-			processAuditEvent(sink, ev)
+			processAuditEvent(sink, ev, omitStages)
 		}()
 		handler.ServeHTTP(respWriter, req)
 	})
@@ -110,47 +110,53 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 // - context with audit event attached to it
 // - created audit event
 // - error if anything bad happened
-func createAuditEventAndAttachToContext(requestContextMapper request.RequestContextMapper, req *http.Request, policy policy.Checker) (request.Context, *auditinternal.Event, error) {
+func createAuditEventAndAttachToContext(requestContextMapper request.RequestContextMapper, req *http.Request, policy policy.Checker) (request.Context, *auditinternal.Event, []auditinternal.Stage, error) {
 	ctx, ok := requestContextMapper.Get(req)
 	if !ok {
-		return nil, nil, fmt.Errorf("no context found for request")
+		return nil, nil, nil, fmt.Errorf("no context found for request")
 	}
 
 	attribs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
-	level := policy.Level(attribs)
+	level, omitStages := policy.LevelAndStages(attribs)
 	audit.ObservePolicyLevel(level)
 	if level == auditinternal.LevelNone {
 		// Don't audit.
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	ev, err := audit.NewEventFromRequest(req, level, attribs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
 	ctx = request.WithAuditEvent(ctx, ev)
 	if err := requestContextMapper.Update(req, ctx); err != nil {
-		return nil, nil, fmt.Errorf("failed to attach audit event to context: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to attach audit event to context: %v", err)
 	}
 
-	return ctx, ev, nil
+	return ctx, ev, omitStages, nil
 }
 
-func processAuditEvent(sink audit.Sink, ev *auditinternal.Event) {
+func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) {
+	for _, stage := range omitStages {
+		if ev.Stage == stage {
+			return
+		}
+	}
 	audit.ObserveEvent()
 	sink.ProcessEvents(ev)
 }
 
-func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink) http.ResponseWriter {
+func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink, omitStages []auditinternal.Stage) http.ResponseWriter {
 	delegate := &auditResponseWriter{
 		ResponseWriter: responseWriter,
 		event:          ev,
 		sink:           sink,
+		omitStages:     omitStages,
 	}
 
 	// check if the ResponseWriter we're wrapping is the fancy one we need
@@ -170,9 +176,10 @@ var _ http.ResponseWriter = &auditResponseWriter{}
 // create immediately an event (for long running requests).
 type auditResponseWriter struct {
 	http.ResponseWriter
-	event *auditinternal.Event
-	once  sync.Once
-	sink  audit.Sink
+	event      *auditinternal.Event
+	once       sync.Once
+	sink       audit.Sink
+	omitStages []auditinternal.Stage
 }
 
 func (a *auditResponseWriter) setHttpHeader() {
@@ -188,7 +195,7 @@ func (a *auditResponseWriter) processCode(code int) {
 		a.event.Stage = auditinternal.StageResponseStarted
 
 		if a.sink != nil {
-			processAuditEvent(a.sink, a.event)
+			processAuditEvent(a.sink, a.event, a.omitStages)
 		}
 	})
 }

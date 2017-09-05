@@ -23,7 +23,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -33,7 +35,7 @@ type containerManagerImpl struct {
 
 var _ ContainerManager = &containerManagerImpl{}
 
-func (cm *containerManagerImpl) Start(_ *v1.Node, _ ActivePodsFunc) error {
+func (cm *containerManagerImpl) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
 	glog.V(2).Infof("Starting Windows stub container manager")
 	return nil
 }

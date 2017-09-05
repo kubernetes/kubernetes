@@ -228,7 +228,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
 		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, timeout, gracePeriod, waitForDeletion, shortOutput, mapper, false)
 	} else {
-		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+		err = DeleteResult(r, out, ignoreNotFound, gracePeriod, shortOutput, mapper)
 	}
 	if err != nil {
 		return err

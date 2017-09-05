@@ -207,6 +207,10 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string
+
+	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// An empty list means no restrictions will apply.
+	OmitStages []Stage
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -216,9 +220,9 @@ type GroupResources struct {
 	// +optional
 	Group string
 	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/logs"
-	// would match request to the logs subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/logs".
+	// matched using a "/" to indicate the subresource. For example, "pods/log"
+	// would match request to the log subresource of pods. The top level resource
+	// does not match subresources, "pods" doesn't match "pods/log".
 	// +optional
 	Resources []string
 	// ResourceNames is a list of resource instance names that the policy matches.

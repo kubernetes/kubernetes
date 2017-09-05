@@ -123,6 +123,12 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
+# Optional: Enable Metrics Server. Metrics Server should be enable everywhere,
+# since it's a critical component, but in the first release we need a way to disable
+# this in case of stability issues.
+# TODO(piosz) remove this option once Metrics Server became a stable thing.
+ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
+
 # One special node out of NUM_NODES would be created of this type if specified.
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"

@@ -190,6 +190,7 @@ pkg/controller/volume/attachdetach
 pkg/controller/volume/attachdetach/statusupdater
 pkg/controller/volume/attachdetach/testing
 pkg/controller/volume/events
+pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
@@ -673,7 +674,6 @@ staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 staging/src/k8s.io/client-go/discovery/cached
-staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
 staging/src/k8s.io/client-go/dynamic/fake
 staging/src/k8s.io/client-go/examples/workqueue
