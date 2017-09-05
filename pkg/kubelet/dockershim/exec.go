@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -76,7 +77,9 @@ func (*NsenterExecHandler) ExecInContainer(client libdocker.Interface, container
 	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
 	args = append(args, container.Config.Env...)
 	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, nsenter, args...)
 	var cmdErr error
 	if tty {
 		p, err := kubecontainer.StartPty(command)
@@ -138,6 +141,8 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 	done := make(chan struct{})
 	defer close(done)
 
+	start := time.Now()
+
 	createOpts := dockertypes.ExecConfig{
 		Cmd:          cmd,
 		AttachStdin:  stdin != nil,
@@ -191,6 +196,12 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		if err2 != nil {
 			return err2
 		}
+
+		if timeout >= 0 && time.Since(start) >= timeout {
+			err = timeoutCodeExitError()
+			break
+		}
+
 		if !inspect.Running {
 			if inspect.ExitCode != 0 {
 				err = &dockerExitError{inspect}
@@ -208,4 +219,12 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 	}
 
 	return err
+}
+
+// TODO combine timeout scene into subject flow of command execution
+func timeoutCodeExitError() utilexec.CodeExitError {
+	return utilexec.CodeExitError{
+		Err:  fmt.Errorf("Exec command timeout"),
+		Code: 1,
+	}
 }
