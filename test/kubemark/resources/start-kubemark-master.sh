@@ -345,6 +345,9 @@ function compute-kube-apiserver-params {
 	else
 		params+=" --etcd-servers=${ETCD_SERVERS}"
 	fi
+	if [[ "${ETCD_QUORUM_READ:-}" ]]; then
+		params+=" --etcd-quorum-read"
+	fi
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
