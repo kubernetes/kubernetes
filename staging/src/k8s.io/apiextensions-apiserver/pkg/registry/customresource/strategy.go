@@ -62,10 +62,28 @@ func (a customResourceDefinitionStorageStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (a customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	// This applies defaults from the CRD schema.
+	// Validation errors, if any, are ignored. We do another validation pass here
+	// because we want defaulting to occur before the actual validation.
+	customResource := obj.(*unstructured.Unstructured)
+	customResourceValidator := a.validator.validator
+	result := customResourceValidator.Validate(customResource.UnstructuredContent())
+	if result.AsError() == nil {
+		result.ApplyDefaults()
+	}
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (a customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	// This applies defaults from the CRD schema.
+	// Validation errors, if any, are ignored. We do another validation pass here
+	// because we want defaulting to occur before the actual validation.
+	customResource := obj.(*unstructured.Unstructured)
+	customResourceValidator := a.validator.validator
+	result := customResourceValidator.Validate(customResource.UnstructuredContent())
+	if result.AsError() == nil {
+		result.ApplyDefaults()
+	}
 }
 
 func (a customResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
