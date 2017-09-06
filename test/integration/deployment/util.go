@@ -30,6 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/deployment"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -143,8 +144,10 @@ func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 	}
 }
 
-func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image string) error {
-	return testutil.WaitForDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image, d.t.Logf, pollInterval, pollTimeout)
+func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image string) {
+	if err := testutil.WaitForDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image, d.t.Logf, pollInterval, pollTimeout); err != nil {
+		d.t.Fatalf("failed to wait for Deployment revision %s: %v", d.deployment.Name, err)
+	}
 }
 
 // markAllPodsReady manually updates all Deployment pods status to ready
@@ -199,5 +202,50 @@ func (d *deploymentTester) waitForDeploymentStatusValidAndMarkPodsReady() {
 	err := d.waitForDeploymentStatusValid()
 	if err != nil {
 		d.t.Fatalf("failed to wait for Deployment status %s: %v", d.deployment.Name, err)
+	}
+}
+
+func (d *deploymentTester) updateDeployment(applyUpdate testutil.UpdateDeploymentFunc) (*v1beta1.Deployment, error) {
+	return testutil.UpdateDeploymentWithRetries(d.c, d.deployment.Namespace, d.deployment.Name, applyUpdate, d.t.Logf)
+}
+
+func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) {
+	if err := testutil.WaitForObservedDeployment(d.c, d.deployment.Namespace, d.deployment.Name, desiredGeneration); err != nil {
+		d.t.Fatalf("failed waiting for ObservedGeneration of deployment %s to become %d: %v", d.deployment.Name, desiredGeneration, err)
+	}
+}
+
+func (d *deploymentTester) getNewReplicaSet() *v1beta1.ReplicaSet {
+	rs, err := deploymentutil.GetNewReplicaSet(d.deployment, d.c.ExtensionsV1beta1())
+	if err != nil {
+		d.t.Fatalf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
+	}
+	return rs
+}
+
+func (d *deploymentTester) expectNoNewReplicaSet() {
+	rs := d.getNewReplicaSet()
+	if rs != nil {
+		d.t.Fatalf("expected deployment %s not to create a new replicaset, got %v", d.deployment.Name, rs)
+	}
+}
+
+func (d *deploymentTester) expectNewReplicaSet() *v1beta1.ReplicaSet {
+	rs := d.getNewReplicaSet()
+	if rs == nil {
+		d.t.Fatalf("expected deployment %s to create a new replicaset, got nil", d.deployment.Name)
+	}
+	return rs
+}
+
+func pauseFn() func(update *v1beta1.Deployment) {
+	return func(update *v1beta1.Deployment) {
+		update.Spec.Paused = true
+	}
+}
+
+func resumeFn() func(update *v1beta1.Deployment) {
+	return func(update *v1beta1.Deployment) {
+		update.Spec.Paused = false
 	}
 }
