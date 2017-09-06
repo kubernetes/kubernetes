@@ -706,7 +706,7 @@ function prepare-kube-proxy-manifest-variables {
     kube_cache_mutation_detector_env_value="value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
   fi
   local pod_priority=""
-  if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
+  if [[ "${ENABLE_POD_PRIORITY:-}" == "true" ]]; then
     pod_priority="priorityClassName: system-node-critical"
   fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
