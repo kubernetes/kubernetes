@@ -27,6 +27,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
@@ -167,15 +169,17 @@ func (m *ManagerImpl) Allocate(resourceName string, devs []string) (*pluginapi.A
 }
 
 // Register registers a device plugin.
-func (m *ManagerImpl) Register(ctx context.Context,
-	r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
+func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	glog.V(2).Infof("Got request for Device Plugin %s", r.ResourceName)
 	if r.Version != pluginapi.Version {
 		return &pluginapi.Empty{}, fmt.Errorf(errUnsuportedVersion)
 	}
 
-	if err := IsResourceNameValid(r.ResourceName); err != nil {
-		return &pluginapi.Empty{}, err
+	if r.ResourceName == "" {
+		return &pluginapi.Empty{}, fmt.Errorf(errEmptyResourceName)
+	}
+	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
+		return &pluginapi.Empty{}, fmt.Errorf(errInvalidResourceName)
 	}
 
 	// TODO: for now, always accepts newest device plugin. Later may consider to

@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/deviceplugin"
 )
@@ -166,7 +167,7 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		resource := string(k)
 		needed := int(v.Value())
 		glog.V(3).Infof("needs %d %s", needed, resource)
-		if !deviceplugin.IsDeviceName(k) || needed == 0 {
+		if !v1helper.IsExtendedResourceName(k) || needed == 0 {
 			continue
 		}
 		h.Lock()

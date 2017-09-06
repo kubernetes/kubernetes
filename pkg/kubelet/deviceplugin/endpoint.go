@@ -74,7 +74,12 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 func (e *endpoint) getDevices() []*pluginapi.Device {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	return copyDevices(e.devices)
+
+	var clones []*pluginapi.Device
+	for _, d := range e.devices {
+		clones = append(clones, cloneDevice(d))
+	}
+	return clones
 }
 
 // list initializes ListAndWatch gRPC call for the device plugin and gets the
@@ -211,4 +216,12 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, error) {
 	}
 
 	return pluginapi.NewDevicePluginClient(c), nil
+}
+
+func cloneDevice(d *pluginapi.Device) *pluginapi.Device {
+	return &pluginapi.Device{
+		ID:     d.ID,
+		Health: d.Health,
+	}
+
 }
