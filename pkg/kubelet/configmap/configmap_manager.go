@@ -282,7 +282,10 @@ func (c *cachingConfigMapManager) RegisterPod(pod *v1.Pod) {
 	c.registeredPods[key] = pod
 	if prev != nil {
 		for name := range getConfigMapNames(prev) {
-			c.configMapStore.Delete(prev.Namespace, name)
+			// remove entries which were in prev but are not in names
+			if !names.Has(name) {
+				c.configMapStore.Delete(prev.Namespace, name)
+			}
 		}
 	}
 }

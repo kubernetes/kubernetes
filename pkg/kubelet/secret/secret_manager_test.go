@@ -465,7 +465,7 @@ func TestCacheRefcounts(t *testing.T) {
 	}
 	assert.True(t, verify("ns1", "s1", 3))
 	assert.True(t, verify("ns1", "s10", 1))
-	assert.True(t, verify("ns1", "s2", 3))
+	assert.True(t, verify("ns1", "s2", 5)) // "s2" is in both s1 and s2
 	assert.True(t, verify("ns1", "s3", 3))
 	assert.True(t, verify("ns1", "s30", 2))
 	assert.True(t, verify("ns1", "s4", 2))
