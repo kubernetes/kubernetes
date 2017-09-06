@@ -65,21 +65,11 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 		Long:    getContextsLong,
 		Example: getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
-			supportedOutputTypes := sets.NewString("", "name")
-			outputFormat := cmdutil.GetFlagString(cmd, "output")
-			if !validOutputTypes.Has(outputFormat) {
-				cmdutil.CheckErr(fmt.Errorf("output must be one of '' or 'name': %v", outputFormat))
-			}
-			if !supportedOutputTypes.Has(outputFormat) {
-				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", outputFormat)
-				cmd.Flags().Set("output", "")
-			}
 			cmdutil.CheckErr(options.Complete(cmd, args, out))
 			cmdutil.CheckErr(options.RunGetContexts())
 		},
 	}
-	cmdutil.AddOutputFlags(cmd)
+	cmd.Flags().StringP("output", "o", "", "Output format. Only support 'name', use other output format will reset to default output format")
 	cmdutil.AddNoHeadersFlags(cmd)
 	return cmd
 }
@@ -89,7 +79,13 @@ func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string, out io.
 	o.contextNames = args
 	o.out = out
 	o.nameOnly = false
-	if cmdutil.GetFlagString(cmd, "output") == "name" {
+	output := cmdutil.GetFlagString(cmd, "output")
+	supportedOutputTypes := sets.NewString("", "name")
+	if !supportedOutputTypes.Has(output) {
+		fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", output)
+		cmd.Flags().Set("output", "")
+	}
+	if output == "name" {
 		o.nameOnly = true
 	}
 	o.showHeaders = true
