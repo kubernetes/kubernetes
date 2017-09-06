@@ -142,18 +142,7 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 
 // Flush is part of Interface.  Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
-	vss, err := runner.GetVirtualServers()
-	if err != nil {
-		return err
-	}
-	for _, vs := range vss {
-		err := runner.DeleteVirtualServer(vs)
-		// TODO: aggregate errors?
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return runner.ipvsHandle.Flush()
 }
 
 // AddRealServer is part of Interface.
