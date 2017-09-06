@@ -71,6 +71,11 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		c.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+		return nil
+	}
+
 	cfg, err := s.ToAuthorizationConfig()
 	if err != nil {
 		return err

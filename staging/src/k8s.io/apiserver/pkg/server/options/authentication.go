@@ -143,6 +143,11 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		c.Authenticator = nil
+		return nil
+	}
+
 	clientCA, err := s.getClientCA()
 	if err != nil {
 		return err
