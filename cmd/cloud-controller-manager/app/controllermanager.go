@@ -215,8 +215,8 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
 		go serviceController.Run(stop, int(s.ConcurrentServiceSyncs))
+		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
