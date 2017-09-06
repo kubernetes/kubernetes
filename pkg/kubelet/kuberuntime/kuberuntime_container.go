@@ -346,29 +346,18 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeapi.Container, error) {
 	filter := &runtimeapi.ContainerFilter{}
 	if !allContainers {
-		runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
 		filter.State = &runtimeapi.ContainerStateValue{
-			State: runningState,
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
 
-	containers, err := m.getContainersHelper(filter)
+	containers, err := m.runtimeService.ListContainers(filter)
 	if err != nil {
 		glog.Errorf("getKubeletContainers failed: %v", err)
 		return nil, err
 	}
 
 	return containers, nil
-}
-
-// getContainers lists containers by filter.
-func (m *kubeGenericRuntimeManager) getContainersHelper(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
-	resp, err := m.runtimeService.ListContainers(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, err
 }
 
 // makeUID returns a randomly generated string.
