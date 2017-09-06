@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package token
 
 import (
 	"fmt"
@@ -30,8 +30,6 @@ import (
 )
 
 const tokenCreateRetries = 5
-
-// TODO(mattmoyer): Move CreateNewToken, UpdateOrCreateToken and encodeTokenSecretData out of this package to client-go for a generic abstraction and client for a Bootstrap Token
 
 // CreateNewToken tries to create a token and fails if one with the same ID already exists
 func CreateNewToken(client clientset.Interface, token string, tokenDuration time.Duration, usages []string, extraGroups []string, description string) error {
