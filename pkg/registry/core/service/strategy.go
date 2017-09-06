@@ -89,7 +89,7 @@ func (svcStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exa
 		return nil
 	}
 	if t.Spec.ClusterIP != api.ClusterIPNone {
-		t.Spec.ClusterIP = "<unknown>"
+		t.Spec.ClusterIP = ""
 	}
 	if t.Spec.Type == api.ServiceTypeNodePort {
 		for i := range t.Spec.Ports {
