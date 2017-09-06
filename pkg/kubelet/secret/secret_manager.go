@@ -282,7 +282,10 @@ func (c *cachingSecretManager) RegisterPod(pod *v1.Pod) {
 	c.registeredPods[key] = pod
 	if prev != nil {
 		for name := range getSecretNames(prev) {
-			c.secretStore.Delete(prev.Namespace, name)
+			// remove secrets which were in prev but are not in names
+			if !names.Has(name) {
+				c.secretStore.Delete(prev.Namespace, name)
+			}
 		}
 	}
 }
