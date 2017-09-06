@@ -51,6 +51,7 @@ go_library(
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/util:go_default_library",
+        "//pkg/util/async:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/sysctl:go_default_library",
@@ -58,9 +59,9 @@ go_library(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
