@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-// +groupName=metrics.k8s.io
-package metrics
+package v1beta1
+
+type NodeMetricsExpansion interface{}
+
+type PodMetricsExpansion interface{}

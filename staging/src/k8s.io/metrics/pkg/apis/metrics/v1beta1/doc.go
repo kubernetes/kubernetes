@@ -15,5 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +groupName=metrics.k8s.io
-package metrics
+// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/metrics
+// +k8s:openapi-gen=true
+
+package v1beta1

@@ -45,7 +45,7 @@ import (
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 
@@ -549,7 +549,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		testCMClient = tc.testCMClient
 	}
 	metricsClient := metrics.NewRESTMetricsClient(
-		testMetricsClient.MetricsV1alpha1(),
+		testMetricsClient.MetricsV1beta1(),
 		testCMClient,
 	)
 
