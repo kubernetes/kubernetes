@@ -34,8 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// DeploymentV1Beta1 satisfies the Generator interface.
 type DeploymentV1Beta1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -57,6 +59,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -124,8 +127,10 @@ func (DeploymentV1Beta1) Generate(genericParams map[string]interface{}) (runtime
 	return &deployment, nil
 }
 
+// DeploymentAppsV1Beta1 satisfies the Generator interface.
 type DeploymentAppsV1Beta1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -147,6 +152,7 @@ func (DeploymentAppsV1Beta1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (DeploymentAppsV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -236,7 +242,7 @@ func getName(params map[string]string) (string, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return "", fmt.Errorf("'name' is a required parameter.")
+			return "", fmt.Errorf("'name' is a required parameter")
 		}
 	}
 	return name, nil
@@ -289,8 +295,10 @@ func getEnvs(genericParams map[string]interface{}) ([]v1.EnvVar, error) {
 	return envs, nil
 }
 
+// JobV1 satisfies the Generator interface.
 type JobV1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (JobV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -313,6 +321,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -383,8 +392,10 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 	return &job, nil
 }
 
+// CronJobV2Alpha1 satisfies the Generator interface.
 type CronJobV2Alpha1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -408,6 +419,7 @@ func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -484,8 +496,10 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 	return &cronJob, nil
 }
 
+// CronJobV1Beta1 satisfies the Generator interface.
 type CronJobV1Beta1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (CronJobV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -509,6 +523,7 @@ func (CronJobV1Beta1) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -585,8 +600,10 @@ func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Ob
 	return &cronJob, nil
 }
 
+// BasicReplicationController satisfies the Generator interface.
 type BasicReplicationController struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (BasicReplicationController) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -724,6 +741,7 @@ func makePodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 	return &spec, nil
 }
 
+// Generate creates an API object given a set of parameters.
 func (BasicReplicationController) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
@@ -849,8 +867,10 @@ func updatePodPorts(params map[string]string, podSpec *v1.PodSpec) (err error) {
 	return nil
 }
 
+// BasicPod satisfies the Generator interface.
 type BasicPod struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (BasicPod) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
@@ -873,6 +893,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {

@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// ResourceQuotaGeneratorV1 supports stable generation of a resource quota
+// ResourceQuotaGeneratorV1 supports stable generation of a resource quota.
 type ResourceQuotaGeneratorV1 struct {
 	// The name of a quota object.
 	Name string
@@ -36,7 +36,7 @@ type ResourceQuotaGeneratorV1 struct {
 	Scopes string
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (g ResourceQuotaGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -45,12 +45,13 @@ func (g ResourceQuotaGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &ResourceQuotaGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &ResourceQuotaGeneratorV1{}
 
+// Generate creates an API object given a set of parameters.
 func (g ResourceQuotaGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(g.ParamNames(), genericParams)
 	if err != nil {
@@ -73,7 +74,7 @@ func (g ResourceQuotaGeneratorV1) Generate(genericParams map[string]interface{})
 	return delegate.StructuredGenerate()
 }
 
-// StructuredGenerate outputs a ResourceQuota object using the configured fields
+// StructuredGenerate outputs a ResourceQuota object using the configured fields.
 func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := g.validate(); err != nil {
 		return nil, err
@@ -96,9 +97,9 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 	return resourceQuota, nil
 }
 
-// validate validates required fields are set to support structured generation
-func (r *ResourceQuotaGeneratorV1) validate() error {
-	if len(r.Name) == 0 {
+// validate validates required fields are set to support structured generation.
+func (g *ResourceQuotaGeneratorV1) validate() error {
+	if len(g.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
 	return nil

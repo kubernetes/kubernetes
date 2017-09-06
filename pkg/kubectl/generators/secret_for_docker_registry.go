@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
-// SecretForDockerRegistryGeneratorV1 supports stable generation of a docker registry secret
+// SecretForDockerRegistryGeneratorV1 supports stable generation of a docker registry secret.
 type SecretForDockerRegistryGeneratorV1 struct {
 	// Name of secret (required)
 	Name string
@@ -42,13 +42,13 @@ type SecretForDockerRegistryGeneratorV1 struct {
 	AppendHash bool
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &SecretForDockerRegistryGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &SecretForDockerRegistryGeneratorV1{}
 
-// Generate returns a secret using the specified parameters
+// Generate returns a secret using the specified parameters.
 func (s SecretForDockerRegistryGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), genericParams)
 	if err != nil {
@@ -80,7 +80,7 @@ func (s SecretForDockerRegistryGeneratorV1) Generate(genericParams map[string]in
 	return delegate.StructuredGenerate()
 }
 
-// StructuredGenerate outputs a secret object using the configured fields
+// StructuredGenerate outputs a secret object using the configured fields.
 func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 	return secret, nil
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (s SecretForDockerRegistryGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -116,7 +116,7 @@ func (s SecretForDockerRegistryGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
@@ -133,7 +133,7 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	return nil
 }
 
-// handleDockercfgContent serializes a dockercfg json file
+// handleDockercfgContent serializes a dockercfg json file.
 func handleDockercfgContent(username, password, email, server string) ([]byte, error) {
 	dockercfgAuth := credentialprovider.DockerConfigEntry{
 		Username: username,

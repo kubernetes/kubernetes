@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package generators provides implementations of the generators.Generator interface.
+// Package generators provides the Generator interface and various implementations.
 package generators

@@ -23,16 +23,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// ServiceAccountGeneratorV1 supports stable generation of a service account
+// ServiceAccountGeneratorV1 supports stable generation of a service account.
 type ServiceAccountGeneratorV1 struct {
 	// Name of service account
 	Name string
 }
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &ServiceAccountGeneratorV1{}
 
-// StructuredGenerate outputs a service account object using the configured fields
+// StructuredGenerate outputs a service account object using the configured fields.
 func (g *ServiceAccountGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := g.validate(); err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (g *ServiceAccountGeneratorV1) StructuredGenerate() (runtime.Object, error)
 	return serviceAccount, nil
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 func (g *ServiceAccountGeneratorV1) validate() error {
 	if len(g.Name) == 0 {
 		return fmt.Errorf("name must be specified")

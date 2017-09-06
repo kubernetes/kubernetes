@@ -32,17 +32,17 @@ import (
 
 // ConfigMapGeneratorV1 supports stable generation of a configMap.
 type ConfigMapGeneratorV1 struct {
-	// Name of configMap (required)
+	// Name of configMap (required).
 	Name string
-	// Type of configMap (optional)
+	// Type of configMap (optional).
 	Type string
-	// FileSources to derive the configMap from (optional)
+	// FileSources to derive the configMap from (optional).
 	FileSources []string
-	// LiteralSources to derive the configMap from (optional)
+	// LiteralSources to derive the configMap from (optional).
 	LiteralSources []string
-	// EnvFileSource to derive the configMap from (optional)
+	// EnvFileSource to derive the configMap from (optional).
 	EnvFileSource string
-	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
+	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name.
 	AppendHash bool
 }
 
@@ -201,7 +201,7 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
-				return fmt.Errorf("cannot give a key name for a directory path.")
+				return fmt.Errorf("cannot give a key name for a directory path")
 			}
 			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {
@@ -266,7 +266,7 @@ func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))
 	}
 	if _, entryExists := configMap.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, configMap.Data)
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v", keyName, configMap.Data)
 	}
 	configMap.Data[keyName] = data
 	return nil

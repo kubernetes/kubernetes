@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// ServiceCommonGeneratorV1 holds common parameters.
 type ServiceCommonGeneratorV1 struct {
 	Name         string
 	TCP          []string
@@ -37,23 +38,28 @@ type ServiceCommonGeneratorV1 struct {
 	ExternalName string
 }
 
+// ServiceClusterIPGeneratorV1 satisfies the Generator interface.
 type ServiceClusterIPGeneratorV1 struct {
 	ServiceCommonGeneratorV1
 }
 
+// ServiceNodePortGeneratorV1 satisfies the Generator interface.
 type ServiceNodePortGeneratorV1 struct {
 	ServiceCommonGeneratorV1
 }
 
+// ServiceLoadBalancerGeneratorV1 satisfies the Generator interface.
 type ServiceLoadBalancerGeneratorV1 struct {
 	ServiceCommonGeneratorV1
 }
 
+// ServiceExternalNameGeneratorV1 satisfies the Generator interface.
 // TODO: is this really necessary?
 type ServiceExternalNameGeneratorV1 struct {
 	ServiceCommonGeneratorV1
 }
 
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceClusterIPGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -61,6 +67,8 @@ func (ServiceClusterIPGeneratorV1) ParamNames() []GeneratorParam {
 		{"clusterip", false},
 	}
 }
+
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -68,6 +76,8 @@ func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 		{"nodeport", true},
 	}
 }
+
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -75,6 +85,7 @@ func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceExternalNameGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -102,6 +113,7 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	return int32(port), targetPort, nil
 }
 
+// GenerateCommon generates common parameters.
 func (s ServiceCommonGeneratorV1) GenerateCommon(params map[string]interface{}) error {
 	name, isString := params["name"].(string)
 	if !isString {
@@ -126,6 +138,7 @@ func (s ServiceCommonGeneratorV1) GenerateCommon(params map[string]interface{}) 
 	return nil
 }
 
+// Generate creates an API object given a set of parameters.
 func (s ServiceLoadBalancerGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {
@@ -139,6 +152,7 @@ func (s ServiceLoadBalancerGeneratorV1) Generate(params map[string]interface{}) 
 	return delegate.StructuredGenerate()
 }
 
+// Generate creates an API object given a set of parameters.
 func (s ServiceNodePortGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {
@@ -152,6 +166,7 @@ func (s ServiceNodePortGeneratorV1) Generate(params map[string]interface{}) (run
 	return delegate.StructuredGenerate()
 }
 
+// Generate creates an API object given a set of parameters.
 func (s ServiceClusterIPGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {
@@ -165,6 +180,7 @@ func (s ServiceClusterIPGeneratorV1) Generate(params map[string]interface{}) (ru
 	return delegate.StructuredGenerate()
 }
 
+// Generate creates an API object given a set of parameters.
 func (s ServiceExternalNameGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {
@@ -178,7 +194,7 @@ func (s ServiceExternalNameGeneratorV1) Generate(params map[string]interface{}) 
 	return delegate.StructuredGenerate()
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 // TODO(xiangpengzhao): validate ports are identity mapped for headless service when we enforce that in validation.validateServicePort.
 func (s ServiceCommonGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
@@ -201,6 +217,7 @@ func (s ServiceCommonGeneratorV1) validate() error {
 	return nil
 }
 
+// StructuredGenerate creates an API object using pre-configured parameters.
 func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	err := s.validate()
 	if err != nil {

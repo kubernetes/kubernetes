@@ -30,29 +30,29 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
-// SecretGeneratorV1 supports stable generation of an opaque secret
+// SecretGeneratorV1 supports stable generation of an opaque secret.
 type SecretGeneratorV1 struct {
-	// Name of secret (required)
+	// Name of secret (required).
 	Name string
-	// Type of secret (optional)
+	// Type of secret (optional).
 	Type string
-	// FileSources to derive the secret from (optional)
+	// FileSources to derive the secret from (optional).
 	FileSources []string
-	// LiteralSources to derive the secret from (optional)
+	// LiteralSources to derive the secret from (optional).
 	LiteralSources []string
-	// EnvFileSource to derive the secret from (optional)
+	// EnvFileSource to derive the secret from (optional).
 	EnvFileSource string
-	// AppendHash; if true, derive a hash from the Secret data and type and append it to the name
+	// AppendHash; if true, derive a hash from the Secret data and type and append it to the name.
 	AppendHash bool
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &SecretGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &SecretGeneratorV1{}
 
-// Generate returns a secret using the specified parameters
+// Generate returns a secret using the specified parameters.
 func (s SecretGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), genericParams)
 	if err != nil {
@@ -111,7 +111,7 @@ func (s SecretGeneratorV1) Generate(genericParams map[string]interface{}) (runti
 	return delegate.StructuredGenerate()
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (s SecretGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -124,7 +124,7 @@ func (s SecretGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-// StructuredGenerate outputs a secret object using the configured fields
+// StructuredGenerate outputs a secret object using the configured fields.
 func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (s SecretGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	return secret, nil
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 func (s SecretGeneratorV1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
@@ -171,7 +171,7 @@ func (s SecretGeneratorV1) validate() error {
 	return nil
 }
 
-// handleFromLiteralSources adds the specified literal source information into the provided secret
+// handleFromLiteralSources adds the specified literal source information into the provided secret.
 func handleFromLiteralSources(secret *api.Secret, literalSources []string) error {
 	for _, literalSource := range literalSources {
 		keyName, value, err := util.ParseLiteralSource(literalSource)
@@ -185,7 +185,7 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 	return nil
 }
 
-// handleFromFileSources adds the specified file source information into the provided secret
+// handleFromFileSources adds the specified file source information into the provided secret.
 func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 	for _, fileSource := range fileSources {
 		keyName, filePath, err := util.ParseFileSource(fileSource)
@@ -203,7 +203,7 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
-				return fmt.Errorf("cannot give a key name for a directory path.")
+				return fmt.Errorf("cannot give a key name for a directory path")
 			}
 			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {
@@ -229,7 +229,7 @@ func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 }
 
 // handleFromEnvFileSource adds the specified env file source information
-// into the provided secret
+// into the provided secret.
 func handleFromEnvFileSource(secret *api.Secret, envFileSource string) error {
 	info, err := os.Stat(envFileSource)
 	if err != nil {
@@ -263,7 +263,7 @@ func addKeyFromLiteralToSecret(secret *api.Secret, keyName string, data []byte) 
 	}
 
 	if _, entryExists := secret.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v.", keyName, secret.Data)
+		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v", keyName, secret.Data)
 	}
 	secret.Data[keyName] = data
 	return nil

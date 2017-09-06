@@ -29,34 +29,31 @@ import (
 // ClusterGeneratorV1Beta1 supports stable generation of a
 // federation/cluster resource.
 type ClusterGeneratorV1Beta1 struct {
-	// Name of the cluster context (required)
+	// Name of the cluster context (required).
 	Name string
 	// ClientCIDR is the CIDR range in which the Kubernetes APIServer
-	// is available for the client (optional)
+	// is available for the client (optional).
 	ClientCIDR string
 	// ServerAddress is the APIServer address of the Kubernetes cluster
-	// that is being registered (required)
+	// that is being registered (required).
 	ServerAddress string
 	// SecretName is the name of the secret that stores the credentials
-	// for the Kubernetes cluster that is being registered (optional)
+	// for the Kubernetes cluster that is being registered (optional).
 	SecretName string
 	// ServiceAccountName is the name of the service account that is
 	// created in the cluster being registered. If this is provided,
-	// then ClusterRoleName must also be provided (optional)
+	// then ClusterRoleName must also be provided (optional).
 	ServiceAccountName string
 	// ClusterRoleName is the name of the cluster role and cluster role
 	// binding that are created in the cluster being registered. If this
-	// is provided, then ServiceAccountName must also be provided
-	// (optional)
+	// is provided, then ServiceAccountName must also be provided (optional).
 	ClusterRoleName string
 }
 
-// Ensure it supports the generator pattern that uses parameter
-// injection.
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &ClusterGeneratorV1Beta1{}
 
-// Ensure it supports the generator pattern that uses parameters
-// specified during construction.
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &ClusterGeneratorV1Beta1{}
 
 // Generate returns a cluster resource using the specified parameters.
@@ -142,8 +139,7 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 	return cluster, nil
 }
 
-// validate validates required fields are set to support structured
-// generation.
+// validate validates required fields are set to support structured generation.
 func (s ClusterGeneratorV1Beta1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")

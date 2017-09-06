@@ -28,15 +28,15 @@ import (
 
 // ClusterRoleBindingGeneratorV1 supports stable generation of a clusterRoleBinding.
 type ClusterRoleBindingGeneratorV1 struct {
-	// Name of clusterRoleBinding (required)
+	// Name of clusterRoleBinding (required).
 	Name string
-	// ClusterRole for the clusterRoleBinding (required)
+	// ClusterRole for the clusterRoleBinding (required).
 	ClusterRole string
-	// Users to derive the clusterRoleBinding from (optional)
+	// Users to derive the clusterRoleBinding from (optional).
 	Users []string
-	// Groups to derive the clusterRoleBinding from (optional)
+	// Groups to derive the clusterRoleBinding from (optional).
 	Groups []string
-	// ServiceAccounts to derive the clusterRoleBinding from in namespace:name format(optional)
+	// ServiceAccounts to derive the clusterRoleBinding from in namespace:name format(optional).
 	ServiceAccounts []string
 }
 

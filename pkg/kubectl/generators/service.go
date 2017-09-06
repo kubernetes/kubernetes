@@ -27,24 +27,31 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// The only difference between ServiceGeneratorV1 and V2 is that the service port is named "default" in V1, while it is left unnamed in V2.
+// ServiceGeneratorV1 satisfies the Generator interface.
+// The only difference between ServiceGeneratorV1 and V2 is that the service port
+// is named "default" in V1, while it is left unnamed in V2.
 type ServiceGeneratorV1 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceGeneratorV1) ParamNames() []GeneratorParam {
 	return paramNames()
 }
 
+// Generate creates an API object given a set of parameters.
 func (ServiceGeneratorV1) Generate(params map[string]interface{}) (runtime.Object, error) {
 	params["port-name"] = "default"
 	return generate(params)
 }
 
+// ServiceGeneratorV2 satisfies the Generator interface.
 type ServiceGeneratorV2 struct{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (ServiceGeneratorV2) ParamNames() []GeneratorParam {
 	return paramNames()
 }
 
+// Generate creates an API object given a set of parameters.
 func (ServiceGeneratorV2) Generate(params map[string]interface{}) (runtime.Object, error) {
 	return generate(params)
 }
@@ -87,7 +94,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	selectorString, found := params["selector"]
 	if !found || len(selectorString) == 0 {
-		return nil, fmt.Errorf("'selector' is a required parameter.")
+		return nil, fmt.Errorf("'selector' is a required parameter")
 	}
 	selector, err := ParseLabels(selectorString)
 	if err != nil {
@@ -107,7 +114,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+			return nil, fmt.Errorf("'name' is a required parameter")
 		}
 	}
 
@@ -135,7 +142,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	if portString, found = params["ports"]; !found {
 		portString, found = params["port"]
 		if !found && !isHeadlessService {
-			return nil, fmt.Errorf("'port' is a required parameter.")
+			return nil, fmt.Errorf("'port' is a required parameter")
 		}
 	}
 

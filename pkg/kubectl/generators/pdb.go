@@ -36,6 +36,7 @@ type PodDisruptionBudgetV1Generator struct {
 // Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &PodDisruptionBudgetV1Generator{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (PodDisruptionBudgetV1Generator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -44,6 +45,7 @@ func (PodDisruptionBudgetV1Generator) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (s PodDisruptionBudgetV1Generator) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {
@@ -118,6 +120,7 @@ type PodDisruptionBudgetV2Generator struct {
 // Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &PodDisruptionBudgetV2Generator{}
 
+// ParamNames returns the list of parameters that this generator uses.
 func (PodDisruptionBudgetV2Generator) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -127,6 +130,7 @@ func (PodDisruptionBudgetV2Generator) ParamNames() []GeneratorParam {
 	}
 }
 
+// Generate creates an API object given a set of parameters.
 func (s PodDisruptionBudgetV2Generator) Generate(params map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), params)
 	if err != nil {

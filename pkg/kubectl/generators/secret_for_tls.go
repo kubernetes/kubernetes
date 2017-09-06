@@ -38,13 +38,13 @@ type SecretForTLSGeneratorV1 struct {
 	AppendHash bool
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &SecretForTLSGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &SecretForTLSGeneratorV1{}
 
-// Generate returns a secret using the specified parameters
+// Generate returns a secret using the specified parameters.
 func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(s.ParamNames(), genericParams)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) 
 	return delegate.StructuredGenerate()
 }
 
-// StructuredGenerate outputs a secret object using the configured fields
+// StructuredGenerate outputs a secret object using the configured fields.
 func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func readFile(file string) ([]byte, error) {
 	return b, nil
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (s SecretForTLSGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
@@ -122,7 +122,7 @@ func (s SecretForTLSGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 func (s SecretForTLSGeneratorV1) validate() error {
 	// TODO: This is not strictly necessary. We can generate a self signed cert
 	// if no key/cert is given. The only requiredment is that we either get both

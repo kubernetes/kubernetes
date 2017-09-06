@@ -23,19 +23,19 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// NamespaceGeneratorV1 supports stable generation of a namespace
+// NamespaceGeneratorV1 supports stable generation of a namespace.
 type NamespaceGeneratorV1 struct {
-	// Name of namespace
+	// Name of namespace.
 	Name string
 }
 
-// Ensure it supports the generator pattern that uses parameter injection
+// Ensure it supports the generator pattern that uses parameter injection.
 var _ Generator = &NamespaceGeneratorV1{}
 
-// Ensure it supports the generator pattern that uses parameters specified during construction
+// Ensure it supports the generator pattern that uses parameters specified during construction.
 var _ StructuredGenerator = &NamespaceGeneratorV1{}
 
-// Generate returns a namespace using the specified parameters
+// Generate returns a namespace using the specified parameters.
 func (g NamespaceGeneratorV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	err := ValidateParams(g.ParamNames(), genericParams)
 	if err != nil {
@@ -53,14 +53,14 @@ func (g NamespaceGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 	return delegate.StructuredGenerate()
 }
 
-// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
+// ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (g NamespaceGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 	}
 }
 
-// StructuredGenerate outputs a namespace object using the configured fields
+// StructuredGenerate outputs a namespace object using the configured fields.
 func (g *NamespaceGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := g.validate(); err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (g *NamespaceGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	return namespace, nil
 }
 
-// validate validates required fields are set to support structured generation
+// validate validates required fields are set to support structured generation.
 func (g *NamespaceGeneratorV1) validate() error {
 	if len(g.Name) == 0 {
 		return fmt.Errorf("name must be specified")

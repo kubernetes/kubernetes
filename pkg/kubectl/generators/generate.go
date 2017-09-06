@@ -28,7 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-// GeneratorParam is a parameter for a generator
+// GeneratorParam is a parameter for a generator.
 // TODO: facilitate structured json generator input schemes
 type GeneratorParam struct {
 	Name     string
@@ -39,18 +39,20 @@ type GeneratorParam struct {
 // parameters. One example is the "expose" generator that is capable of exposing
 // new replication controllers and services, among other things.
 type Generator interface {
-	// Generate creates an API object given a set of parameters
+	// Generate creates an API object given a set of parameters.
 	Generate(params map[string]interface{}) (runtime.Object, error)
-	// ParamNames returns the list of parameters that this generator uses
+	// ParamNames returns the list of parameters that this generator uses.
 	ParamNames() []GeneratorParam
 }
 
-// StructuredGenerator is an interface for things that can generate API objects not using parameter injection
+// StructuredGenerator is an interface for things that can generate API objects
+// not using parameter injection.
 type StructuredGenerator interface {
-	// StructuredGenerator creates an API object using pre-configured parameters
+	// StructuredGenerator creates an API object using pre-configured parameters.
 	StructuredGenerate() (runtime.Object, error)
 }
 
+// IsZero returns true if i is nil or zero value for type.
 func IsZero(i interface{}) bool {
 	if i == nil {
 		return true
@@ -58,7 +60,7 @@ func IsZero(i interface{}) bool {
 	return reflect.DeepEqual(i, reflect.Zero(reflect.TypeOf(i)).Interface())
 }
 
-// ValidateParams ensures that all required params are present in the params map
+// ValidateParams ensures that all required params are present in the params map.
 func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) error {
 	allErrs := []error{}
 	for ix := range paramSpec {
@@ -98,7 +100,7 @@ func AnnotateFlags(cmd *cobra.Command, generators map[string]Generator) {
 	}
 }
 
-//  EnsureFlagsValid ensures that no invalid flags are being used against a generator.
+// EnsureFlagsValid ensures that no invalid flags are being used against a generator.
 func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, generatorInUse string) error {
 	AnnotateFlags(cmd, generators)
 
@@ -124,7 +126,7 @@ func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, gener
 	return utilerrors.NewAggregate(allErrs)
 }
 
-// MakeParams is a utility that creates generator parameters from a command line
+// MakeParams is a utility that creates generator parameters from a command line.
 func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interface{} {
 	result := map[string]interface{}{}
 	for ix := range params {
@@ -136,6 +138,7 @@ func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interfac
 	return result
 }
 
+// MakeProtocols flattens protocols map into a string "key1/val1,key2/val2 ..."
 func MakeProtocols(protocols map[string]string) string {
 	out := []string{}
 	for key, value := range protocols {
@@ -144,6 +147,8 @@ func MakeProtocols(protocols map[string]string) string {
 	return strings.Join(out, ",")
 }
 
+// ParseProtocols turns a string representation of a protocol set into a map[string]string.
+// This is the inverse function of MakeProtocols.
 func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	protocolsString, isString := protocols.(string)
 	if !isString {
@@ -170,6 +175,7 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	return portProtocolMap, nil
 }
 
+// MakeLabels flattens labels map into a string "key1=val1,key2=val2 ..."
 func MakeLabels(labels map[string]string) string {
 	out := []string{}
 	for key, value := range labels {
@@ -178,7 +184,8 @@ func MakeLabels(labels map[string]string) string {
 	return strings.Join(out, ",")
 }
 
-// ParseLabels turns a string representation of a label set into a map[string]string
+// ParseLabels turns a string representation of a label set into a map[string]string.
+// This is the inverse function of MakeLabels.
 func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	labelString, isString := labelSpec.(string)
 	if !isString {
@@ -202,10 +209,12 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	return labels, nil
 }
 
+// GetBool checks params map for a key. If found returns bool represented by
+// the value found. Returns defValue if key not found.
 func GetBool(params map[string]string, key string, defValue bool) (bool, error) {
-	if val, found := params[key]; !found {
+	val, found := params[key]
+	if !found {
 		return defValue, nil
-	} else {
-		return strconv.ParseBool(val)
 	}
+	return strconv.ParseBool(val)
 }
