@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
 )
@@ -119,7 +118,7 @@ type APIAggregator struct {
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
 
-	openAPIAggregator *openAPIAggregator
+	openAPIAggregationController *openapicontroller.AggregationController
 }
 
 type completedConfig struct {
@@ -222,15 +221,22 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	})
 
 	if openApiConfig != nil {
-		s.openAPIAggregator, err = buildAndRegisterOpenAPIAggregator(
-			s.delegateHandler,
+		specDownloader := openapicontroller.NewDownloader(s.contextMapper)
+		openAPIAggregator, err := openapicontroller.BuildAndRegisterAggregator(
+			&specDownloader,
+			delegationTarget,
 			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
 			openApiConfig,
-			s.GenericAPIServer.Handler.NonGoRestfulMux,
-			s.contextMapper)
+			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return nil, err
 		}
+		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
+
+		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+			go s.openAPIAggregationController.Run(context.StopCh)
+			return nil
+		})
 	}
 
 	return s, nil
@@ -243,7 +249,10 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
 		proxyHandler.updateAPIService(apiService)
-		return s.openAPIAggregator.loadApiServiceSpec(proxyHandler, apiService)
+		if s.openAPIAggregationController != nil {
+			s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
+		}
+		return nil
 	}
 
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
@@ -262,8 +271,8 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 		serviceResolver: s.serviceResolver,
 	}
 	proxyHandler.updateAPIService(apiService)
-	if err := s.openAPIAggregator.loadApiServiceSpec(proxyHandler, apiService); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load OpenAPI spec for API service %s: %v", apiService.Name, err))
+	if s.openAPIAggregationController != nil {
+		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
 	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
@@ -307,6 +316,9 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
+	if s.openAPIAggregationController != nil {
+		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
+	}
 	delete(s.proxyHandlers, apiServiceName)
 
 	// TODO unregister group level discovery when there are no more versions for the group

@@ -15,7 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-ansiterm:go_default_library",
-        "//vendor/github.com/Sirupsen/logrus:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",

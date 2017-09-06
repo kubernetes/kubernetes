@@ -23,12 +23,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+
+	"github.com/golang/glog"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -72,9 +73,10 @@ var (
 	schedulerFactoryMutex sync.Mutex
 
 	// maps that hold registered algorithm types
-	fitPredicateMap      = make(map[string]FitPredicateFactory)
-	priorityFunctionMap  = make(map[string]PriorityConfigFactory)
-	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
+	fitPredicateMap        = make(map[string]FitPredicateFactory)
+	mandatoryFitPredicates = sets.NewString()
+	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
+	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
 	priorityMetadataProducer  MetadataProducerFactory
@@ -97,6 +99,18 @@ type AlgorithmProviderConfig struct {
 // registry. Returns the name with which the predicate was registered.
 func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string {
 	return RegisterFitPredicateFactory(name, func(PluginFactoryArgs) algorithm.FitPredicate { return predicate })
+}
+
+// RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
+// kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
+// registered.
+func RegisterMandatoryFitPredicate(name string, predicate algorithm.FitPredicate) string {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+	validateAlgorithmNameOrDie(name)
+	fitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	mandatoryFitPredicates.Insert(name)
+	return name
 }
 
 // RegisterFitPredicateFactory registers a fit predicate factory with the
@@ -129,7 +143,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 				)
 
 				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicatePrecomputation(policy.Name, precomputationFunction)
+				predicates.RegisterPredicateMetadataProducer(policy.Name, precomputationFunction)
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
@@ -308,6 +322,14 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 		}
 		predicates[name] = factory(args)
 	}
+
+	// Always include mandatory fit predicates.
+	for name := range mandatoryFitPredicates {
+		if factory, found := fitPredicateMap[name]; found {
+			predicates[name] = factory(args)
+		}
+	}
+
 	return predicates, nil
 }
 

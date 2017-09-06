@@ -47,8 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 var (
@@ -412,6 +410,28 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	}
 }
 
+// Simulate a cluster with 100 nodes, but simulate a limit (like a quota limit)
+// of 10 pods, and verify that the ds doesn't make 100 create calls per sync pass
+func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _ := newTestController(ds)
+		podControl.FakePodControl.CreateLimit = 10
+		addNodes(manager.nodeStore, 0, podControl.FakePodControl.CreateLimit*10, nil)
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
+		expectedLimit := 0
+		for pass := uint8(0); expectedLimit <= podControl.FakePodControl.CreateLimit; pass++ {
+			expectedLimit += controller.SlowStartInitialBatchSize << pass
+		}
+		if podControl.FakePodControl.CreateCallCount > expectedLimit {
+			t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
+		}
+
+	}
+}
+
 func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
@@ -478,20 +498,6 @@ func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		manager.nodeStore.Add(node)
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-	}
-}
-
-// DaemonSets should not place onto OutOfDisk nodes
-func TestOutOfDiskNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	for _, strategy := range updateStrategies() {
-		ds := newDaemonSet("foo")
-		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, _ := newTestController(ds)
-		node := newNode("not-enough-disk", nil)
-		node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
-		manager.nodeStore.Add(node)
-		manager.dsStore.Add(ds)
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1213,12 +1219,27 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		setDaemonSetToleration(ds, noScheduleTolerations)
 		manager, podControl, _ := newTestController(ds)
-
-		node := newNode("untainted", nil)
-		manager.nodeStore.Add(node)
+		addNodes(manager.nodeStore, 0, 1, nil)
 		manager.dsStore.Add(ds)
 
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+	}
+}
+
+// DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
+func TestDaemonSetRespectsTermination(t *testing.T) {
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _ := newTestController(ds)
+
+		addNodes(manager.nodeStore, 0, 1, simpleNodeLabel)
+		pod := newPod(fmt.Sprintf("%s-", "node-0"), "node-0", simpleDaemonSetLabel, ds)
+		dt := metav1.Now()
+		pod.DeletionTimestamp = &dt
+		manager.podStore.Add(pod)
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1230,30 +1251,8 @@ func setDaemonSetToleration(ds *extensions.DaemonSet, tolerations []v1.Toleratio
 	ds.Spec.Template.Spec.Tolerations = tolerations
 }
 
-// DaemonSet should launch a critical pod even when the node is OutOfDisk.
-func TestOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
-	for _, strategy := range updateStrategies() {
-		ds := newDaemonSet("critical")
-		ds.Spec.UpdateStrategy = *strategy
-		setDaemonSetCritical(ds)
-		manager, podControl, _ := newTestController(ds)
-
-		node := newNode("not-enough-disk", nil)
-		node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
-		manager.nodeStore.Add(node)
-
-		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
-		manager.dsStore.Add(ds)
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
-
-		// Enabling critical pod annotation feature gate should create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
-		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-	}
-}
-
 // DaemonSet should launch a critical pod even when the node with OutOfDisk taints.
+// TODO(#48843) OutOfDisk taints will be removed in 1.10
 func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("critical")
@@ -1425,23 +1424,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: simpleDaemonSetLabel,
 						},
-						Spec: resourcePodSpec("", "50M", "0.5"),
-					},
-				},
-			},
-			nodeCondition:         []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-			wantToRun:             true,
-			shouldSchedule:        false,
-			shouldContinueRunning: true,
-		},
-		{
-			ds: &extensions.DaemonSet{
-				Spec: extensions.DaemonSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: simpleDaemonSetLabel,
-						},
 						Spec: resourcePodSpec("", "200M", "0.5"),
 					},
 				},
@@ -1574,41 +1556,6 @@ func TestUpdateNode(t *testing.T) {
 			newNode:       newNode("node1", nil),
 			ds:            newDaemonSet("ds"),
 			shouldEnqueue: true,
-		},
-		{
-			test: "Node conditions changed",
-			oldNode: func() *v1.Node {
-				node := newNode("node1", nil)
-				node.Status.Conditions = []v1.NodeCondition{
-					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-				}
-				return node
-			}(),
-			newNode:       newNode("node1", nil),
-			ds:            newDaemonSet("ds"),
-			shouldEnqueue: true,
-		},
-		{
-			test: "Node conditions not changed",
-			oldNode: func() *v1.Node {
-				node := newNode("node1", nil)
-				node.Status.Conditions = []v1.NodeCondition{
-					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-					{Type: v1.NodeMemoryPressure, Status: v1.ConditionFalse},
-					{Type: v1.NodeDiskPressure, Status: v1.ConditionFalse},
-					{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionFalse},
-				}
-				return node
-			}(),
-			newNode: func() *v1.Node {
-				node := newNode("node1", nil)
-				node.Status.Conditions = []v1.NodeCondition{
-					{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-				}
-				return node
-			}(),
-			ds:            newDaemonSet("ds"),
-			shouldEnqueue: false,
 		},
 	}
 	for _, c := range cases {
@@ -1837,12 +1784,6 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 			newPod("non-matching-owned-0-", "node-0", simpleDaemonSetLabel2, ds),
 			newPod("non-matching-orphan-1-", "node-1", simpleDaemonSetLabel2, nil),
 			newPod("matching-owned-by-other-0-", "node-0", simpleDaemonSetLabel, ds2),
-			func() *v1.Pod {
-				pod := newPod("matching-owned-2-but-set-for-deletion", "node-2", simpleDaemonSetLabel, ds)
-				now := metav1.Now()
-				pod.DeletionTimestamp = &now
-				return pod
-			}(),
 		}
 		for _, pod := range ignoredPods {
 			manager.podStore.Add(pod)
@@ -2173,58 +2114,4 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func TestPredicates(t *testing.T) {
-	type args struct {
-		pod  *v1.Pod
-		node *v1.Node
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantRes []algorithm.PredicateFailureReason
-		wantErr bool
-	}{
-		{
-			name: "retrun OutOfDiskErr if outOfDisk",
-			args: args{
-				pod: newPod("pod1-", "node-0", nil, nil),
-				node: &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "node-0",
-					},
-					Status: v1.NodeStatus{
-						Conditions: []v1.NodeCondition{
-							{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue},
-						},
-						Allocatable: v1.ResourceList{
-							v1.ResourcePods: resource.MustParse("100"),
-						},
-					},
-				},
-			},
-			want:    false,
-			wantRes: []algorithm.PredicateFailureReason{predicates.ErrNodeOutOfDisk},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nodeInfo := schedulercache.NewNodeInfo(tt.args.pod)
-			nodeInfo.SetNode(tt.args.node)
-
-			got, res, err := Predicates(tt.args.pod, nodeInfo)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("%s (error): error = %v, wantErr %v", tt.name, err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("%s (fit): got = %v, want %v", tt.name, got, tt.want)
-			}
-			if !reflect.DeepEqual(res, tt.wantRes) {
-				t.Errorf("%s (reasons): got = %v, want %v", tt.name, res, tt.wantRes)
-			}
-		})
-	}
 }

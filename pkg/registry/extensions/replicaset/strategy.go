@@ -22,10 +22,14 @@ import (
 	"fmt"
 	"strconv"
 
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -33,6 +37,7 @@ import (
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -63,6 +68,8 @@ func (rsStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Ob
 	rs.Status = extensions.ReplicaSetStatus{}
 
 	rs.Generation = 1
+
+	pod.DropDisabledAlphaFields(&rs.Spec.Template.Spec)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -71,6 +78,9 @@ func (rsStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runti
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set status
 	newRS.Status = oldRS.Status
+
+	pod.DropDisabledAlphaFields(&newRS.Spec.Template.Spec)
+	pod.DropDisabledAlphaFields(&oldRS.Spec.Template.Spec)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -103,9 +113,29 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (rsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
-	updateErrorList := validation.ValidateReplicaSetUpdate(obj.(*extensions.ReplicaSet), old.(*extensions.ReplicaSet))
-	return append(validationErrorList, updateErrorList...)
+	newReplicaSet := obj.(*extensions.ReplicaSet)
+	oldReplicaSet := old.(*extensions.ReplicaSet)
+	allErrs := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
+	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
+
+	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
+	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
+	// to prevent unintentionally breaking users who may rely on the old behavior.
+	// TODO(#50791): after extensions/v1beta1 is removed, move selector immutability check inside ValidateReplicaSetUpdate().
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		switch groupVersion {
+		case extensionsv1beta1.SchemeGroupVersion:
+			// no-op for compatibility
+		case appsv1beta2.SchemeGroupVersion:
+			// disallow mutation of selector
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newReplicaSet.Spec.Selector, oldReplicaSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+		default:
+			panic(fmt.Sprintf("unexpected group/version: %v", groupVersion))
+		}
+	}
+
+	return allErrs
 }
 
 func (rsStrategy) AllowUnconditionalUpdate() bool {

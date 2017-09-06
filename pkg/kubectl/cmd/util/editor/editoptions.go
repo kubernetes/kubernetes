@@ -29,6 +29,7 @@ import (
 
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -86,7 +87,7 @@ type editPrinterOptions struct {
 }
 
 // Complete completes all the required options
-func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
+func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
@@ -118,8 +119,10 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		ContinueOnError().
 		Flatten().
 		Do()
@@ -133,6 +136,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		// resource builder to read objects from edited data
 		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 			Stream(bytes.NewReader(data), "edited-file").
+			IncludeUninitialized(includeUninitialized).
 			ContinueOnError().
 			Flatten().
 			Do()

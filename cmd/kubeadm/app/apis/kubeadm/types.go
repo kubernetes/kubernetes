@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,7 +34,7 @@ type MasterConfiguration struct {
 	AuthorizationModes []string
 
 	Token    string
-	TokenTTL time.Duration
+	TokenTTL metav1.Duration
 
 	APIServerExtraArgs         map[string]string
 	ControllerManagerExtraArgs map[string]string
@@ -57,8 +55,8 @@ type MasterConfiguration struct {
 	// UnifiedControlPlaneImage specifies if a specific container image should be used for all control plane components
 	UnifiedControlPlaneImage string
 
-	// FeatureFlags enabled by the user
-	FeatureFlags map[string]bool
+	// FeatureGates enabled by the user
+	FeatureGates map[string]bool
 }
 
 type API struct {

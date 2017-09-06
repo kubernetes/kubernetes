@@ -209,7 +209,7 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 	return true, volumeStatus, nil
 }
 
-// Attaches given cinder volume to the compute running kubelet
+// AttachDisk attaches given cinder volume to the compute running kubelet
 func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	volume, err := os.getVolume(volumeID)
 	if err != nil {
@@ -288,7 +288,7 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	return nil
 }
 
-// Retrieves Volume by its ID.
+// getVolume retrieves Volume by its ID.
 func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
@@ -298,7 +298,7 @@ func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 	return volumes.getVolume(volumeID)
 }
 
-// Create a volume of given size (in GiB)
+// CreateVolume creates a volume of given size (in GiB)
 func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
 	volumes, err := os.volumeService("")
 	if err != nil || volumes == nil {
@@ -378,7 +378,7 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 
 }
 
-// Get device path of attached volume to the compute running kubelet, as known by cinder
+// GetAttachmentDiskPath gets device path of attached volume to the compute running kubelet, as known by cinder
 func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string, error) {
 	// See issue #33128 - Cinder does not always tell you the right device path, as such
 	// we must only use this value as a last resort.
@@ -405,7 +405,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 	return "", fmt.Errorf("volume %s has no ServerId.", volumeID)
 }
 
-// query if a volume is attached to a compute instance
+// DiskIsAttached queries if a volume is attached to a compute instance
 func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	volume, err := os.getVolume(volumeID)
 	if err != nil {
@@ -415,7 +415,7 @@ func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	return instanceID == volume.AttachedServerId, nil
 }
 
-// query if a list of volumes are attached to a compute instance
+// DisksAreAttached queries if a list of volumes are attached to a compute instance
 func (os *OpenStack) DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error) {
 	attached := make(map[string]bool)
 	for _, volumeID := range volumeIDs {
@@ -434,7 +434,7 @@ func (os *OpenStack) diskIsUsed(volumeID string) (bool, error) {
 	return volume.AttachedServerId != "", nil
 }
 
-// query if we should trust the cinder provide deviceName, See issue #33128
+// ShouldTrustDevicePath queries if we should trust the cinder provide deviceName, See issue #33128
 func (os *OpenStack) ShouldTrustDevicePath() bool {
 	return os.bsOpts.TrustDevicePath
 }

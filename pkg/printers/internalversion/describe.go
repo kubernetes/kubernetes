@@ -89,6 +89,8 @@ type PrefixWriter interface {
 	Write(level int, format string, a ...interface{})
 	// WriteLine writes an entire line with no indentation level.
 	WriteLine(a ...interface{})
+	// Flush forces indendation to be reset.
+	Flush()
 }
 
 // prefixWriter implements PrefixWriter
@@ -114,6 +116,12 @@ func (pw *prefixWriter) Write(level int, format string, a ...interface{}) {
 
 func (pw *prefixWriter) WriteLine(a ...interface{}) {
 	fmt.Fprintln(pw.out, a...)
+}
+
+func (pw *prefixWriter) Flush() {
+	if f, ok := pw.out.(flusher); ok {
+		f.Flush()
+	}
 }
 
 func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer {
@@ -835,6 +843,10 @@ func printPortworxVolumeSource(pwxVolume *api.PortworxVolumeSource, w PrefixWrit
 }
 
 func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
+	initiator := "<none>"
+	if iscsi.InitiatorName != nil {
+		initiator = *iscsi.InitiatorName
+	}
 	w.Write(LEVEL_2, "Type:\tISCSI (an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod)\n"+
 		"    TargetPortal:\t%v\n"+
 		"    IQN:\t%v\n"+
@@ -845,9 +857,9 @@ func printISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, w PrefixWriter) {
 		"    Portals:\t%v\n"+
 		"    DiscoveryCHAPAuth:\t%v\n"+
 		"    SessionCHAPAuth:\t%v\n"+
-		"    SecretRef:\t%v\n",
+		"    SecretRef:\t%v\n"+
 		"    InitiatorName:\t%v\n",
-		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, iscsi.InitiatorName)
+		iscsi.TargetPortal, iscsi.IQN, iscsi.Lun, iscsi.ISCSIInterface, iscsi.FSType, iscsi.ReadOnly, iscsi.Portals, iscsi.DiscoveryCHAPAuth, iscsi.SessionCHAPAuth, iscsi.SecretRef, initiator)
 }
 
 func printGlusterfsVolumeSource(glusterfs *api.GlusterfsVolumeSource, w PrefixWriter) {
@@ -2853,19 +2865,24 @@ func DescribeEvents(el *api.EventList, w PrefixWriter) {
 		w.Write(LEVEL_0, "Events:\t<none>\n")
 		return
 	}
+	w.Flush()
 	sort.Sort(events.SortableEvents(el.Items))
-	w.Write(LEVEL_0, "Events:\n  FirstSeen\tLastSeen\tCount\tFrom\tSubObjectPath\tType\tReason\tMessage\n")
-	w.Write(LEVEL_1, "---------\t--------\t-----\t----\t-------------\t--------\t------\t-------\n")
+	w.Write(LEVEL_0, "Events:\n  Type\tReason\tAge\tFrom\tMessage\n")
+	w.Write(LEVEL_1, "----\t------\t----\t----\t-------\n")
 	for _, e := range el.Items {
-		w.Write(LEVEL_1, "%s\t%s\t%d\t%v\t%v\t%v\t%v\t%v\n",
-			translateTimestamp(e.FirstTimestamp),
-			translateTimestamp(e.LastTimestamp),
-			e.Count,
-			formatEventSource(e.Source),
-			e.InvolvedObject.FieldPath,
+		var interval string
+		if e.Count > 1 {
+			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestamp(e.LastTimestamp), e.Count, translateTimestamp(e.FirstTimestamp))
+		} else {
+			interval = translateTimestamp(e.FirstTimestamp)
+		}
+		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
-			e.Message)
+			interval,
+			formatEventSource(e.Source),
+			strings.TrimSpace(e.Message),
+		)
 	}
 }
 
@@ -3591,10 +3608,14 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 	}
 }
 
+type flusher interface {
+	Flush()
+}
+
 func tabbedString(f func(io.Writer) error) (string, error) {
 	out := new(tabwriter.Writer)
 	buf := &bytes.Buffer{}
-	out.Init(buf, 0, 8, 1, '\t', 0)
+	out.Init(buf, 0, 8, 2, ' ', 0)
 
 	err := f(out)
 	if err != nil {

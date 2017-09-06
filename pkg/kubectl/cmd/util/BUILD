@@ -71,6 +71,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/util/homedir:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -142,6 +143,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd/util/editor:all-srcs",
+        "//pkg/kubectl/cmd/util/env:all-srcs",
         "//pkg/kubectl/cmd/util/jsonmerge:all-srcs",
         "//pkg/kubectl/cmd/util/openapi:all-srcs",
         "//pkg/kubectl/cmd/util/sanity:all-srcs",

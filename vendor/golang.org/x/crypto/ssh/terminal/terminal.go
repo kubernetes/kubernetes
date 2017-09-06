@@ -132,8 +132,11 @@ const (
 	keyPasteEnd
 )
 
-var pasteStart = []byte{keyEscape, '[', '2', '0', '0', '~'}
-var pasteEnd = []byte{keyEscape, '[', '2', '0', '1', '~'}
+var (
+	crlf       = []byte{'\r', '\n'}
+	pasteStart = []byte{keyEscape, '[', '2', '0', '0', '~'}
+	pasteEnd   = []byte{keyEscape, '[', '2', '0', '1', '~'}
+)
 
 // bytesToKey tries to parse a key sequence from b. If successful, it returns
 // the key and the remainder of the input. Otherwise it returns utf8.RuneError.
@@ -333,7 +336,7 @@ func (t *Terminal) advanceCursor(places int) {
 		// So, if we are stopping at the end of a line, we
 		// need to write a newline so that our cursor can be
 		// advanced to the next line.
-		t.outBuf = append(t.outBuf, '\n')
+		t.outBuf = append(t.outBuf, '\r', '\n')
 	}
 }
 
@@ -593,6 +596,35 @@ func (t *Terminal) writeLine(line []rune) {
 	}
 }
 
+// writeWithCRLF writes buf to w but replaces all occurrences of \n with \r\n.
+func writeWithCRLF(w io.Writer, buf []byte) (n int, err error) {
+	for len(buf) > 0 {
+		i := bytes.IndexByte(buf, '\n')
+		todo := len(buf)
+		if i >= 0 {
+			todo = i
+		}
+
+		var nn int
+		nn, err = w.Write(buf[:todo])
+		n += nn
+		if err != nil {
+			return n, err
+		}
+		buf = buf[todo:]
+
+		if i >= 0 {
+			if _, err = w.Write(crlf); err != nil {
+				return n, err
+			}
+			n += 1
+			buf = buf[1:]
+		}
+	}
+
+	return n, nil
+}
+
 func (t *Terminal) Write(buf []byte) (n int, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -600,7 +632,7 @@ func (t *Terminal) Write(buf []byte) (n int, err error) {
 	if t.cursorX == 0 && t.cursorY == 0 {
 		// This is the easy case: there's nothing on the screen that we
 		// have to move out of the way.
-		return t.c.Write(buf)
+		return writeWithCRLF(t.c, buf)
 	}
 
 	// We have a prompt and possibly user input on the screen. We
@@ -620,7 +652,7 @@ func (t *Terminal) Write(buf []byte) (n int, err error) {
 	}
 	t.outBuf = t.outBuf[:0]
 
-	if n, err = t.c.Write(buf); err != nil {
+	if n, err = writeWithCRLF(t.c, buf); err != nil {
 		return
 	}
 
@@ -740,8 +772,6 @@ func (t *Terminal) readLine() (line string, err error) {
 
 		t.remainder = t.inBuf[:n+len(t.remainder)]
 	}
-
-	panic("unreachable") // for Go 1.0.
 }
 
 // SetPrompt sets the prompt to be used when reading subsequent lines.
@@ -889,4 +919,33 @@ func (s *stRingBuffer) NthPreviousEntry(n int) (value string, ok bool) {
 		index += s.max
 	}
 	return s.entries[index], true
+}
+
+// readPasswordLine reads from reader until it finds \n or io.EOF.
+// The slice returned does not include the \n.
+// readPasswordLine also ignores any \r it finds.
+func readPasswordLine(reader io.Reader) ([]byte, error) {
+	var buf [1]byte
+	var ret []byte
+
+	for {
+		n, err := reader.Read(buf[:])
+		if n > 0 {
+			switch buf[0] {
+			case '\n':
+				return ret, nil
+			case '\r':
+				// remove \r from passwords on Windows
+			default:
+				ret = append(ret, buf[0])
+			}
+			continue
+		}
+		if err != nil {
+			if err == io.EOF && len(ret) > 0 {
+				return ret, nil
+			}
+			return ret, err
+		}
+	}
 }

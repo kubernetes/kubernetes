@@ -85,15 +85,15 @@ function get-node-ip-range {
 }
 
 function get-cluster-ip-range {
-  local suggested_range="10.100.0.0/14"
+  local suggested_range="10.64.0.0/14"
   if [[ "${NUM_NODES}" -gt 1000 ]]; then
-    suggested_range="10.100.0.0/13"
+    suggested_range="10.64.0.0/13"
   fi
   if [[ "${NUM_NODES}" -gt 2000 ]]; then
-    suggested_range="10.100.0.0/12"
+    suggested_range="10.64.0.0/12"
   fi
   if [[ "${NUM_NODES}" -gt 4000 ]]; then
-    suggested_range="10.100.0.0/11"
+    suggested_range="10.64.0.0/11"
   fi
   echo "${suggested_range}" 
 }

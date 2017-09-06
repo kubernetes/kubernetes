@@ -63,10 +63,10 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 	}
 }
 
-// installFlex installs the driver found at filePath on the node and restarts
-// kubelet. If node is nil, installs on the master and restarts
-// controller-manager.
-func installFlex(node *v1.Node, vendor, driver, filePath string) {
+// installFlex installs the driver found at filePath on the node, and restarts
+// kubelet if 'restart' is true. If node is nil, installs on the master, and restarts
+// controller-manager if 'restart' is true.
+func installFlex(node *v1.Node, vendor, driver, filePath string, restart bool) {
 	flexDir := getFlexDir(node == nil, vendor, driver)
 	flexFile := path.Join(flexDir, driver)
 
@@ -86,6 +86,10 @@ func installFlex(node *v1.Node, vendor, driver, filePath string) {
 
 	cmd = fmt.Sprintf("sudo chmod +x %s", flexFile)
 	sshAndLog(cmd, host)
+
+	if !restart {
+		return
+	}
 
 	if node != nil {
 		err := framework.RestartKubelet(host)
@@ -170,7 +174,7 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 
 		testFlexVolume(driverInstallAs, cs, config, f, clean)
 
@@ -188,9 +192,9 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 		By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(nil, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 
 		testFlexVolume(driverInstallAs, cs, config, f, clean)
 
@@ -203,5 +207,23 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		uninstallFlex(&node, "k8s", driverInstallAs)
 		By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
 		uninstallFlex(nil, "k8s", driverInstallAs)
+	})
+
+	It("should install plugin without kubelet restart", func() {
+		driver := "dummy"
+		driverInstallAs := driver + "-" + suffix
+
+		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver), false /* restart */)
+
+		testFlexVolume(driverInstallAs, cs, config, f, clean)
+
+		By("waiting for flex client pod to terminate")
+		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+
+		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
+		uninstallFlex(&node, "k8s", driverInstallAs)
 	})
 })

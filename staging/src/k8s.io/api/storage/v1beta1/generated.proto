@@ -53,6 +53,16 @@ message StorageClass {
   // created with this reclaimPolicy. Defaults to Delete.
   // +optional
   optional string reclaimPolicy = 4;
+
+  // Dynamically provisioned PersistentVolumes of this storage class are
+  // created with these mountOptions, e.g. ["ro", "soft"]. Not validated -
+  // mount of the PVs will simply fail if one is invalid.
+  // +optional
+  repeated string mountOptions = 5;
+
+  // AllowVolumeExpansion shows whether the storage class allow volume expand
+  // +optional
+  optional bool allowVolumeExpansion = 6;
 }
 
 // StorageClassList is a collection of storage classes.

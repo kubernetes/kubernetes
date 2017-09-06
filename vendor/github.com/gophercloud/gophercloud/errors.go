@@ -393,13 +393,6 @@ func (e ErrScopeProjectIDAlone) Error() string {
 	return "ProjectID must be supplied alone in a Scope"
 }
 
-// ErrScopeDomainName indicates that a DomainName was provided alone in a Scope.
-type ErrScopeDomainName struct{ BaseError }
-
-func (e ErrScopeDomainName) Error() string {
-	return "DomainName must be supplied with a ProjectName or ProjectID in a Scope"
-}
-
 // ErrScopeEmpty indicates that no credentials were provided in a Scope.
 type ErrScopeEmpty struct{ BaseError }
 

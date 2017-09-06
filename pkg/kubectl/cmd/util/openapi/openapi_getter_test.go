@@ -18,17 +18,21 @@ package openapi_test
 
 import (
 	"fmt"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	oapi "k8s.io/kube-openapi/pkg/util/proto"
+	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
+
+var fakeSchema = tst.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
 
 var _ = Describe("Getting the Resources", func() {
 	var client *tst.FakeClient
-	var expectedData openapi.Resources
+	var expectedData oapi.Resources
 	var instance openapi.Getter
 
 	BeforeEach(func() {
@@ -36,10 +40,10 @@ var _ = Describe("Getting the Resources", func() {
 		d, err := fakeSchema.OpenAPISchema()
 		Expect(err).To(BeNil())
 
-		expectedData, err = openapi.NewOpenAPIData(d)
+		expectedData, err = oapi.NewOpenAPIData(d, openapi.ParseGroupVersionKind)
 		Expect(err).To(BeNil())
 
-		instance = openapi.NewOpenAPIGetter("", "", client)
+		instance = openapi.NewOpenAPIGetter(client)
 	})
 
 	Context("when the server returns a successful result", func() {

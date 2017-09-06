@@ -578,10 +578,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
-	d, err := util.DeploymentDeepCopy(deployment)
-	if err != nil {
-		return err
-	}
+	d := deployment.DeepCopy()
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
@@ -619,14 +616,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	if err = dc.checkPausedConditions(d); err != nil {
 		return err
 	}
-
-	_, err = dc.hasFailed(d, rsList, podMap)
-	if err != nil {
-		return err
-	}
-	// TODO: Automatically rollback here if we failed above. Locate the last complete
-	// revision and populate the rollback spec with it.
-	// See https://github.com/kubernetes/kubernetes/issues/23211.
 
 	if d.Spec.Paused {
 		return dc.sync(d, rsList, podMap)

@@ -815,7 +815,7 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   BusyBoxImage,
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{
@@ -838,9 +838,80 @@ func MakePod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool,
 	return podSpec
 }
 
+// Returns a pod definition based on the namespace. The pod references the PVC's
+// name.  A slice of BASH commands can be supplied as args to be run by the pod.
+// SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
+func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) *v1.Pod {
+	if len(command) == 0 {
+		command = "while true; do sleep 1; done"
+	}
+	podName := "security-context-" + string(uuid.NewUUID())
+	fsGroup := int64(1000)
+	podSpec := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: ns,
+		},
+		Spec: v1.PodSpec{
+			HostIPC: hostIPC,
+			HostPID: hostPID,
+			SecurityContext: &v1.PodSecurityContext{
+				FSGroup: &fsGroup,
+			},
+			Containers: []v1.Container{
+				{
+					Name:    "write-pod",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", command},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &isPrivileged,
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyOnFailure,
+		},
+	}
+	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
+	var volumes = make([]v1.Volume, len(pvclaims))
+	for index, pvclaim := range pvclaims {
+		volumename := fmt.Sprintf("volume%v", index+1)
+		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+	}
+	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Spec.Volumes = volumes
+	podSpec.Spec.SecurityContext.SELinuxOptions = seLinuxLabel
+	return podSpec
+}
+
 // create pod with given claims
 func CreatePod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, pvclaims, isPrivileged, command)
+	pod, err := client.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("pod Create API error: %v", err)
+	}
+	// Waiting for pod to be running
+	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	if err != nil {
+		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
+	}
+	// get fresh pod info
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return pod, fmt.Errorf("pod Get API error: %v", err)
+	}
+	return pod, nil
+}
+
+// create security pod with given claims
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
+	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)

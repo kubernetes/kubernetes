@@ -298,11 +298,15 @@
     "properties": {
      "selfLink": {
       "type": "string",
-      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+      "description": "selfLink is a URL representing this object. Populated by the system. Read-only."
      },
      "resourceVersion": {
       "type": "string",
       "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "continue": {
+      "type": "string",
+      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response."
      }
     }
    },
@@ -462,6 +466,14 @@
      "namespaced": {
       "type": "boolean",
       "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "group": {
+      "type": "string",
+      "description": "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\"."
+     },
+     "version": {
+      "type": "string",
+      "description": "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\"."
      },
      "kind": {
       "type": "string",

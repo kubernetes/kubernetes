@@ -14,10 +14,14 @@ go_library(
         "customresource_handler.go",
     ],
     deps = [
+        "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/github.com/go-openapi/strfmt:go_default_library",
+        "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions:go_default_library",
@@ -68,6 +72,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:all-srcs",
+    ],
     tags = ["automanaged"],
 )

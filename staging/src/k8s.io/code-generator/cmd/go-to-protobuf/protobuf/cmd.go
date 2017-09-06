@@ -98,8 +98,10 @@ func New() *Generator {
 			`k8s.io/api/networking/v1`,
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,
 			`k8s.io/metrics/pkg/apis/metrics/v1alpha1`,
-			`k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1`,
+			`k8s.io/metrics/pkg/apis/metrics/v1beta1`,
+			`k8s.io/metrics/pkg/apis/custom_metrics/v1beta1`,
 			`k8s.io/apiserver/pkg/apis/audit/v1alpha1`,
+			`k8s.io/apiserver/pkg/apis/audit/v1beta1`,
 		}, ","),
 		DropEmbeddedFields: "k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta",
 	}

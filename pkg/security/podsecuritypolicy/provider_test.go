@@ -248,6 +248,23 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		},
 	}
 
+	failHostPathDirPod := defaultPod()
+	failHostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/fail",
+				},
+			},
+		},
+	}
+	failHostPathDirPSP := defaultPSP()
+	failHostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	failHostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
 
@@ -317,6 +334,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failHostDirPod,
 			psp:           defaultPSP(),
 			expectedError: "hostPath volumes are not allowed to be used",
+		},
+		"failHostPathDirPSP": {
+			pod:           failHostPathDirPod,
+			psp:           failHostPathDirPSP,
+			expectedError: "is not allowed to be used",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
@@ -556,6 +578,30 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "good volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar/baz",
+				},
+			},
+		},
+	}
+
+	hostPathDirPSP := defaultPSP()
+	hostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	hostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
+	hostPathDirAsterisksPSP := defaultPSP()
+	hostPathDirAsterisksPSP.Spec.Volumes = []extensions.FSType{extensions.All}
+	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
 	sysctlAllowFooPSP := defaultPSP()
 	sysctlAllowFooPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
 
@@ -618,6 +664,14 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		"pass empty profile with unsafe sysctl": {
 			pod: unsafeSysctlFooPod,
 			psp: defaultPSP(),
+		},
+		"pass hostDir allowed directory validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirPSP,
+		},
+		"pass hostDir all volumes allowed validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirAsterisksPSP,
 		},
 		"pass seccomp validating PSP": {
 			pod: seccompPod,

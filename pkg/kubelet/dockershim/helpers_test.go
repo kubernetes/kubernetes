@@ -323,3 +323,70 @@ func TestMakePortsAndBindings(t *testing.T) {
 		assert.Equal(t, test.portmappings, actualPortMappings)
 	}
 }
+
+func TestGenerateMountBindings(t *testing.T) {
+	mounts := []*runtimeapi.Mount{
+		// everything default
+		{
+			HostPath:      "/mnt/1",
+			ContainerPath: "/var/lib/mysql/1",
+		},
+		// readOnly
+		{
+			HostPath:      "/mnt/2",
+			ContainerPath: "/var/lib/mysql/2",
+			Readonly:      true,
+		},
+		// SELinux
+		{
+			HostPath:       "/mnt/3",
+			ContainerPath:  "/var/lib/mysql/3",
+			SelinuxRelabel: true,
+		},
+		// Propagation private
+		{
+			HostPath:      "/mnt/4",
+			ContainerPath: "/var/lib/mysql/4",
+			Propagation:   runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
+		},
+		// Propagation rslave
+		{
+			HostPath:      "/mnt/5",
+			ContainerPath: "/var/lib/mysql/5",
+			Propagation:   runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+		},
+		// Propagation rshared
+		{
+			HostPath:      "/mnt/6",
+			ContainerPath: "/var/lib/mysql/6",
+			Propagation:   runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+		},
+		// Propagation unknown (falls back to private)
+		{
+			HostPath:      "/mnt/7",
+			ContainerPath: "/var/lib/mysql/7",
+			Propagation:   runtimeapi.MountPropagation(42),
+		},
+		// Everything
+		{
+			HostPath:       "/mnt/8",
+			ContainerPath:  "/var/lib/mysql/8",
+			Readonly:       true,
+			SelinuxRelabel: true,
+			Propagation:    runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+		},
+	}
+	expectedResult := []string{
+		"/mnt/1:/var/lib/mysql/1",
+		"/mnt/2:/var/lib/mysql/2:ro",
+		"/mnt/3:/var/lib/mysql/3:Z",
+		"/mnt/4:/var/lib/mysql/4",
+		"/mnt/5:/var/lib/mysql/5:rslave",
+		"/mnt/6:/var/lib/mysql/6:rshared",
+		"/mnt/7:/var/lib/mysql/7",
+		"/mnt/8:/var/lib/mysql/8:ro,Z,rshared",
+	}
+	result := generateMountBindings(mounts)
+
+	assert.Equal(t, result, expectedResult)
+}

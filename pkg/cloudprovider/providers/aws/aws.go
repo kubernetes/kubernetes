@@ -38,8 +38,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"path"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -203,6 +207,7 @@ type Services interface {
 	LoadBalancing(region string) (ELB, error)
 	Autoscaling(region string) (ASG, error)
 	Metadata() (EC2Metadata, error)
+	KeyManagement(region string) (KMS, error)
 }
 
 // EC2 is an abstraction over AWS', to allow mocking/other implementations
@@ -271,6 +276,12 @@ type ELB interface {
 type ASG interface {
 	UpdateAutoScalingGroup(*autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error)
 	DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error)
+}
+
+// KMS is a simple pass-through of the Key Management Service client interface,
+// which allows for testing.
+type KMS interface {
+	DescribeKey(*kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error)
 }
 
 // EC2Metadata is an abstraction over the AWS metadata service.
@@ -370,6 +381,7 @@ type Cloud struct {
 	ec2      EC2
 	elb      ELB
 	asg      ASG
+	kms      KMS
 	metadata EC2Metadata
 	cfg      *CloudConfig
 	region   string
@@ -568,6 +580,20 @@ func (p *awsSDKProvider) Metadata() (EC2Metadata, error) {
 	return client, nil
 }
 
+func (p *awsSDKProvider) KeyManagement(regionName string) (KMS, error) {
+	awsConfig := &aws.Config{
+		Region:      &regionName,
+		Credentials: p.creds,
+	}
+	awsConfig = awsConfig.WithCredentialsChainVerboseErrors(true)
+
+	kmsClient := kms.New(session.New(awsConfig))
+
+	p.addHandlers(regionName, &kmsClient.Handlers)
+
+	return kmsClient, nil
+}
+
 // stringPointerArray creates a slice of string pointers from a slice of strings
 // Deprecated: consider using aws.StringSlice - but note the slightly different behaviour with a nil input
 func stringPointerArray(orig []string) []*string {
@@ -575,18 +601,6 @@ func stringPointerArray(orig []string) []*string {
 		return nil
 	}
 	return aws.StringSlice(orig)
-}
-
-// isNilOrEmpty returns true if the value is nil or ""
-// Deprecated: prefer aws.StringValue(x) == "" (and elimination of this check altogether where possible)
-func isNilOrEmpty(s *string) bool {
-	return s == nil || *s == ""
-}
-
-// orEmpty returns the string value, or "" if the pointer is nil
-// Deprecated: prefer aws.StringValue
-func orEmpty(s *string) string {
-	return aws.StringValue(s)
 }
 
 func newEc2Filter(name string, values ...string) *ec2.Filter {
@@ -627,7 +641,7 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 		}
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -679,7 +693,7 @@ func (s *awsSdkEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.V
 		results = append(results, response.Volumes...)
 
 		nextToken = response.NextToken
-		if isNilOrEmpty(nextToken) {
+		if aws.StringValue(nextToken) == "" {
 			break
 		}
 		request.NextToken = nextToken
@@ -877,11 +891,17 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
 	}
 
+	kms, err := awsServices.KeyManagement(regionName)
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS key management client: %v", err)
+	}
+
 	awsCloud := &Cloud{
 		ec2:      ec2,
 		elb:      elb,
 		asg:      asg,
 		metadata: metadata,
+		kms:      kms,
 		cfg:      cfg,
 		region:   regionName,
 
@@ -981,11 +1001,27 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
 		addresses := []v1.NodeAddress{}
 
-		internalIP, err := c.metadata.GetMetadata("local-ipv4")
+		macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
 		if err != nil {
-			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "local-ipv4", err)
+			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "network/interfaces/macs", err)
 		}
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+
+		for _, macID := range strings.Split(macs, "\n") {
+			if macID == "" {
+				continue
+			}
+			macPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
+			internalIPs, err := c.metadata.GetMetadata(macPath)
+			if err != nil {
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", macPath, err)
+			}
+			for _, internalIP := range strings.Split(internalIPs, "\n") {
+				if internalIP == "" {
+					continue
+				}
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+			}
+		}
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -1034,13 +1070,22 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 
 	addresses := []v1.NodeAddress{}
 
-	privateIPAddress := aws.StringValue(instance.PrivateIpAddress)
-	if privateIPAddress != "" {
-		ip := net.ParseIP(privateIPAddress)
-		if ip == nil {
-			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", aws.StringValue(instance.InstanceId), privateIPAddress)
+	// handle internal network interfaces
+	for _, networkInterface := range instance.NetworkInterfaces {
+		// skip network interfaces that are not currently in use
+		if aws.StringValue(networkInterface.Status) != ec2.NetworkInterfaceStatusInUse {
+			continue
 		}
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+
+		for _, internalIP := range networkInterface.PrivateIpAddresses {
+			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
+				ip := net.ParseIP(ipAddress)
+				if ip == nil {
+					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
+				}
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+			}
+		}
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
@@ -1098,7 +1143,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	if instance == nil {
 		return "", cloudprovider.InstanceNotFound
 	}
-	return orEmpty(instance.InstanceId), nil
+	return aws.StringValue(instance.InstanceId), nil
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
@@ -1118,7 +1163,7 @@ func (c *Cloud) InstanceID(nodeName types.NodeName) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
 	}
-	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
+	return "/" + aws.StringValue(inst.Placement.AvailabilityZone) + "/" + aws.StringValue(inst.InstanceId), nil
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -1211,14 +1256,38 @@ func (c *Cloud) GetZone() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (c *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	instance, err := c.getInstanceByID(string(instanceID))
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+
+	zone := cloudprovider.Zone{
+		FailureDomain: *(instance.Placement.AvailabilityZone),
+		Region:        c.region,
+	}
+
+	return zone, nil
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (c *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	instance, err := c.getInstanceByNodeName(nodeName)
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	zone := cloudprovider.Zone{
+		FailureDomain: *(instance.Placement.AvailabilityZone),
+		Region:        c.region,
+	}
+
+	return zone, nil
+
 }
 
 // Abstraction around AWS Instance Types
@@ -1739,7 +1808,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 	}
 	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
-		if adminSetOfZones, err := volume.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
+		if adminSetOfZones, err := volumeutil.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
 			return "", err
 		} else {
 			createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
@@ -1788,6 +1857,14 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
 	if len(volumeOptions.KmsKeyId) > 0 {
+		if missing, err := c.checkEncryptionKey(volumeOptions.KmsKeyId); err != nil {
+			if missing {
+				// KSM key is missing, provisioning would fail
+				return "", err
+			}
+			// Log checkEncryptionKey error and try provisioning anyway.
+			glog.Warningf("Cannot check KSM key %s: %v", volumeOptions.KmsKeyId, err)
+		}
 		request.KmsKeyId = aws.String(volumeOptions.KmsKeyId)
 		request.Encrypted = aws.Bool(true)
 	}
@@ -1817,6 +1894,23 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	}
 
 	return volumeName, nil
+}
+
+// checkEncryptionKey tests that given encryption key exists.
+func (c *Cloud) checkEncryptionKey(keyId string) (missing bool, err error) {
+	input := &kms.DescribeKeyInput{
+		KeyId: aws.String(keyId),
+	}
+	_, err = c.kms.DescribeKey(input)
+	if err == nil {
+		return false, nil
+	}
+	if awsError, ok := err.(awserr.Error); ok {
+		if awsError.Code() == "NotFoundException" {
+			return true, fmt.Errorf("KMS key %s not found: %q", keyId, err)
+		}
+	}
+	return false, fmt.Errorf("Error checking KSM key %s: %q", keyId, err)
 }
 
 // DeleteDisk implements Volumes.DeleteDisk
@@ -2379,7 +2473,7 @@ func (c *Cloud) ensureSecurityGroup(name string, description string) (string, er
 			}
 			time.Sleep(1 * time.Second)
 		} else {
-			groupID = orEmpty(createResponse.GroupId)
+			groupID = aws.StringValue(createResponse.GroupId)
 			break
 		}
 	}
@@ -2934,13 +3028,13 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 		return nil, err
 	}
 
-	err = c.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
+	err = c.ensureLoadBalancerInstances(aws.StringValue(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
 	if err != nil {
 		glog.Warningf("Error registering instances with the load balancer: %q", err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, orEmpty(loadBalancer.DNSName))
+	glog.V(1).Infof("Loadbalancer %s (%v) has DNS name %s", loadBalancerName, serviceName, aws.StringValue(loadBalancer.DNSName))
 
 	// TODO: Wait for creation?
 
@@ -2967,9 +3061,9 @@ func (c *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.Lo
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
 	status := &v1.LoadBalancerStatus{}
 
-	if !isNilOrEmpty(lb.DNSName) {
+	if aws.StringValue(lb.DNSName) != "" {
 		var ingress v1.LoadBalancerIngress
-		ingress.Hostname = orEmpty(lb.DNSName)
+		ingress.Hostname = aws.StringValue(lb.DNSName)
 		status.Ingress = []v1.LoadBalancerIngress{ingress}
 	}
 
@@ -3055,17 +3149,17 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	// Determine the load balancer security group id
 	loadBalancerSecurityGroupID := ""
 	for _, securityGroup := range lb.SecurityGroups {
-		if isNilOrEmpty(securityGroup) {
+		if aws.StringValue(securityGroup) == "" {
 			continue
 		}
 		if loadBalancerSecurityGroupID != "" {
 			// We create LBs with one SG
-			glog.Warningf("Multiple security groups for load balancer: %q", orEmpty(lb.LoadBalancerName))
+			glog.Warningf("Multiple security groups for load balancer: %q", aws.StringValue(lb.LoadBalancerName))
 		}
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", orEmpty(lb.LoadBalancerName))
+		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -3109,7 +3203,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		}
 
 		if securityGroup == nil {
-			glog.Warning("Ignoring instance without security group: ", orEmpty(instance.InstanceId))
+			glog.Warning("Ignoring instance without security group: ", aws.StringValue(instance.InstanceId))
 			continue
 		}
 		id := aws.StringValue(securityGroup.GroupId)
@@ -3225,7 +3319,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 				//We don't want to delete a security group that was defined in the Cloud Configurationn.
 				continue
 			}
-			if isNilOrEmpty(securityGroupID) {
+			if aws.StringValue(securityGroupID) == "" {
 				glog.Warning("Ignoring empty security group in ", service.Name)
 				continue
 			}
@@ -3341,7 +3435,7 @@ func (c *Cloud) getInstancesByIDs(instanceIDs []*string) (map[string]*ec2.Instan
 	}
 
 	for _, instance := range instances {
-		instanceID := orEmpty(instance.InstanceId)
+		instanceID := aws.StringValue(instance.InstanceId)
 		if instanceID == "" {
 			continue
 		}

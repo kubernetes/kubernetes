@@ -93,62 +93,74 @@ func getErrorFromOp(op *computev1.Operation) error {
 }
 
 func (gce *GCECloud) waitForGlobalOp(op gceObject, mc *metricContext) error {
-	switch v := op.(type) {
-	case *computealpha.Operation:
-		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceAlpha.GlobalOperations.Get(gce.projectID, operationName).Do()
-			return convertToV1Operation(op), err
-		}, mc)
-	case *computebeta.Operation:
-		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceBeta.GlobalOperations.Get(gce.projectID, operationName).Do()
-			return convertToV1Operation(op), err
-		}, mc)
-	case *computev1.Operation:
-		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.GlobalOperations.Get(gce.projectID, operationName).Do()
-		}, mc)
-	default:
-		return fmt.Errorf("unexpected type: %T", v)
-	}
+	return gce.waitForGlobalOpInProject(op, gce.ProjectID(), mc)
 }
 
 func (gce *GCECloud) waitForRegionOp(op gceObject, region string, mc *metricContext) error {
+	return gce.waitForRegionOpInProject(op, gce.ProjectID(), region, mc)
+}
+
+func (gce *GCECloud) waitForZoneOp(op gceObject, zone string, mc *metricContext) error {
+	return gce.waitForZoneOpInProject(op, gce.ProjectID(), zone, mc)
+}
+
+func (gce *GCECloud) waitForGlobalOpInProject(op gceObject, projectID string, mc *metricContext) error {
 	switch v := op.(type) {
 	case *computealpha.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceAlpha.RegionOperations.Get(gce.projectID, region, operationName).Do()
+			op, err := gce.serviceAlpha.GlobalOperations.Get(projectID, operationName).Do()
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computebeta.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceBeta.RegionOperations.Get(gce.projectID, region, operationName).Do()
+			op, err := gce.serviceBeta.GlobalOperations.Get(projectID, operationName).Do()
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computev1.Operation:
 		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.RegionOperations.Get(gce.projectID, region, operationName).Do()
+			return gce.service.GlobalOperations.Get(projectID, operationName).Do()
 		}, mc)
 	default:
 		return fmt.Errorf("unexpected type: %T", v)
 	}
 }
 
-func (gce *GCECloud) waitForZoneOp(op gceObject, zone string, mc *metricContext) error {
+func (gce *GCECloud) waitForRegionOpInProject(op gceObject, projectID, region string, mc *metricContext) error {
 	switch v := op.(type) {
 	case *computealpha.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceAlpha.ZoneOperations.Get(gce.projectID, zone, operationName).Do()
+			op, err := gce.serviceAlpha.RegionOperations.Get(projectID, region, operationName).Do()
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computebeta.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
-			op, err := gce.serviceBeta.ZoneOperations.Get(gce.projectID, zone, operationName).Do()
+			op, err := gce.serviceBeta.RegionOperations.Get(projectID, region, operationName).Do()
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computev1.Operation:
 		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.ZoneOperations.Get(gce.projectID, zone, operationName).Do()
+			return gce.service.RegionOperations.Get(projectID, region, operationName).Do()
+		}, mc)
+	default:
+		return fmt.Errorf("unexpected type: %T", v)
+	}
+}
+
+func (gce *GCECloud) waitForZoneOpInProject(op gceObject, projectID, zone string, mc *metricContext) error {
+	switch v := op.(type) {
+	case *computealpha.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceAlpha.ZoneOperations.Get(projectID, zone, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computebeta.Operation:
+		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			op, err := gce.serviceBeta.ZoneOperations.Get(projectID, zone, operationName).Do()
+			return convertToV1Operation(op), err
+		}, mc)
+	case *computev1.Operation:
+		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
+			return gce.service.ZoneOperations.Get(projectID, zone, operationName).Do()
 		}, mc)
 	default:
 		return fmt.Errorf("unexpected type: %T", v)

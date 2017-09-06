@@ -12,6 +12,9 @@ import (
 
 // SecretList returns the list of secrets.
 func (cli *Client) SecretList(ctx context.Context, options types.SecretListOptions) ([]swarm.Secret, error) {
+	if err := cli.NewVersionError("1.25", "secret list"); err != nil {
+		return nil, err
+	}
 	query := url.Values{}
 
 	if options.Filters.Len() > 0 {

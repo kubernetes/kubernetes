@@ -158,7 +158,7 @@ func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
 
 // makeUpgradeTransport creates a transport that explicitly bypasses HTTP2 support
 // for proxy connections that must upgrade.
-func makeUpgradeTransport(config *rest.Config) (http.RoundTripper, error) {
+func makeUpgradeTransport(config *rest.Config) (proxy.UpgradeRequestRoundTripper, error) {
 	transportConfig, err := config.TransportConfig()
 	if err != nil {
 		return nil, err
@@ -170,7 +170,11 @@ func makeUpgradeTransport(config *rest.Config) (http.RoundTripper, error) {
 	rt := utilnet.SetOldTransportDefaults(&http.Transport{
 		TLSClientConfig: tlsConfig,
 	})
-	return transport.HTTPWrappersForConfig(transportConfig, rt)
+	upgrader, err := transport.HTTPWrappersForConfig(transportConfig, proxy.MirrorRequest)
+	if err != nil {
+		return nil, err
+	}
+	return proxy.NewUpgradeRequestRoundTripper(rt, upgrader), nil
 }
 
 // NewServer creates and installs a new Server.

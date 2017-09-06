@@ -18,6 +18,7 @@ package reconciliation
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -28,6 +29,10 @@ import (
 // +k8s:deepcopy-gen:nonpointer-interfaces=true
 type ClusterRoleBindingAdapter struct {
 	ClusterRoleBinding *rbac.ClusterRoleBinding
+}
+
+func (o ClusterRoleBindingAdapter) GetObject() runtime.Object {
+	return o.ClusterRoleBinding
 }
 
 func (o ClusterRoleBindingAdapter) GetNamespace() string {

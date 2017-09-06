@@ -21,3 +21,6 @@ import "k8s.io/apimachinery/pkg/types"
 
 // UniquePodName defines the type to key pods off of
 type UniquePodName types.UID
+
+// UniquePVCName defines the type to key pvc off
+type UniquePVCName types.UID

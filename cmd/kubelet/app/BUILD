@@ -112,6 +112,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",

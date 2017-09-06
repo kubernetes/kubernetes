@@ -19,11 +19,11 @@
 
 REGISTRY?=gcr.io/google-containers
 IMAGE?=debian-hyperkube-base
-TAG=0.1
+TAG=0.2
 ARCH?=amd64
 CACHEBUST?=1
 
-BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.1
+BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.2
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 
 TEMP_DIR:=$(shell mktemp -d)

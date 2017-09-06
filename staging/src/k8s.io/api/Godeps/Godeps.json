@@ -71,10 +71,6 @@
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
 		},
 		{
-			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
-		},
-		{
 			"ImportPath": "golang.org/x/net/http2",
 			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
 		},

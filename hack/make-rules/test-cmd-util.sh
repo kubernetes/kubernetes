@@ -932,6 +932,30 @@ run_kubectl_apply_tests() {
   kubectl delete pods test-pod "${kube_flags[@]}"
 
 
+  ## kubectl apply should be able to clear defaulted fields.
+  # Pre-Condition: no deployment exists
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a deployment "test-deployment-retainkeys" (doesn't exist) should create this deployment
+  kubectl apply -f hack/testdata/retainKeys/deployment/deployment-before.yaml "${kube_flags[@]}"
+  # Post-Condition: deployment "test-deployment-retainkeys" created
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}{{end}}" 'test-deployment-retainkeys'
+  # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxSurge)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep maxUnavailable)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Command: apply a deployment "test-deployment-retainkeys" should clear
+  # defaulted fields and successfully update the deployment
+  [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]}")" ]]
+  # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep Recreate)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep RollingUpdate)" ]]
+  [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep hostPath)" ]]
+  ! [[ "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]}" | grep emptyDir)" ]]
+  # Clean up
+  kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]}"
+
+
   ## kubectl apply -f with label selector should only apply matching objects
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -1224,16 +1248,14 @@ run_kubectl_run_tests() {
   # Clean up
   kubectl delete deployment nginx-apps "${kube_flags[@]}"
 
-  # TODO: enable batch/v1beta1 by default before 1.8 release, after issues
-  # with CronJobs existing in multiple versions at once is solved
-  # # Pre-Condition: no Job exists
-  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" ''
-  # # Command
-  # kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
-  # # Post-Condition: CronJob "pi" is created
-  # kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
-  # # Clean up
-  # kubectl delete cronjobs pi "${kube_flags[@]}"
+  # Pre-Condition: no Job exists
+  kube::test::get_object_assert cronjob.v1beta1.batch "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: CronJob "pi" is created
+  kube::test::get_object_assert cronjob.v1beta1.batch "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Clean up
+  kubectl delete cronjob.v1beta1.batch pi "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit
@@ -2794,7 +2816,7 @@ run_deployment_tests() {
   ! kubectl rollout status deployment/nginx --revision=3
   cat hack/testdata/deployment-revision1.yaml | $SED "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
   # Deletion of both deployments should not be blocked
-   kubectl delete deployment nginx2 "${kube_flags[@]}"
+  kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
@@ -2832,9 +2854,45 @@ run_deployment_tests() {
   kubectl set image deployment nginx-deployment "*"="${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
-
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+
+  ### Set env of a deployment
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/configmap.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/secret.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
+  kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
+  # Set env of deployments for all container
+  kubectl set env deployment nginx-deployment env=prod "${kube_flags[@]}"
+  # Set env of deployments for specific container
+  kubectl set env deployment nginx-deployment env=prod -c=nginx "${kube_flags[@]}"
+  # Set env of deployments by configmap
+  kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]}"
+  # Set env of deployments by secret
+  kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]}"
+  # Remove specific env of deployment
+  kubectl set env deployment nginx-deployment env-
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete configmap test-set-env-config "${kube_flags[@]}"
+  kubectl delete secret test-set-env-secret "${kube_flags[@]}"
+
+  ### Delete a deployment with initializer
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create --request-timeout=1 -f hack/testdata/deployment-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
+  kube::test::get_object_assert 'deployment web' "{{$id_field}}" 'web'
+  # Delete a deployment
+  kubectl delete deployment web "${kube_flags[@]}"
+  # Check Deployment web doesn't exist
+  output_message=$(! kubectl get deployment web 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" '"web" not found'
 
   set +o nounset
   set +o errexit
@@ -2947,6 +3005,18 @@ run_rs_tests() {
   kubectl delete rs frontend redis-slave "${kube_flags[@]}" # delete multiple replica sets at once
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Delete a rs with initializer
+  # Pre-condition: no rs exists
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a rs
+  kubectl create --request-timeout=1 -f hack/testdata/replicaset-with-initializer.yaml 2>&1 "${kube_flags[@]}" || true
+  kube::test::get_object_assert 'rs nginx' "{{$id_field}}" 'nginx'
+  # Delete a rs
+  kubectl delete rs nginx "${kube_flags[@]}"
+  # check rs nginx doesn't exist
+  output_message=$(! kubectl get rs nginx 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" '"nginx" not found'
 
   if kube::test::if_supports_resource "${horizontalpodautoscalers}" ; then
     ### Auto scale replica set
@@ -3522,7 +3592,7 @@ run_kubectl_create_error_tests() {
   ERROR_FILE="${KUBE_TEMP}/validation-error"
   kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
   # Post-condition: should get an error reporting the empty string
-  if grep -q "unexpected nil value for field" "${ERROR_FILE}"; then
+  if grep -q "unknown object type \"nil\" in ReplicationController" "${ERROR_FILE}"; then
     kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat ${ERROR_FILE})"
   else
     kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat ${ERROR_FILE})"
@@ -4621,6 +4691,17 @@ runTests() {
     kube::test::if_empty_string "${output_message}"
   fi
 
+  # kubectl auth reconcile
+  if kube::test::if_supports_resource "${clusterroles}" ; then
+    kubectl auth reconcile "${kube_flags[@]}" -f test/fixtures/pkg/kubectl/cmd/auth/rbac-resource-plus.yaml
+    kube::test::get_object_assert 'rolebindings -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-RB:'
+    kube::test::get_object_assert 'roles -n some-other-random -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-R:'
+    kube::test::get_object_assert 'clusterrolebindings -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CRB:'
+    kube::test::get_object_assert 'clusterroles -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CR:'
+
+    kubectl delete "${kube_flags[@]}" rolebindings,role,clusterroles,clusterrolebindings -n some-other-random -l test-cmd=auth
+  fi
+
   #####################
   # Retrieve multiple #
   #####################
@@ -4698,4 +4779,272 @@ runTests() {
     echo "TEST FAILED"
     exit 1
   fi
+}
+
+run_initializer_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing --include-uninitialized"
+
+  ### Create a deployment
+  kubectl create --request-timeout=1 -f hack/testdata/initializer-deployments.yaml 2>&1 "${kube_flags[@]}" || true
+
+  ### Test kubectl get --include-uninitialized
+  # Command
+  output_message=$(kubectl get deployments 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get deployments --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl get deployments --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: I assume "web" is the deployment name
+  kube::test::if_has_string "${output_message}" 'web'
+  # Command
+  output_message=$(kubectl get deployments web 2>&1 "${kube_flags[@]}")
+  # Post-condition: I assume "web" is the deployment name
+  kube::test::if_has_string "${output_message}" 'web'
+  # Command
+  output_message=$(kubectl get deployments --show-all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+
+  ### Test kubectl describe --include-uninitialized
+  # Command
+  output_message=$(kubectl describe deployments 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "run=web" should be part of the output
+  kube::test::if_has_string "${output_message}" 'run=web'
+  # Command
+  output_message=$(kubectl describe deployments --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "run=web" should be part of the output
+  kube::test::if_has_string "${output_message}" 'run=web'
+  # Command
+  output_message=$(kubectl describe deployments --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl describe deployments web --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "run=web" should be part of the output
+  kube::test::if_has_string "${output_message}" 'run=web'
+  # Command
+  output_message=$(kubectl describe deployments web --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "run=web" should be part of the output
+  kube::test::if_has_string "${output_message}" 'run=web'
+
+  ### Test kubectl label --include-uninitialized
+  # Command
+  output_message=$(kubectl label deployments labelkey1=labelvalue1 --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: web is labelled
+  kube::test::if_has_string "${output_message}" 'deployment "web" labeled'
+  kube::test::get_object_assert 'deployments web' "{{${labels_field}.labelkey1}}" 'labelvalue1'
+  # Command
+  output_message=$(kubectl label deployments labelkey2=labelvalue2 --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl label deployments labelkey3=labelvalue3 -l run=web 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl label deployments labelkey4=labelvalue4 -l run=web --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: web is labelled
+  kube::test::if_has_string "${output_message}" 'deployment "web" labeled'
+  kube::test::get_object_assert 'deployments web' "{{${labels_field}.labelkey4}}" 'labelvalue4'
+  # Command
+  output_message=$(kubectl label deployments labelkey5=labelvalue5 -l run=web --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl label deployments labelkey6=labelvalue6 -l run=web --all --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: web is labelled
+  kube::test::if_has_string "${output_message}" 'deployment "web" labeled'
+  kube::test::get_object_assert 'deployments web' "{{${labels_field}.labelkey6}}" 'labelvalue6'
+  # Command
+  output_message=$(kubectl label deployments web labelkey7=labelvalue7 2>&1 "${kube_flags[@]}")
+  # Post-condition: web is labelled
+  kube::test::if_has_string "${output_message}" 'deployment "web" labeled'
+  kube::test::get_object_assert 'deployments web' "{{${labels_field}.labelkey7}}" 'labelvalue7'
+  # Found All Labels
+  kube::test::get_object_assert 'deployments web' "{{${labels_field}}}" 'map[labelkey1:labelvalue1 labelkey4:labelvalue4 labelkey6:labelvalue6 labelkey7:labelvalue7 run:web]'
+
+  ### Test kubectl annotate --include-uninitialized
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey1=annotatevalue1 --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: DEPLOYMENT has annotation
+  kube::test::if_has_string "${output_message}" 'deployment "web" annotated'
+  kube::test::get_object_assert 'deployments web' "{{${annotations_field}.annotatekey1}}" 'annotatevalue1'
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey2=annotatevalue2 --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey3=annotatevalue3 -l run=web 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey4=annotatevalue4 -l run=web --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: DEPLOYMENT has annotation
+  kube::test::if_has_string "${output_message}" 'deployment "web" annotated'
+  kube::test::get_object_assert 'deployments web' "{{${annotations_field}.annotatekey4}}" 'annotatevalue4'
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey5=annotatevalue5 -l run=web --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl annotate deployments annotatekey6=annotatevalue6 -l run=web --all --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: DEPLOYMENT has annotation
+  kube::test::if_has_string "${output_message}" 'deployment "web" annotated'
+  kube::test::get_object_assert 'deployments web' "{{${annotations_field}.annotatekey6}}" 'annotatevalue6'
+  # Command
+  output_message=$(kubectl annotate deployments web annotatekey7=annotatevalue7 2>&1 "${kube_flags[@]}")
+  # Post-condition: web DEPLOYMENT has annotation
+  kube::test::if_has_string "${output_message}" 'deployment "web" annotated'
+  kube::test::get_object_assert 'deployments web' "{{${annotations_field}.annotatekey7}}" 'annotatevalue7'
+
+  ### Test kubectl edit --include-uninitialized
+  [ "$(EDITOR=cat kubectl edit deployments 2>&1 "${kube_flags[@]}" | grep 'edit cancelled, no objects found')" ]
+  [ "$(EDITOR=cat kubectl edit deployments --include-uninitialized 2>&1 "${kube_flags[@]}" | grep 'Edit cancelled, no changes made.')" ]
+
+  ### Test kubectl set image --include-uninitialized
+  # Command
+  output_message=$(kubectl set image deployments *=nginx:1.11 --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "image updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'image updated'
+  # Command
+  output_message=$(kubectl set image deployments *=nginx:1.11 --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set image deployments *=nginx:1.11 -l run=web 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set image deployments *=nginx:1.12 -l run=web --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "image updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'image updated'
+  # Command
+  output_message=$(kubectl set image deployments *=nginx:1.13 -l run=web --include-uninitialized --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "image updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'image updated'
+
+  ### Test kubectl set resources --include-uninitialized
+  # Command
+  output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "resource requirements updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'resource requirements updated'
+  # Command
+  output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi -l run=web 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=200m,memory=256Mi -l run=web --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "resource requirements updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'resource requirements updated'
+  # Command
+  output_message=$(kubectl set resources deployments --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=512Mi -l run=web --include-uninitialized --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "resource requirements updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'resource requirements updated'
+
+  ### Test kubectl set selector --include-uninitialized
+  # Create a service with initializer
+  kubectl create --request-timeout=1 -f hack/testdata/initializer-redis-master-service.yaml 2>&1 "${kube_flags[@]}" || true
+  # Command
+  output_message=$(kubectl set selector services role=padawan --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "selector updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'selector updated'
+  # Command
+  output_message=$(kubectl set selector services role=padawan --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+
+  ### Test kubectl set subject --include-uninitialized
+  # Create a create clusterrolebinding with initializer
+  kubectl create --request-timeout=1 -f hack/testdata/initializer-clusterrolebinding.yaml 2>&1 "${kube_flags[@]}" || true
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
+  # Command
+  output_message=$(kubectl set subject clusterrolebinding --user=foo --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "subjects updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'subjects updated'
+  # Command
+  output_message=$(kubectl set subject clusterrolebinding --user=foo --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set subject clusterrolebinding --user=foo -l clusterrolebinding=super 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+  # Command
+  output_message=$(kubectl set subject clusterrolebinding --user=foo -l clusterrolebinding=super --include-uninitialized 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "subjects updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'subjects updated'
+  # Command
+  output_message=$(kubectl set subject clusterrolebinding --user=foo -l clusterrolebinding=super --include-uninitialized --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "subjects updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'subjects updated'
+
+  ### Test kubectl set serviceaccount --include-uninitialized
+  # Command
+  output_message=$(kubectl set serviceaccount deployment serviceaccount1 --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "serviceaccount updated" should be part of the output
+  kube::test::if_has_string "${output_message}" 'serviceaccount updated'
+  # Command
+  output_message=$(kubectl set serviceaccount deployment serviceaccount1 --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The output should be empty
+  kube::test::if_empty_string "${output_message}"
+
+  ### Test kubectl delete --include-uninitialized
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
+  # Command
+  output_message=$(kubectl delete clusterrolebinding --all --include-uninitialized=false 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "No resources found" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Command
+  output_message=$(kubectl delete clusterrolebinding --all 2>&1 "${kube_flags[@]}")
+  # Post-condition: The text "deleted" should be part of the output
+  kube::test::if_has_string "${output_message}" 'deleted'
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Test kubectl apply --include-uninitialized
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply pod a
+  kubectl apply --prune --request-timeout=20 --include-uninitialized=false --all -f hack/testdata/prune/a.yaml "${kube_flags[@]}" 2>&1
+  # check right pod exists
+  kube::test::get_object_assert pods/a "{{${id_field}}}" 'a'
+  # Post-condition: Other uninitialized resources should not be pruned
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" 'web'
+  kube::test::get_object_assert services/redis-master "{{range.items}}{{$id_field}}:{{end}}" 'redis-master'
+  # cleanup
+  kubectl delete pod a
+  # apply pod a and prune uninitialized deployments web
+  kubectl apply --prune --request-timeout=20 --all -f hack/testdata/prune/a.yaml "${kube_flags[@]}" 2>&1
+  # check right pod exists
+  kube::test::get_object_assert pods/a "{{${id_field}}}" 'a'
+  # Post-condition: Other uninitialized resources should not be pruned
+  kube::test::get_object_assert deployments/web "{{range.items}}{{$id_field}}:{{end}}" 'web'
+  kube::test::get_object_assert services/redis-master "{{range.items}}{{$id_field}}:{{end}}" 'redis-master'
+  # cleanup
+  kubectl delete pod a
+  # apply pod a and prune uninitialized deployments web
+  kubectl apply --prune --request-timeout=20 --include-uninitialized --all -f hack/testdata/prune/a.yaml "${kube_flags[@]}" 2>&1
+  # check right pod exists
+  kube::test::get_object_assert pods/a "{{${id_field}}}" 'a'
+  # Post-condition: Other uninitialized resources should not be pruned
+  kube::test::get_object_assert deployments/web "{{range.items}}{{$id_field}}:{{end}}" 'web'
+  kube::test::get_object_assert services/redis-master "{{range.items}}{{$id_field}}:{{end}}" 'redis-master'
+  # cleanup
+  kubectl delete pod a
+  kubectl delete --request-timeout=1 deploy web
+  kubectl delete --request-timeout=1 service redis-master
+
+  set +o nounset
+  set +o errexit
 }

@@ -21,10 +21,8 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes/scheme"
 	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/util/retry"
@@ -47,11 +45,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := scheme.Scheme.DeepCopy(rs)
-		if deepCopyErr != nil {
-			return deepCopyErr
-		}
-		rs = obj.(*extensions.ReplicaSet)
+		rs = rs.DeepCopy()
 		// Apply the update, then attempt to push it to the apiserver.
 		if applyErr := applyUpdate(rs); applyErr != nil {
 			return applyErr
@@ -71,11 +65,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 
 // GetReplicaSetHash returns the pod template hash of a ReplicaSet's pod template space
 func GetReplicaSetHash(rs *extensions.ReplicaSet, uniquifier *int32) (string, error) {
-	template, err := scheme.Scheme.DeepCopy(rs.Spec.Template)
-	if err != nil {
-		return "", err
-	}
-	rsTemplate := template.(v1.PodTemplateSpec)
+	rsTemplate := rs.Spec.Template.DeepCopy()
 	rsTemplate.Labels = labelsutil.CloneAndRemoveLabel(rsTemplate.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", controller.ComputeHash(&rsTemplate, uniquifier)), nil
+	return fmt.Sprintf("%d", controller.ComputeHash(rsTemplate, uniquifier)), nil
 }

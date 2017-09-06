@@ -21,10 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -93,12 +94,17 @@ func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*
 }
 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
+	alwaysTrue := func(p *v1.Pod) bool { return true }
+	return cache.FilteredList(alwaysTrue, selector)
+}
+
+func (cache *schedulerCache) FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	var pods []*v1.Pod
 	for _, info := range cache.nodes {
 		for _, pod := range info.pods {
-			if selector.Matches(labels.Set(pod.Labels)) {
+			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
 			}
 		}

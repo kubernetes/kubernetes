@@ -206,6 +206,10 @@ type KubeletConfiguration struct {
 	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
+	// CPUManagerPolicy is the name of the policy to use.
+	CPUManagerPolicy string `json:"cpuManagerPolicy"`
+	// CPU Manager reconciliation period.
+	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`

@@ -102,6 +102,9 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.key\" && \
+    sudo bash -c \"echo ${REQUESTHEADER_CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/aggr_ca.crt\" && \
+    sudo bash -c \"echo ${PROXY_CLIENT_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.crt\" && \
+    sudo bash -c \"echo ${PROXY_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.key\" && \
     sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/kubecfg.crt\" && \
     sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
@@ -356,7 +359,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       else
         echo "Got error while trying to list hollow-nodes. Probably API server is down."
       fi
-      pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+      pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
       running=$(($(echo "${pods}" | grep "Running" | wc -l)))
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))

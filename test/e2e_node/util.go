@@ -45,6 +45,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO(random-liu): Get this automatically from kubelet flag.
@@ -52,6 +53,7 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+var busyboxImage = imageutils.GetBusyBoxImage()
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -102,9 +104,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		if configEnabled {
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
-			clone, err := scheme.Scheme.DeepCopy(oldCfg)
-			framework.ExpectNoError(err)
-			newCfg := clone.(*kubeletconfig.KubeletConfiguration)
+			newCfg := oldCfg.DeepCopy()
 			updateFunction(newCfg)
 			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 		} else {

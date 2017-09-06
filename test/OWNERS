@@ -22,6 +22,7 @@ reviewers:
   - sig-testing-reviewers
   - sttts
   - zmerlynn
+  - vishh
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - deads2k
@@ -47,3 +48,4 @@ approvers:
   - soltysh
   - sttts
   - zmerlynn
+  - vishh 

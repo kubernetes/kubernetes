@@ -14,6 +14,7 @@ go_library(
         "//vendor/github.com/docker/engine-api/client:go_default_library",
         "//vendor/github.com/docker/engine-api/types:go_default_library",
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
+        "//vendor/github.com/docker/go-connections/tlsconfig:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",

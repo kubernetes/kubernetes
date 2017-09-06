@@ -208,6 +208,10 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
+
+	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// An empty list means no restrictions will apply.
+	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -216,10 +220,17 @@ type GroupResources struct {
 	// The empty string represents the core API group.
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
-	// Resources is a list of resources within the API group.
-	// Any empty list implies every resource kind in the API group.
+	// Resources is a list of resources within the API group. Subresources are
+	// matched using a "/" to indicate the subresource. For example, "pods/logs"
+	// would match request to the logs subresource of pods. The top level resource
+	// does not match subresources, "pods" doesn't match "pods/logs".
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
+	// ResourceNames is a list of resource instance names that the policy matches.
+	// Using this field requires Resources to be specified.
+	// An empty list implies that every instance of the resource is matched.
+	// +optional
+	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,3,rep,name=resourceNames"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.

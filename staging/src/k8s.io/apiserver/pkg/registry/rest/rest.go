@@ -77,6 +77,14 @@ type CategoriesProvider interface {
 	Categories() []string
 }
 
+// GroupVersionKindProvider is used to specify a particular GroupVersionKind to discovery.  This is used for polymorphic endpoints
+// which generally point to foreign versions.  Scale refers to Scale.v1beta1.extensions for instance.
+// This trumps KindProvider since it is capable of providing the information required.
+// TODO KindProvider (only used by federation) should be removed and replaced with this, but that presents greater risk late in 1.8.
+type GroupVersionKindProvider interface {
+	GroupVersionKind() schema.GroupVersionKind
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.

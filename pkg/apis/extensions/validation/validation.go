@@ -19,6 +19,8 @@ package validation
 import (
 	"fmt"
 	"net"
+
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -661,6 +663,7 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
+	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 
 	return allErrs
 }
@@ -698,6 +701,29 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
 		}
 	}
+	return allErrs
+}
+
+// validatePSPAllowedHostPaths makes sure all allowed host paths follow:
+// 1. path prefix is required
+// 2. path prefix does not have any element which is ".."
+func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []extensions.AllowedHostPath) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, target := range allowedHostPaths {
+		if target.PathPrefix == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i), "is required"))
+			break
+		}
+		parts := strings.Split(filepath.ToSlash(target.PathPrefix), "/")
+		for _, item := range parts {
+			if item == ".." {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), target.PathPrefix, "must not contain '..'"))
+				break // even for `../../..`, one error is sufficient to make the point
+			}
+		}
+	}
+
 	return allErrs
 }
 

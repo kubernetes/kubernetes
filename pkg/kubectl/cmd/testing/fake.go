@@ -37,13 +37,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	openapi "k8s.io/kube-openapi/pkg/util/proto"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
@@ -424,7 +424,7 @@ func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclar
 	return nil, nil
 }
 
-func (f *FakeFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+func (f *FakeFactory) OpenAPISchema() (openapi.Resources, error) {
 	return nil, nil
 }
 
@@ -796,7 +796,7 @@ func (f *fakeAPIFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDec
 	return nil, nil
 }
 
-func (f *fakeAPIFactory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+func (f *fakeAPIFactory) OpenAPISchema() (openapi.Resources, error) {
 	if f.tf.OpenAPISchemaFunc != nil {
 		return f.tf.OpenAPISchemaFunc()
 	}

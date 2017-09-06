@@ -70,7 +70,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 			AfterEach(func() {
 				// Scale down back to only 'nodesNum' nodes, as expected at the start of the test.
 				framework.ExpectNoError(framework.ResizeGroup(nodeGroupName, nodesNum))
-				framework.ExpectNoError(framework.WaitForClusterSize(f.ClientSet, nodesNum, 15*time.Minute))
+				framework.ExpectNoError(framework.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
 			})
 
 			Measure("takes less than 15 minutes", func(b Benchmarker) {

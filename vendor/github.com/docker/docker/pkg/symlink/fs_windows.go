@@ -6,49 +6,49 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/docker/docker/pkg/longpath"
+	"golang.org/x/sys/windows"
 )
 
 func toShort(path string) (string, error) {
-	p, err := syscall.UTF16FromString(path)
+	p, err := windows.UTF16FromString(path)
 	if err != nil {
 		return "", err
 	}
 	b := p // GetShortPathName says we can reuse buffer
-	n, err := syscall.GetShortPathName(&p[0], &b[0], uint32(len(b)))
+	n, err := windows.GetShortPathName(&p[0], &b[0], uint32(len(b)))
 	if err != nil {
 		return "", err
 	}
 	if n > uint32(len(b)) {
 		b = make([]uint16, n)
-		if _, err = syscall.GetShortPathName(&p[0], &b[0], uint32(len(b))); err != nil {
+		if _, err = windows.GetShortPathName(&p[0], &b[0], uint32(len(b))); err != nil {
 			return "", err
 		}
 	}
-	return syscall.UTF16ToString(b), nil
+	return windows.UTF16ToString(b), nil
 }
 
 func toLong(path string) (string, error) {
-	p, err := syscall.UTF16FromString(path)
+	p, err := windows.UTF16FromString(path)
 	if err != nil {
 		return "", err
 	}
 	b := p // GetLongPathName says we can reuse buffer
-	n, err := syscall.GetLongPathName(&p[0], &b[0], uint32(len(b)))
+	n, err := windows.GetLongPathName(&p[0], &b[0], uint32(len(b)))
 	if err != nil {
 		return "", err
 	}
 	if n > uint32(len(b)) {
 		b = make([]uint16, n)
-		n, err = syscall.GetLongPathName(&p[0], &b[0], uint32(len(b)))
+		n, err = windows.GetLongPathName(&p[0], &b[0], uint32(len(b)))
 		if err != nil {
 			return "", err
 		}
 	}
 	b = b[:n]
-	return syscall.UTF16ToString(b), nil
+	return windows.UTF16ToString(b), nil
 }
 
 func evalSymlinks(path string) (string, error) {
@@ -65,7 +65,7 @@ func evalSymlinks(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// syscall.GetLongPathName does not change the case of the drive letter,
+	// windows.GetLongPathName does not change the case of the drive letter,
 	// but the result of EvalSymlinks must be unique, so we have
 	// EvalSymlinks(`c:\a`) == EvalSymlinks(`C:\a`).
 	// Make drive letter upper case.

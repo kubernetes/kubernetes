@@ -9,47 +9,48 @@ spec:
     metadata:
       labels:
         app: mysql
-      annotations:
-        pod.beta.kubernetes.io/init-containers: '[
-          {
-            "name": "init-mysql",
-            "image": "mysql:5.7",
-            "command": ["bash", "-c", "
-              set -ex\n
-              [[ `hostname` =~ -([0-9]+)$ ]] || exit 1\n
-              ordinal=${BASH_REMATCH[1]}\n
-              echo [mysqld] > /mnt/conf.d/server-id.cnf\n
-              echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf\n
-              if [[ $ordinal -eq 0 ]]; then\n
-                cp /mnt/config-map/master.cnf /mnt/conf.d/\n
-              else\n
-                cp /mnt/config-map/slave.cnf /mnt/conf.d/\n
-              fi\n
-            "],
-            "volumeMounts": [
-              {"name": "conf", "mountPath": "/mnt/conf.d"},
-              {"name": "config-map", "mountPath": "/mnt/config-map"}
-            ]
-          },
-          {
-            "name": "clone-mysql",
-            "image": "gcr.io/google-samples/xtrabackup:1.0",
-            "command": ["bash", "-c", "
-              set -ex\n
-              [[ -d /var/lib/mysql/mysql ]] && exit 0\n
-              [[ `hostname` =~ -([0-9]+)$ ]] || exit 1\n
-              ordinal=${BASH_REMATCH[1]}\n
-              [[ $ordinal -eq 0 ]] && exit 0\n
-              ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql\n
-              xtrabackup --prepare --target-dir=/var/lib/mysql\n
-            "],
-            "volumeMounts": [
-              {"name": "data", "mountPath": "/var/lib/mysql", "subPath": "mysql"},
-              {"name": "conf", "mountPath": "/etc/mysql/conf.d"}
-            ]
-          }
-        ]'
     spec:
+      initContainers:
+      - name: init-mysql
+        image: mysql:5.7
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          if [[ $ordinal -eq 0 ]]; then
+            cp /mnt/config-map/master.cnf /mnt/conf.d/
+          else
+            cp /mnt/config-map/slave.cnf /mnt/conf.d/
+          fi
+        volumeMounts:
+        - name: conf
+          mountPath: /mnt/conf.d
+        - name: config-map
+          mountPath: /mnt/config-map
+      - name: clone-mysql
+        image: gcr.io/google-samples/xtrabackup:1.0
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          xtrabackup --prepare --target-dir=/var/lib/mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
       containers:
       - name: mysql
         image: mysql:5.7.15
@@ -138,10 +139,9 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: data
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: default
     spec:
       accessModes: ["ReadWriteOnce"]
+      storageClassName: default
       resources:
         requests:
           storage: 10Gi

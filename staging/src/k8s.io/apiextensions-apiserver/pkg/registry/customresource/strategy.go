@@ -19,9 +19,12 @@ package customresource
 import (
 	"fmt"
 
+	"github.com/go-openapi/validate"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,6 +33,8 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
 type customResourceDefinitionStorageStrategy struct {
@@ -40,7 +45,7 @@ type customResourceDefinitionStorageStrategy struct {
 	validator       customResourceValidator
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind) customResourceDefinitionStorageStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, validator *validate.SchemaValidator) customResourceDefinitionStorageStrategy {
 	return customResourceDefinitionStorageStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
@@ -48,6 +53,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 		validator: customResourceValidator{
 			namespaceScoped: namespaceScoped,
 			kind:            kind,
+			validator:       validator,
 		},
 	}
 }
@@ -113,6 +119,7 @@ func (a customResourceDefinitionStorageStrategy) MatchCustomResourceDefinitionSt
 type customResourceValidator struct {
 	namespaceScoped bool
 	kind            schema.GroupVersionKind
+	validator       *validate.SchemaValidator
 }
 
 func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -129,6 +136,17 @@ func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj run
 	}
 	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
+	}
+
+	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	// this will never happen.
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
+	}
+
+	customResource := customResourceObject.UnstructuredContent()
+	if err = apiservervalidation.ValidateCustomResource(customResource, a.validator); err != nil {
+		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
 	}
 
 	return validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
@@ -152,6 +170,17 @@ func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, o
 	}
 	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
+	}
+
+	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	// this will never happen.
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
+	}
+
+	customResource := customResourceObject.UnstructuredContent()
+	if err = apiservervalidation.ValidateCustomResource(customResource, a.validator); err != nil {
+		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
 	}
 
 	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))

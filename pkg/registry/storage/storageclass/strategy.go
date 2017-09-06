@@ -21,9 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // storageClassStrategy implements behavior for StorageClass objects
@@ -42,7 +44,11 @@ func (storageClassStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (storageClassStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	_ = obj.(*storage.StorageClass)
+	class := obj.(*storage.StorageClass)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		class.AllowVolumeExpansion = nil
+	}
 }
 
 func (storageClassStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -60,8 +66,13 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (storageClassStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
-	_ = obj.(*storage.StorageClass)
-	_ = old.(*storage.StorageClass)
+	newClass := obj.(*storage.StorageClass)
+	oldClass := old.(*storage.StorageClass)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		newClass.AllowVolumeExpansion = nil
+		oldClass.AllowVolumeExpansion = nil
+	}
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {

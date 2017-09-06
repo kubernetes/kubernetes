@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,7 +25,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchV1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,9 +35,10 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 )
 
-// schedule is hourly on the hour
 var (
-	onTheHour string = "0 * * * ?"
+	// schedule is hourly on the hour
+	onTheHour     string = "0 * * * ?"
+	errorSchedule string = "obvious error schedule"
 )
 
 func justBeforeTheHour() time.Time {
@@ -96,19 +98,19 @@ func startTimeStringToTime(startTime string) time.Time {
 }
 
 // returns a cronJob with some fields filled in.
-func cronJob() batchv2alpha1.CronJob {
-	return batchv2alpha1.CronJob{
+func cronJob() batchV1beta1.CronJob {
+	return batchV1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "mycronjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
-			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/cronjobs/mycronjob",
+			SelfLink:          "/apis/batch/v1beta1/namespaces/snazzycats/cronjobs/mycronjob",
 			CreationTimestamp: metav1.Time{Time: justBeforeTheHour()},
 		},
-		Spec: batchv2alpha1.CronJobSpec{
+		Spec: batchV1beta1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
-			JobTemplate: batchv2alpha1.JobTemplateSpec{
+			ConcurrencyPolicy: batchV1beta1.AllowConcurrent,
+			JobTemplate: batchV1beta1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -152,15 +154,15 @@ func newJob(UID string) batchv1.Job {
 }
 
 var (
-	shortDead  int64                           = 10
-	mediumDead int64                           = 2 * 60 * 60
-	longDead   int64                           = 1000000
-	noDead     int64                           = -12345
-	A          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.AllowConcurrent
-	f          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.ForbidConcurrent
-	R          batchv2alpha1.ConcurrencyPolicy = batchv2alpha1.ReplaceConcurrent
-	T          bool                            = true
-	F          bool                            = false
+	shortDead  int64                          = 10
+	mediumDead int64                          = 2 * 60 * 60
+	longDead   int64                          = 1000000
+	noDead     int64                          = -12345
+	A          batchV1beta1.ConcurrencyPolicy = batchV1beta1.AllowConcurrent
+	f          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ForbidConcurrent
+	R          batchV1beta1.ConcurrencyPolicy = batchV1beta1.ReplaceConcurrent
+	T          bool                           = true
+	F          bool                           = false
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {
@@ -179,7 +181,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 	testCases := map[string]struct {
 		// sj spec
-		concurrencyPolicy batchv2alpha1.ConcurrencyPolicy
+		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -197,6 +199,9 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		expectActive     int
 		expectedWarnings int
 	}{
+		"never ran, not valid schedule, A":      {A, F, errorSchedule, noDead, F, F, justBeforeTheHour(), F, F, 0, 1},
+		"never ran, not valid schedule, F":      {f, F, errorSchedule, noDead, F, F, justBeforeTheHour(), F, F, 0, 1},
+		"never ran, not valid schedule, R":      {f, F, errorSchedule, noDead, F, F, justBeforeTheHour(), F, F, 0, 1},
 		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0, 0},
 		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0, 0},
 		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0, 0},
@@ -298,7 +303,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			if controllerRef == nil {
 				t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
 			} else {
-				if got, want := controllerRef.APIVersion, "batch/v2alpha1"; got != want {
+				if got, want := controllerRef.APIVersion, "batch/v1beta1"; got != want {
 					t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
 				}
 				if got, want := controllerRef.Kind, "CronJob"; got != want {
@@ -480,6 +485,16 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 				{"2016-05-19T08:00:00Z", F, F, F, F},
 				{"2016-05-19T09:00:00Z", F, F, F, F},
 			}, justBeforeTheHour(), &limitZero, &limitZero, 6},
+
+		"failed list pod err": {
+			[]CleanupJobSpec{
+				{"2016-05-19T04:00:00Z", T, F, F, F},
+				{"2016-05-19T05:00:00Z", T, F, F, F},
+				{"2016-05-19T06:00:00Z", T, T, F, F},
+				{"2016-05-19T07:00:00Z", T, T, F, F},
+				{"2016-05-19T08:00:00Z", T, F, F, F},
+				{"2016-05-19T09:00:00Z", T, F, F, F},
+			}, justBeforeTheHour(), &limitZero, &limitZero, 0},
 	}
 
 	for name, tc := range testCases {
@@ -551,6 +566,9 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 		pc := &fakePodControl{}
 		sjc := &fakeSJControl{}
 		recorder := record.NewFakeRecorder(10)
+		if name == "failed list pod err" {
+			pc.Err = errors.New("fakePodControl err")
+		}
 
 		cleanupFinishedJobs(&sj, js, jc, sjc, pc, recorder)
 
@@ -569,6 +587,9 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 
 		// Check for events
 		expectedEvents := len(jobsToDelete)
+		if name == "failed list pod err" {
+			expectedEvents = len(tc.jobSpecs)
+		}
 		if len(recorder.Events) != expectedEvents {
 			t.Errorf("%s: expected %d event, actually %v", name, expectedEvents, len(recorder.Events))
 		}
@@ -596,7 +617,7 @@ func TestSyncOne_Status(t *testing.T) {
 
 	testCases := map[string]struct {
 		// sj spec
-		concurrencyPolicy batchv2alpha1.ConcurrencyPolicy
+		concurrencyPolicy batchV1beta1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64

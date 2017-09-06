@@ -136,3 +136,25 @@ func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, s
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
+
+// GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeStatefulSets) GetScale(statefulSetName string, options v1.GetOptions) (result *v1beta2.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(statefulsetsResource, c.ns, "scale", statefulSetName), &v1beta2.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeStatefulSets) UpdateScale(statefulSetName string, scale *v1beta2.Scale) (result *v1beta2.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &v1beta2.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.Scale), err
+}

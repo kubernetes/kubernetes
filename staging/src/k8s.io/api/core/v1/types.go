@@ -519,6 +519,11 @@ type PersistentVolumeSpec struct {
 	// means that this volume does not belong to any StorageClass.
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty" protobuf:"bytes,6,opt,name=storageClassName"`
+	// A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+	// simply fail if one is invalid.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+	// +optional
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,7,opt,name=mountOptions"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -625,6 +630,34 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 }
 
+// PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
+type PersistentVolumeClaimConditionType string
+
+const (
+	// PersistentVolumeClaimResizing - a user trigger resize of pvc has been started
+	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
+)
+
+// PersistentVolumeClaimCondition contails details about state of pvc
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
+	Status ConditionStatus                    `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	// Unique, this should be a short, machine understandable string that gives the reason
+	// for condition's last transition. If it reports "ResizeStarted" that means the underlying
+	// persistent volume is being resized.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim.
@@ -637,6 +670,12 @@ type PersistentVolumeClaimStatus struct {
 	// Represents the actual resources of the underlying volume.
 	// +optional
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
+	// Current Condition of persistent volume claim. If underlying persistent volume is being
+	// resized then the Condition will be set to 'ResizeStarted'.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []PersistentVolumeClaimCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 }
 
 type PersistentVolumeAccessMode string
@@ -734,7 +773,7 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	// +optional
-	SizeLimit resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
@@ -904,8 +943,9 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
-	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumHugepages StorageMedium = "HugePages" // use hugepages
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -1542,7 +1582,33 @@ type VolumeMount struct {
 	// Defaults to "" (volume's root).
 	// +optional
 	SubPath string `json:"subPath,omitempty" protobuf:"bytes,4,opt,name=subPath"`
+	// mountPropagation determines how mounts are propagated from the host
+	// to container and the other way around.
+	// When not set, MountPropagationHostToContainer is used.
+	// This field is alpha in 1.8 and can be reworked or removed in a future
+	// release.
+	// +optional
+	MountPropagation *MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=MountPropagationMode"`
 }
+
+// MountPropagationMode describes mount propagation.
+type MountPropagationMode string
+
+const (
+	// MountPropagationHostToContainer means that the volume in a container will
+	// receive new mounts from the host or other containers, but filesystems
+	// mounted inside the container won't be propagated to the host or other
+	// containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rslave" in Linux terminology).
+	MountPropagationHostToContainer MountPropagationMode = "HostToContainer"
+	// MountPropagationBidirectional means that the volume in a container will
+	// receive new mounts from the host or other containers, and its own mounts
+	// will be propagated from the container to the host or other containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rshared" in Linux terminology).
+	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -1573,7 +1639,7 @@ type EnvVarSource struct {
 	// +optional
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,1,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
-	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	// (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
 	// +optional
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,2,opt,name=resourceFieldRef"`
 	// Selects a key of a ConfigMap.
@@ -2462,35 +2528,14 @@ const (
 	TolerationOpEqual  TolerationOperator = "Equal"
 )
 
-const (
-	// This annotation key will be used to contain an array of v1 JSON encoded Containers
-	// for init containers. The annotation will be placed into the internal type and cleared.
-	// This key is only recognized by version >= 1.4.
-	PodInitContainersBetaAnnotationKey = "pod.beta.kubernetes.io/init-containers"
-	// This annotation key will be used to contain an array of v1 JSON encoded Containers
-	// for init containers. The annotation will be placed into the internal type and cleared.
-	// This key is recognized by version >= 1.3. For version 1.4 code, this key
-	// will have its value copied to the beta key.
-	PodInitContainersAnnotationKey = "pod.alpha.kubernetes.io/init-containers"
-	// This annotation key will be used to contain an array of v1 JSON encoded
-	// ContainerStatuses for init containers. The annotation will be placed into the internal
-	// type and cleared. This key is only recognized by version >= 1.4.
-	PodInitContainerStatusesBetaAnnotationKey = "pod.beta.kubernetes.io/init-container-statuses"
-	// This annotation key will be used to contain an array of v1 JSON encoded
-	// ContainerStatuses for init containers. The annotation will be placed into the internal
-	// type and cleared. This key is recognized by version >= 1.3. For version 1.4 code,
-	// this key will have its value copied to the beta key.
-	PodInitContainerStatusesAnnotationKey = "pod.alpha.kubernetes.io/init-container-statuses"
-)
-
 // PodSpec is a description of a pod.
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes
 	// +optional
 	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
+	// +patchStrategy=merge,retainKeys
+	Volumes []Volume `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
 	// List of initialization containers belonging to the pod.
 	// Init containers are executed in order prior to containers being started. If any
 	// init container fails, the pod is considered to have failed and is handled according
@@ -2946,6 +2991,8 @@ type ReplicationControllerCondition struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/extensions/v1beta1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/extensions/v1beta1.Scale,result=k8s.io/api/extensions/v1beta1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -2997,6 +3044,8 @@ const (
 	// ServiceAffinityNone - no session affinity.
 	ServiceAffinityNone ServiceAffinity = "None"
 )
+
+const DefaultClientIPServiceAffinitySeconds int32 = 10800
 
 // SessionAffinityConfig represents the configurations of session affinity.
 type SessionAffinityConfig struct {
@@ -3699,12 +3748,6 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
-	// Local Storage for container overlay filesystem, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageOverlay is alpha and it can change across releases.
-	ResourceStorageOverlay ResourceName = "storage.kubernetes.io/overlay"
-	// Local Storage for scratch space, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-	// The resource name for ResourceStorageScratch is alpha and it can change across releases.
-	ResourceStorageScratch ResourceName = "storage.kubernetes.io/scratch"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// The resource name for ResourceEphemeralStorage is alpha and it can change across releases.
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
@@ -3717,6 +3760,8 @@ const (
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 	// Default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
+	// Name prefix for huge page resources (alpha).
+	ResourceHugePagesPrefix = "hugepages-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
@@ -4744,7 +4789,7 @@ type SecurityContext struct {
 	// +optional
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,6,opt,name=readOnlyRootFilesystem"`
 	// AllowPrivilegeEscalation controls whether a process can gain more
-	// privileges than it's parent process. This bool directly controls if
+	// privileges than its parent process. This bool directly controls if
 	// the no_new_privs flag will be set on the container process.
 	// AllowPrivilegeEscalation is true always when the container is:
 	// 1) run as Privileged

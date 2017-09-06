@@ -64,6 +64,12 @@ type action struct {
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
+// An interface to see if one storage supports override its default verb for monitoring
+type StorageMetricsOverride interface {
+	// OverrideMetricsVerb gives a storage object an opportunity to override the verb reported to the metrics endpoint
+	OverrideMetricsVerb(oldVerb string) (newVerb string)
+}
+
 // An interface to see if an object supports swagger documentation as a method
 type documentable interface {
 	SwaggerDoc() map[string]string
@@ -372,19 +378,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceKind = kind
 	}
 
-	var shortNames []string
-	shortNamesProvider, ok := storage.(rest.ShortNamesProvider)
-	if ok {
-		shortNames = shortNamesProvider.ShortNames()
-	}
-
 	tableProvider, _ := storage.(rest.TableConvertor)
-
-	var categories []string
-	categoriesProvider, ok := storage.(rest.CategoriesProvider)
-	if ok {
-		categories = categoriesProvider.Categories()
-	}
 
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.
@@ -593,6 +587,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			kind = fqParentKind.Kind
 		}
+
+		verbOverrider, needOverride := storage.(StorageMetricsOverride)
+
 		switch action.Verb {
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
@@ -601,7 +598,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			} else {
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, namespaceScope, handler)
+
+			if needOverride {
+				// need change the reported verb
+				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), resource, subresource, namespaceScope, handler)
+			} else {
+				handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, namespaceScope, handler)
+			}
+
 			if a.enableAPIResponseCompression {
 				handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
 			}
@@ -851,8 +855,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
 	}
 	sort.Strings(apiResource.Verbs)
-	apiResource.ShortNames = shortNames
-	apiResource.Categories = categories
+
+	if shortNamesProvider, ok := storage.(rest.ShortNamesProvider); ok {
+		apiResource.ShortNames = shortNamesProvider.ShortNames()
+	}
+	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
+		apiResource.Categories = categoriesProvider.Categories()
+	}
+	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
+		gvk := gvkProvider.GroupVersionKind()
+		apiResource.Group = gvk.Group
+		apiResource.Version = gvk.Version
+		apiResource.Kind = gvk.Kind
+	}
 
 	return &apiResource, nil
 }

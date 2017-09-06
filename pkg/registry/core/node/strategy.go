@@ -34,8 +34,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -61,8 +63,12 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
-	_ = obj.(*api.Node)
+	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		node.Spec.ConfigSource = nil
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -70,6 +76,11 @@ func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old run
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		newNode.Spec.ConfigSource = nil
+		oldNode.Spec.ConfigSource = nil
+	}
 }
 
 // Validate validates a new node.

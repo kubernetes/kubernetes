@@ -35,7 +35,6 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -166,23 +166,18 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 }
 
 // Unused functions
-func (_ *fakeKubelet) GetContainerInfoV2(_ string, _ cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
-	return nil, nil
-}
-
-func (_ *fakeKubelet) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, fmt.Errorf("Unsupported Operation ImagesFsInfo")
-}
-
-func (_ *fakeKubelet) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, fmt.Errorf("Unsupport Operation RootFsInfo")
-}
-
 func (_ *fakeKubelet) GetNode() (*v1.Node, error)   { return nil, nil }
 func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig { return cm.NodeConfig{} }
 
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
+}
+
+func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
+func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)   { return nil, nil }
+func (_ *fakeKubelet) GetCgroupStats(cgroupName string) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+	return nil, nil, nil
 }
 
 type fakeAuth struct {
@@ -242,7 +237,7 @@ func newServerTest() *serverTestFramework {
 	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &kubecontainertesting.FakeRuntime{}),
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,
 		true,
 		false,

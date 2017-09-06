@@ -24,7 +24,6 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	time "time"
 	unsafe "unsafe"
 )
 
@@ -120,7 +119,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
-	out.TokenTTL = time.Duration(in.TokenTTL)
+	out.TokenTTL = in.TokenTTL
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -128,7 +127,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	out.FeatureFlags = *(*map[string]bool)(unsafe.Pointer(&in.FeatureFlags))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 
@@ -152,7 +151,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.NodeName = in.NodeName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
-	out.TokenTTL = time.Duration(in.TokenTTL)
+	out.TokenTTL = in.TokenTTL
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -161,7 +160,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.ImageRepository = in.ImageRepository
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	out.FeatureFlags = *(*map[string]bool)(unsafe.Pointer(&in.FeatureFlags))
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	return nil
 }
 

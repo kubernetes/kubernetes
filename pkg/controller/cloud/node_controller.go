@@ -178,12 +178,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		}
 		nodeAddresses = []v1.NodeAddress{*nodeIP}
 	}
-	nodeCopy, err := scheme.Scheme.DeepCopy(node)
-	if err != nil {
-		glog.Errorf("failed to copy node to a new object")
-		return
-	}
-	newNode := nodeCopy.(*v1.Node)
+	newNode := node.DeepCopy()
 	newNode.Status.Addresses = nodeAddresses
 	if !nodeAddressesChangeDetected(node.Status.Addresses, newNode.Status.Addresses) {
 		return

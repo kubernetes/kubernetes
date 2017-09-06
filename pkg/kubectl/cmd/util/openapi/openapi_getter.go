@@ -20,17 +20,16 @@ import (
 	"sync"
 
 	"k8s.io/client-go/discovery"
+	openapi "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // synchronizedOpenAPIGetter fetches the openapi schema once and then caches it in memory
 type synchronizedOpenAPIGetter struct {
 	// Cached results
 	sync.Once
-	openAPISchema Resources
+	openAPISchema openapi.Resources
 	err           error
 
-	serverVersion string
-	cacheDir      string
 	openAPIClient discovery.OpenAPISchemaInterface
 }
 
@@ -39,31 +38,27 @@ var _ Getter = &synchronizedOpenAPIGetter{}
 // Getter is an interface for fetching openapi specs and parsing them into an Resources struct
 type Getter interface {
 	// OpenAPIData returns the parsed OpenAPIData
-	Get() (Resources, error)
+	Get() (openapi.Resources, error)
 }
 
-// NewOpenAPIGetter returns an object to return OpenAPIDatas which either read from a
-// local file cache or read from a server, and then stored in memory for subsequent invocations
-func NewOpenAPIGetter(cacheDir, serverVersion string, openAPIClient discovery.OpenAPISchemaInterface) Getter {
+// NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
+// from a server, and then stores in memory for subsequent invocations
+func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
 	return &synchronizedOpenAPIGetter{
-		serverVersion: serverVersion,
-		cacheDir:      cacheDir,
 		openAPIClient: openAPIClient,
 	}
 }
 
 // Resources implements Getter
-func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
+func (g *synchronizedOpenAPIGetter) Get() (openapi.Resources, error) {
 	g.Do(func() {
-		client := NewCachingOpenAPIClient(g.openAPIClient, g.serverVersion, g.cacheDir)
-		result, err := client.OpenAPIData()
+		s, err := g.openAPIClient.OpenAPISchema()
 		if err != nil {
 			g.err = err
 			return
 		}
 
-		// Save the result
-		g.openAPISchema = result
+		g.openAPISchema, g.err = openapi.NewOpenAPIData(s, ParseGroupVersionKind)
 	})
 
 	// Return the save result

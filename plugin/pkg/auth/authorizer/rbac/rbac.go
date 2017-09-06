@@ -123,6 +123,36 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	return false, reason, nil
 }
 
+func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+
+	policyRules, err := r.authorizationRuleResolver.RulesFor(user, namespace)
+	for _, policyRule := range policyRules {
+		if len(policyRule.Resources) > 0 {
+			r := authorizer.DefaultResourceRuleInfo{
+				Verbs:         policyRule.Verbs,
+				APIGroups:     policyRule.APIGroups,
+				Resources:     policyRule.Resources,
+				ResourceNames: policyRule.ResourceNames,
+			}
+			var resourceRule authorizer.ResourceRuleInfo = &r
+			resourceRules = append(resourceRules, resourceRule)
+		}
+		if len(policyRule.NonResourceURLs) > 0 {
+			r := authorizer.DefaultNonResourceRuleInfo{
+				Verbs:           policyRule.Verbs,
+				NonResourceURLs: policyRule.NonResourceURLs,
+			}
+			var nonResourceRule authorizer.NonResourceRuleInfo = &r
+			nonResourceRules = append(nonResourceRules, nonResourceRule)
+		}
+	}
+	return resourceRules, nonResourceRules, false, err
+}
+
 func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
 		authorizationRuleResolver: rbacregistryvalidation.NewDefaultRuleResolver(

@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -109,6 +109,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSetList"}:                                                  {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                            {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                             {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                         {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                        {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:                    {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                               {},
@@ -123,8 +125,6 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                                 {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}:               {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfigurationList"}:           {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},
@@ -189,13 +189,10 @@ func TestDefaulting(t *testing.T) {
 
 			src.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
-			original, err := scheme.DeepCopy(src)
-			if err != nil {
-				t.Fatal(err)
-			}
+			original := src.DeepCopyObject()
 
 			// get internal
-			withDefaults, _ := scheme.DeepCopy(src)
+			withDefaults := src.DeepCopyObject()
 			scheme.Default(withDefaults.(runtime.Object))
 
 			if !reflect.DeepEqual(original, withDefaults) {

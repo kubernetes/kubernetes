@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	. "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 var _ NodeLister = &FakeNodeLister{}
@@ -46,6 +47,15 @@ type FakePodLister []*v1.Pod
 func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if s.Matches(labels.Set(pod.Labels)) {
+			selected = append(selected, pod)
+		}
+	}
+	return selected, nil
+}
+
+func (f FakePodLister) FilteredList(podFilter schedulercache.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
+	for _, pod := range f {
+		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
 		}
 	}

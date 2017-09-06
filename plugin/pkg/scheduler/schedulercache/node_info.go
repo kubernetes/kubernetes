@@ -26,6 +26,7 @@ import (
 	clientcache "k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 var emptyResource = Resource{}
@@ -71,6 +72,7 @@ type Resource struct {
 	// explicitly as int, to avoid conversions and improve performance.
 	AllowedPodNumber  int
 	ExtendedResources map[v1.ResourceName]int64
+	HugePages         map[v1.ResourceName]int64
 }
 
 // New creates a Resource from ResourceList
@@ -102,6 +104,9 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			if v1helper.IsExtendedResourceName(rName) {
 				r.AddExtended(rName, rQuant.Value())
 			}
+			if v1helper.IsHugePageResourceName(rName) {
+				r.AddHugePages(rName, rQuant.Value())
+			}
 		}
 	}
 }
@@ -116,6 +121,9 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	}
 	for rName, rQuant := range r.ExtendedResources {
 		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+	}
+	for rName, rQuant := range r.HugePages {
+		result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
 	}
 	return result
 }
@@ -134,6 +142,12 @@ func (r *Resource) Clone() *Resource {
 			res.ExtendedResources[k] = v
 		}
 	}
+	if r.HugePages != nil {
+		res.HugePages = make(map[v1.ResourceName]int64)
+		for k, v := range r.HugePages {
+			res.HugePages[k] = v
+		}
+	}
 	return res
 }
 
@@ -147,6 +161,18 @@ func (r *Resource) SetExtended(name v1.ResourceName, quantity int64) {
 		r.ExtendedResources = map[v1.ResourceName]int64{}
 	}
 	r.ExtendedResources[name] = quantity
+}
+
+func (r *Resource) AddHugePages(name v1.ResourceName, quantity int64) {
+	r.SetHugePages(name, r.HugePages[name]+quantity)
+}
+
+func (r *Resource) SetHugePages(name v1.ResourceName, quantity int64) {
+	// Lazily allocate hugepages resource map.
+	if r.HugePages == nil {
+		r.HugePages = map[v1.ResourceName]int64{}
+	}
+	r.HugePages[name] = quantity
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -306,6 +332,12 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	for rName, rQuant := range res.ExtendedResources {
 		n.requestedResource.ExtendedResources[rName] += rQuant
 	}
+	if n.requestedResource.HugePages == nil && len(res.HugePages) > 0 {
+		n.requestedResource.HugePages = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range res.HugePages {
+		n.requestedResource.HugePages[rName] += rQuant
+	}
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
@@ -360,6 +392,12 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			}
 			for rName, rQuant := range res.ExtendedResources {
 				n.requestedResource.ExtendedResources[rName] -= rQuant
+			}
+			if len(res.HugePages) > 0 && n.requestedResource.HugePages == nil {
+				n.requestedResource.HugePages = map[v1.ResourceName]int64{}
+			}
+			for rName, rQuant := range res.HugePages {
+				n.requestedResource.HugePages[rName] -= rQuant
 			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
@@ -443,4 +481,20 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 // getPodKey returns the string key of a pod.
 func getPodKey(pod *v1.Pod) (string, error) {
 	return clientcache.MetaNamespaceKeyFunc(pod)
+}
+
+// Filter implements PodFilter interface. It returns false only if the pod node name
+// matches NodeInfo.node and the pod is not found in the pods list. Otherwise,
+// returns true.
+func (n *NodeInfo) Filter(pod *v1.Pod) bool {
+	pFullName := util.GetPodFullName(pod)
+	if pod.Spec.NodeName != n.node.Name {
+		return true
+	}
+	for _, p := range n.pods {
+		if util.GetPodFullName(p) == pFullName {
+			return true
+		}
+	}
+	return false
 }

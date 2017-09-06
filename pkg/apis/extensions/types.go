@@ -166,6 +166,8 @@ type ThirdPartyResourceData struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Deployment struct {
@@ -334,7 +336,9 @@ type DeploymentStatus struct {
 	// +optional
 	AvailableReplicas int32
 
-	// Total number of unavailable pods targeted by this deployment.
+	// Total number of unavailable pods targeted by this deployment. This is the total number of
+	// pods that are still required for the deployment to have 100% available capacity. They may
+	// either be pods that are running but not yet available or pods that still have not been created.
 	// +optional
 	UnavailableReplicas int32
 
@@ -751,6 +755,8 @@ type IngressBackend struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a replica set.
@@ -933,6 +939,22 @@ type PodSecurityPolicySpec struct {
 	// privilege escalation.
 	// +optional
 	AllowPrivilegeEscalation bool
+	// AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.
+	// +optional
+	AllowedHostPaths []AllowedHostPath
+}
+
+// AllowedHostPath defines the host volume conditions that will be enabled by a policy
+// for pods to use. It requires the path prefix to be defined.
+type AllowedHostPath struct {
+	// PathPrefix is the path prefix that the host volume must match.
+	// PathPrefix does not support `*`.
+	// Trailing slashes are trimmed when validating the path prefix with a host path.
+	//
+	// Examples:
+	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
+	// `/foo` would not allow `/food` or `/etc/foo`
+	PathPrefix string
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy

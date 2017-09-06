@@ -43,6 +43,7 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

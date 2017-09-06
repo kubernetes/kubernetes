@@ -13,7 +13,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/custom_metrics:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
     ],
 )
 

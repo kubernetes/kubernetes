@@ -16,11 +16,11 @@ go_library(
         "network.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "cgroup_unix.go",
-            "config_unix.go",
+            "cgroup_linux.go",
+            "config_linux.go",
             "device_defaults.go",
+            "namespaces_linux.go",
             "namespaces_syscall.go",
-            "namespaces_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cgroup_windows.go",
@@ -28,7 +28,15 @@ go_library(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
+    deps = [
+        "//vendor/github.com/opencontainers/runtime-spec/specs-go:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

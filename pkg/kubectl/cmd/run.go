@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -225,7 +226,11 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		generatorName = cmdutil.CronJobV2Alpha1GeneratorName
+		if contains(resourcesList, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs")) {
+			generatorName = cmdutil.CronJobV1Beta1GeneratorName
+		} else {
+			generatorName = cmdutil.CronJobV2Alpha1GeneratorName
+		}
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {

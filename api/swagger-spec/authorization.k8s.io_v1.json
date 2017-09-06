@@ -107,6 +107,51 @@
     ]
    },
    {
+    "path": "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews",
+    "description": "API at /apis/authorization.k8s.io/v1",
+    "operations": [
+     {
+      "type": "v1.SelfSubjectRulesReview",
+      "method": "POST",
+      "summary": "create a SelfSubjectRulesReview",
+      "nickname": "createSelfSubjectRulesReview",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.SelfSubjectRulesReview",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.SelfSubjectRulesReview"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/authorization.k8s.io/v1/subjectaccessreviews",
     "description": "API at /apis/authorization.k8s.io/v1",
     "operations": [
@@ -396,11 +441,15 @@
     "properties": {
      "selfLink": {
       "type": "string",
-      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+      "description": "selfLink is a URL representing this object. Populated by the system. Read-only."
      },
      "resourceVersion": {
       "type": "string",
       "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "continue": {
+      "type": "string",
+      "description": "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response."
      }
     }
    },
@@ -600,6 +649,136 @@
      }
     }
    },
+   "v1.SelfSubjectRulesReview": {
+    "id": "v1.SelfSubjectRulesReview",
+    "description": "SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace. The returned list of actions may be incomplete depending on the server's authorization mode, and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions, or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns. SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.",
+    "required": [
+     "spec"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "v1.SelfSubjectRulesReviewSpec",
+      "description": "Spec holds information about the request being evaluated."
+     },
+     "status": {
+      "$ref": "v1.SubjectRulesReviewStatus",
+      "description": "Status is filled in by the server and indicates the set of actions a user can perform."
+     }
+    }
+   },
+   "v1.SelfSubjectRulesReviewSpec": {
+    "id": "v1.SelfSubjectRulesReviewSpec",
+    "properties": {
+     "namespace": {
+      "type": "string",
+      "description": "Namespace to evaluate rules for. Required."
+     }
+    }
+   },
+   "v1.SubjectRulesReviewStatus": {
+    "id": "v1.SubjectRulesReviewStatus",
+    "description": "SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on the set of authorizers the server is configured with and any errors experienced during evaluation. Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission, even if that list is incomplete.",
+    "required": [
+     "resourceRules",
+     "nonResourceRules",
+     "incomplete"
+    ],
+    "properties": {
+     "resourceRules": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ResourceRule"
+      },
+      "description": "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete."
+     },
+     "nonResourceRules": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NonResourceRule"
+      },
+      "description": "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete."
+     },
+     "incomplete": {
+      "type": "boolean",
+      "description": "Incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation."
+     },
+     "evaluationError": {
+      "type": "string",
+      "description": "EvaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete."
+     }
+    }
+   },
+   "v1.ResourceRule": {
+    "id": "v1.ResourceRule",
+    "description": "ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+    "required": [
+     "verbs"
+    ],
+    "properties": {
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all."
+     },
+     "apiGroups": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all."
+     },
+     "resources": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  \"*\" means all."
+     },
+     "resourceNames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all."
+     }
+    }
+   },
+   "v1.NonResourceRule": {
+    "id": "v1.NonResourceRule",
+    "description": "NonResourceRule holds information that describes a rule for the non-resource",
+    "required": [
+     "verbs"
+    ],
+    "properties": {
+     "verbs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all."
+     },
+     "nonResourceURLs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all."
+     }
+    }
+   },
    "v1.SubjectAccessReview": {
     "id": "v1.SubjectAccessReview",
     "description": "SubjectAccessReview checks whether or not a user or group can perform an action.",
@@ -679,6 +858,14 @@
      "namespaced": {
       "type": "boolean",
       "description": "namespaced indicates if a resource is namespaced or not."
+     },
+     "group": {
+      "type": "string",
+      "description": "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\"."
+     },
+     "version": {
+      "type": "string",
+      "description": "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\"."
      },
      "kind": {
       "type": "string",

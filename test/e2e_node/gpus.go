@@ -24,7 +24,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -94,9 +93,7 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
-			clone, err := scheme.Scheme.DeepCopy(oldCfg)
-			framework.ExpectNoError(err)
-			newCfg := clone.(*kubeletconfig.KubeletConfiguration)
+			newCfg := oldCfg.DeepCopy()
 			if newCfg.FeatureGates != "" {
 				newCfg.FeatureGates = fmt.Sprintf("%s,%s", acceleratorsFeatureGate, newCfg.FeatureGates)
 			} else {
@@ -170,7 +167,7 @@ func makePod(gpus int64, name string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{
 				{
-					Image:     "gcr.io/google_containers/busybox:1.24",
+					Image:     busyboxImage,
 					Name:      name,
 					Command:   []string{"sh", "-c", gpuverificationCmd},
 					Resources: resources,

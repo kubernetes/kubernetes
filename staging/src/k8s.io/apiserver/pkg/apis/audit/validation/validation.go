@@ -38,6 +38,7 @@ func validatePolicyRule(rule audit.PolicyRule, fldPath *field.Path) field.ErrorL
 	allErrs = append(allErrs, validateLevel(rule.Level, fldPath.Child("level"))...)
 	allErrs = append(allErrs, validateNonResourceURLs(rule.NonResourceURLs, fldPath.Child("nonResourceURLs"))...)
 	allErrs = append(allErrs, validateResources(rule.Resources, fldPath.Child("resources"))...)
+	allErrs = append(allErrs, validateOmitStages(rule.OmitStages, fldPath.Child("omitStages"))...)
 
 	if len(rule.NonResourceURLs) > 0 {
 		if len(rule.Resources) > 0 || len(rule.Namespaces) > 0 {
@@ -53,6 +54,13 @@ var validLevels = []string{
 	string(audit.LevelMetadata),
 	string(audit.LevelRequest),
 	string(audit.LevelRequestResponse),
+}
+
+var validOmitStages = []string{
+	string(audit.StageRequestReceived),
+	string(audit.StageResponseStarted),
+	string(audit.StageResponseComplete),
+	string(audit.StagePanic),
 }
 
 func validateLevel(level audit.Level, fldPath *field.Path) field.ErrorList {
@@ -88,16 +96,35 @@ func validateResources(groupResources []audit.GroupResources, fldPath *field.Pat
 	var allErrs field.ErrorList
 	for _, groupResource := range groupResources {
 		// The empty string represents the core API group.
-		if len(groupResource.Group) == 0 {
-			continue
+		if len(groupResource.Group) != 0 {
+			// Group names must be lower case and be valid DNS subdomains.
+			// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
+			// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
+			// rbac.authorization.k8s.io is the valid one
+			if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
+			}
 		}
 
-		// Group names must be lower case and be valid DNS subdomains.
-		// reference: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md
-		// an error is returned for group name like rbac.authorization.k8s.io/v1beta1
-		// rbac.authorization.k8s.io is the valid one
-		if msgs := validation.NameIsDNSSubdomain(groupResource.Group, false); len(msgs) != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), groupResource.Group, strings.Join(msgs, ",")))
+		if len(groupResource.ResourceNames) > 0 && len(groupResource.Resources) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNames"), groupResource.ResourceNames, "using resourceNames requires at least one resource"))
+		}
+	}
+	return allErrs
+}
+
+func validateOmitStages(omitStages []audit.Stage, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, stage := range omitStages {
+		valid := false
+		for _, validOmitStage := range validOmitStages {
+			if string(stage) == validOmitStage {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), string(stage), "allowed stages are "+strings.Join(validOmitStages, ",")))
 		}
 	}
 	return allErrs

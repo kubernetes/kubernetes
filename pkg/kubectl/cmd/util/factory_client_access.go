@@ -90,6 +90,7 @@ func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clie
 
 type discoveryFactory struct {
 	clientConfig clientcmd.ClientConfig
+	cacheDir     string
 }
 
 func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
@@ -97,12 +98,20 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.CacheDir = f.cacheDir
+
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
 	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+}
+
+func (f *discoveryFactory) BindFlags(flags *pflag.FlagSet) {
+	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	flags.StringVar(&f.cacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -377,6 +386,8 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clientCache.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
+	f.discoveryFactory.BindFlags(flags)
+
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
@@ -479,6 +490,7 @@ const (
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
 	JobV1GeneratorName                      = "job/v1"
 	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
+	CronJobV1Beta1GeneratorName             = "cronjob/v1beta1"
 	NamespaceV1GeneratorName                = "namespace/v1"
 	ResourceQuotaV1GeneratorName            = "resourcequotas/v1"
 	SecretV1GeneratorName                   = "secret/v1"
@@ -528,6 +540,7 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
 			JobV1GeneratorName:                 kubectl.JobV1{},
 			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
+			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
 		}
 	case "autoscale":
 		generator = map[string]kubectl.Generator{

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -64,9 +65,9 @@ var (
 	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
 )
 
-// A subset of the pod.Manager interface extracted for garbage collection purposes.
-type podGetter interface {
-	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
+// podDeletionProvider can determine if a pod is deleted
+type podDeletionProvider interface {
+	IsPodDeleted(kubetypes.UID) bool
 }
 
 type kubeGenericRuntimeManager struct {
@@ -108,6 +109,9 @@ type kubeGenericRuntimeManager struct {
 
 	// The directory path for seccomp profiles.
 	seccompProfileRoot string
+
+	// Internal lifecycle event handlers for container resource management.
+	internalLifecycle cm.InternalContainerLifecycle
 }
 
 type KubeGenericRuntime interface {
@@ -123,7 +127,7 @@ func NewKubeGenericRuntimeManager(
 	seccompProfileRoot string,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
-	podGetter podGetter,
+	podDeletionProvider podDeletionProvider,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient types.HttpGetter,
@@ -134,6 +138,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	internalLifecycle cm.InternalContainerLifecycle,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -147,6 +152,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeService:      newInstrumentedRuntimeService(runtimeService),
 		imageService:        newInstrumentedImageManagerService(imageService),
 		keyring:             credentialprovider.NewDockerKeyring(),
+		internalLifecycle:   internalLifecycle,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -187,7 +193,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullQPS,
 		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
-	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podDeletionProvider, kubeRuntimeManager)
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -607,6 +613,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		if err != nil {
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			glog.Errorf("createPodSandbox for pod %q failed: %v", format.Pod(pod), err)
+			ref, err := ref.GetReference(api.Scheme, pod)
+			if err != nil {
+				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+			}
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox.")
 			return
 		}
 		glog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))

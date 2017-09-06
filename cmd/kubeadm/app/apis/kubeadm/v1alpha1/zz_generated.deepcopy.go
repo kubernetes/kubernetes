@@ -114,6 +114,7 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	out.TokenTTL = in.TokenTTL
 	if in.APIServerExtraArgs != nil {
 		in, out := &in.APIServerExtraArgs, &out.APIServerExtraArgs
 		*out = make(map[string]string, len(*in))
@@ -140,8 +141,8 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.FeatureFlags != nil {
-		in, out := &in.FeatureFlags, &out.FeatureFlags
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
 		*out = make(map[string]bool, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

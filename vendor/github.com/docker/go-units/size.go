@@ -58,7 +58,7 @@ func CustomSize(format string, size float64, base float64, _map []string) string
 // instead of 4 digit precision used in units.HumanSize.
 func HumanSizeWithPrecision(size float64, precision int) string {
 	size, unit := getSizeAndUnit(size, 1000.0, decimapAbbrs)
-	return fmt.Sprintf("%.*g %s", precision, size, unit)
+	return fmt.Sprintf("%.*g%s", precision, size, unit)
 }
 
 // HumanSize returns a human-readable approximation of a size
@@ -70,7 +70,7 @@ func HumanSize(size float64) string {
 // BytesSize returns a human-readable size in bytes, kibibytes,
 // mebibytes, gibibytes, or tebibytes (eg. "44kiB", "17MiB").
 func BytesSize(size float64) string {
-	return CustomSize("%.4g %s", size, 1024.0, binaryAbbrs)
+	return CustomSize("%.4g%s", size, 1024.0, binaryAbbrs)
 }
 
 // FromHumanSize returns an integer from a human-readable specification of a

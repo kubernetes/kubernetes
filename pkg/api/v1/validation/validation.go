@@ -78,7 +78,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
 	}
-	return field.ErrorList{}
+	return allErrs
 }
 
 // ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
@@ -125,7 +125,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 		}
 	}
 
-	return field.ErrorList{}
+	return allErrs
 }
 
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {

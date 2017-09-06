@@ -53,7 +53,13 @@ type flexVolumeAttachablePlugin struct {
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
-func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
+type PluginFactory interface {
+	NewFlexVolumePlugin(pluginDir, driverName string) (volume.VolumePlugin, error)
+}
+
+type pluginFactory struct{}
+
+func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapePluginName(name)
@@ -83,6 +89,7 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 
 // Init is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
+	plugin.host = host
 	// Hardwired 'success' as any errors from calling init() will be caught by NewFlexVolumePlugin()
 	return nil
 }

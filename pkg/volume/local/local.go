@@ -18,8 +18,9 @@ package local
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"os"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -204,8 +205,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 
 	if m.globalPath == "" {
-		err := fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
-		return err
+		return fmt.Errorf("LocalVolume volume %q path is empty", m.volName)
 	}
 
 	err := validation.ValidatePathNoBacksteps(m.globalPath)
@@ -234,8 +234,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 			fsGroupNew := int64(*fsGroup)
 			fsGroupSame, fsGroupOld, err := volume.IsSameFSGroup(m.globalPath, fsGroupNew)
 			if err != nil {
-				err = fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
-				return err
+				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
 			if !fsGroupSame {
 				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, events.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)

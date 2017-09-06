@@ -31,10 +31,5 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			p := admissionregistration.FailurePolicyType("Fail")
 			obj.FailurePolicy = &p
 		},
-		func(obj *admissionregistration.Initializer, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
-			p := admissionregistration.FailurePolicyType("Fail")
-			obj.FailurePolicy = &p
-		},
 	}
 }

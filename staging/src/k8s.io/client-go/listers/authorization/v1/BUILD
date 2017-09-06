@@ -11,6 +11,7 @@ go_library(
         "expansion_generated.go",
         "localsubjectaccessreview.go",
         "selfsubjectaccessreview.go",
+        "selfsubjectrulesreview.go",
         "subjectaccessreview.go",
     ],
     deps = [

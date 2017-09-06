@@ -496,7 +496,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 		if source.EmptyDir != nil {
 			size := source.EmptyDir.SizeLimit
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
-			if used != nil && size.Sign() == 1 && used.Cmp(size) > 0 {
+			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
 				return m.evictPod(pod, v1.ResourceName("EmptyDir"), fmt.Sprintf("emptyDir usage exceeds the limit %q", size.String()))
 			}
@@ -520,13 +520,13 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	} else {
 		fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	}
-	podUsage, err := podDiskUsage(podStats, pod, fsStatsSet)
+	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet)
 	if err != nil {
 		glog.Errorf("eviction manager: error getting pod disk usage %v", err)
 		return false
 	}
 
-	podEphemeralStorageTotalUsage.Add(podUsage[resourceDisk])
+	podEphemeralStorageTotalUsage.Add(podEphemeralUsage[resourceDisk])
 	if podEphemeralStorageTotalUsage.Cmp(podLimits[v1.ResourceEphemeralStorage]) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		return m.evictPod(pod, v1.ResourceEphemeralStorage, fmt.Sprintf("pod ephemeral local storage usage exceeds the total limit of containers %v", podLimits[v1.ResourceEphemeralStorage]))

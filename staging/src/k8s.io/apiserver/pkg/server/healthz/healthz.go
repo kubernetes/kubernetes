@@ -20,7 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
+
+	"github.com/golang/glog"
 )
 
 // HealthzChecker is a named healthz checker.
@@ -58,11 +61,18 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 	return &healthzCheck{name, check}
 }
 
-// InstallHandler registers a handler for health checking on the path "/healthz" to mux.
+// InstallHandler registers handlers for health checking on the path
+// "/healthz" to mux. *All handlers* for mux must be specified in
+// exactly one call to InstallHandler. Calling InstallHandler more
+// than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthzChecker) {
 	if len(checks) == 0 {
+		glog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthzChecker{PingHealthz}
 	}
+
+	glog.V(5).Info("Installing healthz checkers:", strings.Join(checkerNames(checks...), ", "))
+
 	mux.Handle("/healthz", handleRootHealthz(checks...))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("/healthz/%v", check.Name()), adaptCheckToHandler(check.Check))
@@ -131,4 +141,18 @@ func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
 			fmt.Fprint(w, "ok")
 		}
 	})
+}
+
+// checkerNames returns the names of the checks in the same order as passed in.
+func checkerNames(checks ...HealthzChecker) []string {
+	if len(checks) > 0 {
+		// accumulate the names of checks for printing them out.
+		checkerNames := make([]string, 0, len(checks))
+		for _, check := range checks {
+			// quote the Name so we can disambiguate
+			checkerNames = append(checkerNames, fmt.Sprintf("%q", check.Name()))
+		}
+		return checkerNames
+	}
+	return nil
 }

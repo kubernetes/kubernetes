@@ -19,11 +19,13 @@ package kubelet
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -88,8 +90,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -560,6 +563,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		MTU:               int(crOptions.NetworkPluginMTU),
 	}
 
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
+
 	// Remote runtime shim just cannot talk back to kubelet, so it doesn't
 	// support bandwidth shaping or hostports till #35457. To enable legacy
 	// features, replace with networkHost.
@@ -619,13 +624,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		if err != nil {
 			return nil, err
 		}
+		klet.runtimeService = runtimeService
 		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
 			kubeCfg.SeccompProfileRoot,
 			containerRefManager,
 			machineInfo,
-			klet.podManager,
+			klet,
 			kubeDeps.OSInterface,
 			klet,
 			httpClient,
@@ -636,12 +642,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeCfg.CPUCFSQuota,
 			runtimeService,
 			imageService,
+			kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		)
 		if err != nil {
 			return nil, err
 		}
 		klet.containerRuntime = runtime
 		klet.runner = runtime
+		klet.StatsProvider = stats.NewCadvisorStatsProvider(
+			klet.cadvisor,
+			klet.resourceAnalyzer,
+			klet.podManager,
+			klet.runtimeCache,
+			klet.containerRuntime)
 	} else {
 		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
 		// TODO: Include hairpin mode settings in rkt?
@@ -656,7 +669,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet,
 			kubeDeps.Recorder,
 			containerRefManager,
-			klet.podManager,
+			klet,
 			klet.livenessManager,
 			httpClient,
 			klet.networkPlugin,
@@ -674,10 +687,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 		klet.containerRuntime = runtime
 		klet.runner = kubecontainer.DirectStreamingRunner(runtime)
+		klet.StatsProvider = stats.NewCadvisorStatsProvider(
+			klet.cadvisor,
+			klet.resourceAnalyzer,
+			klet.podManager,
+			klet.runtimeCache,
+			klet.containerRuntime)
 	}
-
-	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
-	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, klet.containerRuntime)
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
@@ -746,7 +762,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// check node capabilities since the mount path is not the default
 	if len(kubeCfg.ExperimentalMounterPath) != 0 {
 		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
+		// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
+		// so that service name could be resolved
+		klet.setupDNSinContainerizedMounter(kubeCfg.ExperimentalMounterPath)
 	}
+
 	// setup volumeManager
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
@@ -953,7 +973,11 @@ type Kubelet struct {
 	volumeManager volumemanager.VolumeManager
 
 	// Cloud provider interface.
-	cloud                   cloudprovider.Interface
+	cloud cloudprovider.Interface
+	// DEPRECATED: auto detecting cloud providers goes against the initiative
+	// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
+	// with cloud providers instead of in the core repo.
+	// More details here: https://github.com/kubernetes/kubernetes/issues/50986
 	autoDetectCloudProvider bool
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
@@ -962,6 +986,11 @@ type Kubelet struct {
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
+
+	// Container runtime service (needed by container runtime Start()).
+	// TODO(CD): try to make this available without holding a reference in this
+	//           struct. For example, by adding a getter to generic runtime.
+	runtimeService internalapi.RuntimeService
 
 	// reasonCache caches the failure reason of the last creation of all containers, which is
 	// used for generating ContainerStatus.
@@ -993,7 +1022,7 @@ type Kubelet struct {
 	oomWatcher OOMWatcher
 
 	// Monitor resource usage
-	resourceAnalyzer stats.ResourceAnalyzer
+	resourceAnalyzer serverstats.ResourceAnalyzer
 
 	// Whether or not we should have the QOS cgroup hierarchy for resource management
 	cgroupsPerQOS bool
@@ -1104,6 +1133,9 @@ type Kubelet struct {
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
+
+	// StatsProvider provides the node and the container stats.
+	*stats.StatsProvider
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {
@@ -1137,6 +1169,9 @@ func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
 		return fmt.Errorf("error creating root directory: %v", err)
+	}
+	if err := kl.mounter.MakeRShared(kl.getRootDir()); err != nil {
+		return fmt.Errorf("error configuring root directory: %v", err)
 	}
 	if err := os.MkdirAll(kl.getPodsDir(), 0750); err != nil {
 		return fmt.Errorf("error creating pods directory: %v", err)
@@ -1221,7 +1256,7 @@ func (kl *Kubelet) initializeModules() error {
 		return fmt.Errorf("Kubelet failed to get node info: %v", err)
 	}
 
-	if err := kl.containerManager.Start(node, kl.GetActivePods); err != nil {
+	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.statusManager, kl.runtimeService); err != nil {
 		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
@@ -2109,6 +2144,36 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+	}
+}
+
+// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
+func (kl *Kubelet) setupDNSinContainerizedMounter(mounterPath string) {
+	resolvePath := filepath.Join(strings.TrimSuffix(mounterPath, "/mounter"), "rootfs", "etc", "resolv.conf")
+	dnsString := ""
+	for _, dns := range kl.clusterDNS {
+		dnsString = dnsString + fmt.Sprintf("nameserver %s\n", dns)
+	}
+	if kl.resolverConfig != "" {
+		f, err := os.Open(kl.resolverConfig)
+		defer f.Close()
+		if err != nil {
+			glog.Error("Could not open resolverConf file")
+		} else {
+			_, hostSearch, err := kl.parseResolvConf(f)
+			if err != nil {
+				glog.Errorf("Error for parsing the reslov.conf file: %v", err)
+			} else {
+				dnsString = dnsString + "search"
+				for _, search := range hostSearch {
+					dnsString = dnsString + fmt.Sprintf(" %s", search)
+				}
+				dnsString = dnsString + "\n"
+			}
+		}
+	}
+	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+		glog.Errorf("Could not write dns nameserver in file %s, with error %v", resolvePath, err)
 	}
 }
 

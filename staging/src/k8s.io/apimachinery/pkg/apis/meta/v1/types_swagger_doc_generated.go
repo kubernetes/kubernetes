@@ -53,6 +53,8 @@ var map_APIResource = map[string]string{
 	"name":         "name is the plural name of the resource.",
 	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
 	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
+	"group":        "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\".",
+	"version":      "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\".",
 	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
 	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
 	"shortNames":   "shortNames is a list of suggested short names of the resource.",
@@ -157,7 +159,7 @@ func (LabelSelector) SwaggerDoc() map[string]string {
 var map_LabelSelectorRequirement = map[string]string{
 	"":         "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
 	"key":      "key is the label key that the selector applies to.",
-	"operator": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
 	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
 }
 
@@ -177,8 +179,9 @@ func (List) SwaggerDoc() map[string]string {
 
 var map_ListMeta = map[string]string{
 	"":                "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
-	"selfLink":        "SelfLink is a URL representing this object. Populated by the system. Read-only.",
+	"selfLink":        "selfLink is a URL representing this object. Populated by the system. Read-only.",
 	"resourceVersion": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
+	"continue":        "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response.",
 }
 
 func (ListMeta) SwaggerDoc() map[string]string {
@@ -193,6 +196,8 @@ var map_ListOptions = map[string]string{
 	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
 	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 	"timeoutSeconds":       "Timeout for the list/watch call.",
+	"limit":                "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+	"continue":             "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {

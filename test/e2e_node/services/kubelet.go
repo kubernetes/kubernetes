@@ -155,6 +155,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--serialize-image-pulls", "false",
 		"--pod-manifest-path", manifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
+		"--docker-disable-shared-pid=false",
 		// Assign a fixed CIDR to the node because there is no node controller.
 		//
 		// Note: this MUST be in sync with with the IP in

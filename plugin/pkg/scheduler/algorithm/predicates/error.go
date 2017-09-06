@@ -38,6 +38,10 @@ var (
 	ErrNodeUnderMemoryPressure   = newPredicateFailureError("NodeUnderMemoryPressure")
 	ErrNodeUnderDiskPressure     = newPredicateFailureError("NodeUnderDiskPressure")
 	ErrNodeOutOfDisk             = newPredicateFailureError("NodeOutOfDisk")
+	ErrNodeNotReady              = newPredicateFailureError("NodeNotReady")
+	ErrNodeNetworkUnavailable    = newPredicateFailureError("NodeNetworkUnavailable")
+	ErrNodeUnschedulable         = newPredicateFailureError("NodeUnschedulable")
+	ErrNodeUnknownCondition      = newPredicateFailureError("NodeUnknownCondition")
 	ErrVolumeNodeConflict        = newPredicateFailureError("NoVolumeNodeConflict")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.

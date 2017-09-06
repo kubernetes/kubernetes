@@ -18,6 +18,8 @@ package constants
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -31,6 +33,7 @@ var KubernetesDir = "/etc/kubernetes"
 
 const (
 	ManifestsSubDirName = "manifests"
+	TempDirForKubeadm   = "/etc/kubernetes/tmp"
 
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
@@ -180,4 +183,18 @@ func GetAdminKubeConfigPath() string {
 // AddSelfHostedPrefix adds the self-hosted- prefix to the component name
 func AddSelfHostedPrefix(componentName string) string {
 	return fmt.Sprintf("%s%s", SelfHostingPrefix, componentName)
+}
+
+// CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
+func CreateTempDirForKubeadm(dirName string) (string, error) {
+	// creates target folder if not already exists
+	if err := os.MkdirAll(TempDirForKubeadm, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", TempDirForKubeadm, err)
+	}
+
+	tempDir, err := ioutil.TempDir(TempDirForKubeadm, dirName)
+	if err != nil {
+		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+	}
+	return tempDir, nil
 }

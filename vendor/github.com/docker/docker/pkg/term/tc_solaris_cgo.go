@@ -5,15 +5,17 @@ package term
 import (
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // #include <termios.h>
 import "C"
 
 // Termios is the Unix API for terminal I/O.
-// It is passthrough for syscall.Termios in order to make it portable with
+// It is passthrough for unix.Termios in order to make it portable with
 // other platforms where it is not available or handled differently.
-type Termios syscall.Termios
+type Termios unix.Termios
 
 // MakeRaw put the terminal connected to the given file descriptor into raw
 // mode and returns the previous state of the terminal so that it can be
@@ -26,11 +28,11 @@ func MakeRaw(fd uintptr) (*State, error) {
 
 	newState := oldState.termios
 
-	newState.Iflag &^= (syscall.IGNBRK | syscall.BRKINT | syscall.PARMRK | syscall.ISTRIP | syscall.INLCR | syscall.IGNCR | syscall.ICRNL | syscall.IXON | syscall.IXANY)
-	newState.Oflag &^= syscall.OPOST
-	newState.Lflag &^= (syscall.ECHO | syscall.ECHONL | syscall.ICANON | syscall.ISIG | syscall.IEXTEN)
-	newState.Cflag &^= (syscall.CSIZE | syscall.PARENB)
-	newState.Cflag |= syscall.CS8
+	newState.Iflag &^= (unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON | unix.IXANY)
+	newState.Oflag &^= unix.OPOST
+	newState.Lflag &^= (unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN)
+	newState.Cflag &^= (unix.CSIZE | unix.PARENB)
+	newState.Cflag |= unix.CS8
 
 	/*
 		VMIN is the minimum number of characters that needs to be read in non-canonical mode for it to be returned

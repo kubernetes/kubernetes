@@ -332,11 +332,7 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 // ApplyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
 func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*apps.StatefulSet, error) {
-	obj, err := scheme.Scheme.DeepCopy(set)
-	if err != nil {
-		return nil, err
-	}
-	clone := obj.(*apps.StatefulSet)
+	clone := set.DeepCopy()
 	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(patchCodec, clone)), revision.Data.Raw, clone)
 	if err != nil {
 		return nil, err

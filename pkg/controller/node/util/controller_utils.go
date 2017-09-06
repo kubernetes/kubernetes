@@ -27,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -256,44 +254,42 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 
 // SwapNodeControllerTaint returns true in case of success and false
 // otherwise.
-func SwapNodeControllerTaint(kubeClient clientset.Interface, taintToAdd, taintToRemove *v1.Taint, node *v1.Node) bool {
-	taintToAdd.TimeAdded = metav1.Now()
-	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintToAdd)
-	if err != nil {
-		utilruntime.HandleError(
-			fmt.Errorf(
-				"unable to taint %v unresponsive Node %q: %v",
-				taintToAdd.Key,
-				node.Name,
-				err))
-		return false
+func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
+	for _, taintToAdd := range taintsToAdd {
+		taintToAdd.TimeAdded = metav1.Now()
 	}
-	glog.V(4).Infof("Added %v Taint to Node %v", taintToAdd, node.Name)
 
-	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintToRemove)
+	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)
 	if err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
-				"unable to remove %v unneeded taint from unresponsive Node %q: %v",
-				taintToRemove.Key,
+				"unable to taint %+v unresponsive Node %q: %v",
+				taintsToAdd,
 				node.Name,
 				err))
 		return false
 	}
-	glog.V(4).Infof("Made sure that Node %v has no %v Taint", node.Name, taintToRemove)
+	glog.V(4).Infof("Added %+v Taint to Node %v", taintsToAdd, node.Name)
+
+	err = controller.RemoveTaintOffNode(kubeClient, node.Name, node, taintsToRemove...)
+	if err != nil {
+		utilruntime.HandleError(
+			fmt.Errorf(
+				"unable to remove %+v unneeded taint from unresponsive Node %q: %v",
+				taintsToRemove,
+				node.Name,
+				err))
+		return false
+	}
+	glog.V(4).Infof("Made sure that Node %+v has no %v Taint", node.Name, taintsToRemove)
+
 	return true
 }
 
 // CreateAddNodeHandler creates an add node handler.
 func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
-		obj, err := scheme.Scheme.DeepCopy(originalObj)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-		node := obj.(*v1.Node)
-
+		node := originalObj.(*v1.Node).DeepCopy()
 		if err := f(node); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Error while processing Node Delete: %v", err))
 		}
@@ -303,18 +299,8 @@ func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 // CreateUpdateNodeHandler creates a node update handler.
 func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldObj, newObj interface{}) {
 	return func(origOldObj, origNewObj interface{}) {
-		oldObj, err := scheme.Scheme.DeepCopy(origOldObj)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-		newObj, err := scheme.Scheme.DeepCopy(origNewObj)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-		node := newObj.(*v1.Node)
-		prevNode := oldObj.(*v1.Node)
+		node := origNewObj.(*v1.Node).DeepCopy()
+		prevNode := origOldObj.(*v1.Node).DeepCopy()
 
 		if err := f(prevNode, node); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
@@ -325,28 +311,22 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 // CreateDeleteNodeHandler creates a delete node handler.
 func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
-		obj, err := scheme.Scheme.DeepCopy(originalObj)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-
-		node, isNode := obj.(*v1.Node)
+		originalNode, isNode := originalObj.(*v1.Node)
 		// We can get DeletedFinalStateUnknown instead of *v1.Node here and
 		// we need to handle that correctly. #34692
 		if !isNode {
-			deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+			deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 			if !ok {
-				glog.Errorf("Received unexpected object: %v", obj)
+				glog.Errorf("Received unexpected object: %v", originalObj)
 				return
 			}
-			node, ok = deletedState.Obj.(*v1.Node)
+			originalNode, ok = deletedState.Obj.(*v1.Node)
 			if !ok {
 				glog.Errorf("DeletedFinalStateUnknown contained non-Node object: %v", deletedState.Obj)
 				return
 			}
 		}
-
+		node := originalNode.DeepCopy()
 		if err := f(node); err != nil {
 			utilruntime.HandleError(fmt.Errorf("Error while processing Node Add/Delete: %v", err))
 		}

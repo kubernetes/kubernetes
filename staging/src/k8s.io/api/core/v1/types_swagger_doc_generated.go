@@ -519,7 +519,7 @@ func (EnvVar) SwaggerDoc() map[string]string {
 var map_EnvVarSource = map[string]string{
 	"":                 "EnvVarSource represents a source for the value of an EnvVar.",
 	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
-	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
 	"configMapKeyRef":  "Selects a key of a ConfigMap.",
 	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
 }
@@ -1122,6 +1122,18 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeClaim
 }
 
+var map_PersistentVolumeClaimCondition = map[string]string{
+	"":                   "PersistentVolumeClaimCondition contails details about state of pvc",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
+	"message":            "Human-readable message indicating details about last transition.",
+}
+
+func (PersistentVolumeClaimCondition) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeClaimCondition
+}
+
 var map_PersistentVolumeClaimList = map[string]string{
 	"":         "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1150,6 +1162,7 @@ var map_PersistentVolumeClaimStatus = map[string]string{
 	"phase":       "Phase represents the current phase of PersistentVolumeClaim.",
 	"accessModes": "AccessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
 	"capacity":    "Represents the actual resources of the underlying volume.",
+	"conditions":  "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
 }
 
 func (PersistentVolumeClaimStatus) SwaggerDoc() map[string]string {
@@ -1212,6 +1225,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
 	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
 	"storageClassName":              "Name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+	"mountOptions":                  "A list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1817,7 +1831,7 @@ var map_SecurityContext = map[string]string{
 	"runAsUser":                "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
 	"runAsNonRoot":             "Indicates that the container must run as a non-root user. If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does. If unset or false, no such validation will be performed. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
 	"readOnlyRootFilesystem":   "Whether this container has a read-only root filesystem. Default is false.",
-	"allowPrivilegeEscalation": "AllowPrivilegeEscalation controls whether a process can gain more privileges than it's parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN",
+	"allowPrivilegeEscalation": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN",
 }
 
 func (SecurityContext) SwaggerDoc() map[string]string {
@@ -2018,11 +2032,12 @@ func (Volume) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeMount = map[string]string{
-	"":          "VolumeMount describes a mounting of a Volume within a container.",
-	"name":      "This must match the Name of a Volume.",
-	"readOnly":  "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
-	"mountPath": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
-	"subPath":   "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
+	"":                 "VolumeMount describes a mounting of a Volume within a container.",
+	"name":             "This must match the Name of a Volume.",
+	"readOnly":         "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
+	"mountPath":        "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+	"subPath":          "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
+	"mountPropagation": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is alpha in 1.8 and can be reworked or removed in a future release.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {

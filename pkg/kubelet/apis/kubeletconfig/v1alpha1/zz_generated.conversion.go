@@ -227,6 +227,8 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.ContainerRuntime = in.ContainerRuntime
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
+	out.CPUManagerPolicy = in.CPUManagerPolicy
+	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	if err := v1.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
@@ -390,6 +392,8 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.ContainerRuntime = in.ContainerRuntime
 	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
 	out.RemoteImageEndpoint = in.RemoteImageEndpoint
+	out.CPUManagerPolicy = in.CPUManagerPolicy
+	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	if err := v1.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {

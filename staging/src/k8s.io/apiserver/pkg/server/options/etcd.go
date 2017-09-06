@@ -34,6 +34,8 @@ import (
 )
 
 type EtcdOptions struct {
+	// The value of Paging on StorageConfig will be overriden by the
+	// calculated feature gate value.
 	StorageConfig                    storagebackend.Config
 	EncryptionProviderConfigFilepath string
 

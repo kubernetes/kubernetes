@@ -75,7 +75,7 @@ func (c *Cloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	var instanceIDs []*string
 
 	for _, r := range table.Routes {
-		instanceID := orEmpty(r.InstanceId)
+		instanceID := aws.StringValue(r.InstanceId)
 
 		if instanceID == "" {
 			continue
@@ -146,7 +146,7 @@ func (c *Cloud) CreateRoute(clusterName string, nameHint string, route *cloudpro
 
 	// In addition to configuring the route itself, we also need to configure the instance to accept that traffic
 	// On AWS, this requires turning source-dest checks off
-	err = c.configureInstanceSourceDestCheck(orEmpty(instance.InstanceId), false)
+	err = c.configureInstanceSourceDestCheck(aws.StringValue(instance.InstanceId), false)
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -238,4 +240,21 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		}
 	}
 	return volumes, nil
+}
+
+// GetVersionInfo returns information about the version of cAdvisor in use.
+func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
+	return kl.cadvisor.VersionInfo()
+}
+
+// GetCachedMachineInfo assumes that the machine info can't change without a reboot
+func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
+	if kl.machineInfo == nil {
+		info, err := kl.cadvisor.MachineInfo()
+		if err != nil {
+			return nil, err
+		}
+		kl.machineInfo = info
+	}
+	return kl.machineInfo, nil
 }

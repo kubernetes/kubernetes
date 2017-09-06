@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.core.v1;
 
+import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -983,7 +984,7 @@ message EnvVarSource {
   optional ObjectFieldSelector fieldRef = 1;
 
   // Selects a resource of the container: only resources limits and requests
-  // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+  // (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
   // +optional
   optional ResourceFieldSelector resourceFieldRef = 2;
 
@@ -2132,6 +2133,31 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
+// PersistentVolumeClaimCondition contails details about state of pvc
+message PersistentVolumeClaimCondition {
+  optional string type = 1;
+
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // Unique, this should be a short, machine understandable string that gives the reason
+  // for condition's last transition. If it reports "ResizeStarted" that means the underlying
+  // persistent volume is being resized.
+  // +optional
+  optional string reason = 5;
+
+  // Human-readable message indicating details about last transition.
+  // +optional
+  optional string message = 6;
+}
+
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
   // Standard list metadata.
@@ -2185,6 +2211,13 @@ message PersistentVolumeClaimStatus {
   // Represents the actual resources of the underlying volume.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+
+  // Current Condition of persistent volume claim. If underlying persistent volume is being
+  // resized then the Condition will be set to 'ResizeStarted'.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PersistentVolumeClaimCondition conditions = 4;
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -2351,6 +2384,12 @@ message PersistentVolumeSpec {
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
+
+  // A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+  // simply fail if one is invalid.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+  // +optional
+  repeated string mountOptions = 7;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2714,7 +2753,7 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes
   // +optional
   // +patchMergeKey=name
-  // +patchStrategy=merge
+  // +patchStrategy=merge,retainKeys
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -3623,7 +3662,7 @@ message SecurityContext {
   optional bool readOnlyRootFilesystem = 6;
 
   // AllowPrivilegeEscalation controls whether a process can gain more
-  // privileges than it's parent process. This bool directly controls if
+  // privileges than its parent process. This bool directly controls if
   // the no_new_privs flag will be set on the container process.
   // AllowPrivilegeEscalation is true always when the container is:
   // 1) run as Privileged
@@ -4064,6 +4103,14 @@ message VolumeMount {
   // Defaults to "" (volume's root).
   // +optional
   optional string subPath = 4;
+
+  // mountPropagation determines how mounts are propagated from the host
+  // to container and the other way around.
+  // When not set, MountPropagationHostToContainer is used.
+  // This field is alpha in 1.8 and can be reworked or removed in a future
+  // release.
+  // +optional
+  optional string mountPropagation = 5;
 }
 
 // Projection that may be projected along with other supported volume types

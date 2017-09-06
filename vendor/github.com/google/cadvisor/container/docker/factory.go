@@ -41,6 +41,10 @@ import (
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
+var ArgDockerTLS = flag.Bool("docker-tls", false, "use TLS to connect to docker")
+var ArgDockerCert = flag.String("docker-tls-cert", "cert.pem", "path to client certificate")
+var ArgDockerKey = flag.String("docker-tls-key", "key.pem", "path to private key")
+var ArgDockerCA = flag.String("docker-tls-ca", "ca.pem", "path to trusted CA")
 
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"

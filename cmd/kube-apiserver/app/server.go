@@ -51,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	//aggregatorinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
@@ -165,6 +164,9 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	// this wires up openapi
 	kubeAPIServer.GenericAPIServer.PrepareRun()
 
+	// This will wire up openapi for extension api server
+	apiExtensionsServer.GenericAPIServer.PrepareRun()
+
 	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions, versionedInformers, serviceResolver, proxyTransport)
 	if err != nil {
@@ -257,6 +259,14 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 	// validate options
 	if errs := s.Validate(); len(errs) != 0 {
 		return nil, nil, nil, nil, nil, utilerrors.NewAggregate(errs)
+	}
+
+	if s.CloudProvider != nil {
+		// Initialize the cloudprovider once, to give it a chance to register KMS plugins, if any.
+		_, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
+		if err != nil {
+			return nil, nil, nil, nil, nil, err
+		}
 	}
 
 	genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, err := BuildGenericConfig(s)
@@ -433,7 +443,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, err = BuildAuthorizer(s, sharedInformers)
+	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -534,12 +544,13 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory) (authorizer.Authorizer, error) {
+func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	return authorizationConfig.New()
 }
 
-// BuildStorageFactory constructs the storage factory
+// BuildStorageFactory constructs the storage factory. If encryption at rest is used, it expects
+// all supported KMS plugins to be registered in the KMS plugin registry before being called.
 func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultStorageFactory, error) {
 	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
@@ -548,9 +559,8 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
-		// FIXME: this GroupVersionResource override should be configurable
-		// TODO we need to update this to batch/v1beta1 when it's enabled by default
-		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
+		// FIXME (soltysh): this GroupVersionResource override should be configurable
+		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v1beta1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
@@ -581,7 +591,7 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	if s.Etcd.EncryptionProviderConfigFilepath != "" {
+	if len(s.Etcd.EncryptionProviderConfigFilepath) != 0 {
 		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(s.Etcd.EncryptionProviderConfigFilepath)
 		if err != nil {
 			return nil, err

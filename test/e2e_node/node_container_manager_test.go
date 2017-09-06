@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -161,11 +160,7 @@ func runTest(f *framework.Framework) error {
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
-	clone, err := scheme.Scheme.DeepCopy(oldCfg)
-	if err != nil {
-		return err
-	}
-	newCfg := clone.(*kubeletconfig.KubeletConfiguration)
+	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.
@@ -193,7 +188,7 @@ func runTest(f *framework.Framework) error {
 	allocatableCPU, allocatableMemory := getAllocatableLimits("200m", "200Mi", capacity)
 	// Total Memory reservation is 200Mi excluding eviction thresholds.
 	// Expect CPU shares on node allocatable cgroup to equal allocatable.
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), cm.MilliCPUToShares(allocatableCPU.MilliValue()), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), int64(cm.MilliCPUToShares(allocatableCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.
@@ -222,7 +217,7 @@ func runTest(f *framework.Framework) error {
 	}
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], kubeReservedCgroup, "cpu.shares"), cm.MilliCPUToShares(kubeReservedCPU.MilliValue()), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], kubeReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit kube reserved cgroup to equal configured value `100Mi`.
@@ -235,7 +230,7 @@ func runTest(f *framework.Framework) error {
 	}
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], systemReservedCgroup, "cpu.shares"), cm.MilliCPUToShares(systemReservedCPU.MilliValue()), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], systemReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.

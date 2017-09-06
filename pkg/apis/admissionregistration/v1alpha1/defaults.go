@@ -25,13 +25,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Initializer(obj *admissionregistrationv1alpha1.Initializer) {
-	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1alpha1.Ignore
-		obj.FailurePolicy = &policy
-	}
-}
-
 func SetDefaults_ExternalAdmissionHook(obj *admissionregistrationv1alpha1.ExternalAdmissionHook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1alpha1.Ignore

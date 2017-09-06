@@ -17,9 +17,10 @@ limitations under the License.
 package factory
 
 import (
+	"testing"
+
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
-	"testing"
 )
 
 func TestAlgorithmNameValidation(t *testing.T) {

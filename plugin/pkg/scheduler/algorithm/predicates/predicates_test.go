@@ -73,11 +73,12 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 }
 
 var (
-	opaqueResourceA = v1helper.OpaqueIntResourceName("AAA")
-	opaqueResourceB = v1helper.OpaqueIntResourceName("BBB")
+	opaqueResourceA   = v1helper.OpaqueIntResourceName("AAA")
+	opaqueResourceB   = v1helper.OpaqueIntResourceName("BBB")
+	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
-func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.NodeResources {
+func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
@@ -86,11 +87,12 @@ func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v
 			v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 			opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 		},
 	}
 }
 
-func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage int64) v1.ResourceList {
+func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage, hugePageA int64) v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
@@ -98,6 +100,7 @@ func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, stora
 		v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 		opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 	}
 }
 
@@ -124,7 +127,7 @@ func addStorageLimit(pod *v1.Pod, sizeLimit int64, medium v1.StorageMedium) *v1.
 					Name: "emptyDirVolumeName",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
-							SizeLimit: *resource.NewQuantity(sizeLimit, resource.BinarySI),
+							SizeLimit: resource.NewQuantity(sizeLimit, resource.BinarySI),
 							Medium:    medium,
 						},
 					},
@@ -348,10 +351,38 @@ func TestPodFitsResources(t *testing.T) {
 			test:    "opaque resource allocatable enforced for unknown resource for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceB, 1, 0, 0)},
 		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			fits:    false,
+			test:    "hugepages resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			fits:    false,
+			test:    "hugepages resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
+			fits:    false,
+			test:    "hugepages resource allocatable enforced for multiple containers",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -406,7 +437,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0, 0)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -464,7 +495,7 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	for _, test := range storagePodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -1550,7 +1581,7 @@ func TestServiceAffinity(t *testing.T) {
 			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 			predicate, precompute := NewServiceAffinityPredicate(schedulertesting.FakePodLister(test.pods), schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
 			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
-			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+			RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 				if !skipPrecompute {
 					precompute(pm)
 				}
@@ -1889,7 +1920,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits: true,
 			wErr: nil,
@@ -1901,7 +1932,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits: false,
 			wErr: nil,
@@ -1915,7 +1946,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: &v1.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0)}},
+			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "no resources/port/host requested always fits on GPU machine",
@@ -1924,7 +1955,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 1})),
-			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0)}},
+			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits:    false,
 			wErr:    nil,
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceNvidiaGPU, 1, 1, 1)},
@@ -1934,7 +1965,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 0})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0)}},
+			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "enough GPU resource",
@@ -1948,7 +1979,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -1960,7 +1991,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -3252,7 +3283,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 					ImagePullPolicy: "Always",
 					// at least one requirement -> burstable pod
 					Resources: v1.ResourceRequirements{
-						Requests: makeAllocatableResources(100, 100, 100, 100, 0, 0),
+						Requests: makeAllocatableResources(100, 100, 100, 100, 0, 0, 0),
 					},
 				},
 			},
@@ -3402,6 +3433,78 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestNodeConditionPredicate(t *testing.T) {
+	tests := []struct {
+		node        *v1.Node
+		schedulable bool
+	}{
+		// node1 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+			schedulable: true,
+		},
+		// node2 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node3 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+
+		// node4 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node5 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node6 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node7 ignored - node out of disk, node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node8 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node9 ignored - node unschedulable
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
+			schedulable: false,
+		},
+		// node10 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
+			schedulable: true,
+		},
+		// node11 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
+			schedulable: true,
+		},
+	}
+
+	for _, test := range tests {
+		nodeInfo := makeEmptyNodeInfo(test.node)
+		if fit, reasons, err := CheckNodeConditionPredicate(nil, nil, nodeInfo); fit != test.schedulable {
+			t.Errorf("%s: expected: %t, got %t; %+v, %v",
+				test.node.Name, test.schedulable, fit, reasons, err)
+		}
+	}
+}
+
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: pod, Namespace: "default"},
@@ -3423,13 +3526,13 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 func TestVolumeZonePredicate(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_3"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-c"}},
 		},
 	}
 
@@ -3466,7 +3569,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"},
 				},
 			},
 			Fits: true,
@@ -3487,7 +3590,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3498,7 +3601,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3509,7 +3612,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -3520,7 +3623,100 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+	}
+
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
+
+	for _, test := range tests {
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		node := &schedulercache.NodeInfo{}
+		node.SetNode(test.Node)
+
+		fits, reasons, err := fit(test.Pod, nil, node)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
+		}
+		if fits != test.Fits {
+			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
+		}
+
+	}
+}
+
+func TestVolumeZonePredicateMultiZone(t *testing.T) {
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_2"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_3"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+	}
+
+	tests := []struct {
+		Name string
+		Pod  *v1.Pod
+		Fits bool
+		Node *v1.Node
+	}{
+		{
+			Name: "node without labels",
+			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain failed match",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,

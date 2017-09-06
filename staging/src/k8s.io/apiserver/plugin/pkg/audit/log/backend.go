@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 )
 
@@ -41,16 +41,18 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out    io.Writer
-	format string
+	out          io.Writer
+	format       string
+	groupVersion schema.GroupVersion
 }
 
 var _ audit.Backend = &backend{}
 
-func NewBackend(out io.Writer, format string) *backend {
+func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
-		out:    out,
-		format: format,
+		out:          out,
+		format:       format,
+		groupVersion: groupVersion,
 	}
 }
 
@@ -66,8 +68,7 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 	case FormatLegacy:
 		line = audit.EventString(ev) + "\n"
 	case FormatJson:
-		// TODO(audit): figure out a general way to let the client choose their preferred version
-		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(auditv1beta1.SchemeGroupVersion), ev)
+		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
 		if err != nil {
 			audit.HandlePluginError("log", err, ev)
 			return

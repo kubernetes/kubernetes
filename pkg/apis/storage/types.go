@@ -54,6 +54,17 @@ type StorageClass struct {
 	// PersistentVolumes of this storage class are created with
 	// +optional
 	ReclaimPolicy *api.PersistentVolumeReclaimPolicy
+
+	// mountOptions are the mount options that dynamically provisioned
+	// PersistentVolumes of this storage class are created with
+	// +optional
+	MountOptions []string
+
+	// AllowVolumeExpansion shows whether the storage class allow volume expand
+	// If the field is nil or not set, it would amount to expansion disabled
+	// for all PVs created from this storageclass.
+	// +optional
+	AllowVolumeExpansion *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

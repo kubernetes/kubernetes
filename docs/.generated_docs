@@ -27,6 +27,7 @@ docs/man/man1/kubectl-apply-view-last-applied.1
 docs/man/man1/kubectl-apply.1
 docs/man/man1/kubectl-attach.1
 docs/man/man1/kubectl-auth-can-i.1
+docs/man/man1/kubectl-auth-reconcile.1
 docs/man/man1/kubectl-auth.1
 docs/man/man1/kubectl-autoscale.1
 docs/man/man1/kubectl-certificate-approve.1
@@ -95,8 +96,10 @@ docs/man/man1/kubectl-rollout-resume.1
 docs/man/man1/kubectl-rollout-status.1
 docs/man/man1/kubectl-rollout-undo.1
 docs/man/man1/kubectl-rollout.1
+docs/man/man1/kubectl-run-container.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
+docs/man/man1/kubectl-set-env.1
 docs/man/man1/kubectl-set-image.1
 docs/man/man1/kubectl-set-resources.1
 docs/man/man1/kubectl-set-selector.1
@@ -121,6 +124,7 @@ docs/user-guide/kubectl/kubectl_apply_view-last-applied.md
 docs/user-guide/kubectl/kubectl_attach.md
 docs/user-guide/kubectl/kubectl_auth.md
 docs/user-guide/kubectl/kubectl_auth_can-i.md
+docs/user-guide/kubectl/kubectl_auth_reconcile.md
 docs/user-guide/kubectl/kubectl_autoscale.md
 docs/user-guide/kubectl/kubectl_certificate.md
 docs/user-guide/kubectl/kubectl_certificate_approve.md
@@ -191,6 +195,7 @@ docs/user-guide/kubectl/kubectl_rollout_undo.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
 docs/user-guide/kubectl/kubectl_set.md
+docs/user-guide/kubectl/kubectl_set_env.md
 docs/user-guide/kubectl/kubectl_set_image.md
 docs/user-guide/kubectl/kubectl_set_resources.md
 docs/user-guide/kubectl/kubectl_set_selector.md
@@ -236,6 +241,7 @@ docs/yaml/kubectl/kubectl_proxy.yaml
 docs/yaml/kubectl/kubectl_replace.yaml
 docs/yaml/kubectl/kubectl_rolling-update.yaml
 docs/yaml/kubectl/kubectl_rollout.yaml
+docs/yaml/kubectl/kubectl_run-container.yaml
 docs/yaml/kubectl/kubectl_run.yaml
 docs/yaml/kubectl/kubectl_scale.yaml
 docs/yaml/kubectl/kubectl_set.yaml

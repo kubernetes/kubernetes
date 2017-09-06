@@ -28,9 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
@@ -233,8 +235,10 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 			continue
 		}
 		if node.Spec.PodCIDR != "" {
-			glog.Errorf("Node %v already has allocated CIDR %v. Releasing assigned one if different.", node.Name, node.Spec.PodCIDR)
+			glog.V(4).Infof("Node %v already has allocated CIDR %v. Releasing assigned one if different.", node.Name, node.Spec.PodCIDR)
 			if node.Spec.PodCIDR != data.cidr.String() {
+				glog.Errorf("Node %q PodCIDR seems to have changed (original=%v, current=%v), releasing original and occupying new CIDR",
+					node.Name, node.Spec.PodCIDR, data.cidr.String())
 				if err := r.cidrs.Release(data.cidr); err != nil {
 					glog.Errorf("Error when releasing CIDR %v", data.cidr.String())
 				}
@@ -261,4 +265,36 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		}
 	}
 	return err
+}
+
+func (r *rangeAllocator) Register(nodeInformer informers.NodeInformer) {
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: util.CreateAddNodeHandler(r.AllocateOrOccupyCIDR),
+		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+			// If the PodCIDR is not empty we either:
+			// - already processed a Node that already had a CIDR after NC restarted
+			//   (cidr is marked as used),
+			// - already processed a Node successfully and allocated a CIDR for it
+			//   (cidr is marked as used),
+			// - already processed a Node but we did saw a "timeout" response and
+			//   request eventually got through in this case we haven't released
+			//   the allocated CIDR (cidr is still marked as used).
+			// There's a possible error here:
+			// - NC sees a new Node and assigns a CIDR X to it,
+			// - Update Node call fails with a timeout,
+			// - Node is updated by some other component, NC sees an update and
+			//   assigns CIDR Y to the Node,
+			// - Both CIDR X and CIDR Y are marked as used in the local cache,
+			//   even though Node sees only CIDR Y
+			// The problem here is that in in-memory cache we see CIDR X as marked,
+			// which prevents it from being assigned to any new node. The cluster
+			// state is correct.
+			// Restart of NC fixes the issue.
+			if newNode.Spec.PodCIDR == "" {
+				return r.AllocateOrOccupyCIDR(newNode)
+			}
+			return nil
+		}),
+		DeleteFunc: util.CreateDeleteNodeHandler(r.ReleaseCIDR),
+	})
 }

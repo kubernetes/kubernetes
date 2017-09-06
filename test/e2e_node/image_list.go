@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -47,12 +48,12 @@ const (
 var NodeImageWhiteList = sets.NewString(
 	"google/cadvisor:latest",
 	"gcr.io/google-containers/stress:v1",
-	"gcr.io/google_containers/busybox:1.24",
+	busyboxImage,
 	"gcr.io/google_containers/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 	"gcr.io/google_containers/node-problem-detector:v0.4.1",
-	"gcr.io/google_containers/nginx-slim:0.7",
-	"gcr.io/google_containers/serve_hostname:v1.4",
-	"gcr.io/google_containers/netexec:1.7",
+	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.ServeHostname),
+	imageutils.GetE2EImage(imageutils.Netexec),
 	"gcr.io/google_containers/nonewprivs:1.2",
 	framework.GetPauseImageNameForHostArch(),
 )

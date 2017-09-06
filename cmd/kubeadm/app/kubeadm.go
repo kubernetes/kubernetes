@@ -23,7 +23,6 @@ import (
 
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func Run() error {
@@ -31,6 +30,6 @@ func Run() error {
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
 
-	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
 }

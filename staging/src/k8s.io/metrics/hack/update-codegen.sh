@@ -36,7 +36,7 @@ PREFIX=k8s.io/metrics/pkg/apis
 INPUT_BASE="--input-base ${PREFIX}"
 CLIENTSET_PATH="--clientset-path k8s.io/metrics/pkg/client/clientset_generated"
 
-${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input metrics/v1alpha1 ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
+${CLIENTGEN} --clientset-name="clientset" ${INPUT_BASE} --input metrics/v1alpha1 --input metrics/v1beta1 ${CLIENTSET_PATH} --output-base ${SCRIPT_BASE}
 
 # we skip informers and listers for metrics, because we don't quite support the requisite operations yet
 # we skip generating the internal clientset as it's not really needed

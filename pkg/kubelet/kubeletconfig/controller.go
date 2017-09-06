@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilpanic "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/panic"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const (
@@ -78,16 +78,16 @@ type Controller struct {
 // If the `initConfigDir` is an empty string, skips trying to load the init config.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(initConfigDir string,
-	dynamicConfigDir string,
-	defaultConfig *kubeletconfig.KubeletConfiguration) (*Controller, error) {
+func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
+	initConfigDir string,
+	dynamicConfigDir string) (*Controller, error) {
 	var err error
 
 	fs := utilfs.DefaultFs{}
 
 	var initLoader configfiles.Loader
 	if len(initConfigDir) > 0 {
-		initLoader, err = configfiles.NewFSLoader(fs, initConfigDir)
+		initLoader, err = configfiles.NewFsLoader(fs, initConfigDir)
 		if err != nil {
 			return nil, err
 		}

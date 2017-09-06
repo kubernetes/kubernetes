@@ -128,14 +128,15 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().Bool("local", false, "If true, label will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
@@ -185,10 +186,12 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	b := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.local {

@@ -152,7 +152,9 @@ func (i *ImportRestriction) isForbidden(imp string) bool {
 	importsBelowBase := strings.HasPrefix(imp, i.BaseDir)
 	importsAllowed := false
 	for _, allowed := range i.AllowedImports {
-		importsAllowed = importsAllowed || strings.HasPrefix(imp, allowed)
+		exactlyImportsAllowed := imp == allowed
+		importsBelowAllowed := strings.HasPrefix(imp, fmt.Sprintf("%s/", allowed))
+		importsAllowed = importsAllowed || (importsBelowAllowed || exactlyImportsAllowed)
 	}
 
 	return importsBelowRoot && !importsBelowBase && !importsAllowed

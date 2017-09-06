@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -118,17 +119,22 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 }
 
 func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
-	var categoryExpander resource.CategoryExpander
-	categoryExpander = resource.LegacyCategoryExpander
+	legacyExpander := resource.LegacyCategoryExpander
+
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
-		// wrap with discovery based filtering
-		categoryExpander, err = resource.NewDiscoveryFilteredExpander(categoryExpander, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		// fallback is the legacy expander wrapped with discovery based filtering
+		fallbackExpander, err := resource.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
+
+		// by default use the expander that discovers based on "categories" field from the API
+		discoveryCategoryExpander, err := resource.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		CheckErr(err)
+
+		return discoveryCategoryExpander
 	}
 
-	return categoryExpander
+	return legacyExpander
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -407,7 +413,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 func (f *ring1Factory) Validator(validate, openapi bool, cacheDir string) (validation.Schema, error) {
 	if validate {
 		if openapi {
-			resources, err := f.OpenAPISchema(cacheDir)
+			resources, err := f.OpenAPISchema()
 			if err == nil {
 				return validation.ConjunctiveSchema{
 					openapivalidation.NewSchemaValidation(resources),
@@ -453,13 +459,7 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 }
 
 // OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
-// Will try to cache the data to a local file.  Cache is written and read from a
-// file created with ioutil.TempFile and obeys the expiration semantics of that file.
-// The cache location is a function of the client and server versions so that the open API
-// schema will be cached separately for different client / server combinations.
-// Note, the cache will not be invalidated if the server changes its open API schema without
-// changing the server version.
-func (f *ring1Factory) OpenAPISchema(cacheDir string) (openapi.Resources, error) {
+func (f *ring1Factory) OpenAPISchema() (oapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -467,23 +467,8 @@ func (f *ring1Factory) OpenAPISchema(cacheDir string) (openapi.Resources, error)
 
 	// Lazily initialize the OpenAPIGetter once
 	f.openAPIGetter.once.Do(func() {
-		// Get the server version for caching the openapi spec
-		versionString := ""
-		version, err := discovery.ServerVersion()
-		if err != nil {
-			// Cache the result under the server version
-			versionString = version.String()
-		}
-
-		// Get the cache directory for caching the openapi spec
-		cacheDir, err = substituteUserHome(cacheDir)
-		if err != nil {
-			// Don't cache the result if we couldn't substitute the home directory
-			cacheDir = ""
-		}
-
 		// Create the caching OpenAPIGetter
-		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(cacheDir, versionString, discovery)
+		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
 	})
 
 	// Delegate to the OpenAPIGetter

@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -50,6 +51,8 @@ type VolumeOptions struct {
 
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
+	// Mount options for a persistent volume
+	MountOptions []string
 	// Suggested PV.Name of the PersistentVolume to provision.
 	// This is a generated name guaranteed to be unique in Kubernetes cluster.
 	// If you choose not to use it as volume name, ensure uniqueness by either
@@ -197,6 +200,14 @@ type AttachableVolumePlugin interface {
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
+}
+
+// ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
+// expanded
+type ExpandableVolumePlugin interface {
+	VolumePlugin
+	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error)
+	RequiresFSResize() bool
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -636,6 +647,32 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 	}
 	if attachablePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
 		return attachablePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindExpandablePluginBySpec fetches a persistent volume plugin by spec.
+func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if expandableVolumePlugin, ok := volumePlugin.(ExpandableVolumePlugin); ok {
+		return expandableVolumePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindExpandablePluginBySpec fetches a persistent volume plugin by name.
+func (pm *VolumePluginMgr) FindExpandablePluginByName(name string) (ExpandableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if expandableVolumePlugin, ok := volumePlugin.(ExpandableVolumePlugin); ok {
+		return expandableVolumePlugin, nil
 	}
 	return nil, nil
 }

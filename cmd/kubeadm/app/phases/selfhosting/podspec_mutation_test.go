@@ -73,7 +73,7 @@ func TestMutatePodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		mutatePodSpec(getDefaultMutators(), rt.component, rt.podSpec)
+		mutatePodSpec(GetDefaultMutators(), rt.component, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)

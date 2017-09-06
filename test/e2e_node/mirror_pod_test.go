@@ -33,6 +33,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
@@ -48,7 +49,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("create the static pod")
 			err := createStaticPod(manifestPath, staticPodName, ns,
-				"gcr.io/google_containers/nginx-slim:0.7", v1.RestartPolicyAlways)
+				imageutils.GetE2EImage(imageutils.NginxSlim), v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")

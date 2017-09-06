@@ -56,7 +56,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 	// Default values for the cobra help text
 	api.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile, featureFlagsString string
+	var cfgPath, kubeConfigFile, featureGatesString string
 
 	// Creates the UX Command
 	cmd := &cobra.Command{
@@ -65,7 +65,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 		Short:   "Converts a Static Pod-hosted control plane into a self-hosted one.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			if cfg.FeatureFlags, err = features.NewFeatureGate(&features.InitFeatureGates, featureFlagsString); err != nil {
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
 
@@ -92,7 +92,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 	// flags bound to the configuration object
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, `The path where certificates are stored`)
 	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
-	cmd.Flags().StringVar(&featureFlagsString, "feature-gates", featureFlagsString, "A set of key=value pairs that describe feature gates for various features."+
+	cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 
 	// flags that are not bound to the configuration object

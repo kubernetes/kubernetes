@@ -45,6 +45,7 @@ const (
 	FailedAttachVolume                   = "FailedAttachVolume"
 	FailedDetachVolume                   = "FailedDetachVolume"
 	FailedMountVolume                    = "FailedMount"
+	VolumeResizeFailed                   = "VolumeResizeFailed"
 	FailedUnMountVolume                  = "FailedUnMount"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
 	SuccessfulDetachVolume               = "SuccessfulDetachVolume"
@@ -63,6 +64,7 @@ const (
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
 	UnsupportedMountOption               = "UnsupportedMountOption"
 	SandboxChanged                       = "SandboxChanged"
+	FailedCreatePodSandBox               = "FailedCreatePodSandBox"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"

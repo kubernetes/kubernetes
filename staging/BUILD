@@ -182,6 +182,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/tools/clientcmd:all-srcs",
         "//staging/src/k8s.io/client-go/tools/leaderelection:all-srcs",
         "//staging/src/k8s.io/client-go/tools/metrics:all-srcs",
+        "//staging/src/k8s.io/client-go/tools/pager:all-srcs",
         "//staging/src/k8s.io/client-go/tools/portforward:all-srcs",
         "//staging/src/k8s.io/client-go/tools/record:all-srcs",
         "//staging/src/k8s.io/client-go/tools/reference:all-srcs",

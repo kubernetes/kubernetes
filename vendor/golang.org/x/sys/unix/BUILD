@@ -9,6 +9,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
             "asm_darwin_amd64.s",
             "constants.go",
+            "dev_darwin.go",
             "dirent.go",
             "endian_little.go",
             "env_unix.go",
@@ -31,6 +32,7 @@ go_library(
             "asm_linux_amd64.s",
             "bluetooth_linux.go",
             "constants.go",
+            "dev_linux.go",
             "dirent.go",
             "endian_little.go",
             "env_unix.go",

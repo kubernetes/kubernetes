@@ -1,0 +1,60 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "feature_adapter.go",
+        "feature_any.go",
+        "feature_any_array.go",
+        "feature_any_bool.go",
+        "feature_any_float.go",
+        "feature_any_int32.go",
+        "feature_any_int64.go",
+        "feature_any_invalid.go",
+        "feature_any_nil.go",
+        "feature_any_number.go",
+        "feature_any_object.go",
+        "feature_any_string.go",
+        "feature_any_uint32.go",
+        "feature_any_uint64.go",
+        "feature_config.go",
+        "feature_iter.go",
+        "feature_iter_array.go",
+        "feature_iter_float.go",
+        "feature_iter_int.go",
+        "feature_iter_object.go",
+        "feature_iter_skip.go",
+        "feature_iter_skip_strict.go",
+        "feature_iter_string.go",
+        "feature_json_number.go",
+        "feature_pool.go",
+        "feature_reflect.go",
+        "feature_reflect_array.go",
+        "feature_reflect_extension.go",
+        "feature_reflect_map.go",
+        "feature_reflect_native.go",
+        "feature_reflect_object.go",
+        "feature_reflect_slice.go",
+        "feature_reflect_struct_decoder.go",
+        "feature_stream.go",
+        "feature_stream_float.go",
+        "feature_stream_int.go",
+        "feature_stream_string.go",
+        "jsoniter.go",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

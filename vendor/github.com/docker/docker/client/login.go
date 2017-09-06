@@ -11,7 +11,7 @@ import (
 )
 
 // RegistryLogin authenticates the docker server with a given docker registry.
-// It returns UnauthorizerError when the authentication fails.
+// It returns unauthorizedError when the authentication fails.
 func (cli *Client) RegistryLogin(ctx context.Context, auth types.AuthConfig) (registry.AuthenticateOKBody, error) {
 	resp, err := cli.post(ctx, "/auth", url.Values{}, auth, nil)
 

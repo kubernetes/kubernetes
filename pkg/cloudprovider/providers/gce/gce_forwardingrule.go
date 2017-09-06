@@ -99,6 +99,14 @@ func (gce *GCECloud) ListRegionForwardingRules(region string) (*compute.Forwardi
 	return v, mc.Observe(err)
 }
 
+// ListRegionForwardingRules lists all RegionalForwardingRules in the project & region.
+func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) (*computealpha.ForwardingRuleList, error) {
+	mc := newForwardingRuleMetricContextWithVersion("list", region, computeAlphaVersion)
+	// TODO: use PageToken to list all not just the first 500
+	v, err := gce.serviceAlpha.ForwardingRules.List(gce.projectID, region).Do()
+	return v, mc.Observe(err)
+}
+
 // CreateRegionForwardingRule creates and returns a
 // RegionalForwardingRule that points to the given BackendService
 func (gce *GCECloud) CreateRegionForwardingRule(rule *compute.ForwardingRule, region string) error {
@@ -132,4 +140,16 @@ func (gce *GCECloud) DeleteRegionForwardingRule(name, region string) error {
 	}
 
 	return gce.waitForRegionOp(op, region, mc)
+}
+
+// TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
+func (gce *GCECloud) getNetworkTierFromForwardingRule(name, region string) (string, error) {
+	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
+		return NetworkTierDefault.ToGCEValue(), nil
+	}
+	fwdRule, err := gce.GetAlphaRegionForwardingRule(name, region)
+	if err != nil {
+		return handleAlphaNetworkTierGetError(err)
+	}
+	return fwdRule.NetworkTier, nil
 }

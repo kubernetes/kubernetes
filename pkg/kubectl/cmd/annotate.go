@@ -128,10 +128,11 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().Bool("local", false, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().String("resource-version", "", i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
@@ -190,10 +191,12 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		return err
 	}
 
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	b := builder.
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.local {

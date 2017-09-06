@@ -386,10 +386,16 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path, volName
 	if source.EmptyDir != nil {
 		numVolumes++
 		if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-			unsetSizeLimit := resource.Quantity{}
-			if unsetSizeLimit.Cmp(source.EmptyDir.SizeLimit) != 0 {
+			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) != 0 {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field disabled by feature-gate for EmptyDir volumes"))
 			}
+		} else {
+			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
+			}
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == api.StorageMediumHugePages {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
 		}
 	}
 	if source.HostPath != nil {
@@ -1024,6 +1030,38 @@ func validatePathNoBacksteps(targetPath string, fldPath *field.Path) field.Error
 	return allErrs
 }
 
+// validateMountPropagation verifies that MountPropagation field is valid and
+// allowed for given container.
+func validateMountPropagation(mountPropagation *api.MountPropagationMode, container *api.Container, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if mountPropagation == nil {
+		return allErrs
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "mount propagation is disabled by feature-gate"))
+		return allErrs
+	}
+
+	supportedMountPropagations := sets.NewString(string(api.MountPropagationBidirectional), string(api.MountPropagationHostToContainer))
+	if !supportedMountPropagations.Has(string(*mountPropagation)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, *mountPropagation, supportedMountPropagations.List()))
+	}
+
+	if container == nil {
+		// The container is not available yet, e.g. during validation of
+		// PodPreset. Stop validation now, Pod validation will refuse final
+		// Pods with Bidirectional propagation in non-privileged containers.
+		return allErrs
+	}
+
+	privileged := container.SecurityContext != nil && container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged
+	if *mountPropagation == api.MountPropagationBidirectional && !privileged {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Bidirectional mount propagation is available only to privileged containers"))
+	}
+	return allErrs
+}
+
 // This validate will make sure targetPath:
 // 1. is not abs path
 // 2. does not contain any '..' elements
@@ -1553,10 +1591,31 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 		oldPvc.Spec.VolumeName = newPvc.Spec.VolumeName
 		defer func() { oldPvc.Spec.VolumeName = "" }()
 	}
-	// changes to Spec are not allowed, but updates to label/and some annotations are OK.
-	// no-op updates pass validation.
-	if !apiequality.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		newPVCSpecCopy := newPvc.Spec.DeepCopy()
+
+		// lets make sure storage values are same.
+		if newPvc.Status.Phase == api.ClaimBound && newPVCSpecCopy.Resources.Requests != nil {
+			newPVCSpecCopy.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"]
+		}
+
+		oldSize := oldPvc.Spec.Resources.Requests["storage"]
+		newSize := newPvc.Spec.Resources.Requests["storage"]
+
+		if !apiequality.Semantic.DeepEqual(*newPVCSpecCopy, oldPvc.Spec) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "is immutable after creation except resources.requests for bound claims"))
+		}
+		if newSize.Cmp(oldSize) < 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
+		}
+
+	} else {
+		// changes to Spec are not allowed, but updates to label/and some annotations are OK.
+		// no-op updates pass validation.
+		if !apiequality.Semantic.DeepEqual(newPvc.Spec, oldPvc.Spec) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "field is immutable after creation"))
+		}
 	}
 
 	// storageclass annotation should be immutable after creation
@@ -1575,6 +1634,10 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	}
 	if len(newPvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("Spec", "accessModes"), ""))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && len(newPvc.Status.Conditions) > 0 {
+		conditionPath := field.NewPath("status", "conditions")
+		allErrs = append(allErrs, field.Forbidden(conditionPath, "invalid field"))
 	}
 	capPath := field.NewPath("status", "capacity")
 	for r, qty := range newPvc.Status.Capacity {
@@ -1643,7 +1706,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 }
 
 var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
-var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
+var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1703,6 +1766,13 @@ func validateObjectFieldSelector(fs *api.ObjectFieldSelector, expressions *sets.
 	return allErrs
 }
 
+func fsResourceIsEphemeralStorage(resource string) bool {
+	if resource == "limits.ephemeral-storage" || resource == "requests.ephemeral-storage" {
+		return true
+	}
+	return false
+}
+
 func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expressions *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1712,6 +1782,8 @@ func validateContainerResourceFieldSelector(fs *api.ResourceFieldSelector, expre
 		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
 	} else if !expressions.Has(fs.Resource) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("resource"), fs.Resource, expressions.List()))
+	} else if fsResourceIsEphemeralStorage(fs.Resource) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Containers' ephemeral storage requests/limits disabled by feature-gate for Downward API"))
 	}
 	allErrs = append(allErrs, validateContainerResourceDivisor(fs.Resource, fs.Divisor, fldPath)...)
 	return allErrs
@@ -1772,6 +1844,7 @@ func validateSecretEnvSource(secretSource *api.SecretEnvSource, fldPath *field.P
 
 var validContainerResourceDivisorForCPU = sets.NewString("1m", "1")
 var validContainerResourceDivisorForMemory = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
+var validContainerResourceDivisorForEphemeralStorage = sets.NewString("1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei")
 
 func validateContainerResourceDivisor(rName string, divisor resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1787,6 +1860,10 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 	case "limits.memory", "requests.memory":
 		if !validContainerResourceDivisorForMemory.Has(divisor.String()) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource"))
+		}
+	case "limits.ephemeral-storage", "requests.ephemeral-storage":
+		if !validContainerResourceDivisorForEphemeralStorage.Has(divisor.String()) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource"))
 		}
 	}
 	return allErrs
@@ -1828,7 +1905,7 @@ func validateSecretKeySelector(s *api.SecretKeySelector, fldPath *field.Path) fi
 	return allErrs
 }
 
-func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, container *api.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.NewString()
 
@@ -1851,6 +1928,10 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
+
+		if mnt.MountPropagation != nil {
+			allErrs = append(allErrs, validateMountPropagation(mnt.MountPropagation, container, fldPath.Child("mountPropagation"))...)
 		}
 	}
 	return allErrs
@@ -2118,7 +2199,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
-		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
+		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, &ctr, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
@@ -2324,6 +2405,28 @@ func ValidateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	return allErrors
 }
 
+func toResourceNames(resources api.ResourceList) []api.ResourceName {
+	result := []api.ResourceName{}
+	for resourceName := range resources {
+		result = append(result, resourceName)
+	}
+	return result
+}
+
+func toSet(resourceNames []api.ResourceName) sets.String {
+	result := sets.NewString()
+	for _, resourceName := range resourceNames {
+		result.Insert(string(resourceName))
+	}
+	return result
+}
+
+func toContainerResourcesSet(ctr *api.Container) sets.String {
+	resourceNames := toResourceNames(ctr.Resources.Requests)
+	resourceNames = append(resourceNames, toResourceNames(ctr.Resources.Limits)...)
+	return toSet(resourceNames)
+}
+
 // validateContainersOnlyForPod does additional validation for containers on a pod versus a pod template
 // it only does additive validation of fields not covered in validateContainers
 func validateContainersOnlyForPod(containers []api.Container, fldPath *field.Path) field.ErrorList {
@@ -2350,6 +2453,21 @@ func ValidatePod(pod *api.Pod) field.ErrorList {
 
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		hugePageResources := sets.NewString()
+		for i := range pod.Spec.Containers {
+			resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+			for resourceStr := range resourceSet {
+				if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+					hugePageResources.Insert(resourceStr)
+				}
+			}
+		}
+		if len(hugePageResources) > 1 {
+			allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
+		}
+	}
 
 	return allErrs
 }
@@ -3367,7 +3485,10 @@ func ValidateNode(node *api.Node) field.ErrorList {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
 
-	// Only validate spec. All status fields are optional and can be updated later.
+	// Only validate spec.
+	// All status fields are optional and can be updated later.
+	// That said, if specified, we need to ensure they are valid.
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// external ID is required.
 	if len(node.Spec.ExternalID) == 0 {
@@ -3383,6 +3504,38 @@ func ValidateNode(node *api.Node) field.ErrorList {
 	return allErrs
 }
 
+// ValidateNodeResources is used to make sure a node has valid capacity and allocatable values.
+func ValidateNodeResources(node *api.Node) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Validate resource quantities in capacity.
+	hugePageSizes := sets.NewString()
+	for k, v := range node.Status.Capacity {
+		resPath := field.NewPath("status", "capacity", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	// Validate resource quantities in allocatable.
+	hugePageSizes = sets.NewString()
+	for k, v := range node.Status.Allocatable {
+		resPath := field.NewPath("status", "allocatable", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		// track any huge page size that has a positive value
+		if helper.IsHugePageResourceName(k) && v.Value() > int64(0) {
+			hugePageSizes.Insert(string(k))
+		}
+		if len(hugePageSizes) > 1 {
+			allErrs = append(allErrs, field.Invalid(resPath, v, "may not have pre-allocated hugepages for multiple page sizes"))
+		}
+	}
+	return allErrs
+}
+
 // ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
 func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
@@ -3395,16 +3548,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
-	// Validate resource quantities in capacity.
-	for k, v := range node.Status.Capacity {
-		resPath := field.NewPath("status", "capacity", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
-	// Validate resource quantities in allocatable.
-	for k, v := range node.Status.Allocatable {
-		resPath := field.NewPath("status", "allocatable", string(k))
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
-	}
+	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
 	// Validate no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
@@ -3423,6 +3567,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDR"), "node updates may not change podCIDR except from \"\" to valid"))
 		}
 	}
+
+	// Allow controller manager updating provider ID when not set
+	if len(oldNode.Spec.ProviderID) == 0 {
+		oldNode.Spec.ProviderID = node.Spec.ProviderID
+	} else {
+		if oldNode.Spec.ProviderID != node.Spec.ProviderID {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "providerID"), "node updates may not change providerID except from \"\" to valid"))
+		}
+	}
+
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
 	oldNode.ObjectMeta = node.ObjectMeta
@@ -3493,10 +3647,23 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
+// isLocalStorageResource checks whether the resource is local ephemeral storage
+func isLocalStorageResource(name string) bool {
+	if name == string(api.ResourceEphemeralStorage) || name == string(api.ResourceRequestsEphemeralStorage) ||
+		name == string(api.ResourceLimitsEphemeralStorage) {
+		return true
+	} else {
+		return false
+	}
+}
+
 // Validate resource names that can go in a resource quota
 // Refer to docs/design/resources.md for more details.
 func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
+	if isLocalStorageResource(value) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"))
+	}
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
@@ -3527,6 +3694,10 @@ func validateLimitRangeTypeName(value string, fldPath *field.Path) field.ErrorLi
 // Validate limit range resource name
 // limit types (other than Pod/Container) could contain storage not just cpu or memory
 func validateLimitRangeResourceName(limitType api.LimitType, value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if value == string(api.ResourceEphemeralStorage) && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		return append(allErrs, field.Forbidden(fldPath, "ResourceEphemeralStorage field disabled by feature-gate for Resource LimitRange"))
+	}
 	switch limitType {
 	case api.LimitTypePod, api.LimitTypeContainer:
 		return validateContainerResourceName(value, fldPath)
@@ -3820,6 +3991,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		if resourceName == api.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			allErrs = append(allErrs, field.Forbidden(limPath, "ResourceEphemeralStorage field disabled by feature-gate for ResourceRequirements"))
 		}
+		if helper.IsHugePageResourceName(resourceName) && !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+			allErrs = append(allErrs, field.Forbidden(limPath, fmt.Sprintf("%s field disabled by feature-gate for ResourceRequirements", resourceName)))
+		}
+
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))

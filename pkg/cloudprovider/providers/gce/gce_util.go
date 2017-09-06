@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -56,6 +57,43 @@ func getProjectAndZone() (string, string, error) {
 		return "", "", err
 	}
 	return projectID, zone, nil
+}
+
+func (gce *GCECloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
+	msg := fmt.Sprintf("Firewall change required by network admin: `%v`", cmd)
+	if gce.eventRecorder != nil && svc != nil {
+		gce.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
+	}
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to create a firewall with specified params
+func FirewallToGCloudCreateCmd(fw *compute.Firewall, projectID string) string {
+	args := firewallToGcloudArgs(fw, projectID)
+	return fmt.Sprintf("gcloud compute firewall-rules create %v --network %v %v", fw.Name, getNameFromLink(fw.Network), args)
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to update a firewall to specified params
+func FirewallToGCloudUpdateCmd(fw *compute.Firewall, projectID string) string {
+	args := firewallToGcloudArgs(fw, projectID)
+	return fmt.Sprintf("gcloud compute firewall-rules update %v %v", fw.Name, args)
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to delete a firewall to specified params
+func FirewallToGCloudDeleteCmd(fwName, projectID string) string {
+	return fmt.Sprintf("gcloud compute firewall-rules delete %v --project %v", fwName, projectID)
+}
+
+func firewallToGcloudArgs(fw *compute.Firewall, projectID string) string {
+	var allPorts []string
+	for _, a := range fw.Allowed {
+		for _, p := range a.Ports {
+			allPorts = append(allPorts, fmt.Sprintf("%v:%v", a.IPProtocol, p))
+		}
+	}
+	allow := strings.Join(allPorts, ",")
+	srcRngs := strings.Join(fw.SourceRanges, ",")
+	targets := strings.Join(fw.TargetTags, ",")
+	return fmt.Sprintf("--description %q --allow %v --source-ranges %v --target-tags %v --project %v", fw.Description, allow, srcRngs, targets, projectID)
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
@@ -150,6 +188,26 @@ func isNotFoundOrInUse(err error) bool {
 	return isNotFound(err) || isInUsedByError(err)
 }
 
+func isForbidden(err error) bool {
+	return isHTTPErrorCode(err, http.StatusForbidden)
+}
+
 func makeGoogleAPINotFoundError(message string) error {
 	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
+}
+
+func makeGoogleAPIError(code int, message string) error {
+	return &googleapi.Error{Code: code, Message: message}
+}
+
+// TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
+func handleAlphaNetworkTierGetError(err error) (string, error) {
+	if isForbidden(err) {
+		// Network tier is still an Alpha feature in GCP, and not every project
+		// is whitelisted to access the API. If we cannot access the API, just
+		// assume the tier is premium.
+		return NetworkTierDefault.ToGCEValue(), nil
+	}
+	// Can't get the network tier, just return an error.
+	return "", err
 }

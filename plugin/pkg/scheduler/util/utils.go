@@ -39,3 +39,10 @@ func GetUsedPorts(pods ...*v1.Pod) map[int]bool {
 	}
 	return ports
 }
+
+// GetPodFullName returns a name that uniquely identifies a pod.
+func GetPodFullName(pod *v1.Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format).
+	return pod.Name + "_" + pod.Namespace
+}

@@ -19,10 +19,7 @@ limitations under the License.
 package mount
 
 import (
-	"bufio"
 	"fmt"
-	"hash/fnv"
-	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -32,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilio "k8s.io/kubernetes/pkg/util/io"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -42,6 +40,8 @@ const (
 	expectedNumFieldsPerLine = 6
 	// Location of the mount file to use
 	procMountsPath = "/proc/mounts"
+	// Location of the mountinfo file
+	procMountInfoPath = "/proc/self/mountinfo"
 )
 
 const (
@@ -333,76 +333,54 @@ func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (str
 }
 
 func listProcMounts(mountFilePath string) ([]MountPoint, error) {
-	hash1, err := readProcMounts(mountFilePath, nil)
+	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := 0; i < maxListTries; i++ {
-		mps := []MountPoint{}
-		hash2, err := readProcMounts(mountFilePath, &mps)
-		if err != nil {
-			return nil, err
-		}
-		if hash1 == hash2 {
-			// Success
-			return mps, nil
-		}
-		hash1 = hash2
-	}
-	return nil, fmt.Errorf("failed to get a consistent snapshot of %v after %d tries", mountFilePath, maxListTries)
+	return parseProcMounts(content)
 }
 
-// readProcMounts reads the given mountFilePath (normally /proc/mounts) and produces a hash
-// of the contents.  If the out argument is not nil, this fills it with MountPoint structs.
-func readProcMounts(mountFilePath string, out *[]MountPoint) (uint32, error) {
-	file, err := os.Open(mountFilePath)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-	return readProcMountsFrom(file, out)
-}
-
-func readProcMountsFrom(file io.Reader, out *[]MountPoint) (uint32, error) {
-	hash := fnv.New32a()
-	scanner := bufio.NewReader(file)
-	for {
-		line, err := scanner.ReadString('\n')
-		if err == io.EOF {
-			break
+func parseProcMounts(content []byte) ([]MountPoint, error) {
+	out := []MountPoint{}
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if line == "" {
+			// the last split() item is empty string following the last \n
+			continue
 		}
 		fields := strings.Fields(line)
 		if len(fields) != expectedNumFieldsPerLine {
-			return 0, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
+			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
 		}
 
-		fmt.Fprintf(hash, "%s", line)
-
-		if out != nil {
-			mp := MountPoint{
-				Device: fields[0],
-				Path:   fields[1],
-				Type:   fields[2],
-				Opts:   strings.Split(fields[3], ","),
-			}
-
-			freq, err := strconv.Atoi(fields[4])
-			if err != nil {
-				return 0, err
-			}
-			mp.Freq = freq
-
-			pass, err := strconv.Atoi(fields[5])
-			if err != nil {
-				return 0, err
-			}
-			mp.Pass = pass
-
-			*out = append(*out, mp)
+		mp := MountPoint{
+			Device: fields[0],
+			Path:   fields[1],
+			Type:   fields[2],
+			Opts:   strings.Split(fields[3], ","),
 		}
+
+		freq, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return nil, err
+		}
+		mp.Freq = freq
+
+		pass, err := strconv.Atoi(fields[5])
+		if err != nil {
+			return nil, err
+		}
+		mp.Pass = pass
+
+		out = append(out, mp)
 	}
-	return hash.Sum32(), nil
+	return out, nil
+}
+
+func (mounter *Mounter) MakeRShared(path string) error {
+	mountCmd := defaultMountCommand
+	mountArgs := []string{}
+	return doMakeRShared(path, procMountInfoPath, mountCmd, mountArgs)
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -501,4 +479,98 @@ func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
 	// The device has dependent devices, most probably partitions (LVM, LUKS
 	// and MD RAID are reported as FSTYPE and caught above).
 	return "unknown data, probably partitions", nil
+}
+
+// isShared returns true, if given path is on a mount point that has shared
+// mount propagation.
+func isShared(path string, filename string) (bool, error) {
+	infos, err := parseMountInfo(filename)
+	if err != nil {
+		return false, err
+	}
+
+	// process /proc/xxx/mountinfo in backward order and find the first mount
+	// point that is prefix of 'path' - that's the mount where path resides
+	var info *mountInfo
+	for i := len(infos) - 1; i >= 0; i-- {
+		if strings.HasPrefix(path, infos[i].mountPoint) {
+			info = &infos[i]
+			break
+		}
+	}
+	if info == nil {
+		return false, fmt.Errorf("cannot find mount point for %q", path)
+	}
+
+	// parse optional parameters
+	for _, opt := range info.optional {
+		if strings.HasPrefix(opt, "shared:") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+type mountInfo struct {
+	mountPoint string
+	// list of "optional parameters", mount propagation is one of them
+	optional []string
+}
+
+// parseMountInfo parses /proc/xxx/mountinfo.
+func parseMountInfo(filename string) ([]mountInfo, error) {
+	content, err := utilio.ConsistentRead(filename, maxListTries)
+	if err != nil {
+		return []mountInfo{}, err
+	}
+	contentStr := string(content)
+	infos := []mountInfo{}
+
+	for _, line := range strings.Split(contentStr, "\n") {
+		if line == "" {
+			// the last split() item is empty string following the last \n
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 7 {
+			return nil, fmt.Errorf("wrong number of fields in (expected %d, got %d): %s", 8, len(fields), line)
+		}
+		info := mountInfo{
+			mountPoint: fields[4],
+			optional:   []string{},
+		}
+		for i := 6; i < len(fields) && fields[i] != "-"; i++ {
+			info.optional = append(info.optional, fields[i])
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
+}
+
+// doMakeRShared is common implementation of MakeRShared on Linux. It checks if
+// path is shared and bind-mounts it as rshared if needed. mountCmd and
+// mountArgs are expected to contain mount-like command, doMakeRShared will add
+// '--bind <path> <path>' and '--make-rshared <path>' to mountArgs.
+func doMakeRShared(path string, mountInfoFilename string, mountCmd string, mountArgs []string) error {
+	shared, err := isShared(path, mountInfoFilename)
+	if err != nil {
+		return err
+	}
+	if shared {
+		glog.V(4).Infof("Directory %s is already on a shared mount", path)
+		return nil
+	}
+
+	glog.V(2).Infof("Bind-mounting %q with shared mount propagation", path)
+	// mount --bind /var/lib/kubelet /var/lib/kubelet
+	if err := syscall.Mount(path, path, "" /*fstype*/, syscall.MS_BIND, "" /*data*/); err != nil {
+		return fmt.Errorf("failed to bind-mount %s: %v", path, err)
+	}
+
+	// mount --make-rshared /var/lib/kubelet
+	if err := syscall.Mount(path, path, "" /*fstype*/, syscall.MS_SHARED|syscall.MS_REC, "" /*data*/); err != nil {
+		return fmt.Errorf("failed to make %s rshared: %v", path, err)
+	}
+
+	return nil
 }

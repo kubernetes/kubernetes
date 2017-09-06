@@ -29,12 +29,13 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/images/net/nat"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-const kubeProxyE2eImage = "gcr.io/google_containers/e2e-net-amd64:1.0"
+var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Net)
 
 var _ = SIGDescribe("Network", func() {
 	const (

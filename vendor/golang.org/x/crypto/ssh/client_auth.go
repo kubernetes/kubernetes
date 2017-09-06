@@ -30,8 +30,10 @@ func (c *connection) clientAuthenticate(config *ClientConfig) error {
 	// then any untried methods suggested by the server.
 	tried := make(map[string]bool)
 	var lastMethods []string
+
+	sessionID := c.transport.getSessionID()
 	for auth := AuthMethod(new(noneAuth)); auth != nil; {
-		ok, methods, err := auth.auth(c.transport.getSessionID(), config.User, c.transport, config.Rand)
+		ok, methods, err := auth.auth(sessionID, config.User, c.transport, config.Rand)
 		if err != nil {
 			return err
 		}
@@ -177,31 +179,26 @@ func (cb publicKeyCallback) method() string {
 }
 
 func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand io.Reader) (bool, []string, error) {
-	// Authentication is performed in two stages. The first stage sends an
-	// enquiry to test if each key is acceptable to the remote. The second
-	// stage attempts to authenticate with the valid keys obtained in the
-	// first stage.
+	// Authentication is performed by sending an enquiry to test if a key is
+	// acceptable to the remote. If the key is acceptable, the client will
+	// attempt to authenticate with the valid key.  If not the client will repeat
+	// the process with the remaining keys.
 
 	signers, err := cb()
 	if err != nil {
 		return false, nil, err
 	}
-	var validKeys []Signer
-	for _, signer := range signers {
-		if ok, err := validateKey(signer.PublicKey(), user, c); ok {
-			validKeys = append(validKeys, signer)
-		} else {
-			if err != nil {
-				return false, nil, err
-			}
-		}
-	}
-
-	// methods that may continue if this auth is not successful.
 	var methods []string
-	for _, signer := range validKeys {
-		pub := signer.PublicKey()
+	for _, signer := range signers {
+		ok, err := validateKey(signer.PublicKey(), user, c)
+		if err != nil {
+			return false, nil, err
+		}
+		if !ok {
+			continue
+		}
 
+		pub := signer.PublicKey()
 		pubKey := pub.Marshal()
 		sign, err := signer.Sign(rand, buildDataSignedForAuth(session, userAuthRequestMsg{
 			User:    user,
@@ -234,11 +231,27 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 		if err != nil {
 			return false, nil, err
 		}
-		if success {
+
+		// If authentication succeeds or the list of available methods does not
+		// contain the "publickey" method, do not attempt to authenticate with any
+		// other keys.  According to RFC 4252 Section 7, the latter can occur when
+		// additional authentication methods are required.
+		if success || !containsMethod(methods, cb.method()) {
 			return success, methods, err
 		}
 	}
+
 	return false, methods, nil
+}
+
+func containsMethod(methods []string, method string) bool {
+	for _, m := range methods {
+		if m == method {
+			return true
+		}
+	}
+
+	return false
 }
 
 // validateKey validates the key provided is acceptable to the server.

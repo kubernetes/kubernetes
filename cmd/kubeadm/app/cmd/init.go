@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
@@ -81,6 +82,23 @@ var (
 		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
 
 		`)))
+
+	kubeletFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+		Unfortunately, an error has occurred:
+			{{ .Error }}
+
+		This error is likely caused by that:
+			- The kubelet is not running
+			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+			- There is no internet connection; so the kubelet can't pull the following control plane images:
+				- {{ .APIServerImage }}
+				- {{ .ControllerManagerImage }}
+				- {{ .SchedulerImage }}
+
+		You can troubleshoot this for example with the following commands if you're on a systemd-powered system:
+			- 'systemctl status kubelet'
+			- 'journalctl -xeu kubelet'
+		`)))
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -92,14 +110,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var skipTokenPrint bool
 	var dryRun bool
-	var featureFlagsString string
+	var featureGatesString string
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			if cfg.FeatureFlags, err = features.NewFeatureGate(&features.InitFeatureGates, featureFlagsString); err != nil {
+			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)
 			}
 
@@ -120,14 +138,14 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		},
 	}
 
-	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureFlagsString)
+	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
 	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun)
 
 	return cmd
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureFlagsString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
@@ -169,10 +187,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		"The token to use for establishing bidirectional trust between nodes and masters.",
 	)
 	flagSet.DurationVar(
-		&cfg.TokenTTL, "token-ttl", cfg.TokenTTL,
+		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
 		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.",
 	)
-	flagSet.StringVar(featureFlagsString, "feature-gates", *featureFlagsString, "A set of key=value pairs that describe feature gates for various features. "+
+	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
 
@@ -277,14 +295,20 @@ func (i *Init) Run(out io.Writer) error {
 
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
-	// PHASE 1: Generate certificates
-	if err := certsphase.CreatePKIAssets(i.cfg); err != nil {
-		return err
-	}
+	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
 
-	// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-	if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
-		return err
+		// PHASE 1: Generate certificates
+		if err := certsphase.CreatePKIAssets(i.cfg); err != nil {
+			return err
+		}
+
+		// PHASE 2: Generate kubeconfig files for the admin and the kubelet
+		if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
+			return err
+		}
+
+	} else {
+		fmt.Println("[externalca] No ca.key detected, but all other certificates are available, so using external CA mode.  Will not generate certs or kubeconfig.")
 	}
 
 	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
@@ -319,12 +343,17 @@ func (i *Init) Run(out io.Writer) error {
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	waiter := getWaiter(i.dryRun, client)
 
-	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
-	fmt.Println("[init] This process often takes about a minute to perform or longer if the control plane images have to be pulled...")
-	// TODO: Adjust this timeout or start polling the kubelet API
-	// TODO: Make this timeout more realistic when we do create some more complex logic about the interaction with the kubelet
-	if err := waiter.WaitForAPI(); err != nil {
-		return err
+	if err := waitForAPIAndKubelet(waiter); err != nil {
+		ctx := map[string]string{
+			"Error":                  fmt.Sprintf("%v", err),
+			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+		}
+
+		kubeletFailTempl.Execute(out, ctx)
+
+		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
 	}
 
 	// Upload currently used configuration to the cluster
@@ -346,7 +375,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Create the default node bootstrap token
 	tokenDescription := "The default bootstrap token generated by 'kubeadm init'."
-	if err := nodebootstraptokenphase.UpdateOrCreateToken(client, i.cfg.Token, false, i.cfg.TokenTTL, kubeadmconstants.DefaultTokenUsages, tokenDescription); err != nil {
+	if err := nodebootstraptokenphase.UpdateOrCreateToken(client, i.cfg.Token, false, i.cfg.TokenTTL.Duration, kubeadmconstants.DefaultTokenUsages, []string{}, tokenDescription); err != nil {
 		return err
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
@@ -381,7 +410,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
-	if features.Enabled(i.cfg.FeatureFlags, features.SelfHosting) {
+	if features.Enabled(i.cfg.FeatureGates, features.SelfHosting) {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane...")
@@ -466,11 +495,43 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
 }
 
-// getWaiter gets the right waiter implementation
+// getWaiter gets the right waiter implementation for the right occasion
 func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	// TODO: Adjust this timeout slightly?
 	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+}
+
+// waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet
+// /healthz and /healthz/syncloop endpoints continuously are unhealthy, kubeadm will error out after a period of
+// backoffing exponentially
+func waitForAPIAndKubelet(waiter apiclient.Waiter) error {
+	errorChan := make(chan error)
+
+	fmt.Printf("[init] Waiting for the kubelet to boot up the control plane as Static Pods from directory %q\n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Println("[init] This often takes around a minute; or longer if the control plane images have to be pulled.")
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10255/healthz"); err != nil {
+			errC <- err
+		}
+	}(errorChan, waiter)
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
+		if err := waiter.WaitForHealthyKubelet(60*time.Second, "http://localhost:10255/healthz/syncloop"); err != nil {
+			errC <- err
+		}
+	}(errorChan, waiter)
+
+	go func(errC chan error, waiter apiclient.Waiter) {
+		// This main goroutine sends whatever WaitForAPI returns (error or not) to the channel
+		// This in order to continue on success (nil error), or just fail if
+		errC <- waiter.WaitForAPI()
+	}(errorChan, waiter)
+
+	// This call is blocking until one of the goroutines sends to errorChan
+	return <-errorChan
 }

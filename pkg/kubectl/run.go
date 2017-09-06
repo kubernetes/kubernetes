@@ -23,6 +23,7 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -468,6 +469,107 @@ func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.O
 			Schedule:          params["schedule"],
 			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
 			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: *podSpec,
+					},
+				},
+			},
+		},
+	}
+
+	return &cronJob, nil
+}
+
+type CronJobV1Beta1 struct{}
+
+func (CronJobV1Beta1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"image-pull-policy", false},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+		{"schedule", true},
+		{"serviceaccount", false},
+	}
+}
+
+func (CronJobV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getEnvs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makePodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if err = updatePodContainers(params, args, envs, imagePullPolicy, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updatePodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	cronJob := batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:          params["schedule"],
+			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{

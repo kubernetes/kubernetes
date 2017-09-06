@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -39,6 +40,11 @@ const (
 	FederationE2E Suite = "federation e2e"
 )
 
+var (
+	mountImage   = imageutils.GetE2EImage(imageutils.Mounttest)
+	busyboxImage = imageutils.GetBusyBoxImage()
+)
+
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
@@ -46,17 +52,16 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
-	"gcr.io/google_containers/busybox:1.24",
-	"gcr.io/google_containers/eptest:0.1",
-	"gcr.io/google_containers/liveness:e2e",
-	"gcr.io/google_containers/mounttest:0.8",
-	"gcr.io/google_containers/mounttest-user:0.5",
-	"gcr.io/google_containers/netexec:1.4",
-	"gcr.io/google_containers/netexec:1.5",
-	"gcr.io/google_containers/nginx-slim:0.7",
-	"gcr.io/google_containers/serve_hostname:v1.4",
-	"gcr.io/google_containers/test-webserver:e2e",
-	"gcr.io/google_containers/hostexec:1.2",
+	imageutils.GetBusyBoxImage(),
+	imageutils.GetE2EImage(imageutils.EntrypointTester),
+	imageutils.GetE2EImage(imageutils.Liveness),
+	imageutils.GetE2EImage(imageutils.Mounttest),
+	imageutils.GetE2EImage(imageutils.MounttestUser),
+	imageutils.GetE2EImage(imageutils.Netexec),
+	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.ServeHostname),
+	imageutils.GetE2EImage(imageutils.TestWebserver),
+	imageutils.GetE2EImage(imageutils.Hostexec),
 	"gcr.io/google_containers/volume-nfs:0.8",
 	"gcr.io/google_containers/volume-gluster:0.2",
 	"gcr.io/google_containers/e2e-net-amd64:1.0",

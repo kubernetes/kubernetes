@@ -46,13 +46,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	openapi "k8s.io/kube-openapi/pkg/util/proto"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
@@ -61,6 +61,10 @@ import (
 
 const (
 	FlagMatchBinaryVersion = "match-server-version"
+)
+
+var (
+	FlagHTTPCacheDir = "cache-dir"
 )
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
@@ -82,13 +86,17 @@ type Factory interface {
 type DiscoveryClientFactory interface {
 	// Returns a discovery client
 	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+
+	// BindFlags adds any discovery flags that are common to all kubectl sub commands.
+	BindFlags(flags *pflag.FlagSet)
 }
 
 // ClientAccessFactory holds the first level of factory methods.
 // Generally provides discovery, negotiation, and no-dep calls.
 // TODO The polymorphic calls probably deserve their own interface.
 type ClientAccessFactory interface {
-	DiscoveryClientFactory
+	// Returns a discovery client
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
@@ -229,7 +237,7 @@ type ObjectMappingFactory interface {
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// OpenAPISchema returns the schema openapi schema definiton
-	OpenAPISchema(cacheDir string) (openapi.Resources, error)
+	OpenAPISchema() (openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.

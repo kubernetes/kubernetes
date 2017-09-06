@@ -198,6 +198,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 					FSType:      &fsType,
 				},
 			},
+			MountOptions: p.options.MountOptions,
 		},
 	}
 	return pv, nil

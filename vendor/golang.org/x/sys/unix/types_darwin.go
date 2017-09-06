@@ -242,9 +242,13 @@ type BpfHdr C.struct_bpf_hdr
 
 type Termios C.struct_termios
 
+type Winsize C.struct_winsize
+
 // fchmodat-like syscalls.
 
 const (
 	AT_FDCWD            = C.AT_FDCWD
+	AT_REMOVEDIR        = C.AT_REMOVEDIR
+	AT_SYMLINK_FOLLOW   = C.AT_SYMLINK_FOLLOW
 	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
 )

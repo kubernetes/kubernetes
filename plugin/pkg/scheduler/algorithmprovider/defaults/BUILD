@@ -11,6 +11,7 @@ go_library(
     srcs = ["defaults.go"],
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
+        "//pkg/features:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities:go_default_library",
@@ -18,6 +19,7 @@ go_library(
         "//plugin/pkg/scheduler/factory:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
