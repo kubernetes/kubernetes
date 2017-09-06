@@ -282,6 +282,11 @@ func (c *cachingSecretManager) RegisterPod(pod *v1.Pod) {
 	c.registeredPods[key] = pod
 	if prev != nil {
 		for name := range getSecretNames(prev) {
+			// On an update, the .Add() call above will have re-incremented the
+			// ref count of any existing secrets, so any secrets that are in both
+			// names and prev need to have their ref counts decremented. Any that
+			// are only in prev need to be completely removed. This unconditional
+			// call takes care of both cases.
 			c.secretStore.Delete(prev.Namespace, name)
 		}
 	}

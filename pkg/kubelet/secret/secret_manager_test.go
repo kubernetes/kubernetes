@@ -299,11 +299,11 @@ type secretsToAttach struct {
 	containerEnvSecrets  []envSecrets
 }
 
-func podWithSecrets(ns, name string, toAttach secretsToAttach) *v1.Pod {
+func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
-			Name:      name,
+			Name:      podName,
 		},
 		Spec: v1.PodSpec{},
 	}
@@ -453,27 +453,38 @@ func TestCacheRefcounts(t *testing.T) {
 	manager.RegisterPod(podWithSecrets("ns1", "other-name", s2))
 	manager.UnregisterPod(podWithSecrets("ns1", "other-name", s2))
 
+	s5 := secretsToAttach{
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s7"}},
+			{envFromNames: []string{"s70"}},
+		},
+	}
+	// Check the no-op update scenario
+	manager.RegisterPod(podWithSecrets("ns1", "noop-pod", s5))
+	manager.RegisterPod(podWithSecrets("ns1", "noop-pod", s5))
+
 	// Now we have: 3 pods with s1, 2 pods with s2 and 2 pods with s3, 0 pods with s4.
-	verify := func(ns, name string, count int) bool {
+	refs := func(ns, name string) int {
 		store.lock.Lock()
 		defer store.lock.Unlock()
 		item, ok := store.items[objectKey{ns, name}]
 		if !ok {
-			return count == 0
+			return 0
 		}
-		return item.refCount == count
+		return item.refCount
 	}
-	assert.True(t, verify("ns1", "s1", 3))
-	assert.True(t, verify("ns1", "s10", 1))
-	assert.True(t, verify("ns1", "s2", 3))
-	assert.True(t, verify("ns1", "s3", 3))
-	assert.True(t, verify("ns1", "s30", 2))
-	assert.True(t, verify("ns1", "s4", 2))
-	assert.True(t, verify("ns1", "s5", 4))
-	assert.True(t, verify("ns1", "s50", 2))
-	assert.True(t, verify("ns1", "s6", 0))
-	assert.True(t, verify("ns1", "s60", 0))
-	assert.True(t, verify("ns1", "s7", 0))
+	assert.Equal(t, 3, refs("ns1", "s1"))
+	assert.Equal(t, 1, refs("ns1", "s10"))
+	assert.Equal(t, 3, refs("ns1", "s2"))
+	assert.Equal(t, 3, refs("ns1", "s3"))
+	assert.Equal(t, 2, refs("ns1", "s30"))
+	assert.Equal(t, 2, refs("ns1", "s4"))
+	assert.Equal(t, 4, refs("ns1", "s5"))
+	assert.Equal(t, 2, refs("ns1", "s50"))
+	assert.Equal(t, 0, refs("ns1", "s6"))
+	assert.Equal(t, 0, refs("ns1", "s60"))
+	assert.Equal(t, 1, refs("ns1", "s7"))
+	assert.Equal(t, 1, refs("ns1", "s70"))
 }
 
 func TestCachingSecretManager(t *testing.T) {
