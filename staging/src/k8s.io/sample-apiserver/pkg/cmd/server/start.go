@@ -126,6 +126,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 	config := &apiserver.Config{
 		GenericConfig:         serverConfig,
 		SharedInformerFactory: informerFactory,
+		ExtraConfig:   apiserver.ExtraConfig{},
 	}
 	return config, nil
 }

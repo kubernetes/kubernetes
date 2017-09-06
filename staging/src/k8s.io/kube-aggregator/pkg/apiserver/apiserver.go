@@ -70,9 +70,7 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
-type Config struct {
-	GenericConfig *genericapiserver.Config
-
+type ExtraConfig struct {
 	// CoreKubeInformers is used to watch kube resources
 	CoreKubeInformers kubeinformers.SharedInformerFactory
 
@@ -87,6 +85,11 @@ type Config struct {
 
 	// Mechanism by which the Aggregator will resolve services. Required.
 	ServiceResolver ServiceResolver
+}
+
+type Config struct {
+	GenericConfig *genericapiserver.RecommendedConfig
+	ExtraConfig   ExtraConfig
 }
 
 // APIAggregator contains state for a Kubernetes cluster master/api server.
@@ -168,14 +171,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		GenericAPIServer: genericServer,
 		delegateHandler:  delegationTarget.UnprotectedHandler(),
 		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ProxyClientCert,
-		proxyClientKey:   c.ProxyClientKey,
-		proxyTransport:   c.ProxyTransport,
+		proxyClientCert:  c.ExtraConfig.ProxyClientCert,
+		proxyClientKey:   c.ExtraConfig.ProxyClientKey,
+		proxyTransport:   c.ExtraConfig.ProxyTransport,
 		proxyHandlers:    map[string]*proxyHandler{},
 		handledGroups:    sets.String{},
 		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
-		serviceResolver:          c.ServiceResolver,
+		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
@@ -198,17 +201,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.CoreKubeInformers.Core().V1().Services(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.ExtraConfig.CoreKubeInformers.Core().V1().Services(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().InternalVersion().APIServices(),
-		c.CoreKubeInformers.Core().V1().Services(),
-		c.CoreKubeInformers.Core().V1().Endpoints(),
+		c.ExtraConfig.CoreKubeInformers.Core().V1().Services(),
+		c.ExtraConfig.CoreKubeInformers.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),
 	)
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(context.StopCh)
-		c.CoreKubeInformers.Start(context.StopCh)
+		c.ExtraConfig.CoreKubeInformers.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {

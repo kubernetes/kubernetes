@@ -151,16 +151,18 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	serviceResolver := apiserver.NewClusterIPServiceResolver(kubeInformers.Core().V1().Services().Lister())
 
 	config := apiserver.Config{
-		GenericConfig:     serverConfig,
-		CoreKubeInformers: kubeInformers,
-		ServiceResolver:   serviceResolver,
+		GenericConfig: serverConfig,
+		ExtraConfig: apiserver.ExtraConfig{
+			CoreKubeInformers: kubeInformers,
+			ServiceResolver:   serviceResolver,
+		},
 	}
 
-	config.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
+	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
 	if err != nil {
 		return err
 	}
-	config.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
+	config.ExtraConfig.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
 	if err != nil {
 		return err
 	}

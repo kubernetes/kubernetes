@@ -100,8 +100,10 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	}
 
 	config := &apiserver.Config{
-		GenericConfig:        serverConfig,
-		CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+		GenericConfig: serverConfig,
+		ExtraConfig: apiserver.ExtraConfig{
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+		},
 	}
 	return config, nil
 }

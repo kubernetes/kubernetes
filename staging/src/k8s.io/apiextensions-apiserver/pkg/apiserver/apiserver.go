@@ -78,10 +78,14 @@ func init() {
 	Scheme.AddUnversionedTypes(unversionedVersion, unversionedTypes...)
 }
 
+type ExtraConfig struct {
+	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
+}
 type Config struct {
 	GenericConfig *genericapiserver.Config
+	ExtraConfig   ExtraConfig
+}
 
-	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
 
 type CustomResourceDefinitions struct {
@@ -173,7 +177,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions().Lister(),
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		delegateHandler,
-		c.CRDRESTOptionsGetter,
+		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
 	)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)

@@ -41,11 +41,12 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, comm
 
 	apiextensionsConfig := &apiextensionsapiserver.Config{
 		GenericConfig:        &genericConfig,
-		CRDRESTOptionsGetter: apiextensionscmd.NewCRDRESTOptionsGetter(etcdOptions),
+		ExtraConfig: apiextensionsapiserver.ExtraConfig{
+			CRDRESTOptionsGetter: apiextensionscmd.NewCRDRESTOptionsGetter(etcdOptions),
+		},
 	}
 
 	return apiextensionsConfig, nil
-
 }
 
 func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {

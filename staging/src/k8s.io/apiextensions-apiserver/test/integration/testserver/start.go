@@ -88,8 +88,10 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	customResourceDefinitionRESTOptionsGetter.StorageConfig.Copier = extensionsapiserver.UnstructuredCopier{}
 
 	config := &extensionsapiserver.Config{
-		GenericConfig:        genericConfig,
-		CRDRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
+		GenericConfig: genericConfig,
+		ExtraConfig: extensionsapiserver.ExtraConfig{
+			CRDRESTOptionsGetter: customResourceDefinitionRESTOptionsGetter,
+		},
 	}
 
 	return config, nil

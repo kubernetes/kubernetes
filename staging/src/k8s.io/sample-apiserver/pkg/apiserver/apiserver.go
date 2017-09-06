@@ -61,10 +61,15 @@ func init() {
 	)
 }
 
+type ExtraConfig struct {
+	// Place you custom config here.
+}
+
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	// SharedInformerFactory provides shared informers for resources
 	SharedInformerFactory informers.SharedInformerFactory
+	ExtraConfig   ExtraConfig
 }
 
 // WardleServer contains state for a Kubernetes cluster master/api server.

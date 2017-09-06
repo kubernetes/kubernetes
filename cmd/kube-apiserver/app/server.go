@@ -172,8 +172,8 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	if err != nil {
 		return nil, err
 	}
-	aggregatorConfig.ProxyTransport = proxyTransport
-	aggregatorConfig.ServiceResolver = serviceResolver
+	aggregatorConfig.ExtraConfig.ProxyTransport = proxyTransport
+	aggregatorConfig.ExtraConfig.ServiceResolver = serviceResolver
 	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
@@ -312,40 +312,41 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 
 	config := &master.Config{
 		GenericConfig: genericConfig,
+		ExtraConfig: master.ExtraConfig{
+			ClientCARegistrationHook: master.ClientCARegistrationHook{
+				ClientCA:                         clientCA,
+				RequestHeaderUsernameHeaders:     s.Authentication.RequestHeader.UsernameHeaders,
+				RequestHeaderGroupHeaders:        s.Authentication.RequestHeader.GroupHeaders,
+				RequestHeaderExtraHeaderPrefixes: s.Authentication.RequestHeader.ExtraHeaderPrefixes,
+				RequestHeaderCA:                  requestHeaderProxyCA,
+				RequestHeaderAllowedNames:        s.Authentication.RequestHeader.AllowedNames,
+			},
 
-		ClientCARegistrationHook: master.ClientCARegistrationHook{
-			ClientCA:                         clientCA,
-			RequestHeaderUsernameHeaders:     s.Authentication.RequestHeader.UsernameHeaders,
-			RequestHeaderGroupHeaders:        s.Authentication.RequestHeader.GroupHeaders,
-			RequestHeaderExtraHeaderPrefixes: s.Authentication.RequestHeader.ExtraHeaderPrefixes,
-			RequestHeaderCA:                  requestHeaderProxyCA,
-			RequestHeaderAllowedNames:        s.Authentication.RequestHeader.AllowedNames,
+			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
+			StorageFactory:          storageFactory,
+			EnableCoreControllers:   true,
+			EventTTL:                s.EventTTL,
+			KubeletClientConfig:     s.KubeletConfig,
+			EnableUISupport:         true,
+			EnableLogsSupport:       s.EnableLogsHandler,
+			ProxyTransport:          proxyTransport,
+
+			Tunneler: nodeTunneler,
+
+			ServiceIPRange:       serviceIPRange,
+			APIServerServiceIP:   apiServerServiceIP,
+			APIServerServicePort: 443,
+
+			ServiceNodePortRange:      s.ServiceNodePortRange,
+			KubernetesServiceNodePort: s.KubernetesServiceNodePort,
+
+			MasterCount: s.MasterCount,
 		},
-
-		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
-		StorageFactory:          storageFactory,
-		EnableCoreControllers:   true,
-		EventTTL:                s.EventTTL,
-		KubeletClientConfig:     s.KubeletConfig,
-		EnableUISupport:         true,
-		EnableLogsSupport:       s.EnableLogsHandler,
-		ProxyTransport:          proxyTransport,
-
-		Tunneler: nodeTunneler,
-
-		ServiceIPRange:       serviceIPRange,
-		APIServerServiceIP:   apiServerServiceIP,
-		APIServerServicePort: 443,
-
-		ServiceNodePortRange:      s.ServiceNodePortRange,
-		KubernetesServiceNodePort: s.KubernetesServiceNodePort,
-
-		MasterCount: s.MasterCount,
 	}
 
 	if nodeTunneler != nil {
 		// Use the nodeTunneler's dialer to connect to the kubelet
-		config.KubeletClientConfig.Dial = nodeTunneler.Dial
+		config.ExtraConfig.KubeletClientConfig.Dial = nodeTunneler.Dial
 	}
 
 	return config, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, nil

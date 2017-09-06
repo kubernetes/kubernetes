@@ -71,9 +71,11 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 
 	config := &Config{
 		GenericConfig:           genericapiserver.NewConfig(api.Codecs),
-		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
-		APIServerServicePort:    443,
-		MasterCount:             1,
+		ExtraConfig: ExtraConfig{
+			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+			APIServerServicePort:    443,
+			MasterCount:             1,
+		},
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(api.Registry)
@@ -95,16 +97,16 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 
 	kubeVersion := kubeversion.Get()
 	config.GenericConfig.Version = &kubeVersion
-	config.StorageFactory = storageFactory
+	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.GenericConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.EnableMetrics = true
-	config.EnableCoreControllers = false
-	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
-	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
+	config.ExtraConfig.EnableCoreControllers = false
+	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
+	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
@@ -126,12 +128,12 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	storageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:       masterCfg.StorageFactory,
-		ProxyTransport:       masterCfg.ProxyTransport,
-		KubeletClientConfig:  masterCfg.KubeletClientConfig,
-		EventTTL:             masterCfg.EventTTL,
-		ServiceIPRange:       masterCfg.ServiceIPRange,
-		ServiceNodePortRange: masterCfg.ServiceNodePortRange,
+		StorageFactory:       masterCfg.ExtraConfig.StorageFactory,
+		ProxyTransport:       masterCfg.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:  masterCfg.ExtraConfig.KubeletClientConfig,
+		EventTTL:             masterCfg.ExtraConfig.EventTTL,
+		ServiceIPRange:       masterCfg.ExtraConfig.ServiceIPRange,
+		ServiceNodePortRange: masterCfg.ExtraConfig.ServiceNodePortRange,
 		LoopbackClientConfig: masterCfg.GenericConfig.LoopbackClientConfig,
 	}
 
@@ -162,7 +164,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.ExtraConfig.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
 
 	exceptions := registrytest.StrategyExceptions{
 		HasExportStrategy: []string{
@@ -205,8 +207,8 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
-	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	config.ExtraConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
+	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}

@@ -690,7 +690,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 				t.Fatal(err)
 			}
 
-			kubeAPIServerConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
+			kubeAPIServerConfig.ExtraConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
 
 			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
 			if err != nil {
