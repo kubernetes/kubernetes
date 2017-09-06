@@ -3,7 +3,7 @@ Package client is a Go client for the Docker Engine API.
 
 The "docker" command uses this package to communicate with the daemon. It can also
 be used by your own Go applications to do anything the command-line interface does
-– running containers, pulling images, managing swarms, etc.
+- running containers, pulling images, managing swarms, etc.
 
 For more information about the Engine API, see the documentation:
 https://docs.docker.com/engine/reference/api/
@@ -46,6 +46,7 @@ For example, to list running containers (the equivalent of "docker ps"):
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -53,12 +54,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/api"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
+	"golang.org/x/net/context"
 )
 
-// DefaultVersion is the version of the current stable API
-const DefaultVersion string = "1.25"
+// ErrRedirect is the error returned by checkRedirect when the request is non-GET.
+var ErrRedirect = errors.New("unexpected redirect in response")
 
 // Client is the API client that performs all operations
 // against a docker server.
@@ -83,10 +88,27 @@ type Client struct {
 	manualOverride bool
 }
 
+// CheckRedirect specifies the policy for dealing with redirect responses:
+// If the request is non-GET return `ErrRedirect`. Otherwise use the last response.
+//
+// Go 1.8 changes behavior for HTTP redirects (specifically 301, 307, and 308) in the client .
+// The Docker client (and by extension docker API client) can be made to to send a request
+// like POST /containers//start where what would normally be in the name section of the URL is empty.
+// This triggers an HTTP 301 from the daemon.
+// In go 1.8 this 301 will be converted to a GET request, and ends up getting a 404 from the daemon.
+// This behavior change manifests in the client in that before the 301 was not followed and
+// the client did not generate an error, but now results in a message like Error response from daemon: page not found.
+func CheckRedirect(req *http.Request, via []*http.Request) error {
+	if via[0].Method == http.MethodGet {
+		return http.ErrUseLastResponse
+	}
+	return ErrRedirect
+}
+
 // NewEnvClient initializes a new API client based on environment variables.
 // Use DOCKER_HOST to set the url to the docker server.
 // Use DOCKER_API_VERSION to set the version of the API to reach, leave empty for latest.
-// Use DOCKER_CERT_PATH to load the tls certificates from.
+// Use DOCKER_CERT_PATH to load the TLS certificates from.
 // Use DOCKER_TLS_VERIFY to enable or disable TLS verification, off by default.
 func NewEnvClient() (*Client, error) {
 	var client *http.Client
@@ -106,6 +128,7 @@ func NewEnvClient() (*Client, error) {
 			Transport: &http.Transport{
 				TLSClientConfig: tlsc,
 			},
+			CheckRedirect: CheckRedirect,
 		}
 	}
 
@@ -115,7 +138,7 @@ func NewEnvClient() (*Client, error) {
 	}
 	version := os.Getenv("DOCKER_API_VERSION")
 	if version == "" {
-		version = DefaultVersion
+		version = api.DefaultVersion
 	}
 
 	cli, err := NewClient(host, version, client, nil)
@@ -149,7 +172,8 @@ func NewClient(host string, version string, client *http.Client, httpHeaders map
 		transport := new(http.Transport)
 		sockets.ConfigureTransport(transport, proto, addr)
 		client = &http.Client{
-			Transport: transport,
+			Transport:     transport,
+			CheckRedirect: CheckRedirect,
 		}
 	}
 
@@ -195,9 +219,9 @@ func (cli *Client) getAPIPath(p string, query url.Values) string {
 	var apiPath string
 	if cli.version != "" {
 		v := strings.TrimPrefix(cli.version, "v")
-		apiPath = fmt.Sprintf("%s/v%s%s", cli.basePath, v, p)
+		apiPath = cli.basePath + "/v" + v + p
 	} else {
-		apiPath = fmt.Sprintf("%s%s", cli.basePath, p)
+		apiPath = cli.basePath + p
 	}
 
 	u := &url.URL{
@@ -212,17 +236,45 @@ func (cli *Client) getAPIPath(p string, query url.Values) string {
 // ClientVersion returns the version string associated with this
 // instance of the Client. Note that this value can be changed
 // via the DOCKER_API_VERSION env var.
+// This operation doesn't acquire a mutex.
 func (cli *Client) ClientVersion() string {
 	return cli.version
 }
 
-// UpdateClientVersion updates the version string associated with this
-// instance of the Client.
-func (cli *Client) UpdateClientVersion(v string) {
-	if !cli.manualOverride {
-		cli.version = v
+// NegotiateAPIVersion updates the version string associated with this
+// instance of the Client to match the latest version the server supports
+func (cli *Client) NegotiateAPIVersion(ctx context.Context) {
+	ping, _ := cli.Ping(ctx)
+	cli.NegotiateAPIVersionPing(ping)
+}
+
+// NegotiateAPIVersionPing updates the version string associated with this
+// instance of the Client to match the latest version the server supports
+func (cli *Client) NegotiateAPIVersionPing(p types.Ping) {
+	if cli.manualOverride {
+		return
 	}
 
+	// try the latest version before versioning headers existed
+	if p.APIVersion == "" {
+		p.APIVersion = "1.24"
+	}
+
+	// if the client is not initialized with a version, start with the latest supported version
+	if cli.version == "" {
+		cli.version = api.DefaultVersion
+	}
+
+	// if server version is lower than the maximum version supported by the Client, downgrade
+	if versions.LessThan(p.APIVersion, api.DefaultVersion) {
+		cli.version = p.APIVersion
+	}
+}
+
+// DaemonHost returns the host associated with this instance of the Client.
+// This operation doesn't acquire a mutex.
+func (cli *Client) DaemonHost() string {
+	return cli.host
 }
 
 // ParseHost verifies that the given host strings is valid.
@@ -243,4 +295,20 @@ func ParseHost(host string) (string, string, string, error) {
 		basePath = parsed.Path
 	}
 	return proto, addr, basePath, nil
+}
+
+// CustomHTTPHeaders returns the custom http headers associated with this
+// instance of the Client. This operation doesn't acquire a mutex.
+func (cli *Client) CustomHTTPHeaders() map[string]string {
+	m := make(map[string]string)
+	for k, v := range cli.customHTTPHeaders {
+		m[k] = v
+	}
+	return m
+}
+
+// SetCustomHTTPHeaders updates the custom http headers associated with this
+// instance of the Client. This operation doesn't acquire a mutex.
+func (cli *Client) SetCustomHTTPHeaders(headers map[string]string) {
+	cli.customHTTPHeaders = headers
 }

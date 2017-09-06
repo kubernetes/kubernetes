@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package ed25519 implements the Ed25519 signature algorithm. See
-// http://ed25519.cr.yp.to/.
+// https://ed25519.cr.yp.to/.
 //
 // These functions are also compatible with the “Ed25519” function defined in
 // https://tools.ietf.org/html/draft-irtf-cfrg-eddsa-05.
@@ -13,10 +13,10 @@ package ed25519
 // from SUPERCOP.
 
 import (
+	"bytes"
 	"crypto"
 	cryptorand "crypto/rand"
 	"crypto/sha512"
-	"crypto/subtle"
 	"errors"
 	"io"
 	"strconv"
@@ -177,5 +177,5 @@ func Verify(publicKey PublicKey, message, sig []byte) bool {
 
 	var checkR [32]byte
 	R.ToBytes(&checkR)
-	return subtle.ConstantTimeCompare(sig[:32], checkR[:]) == 1
+	return bytes.Equal(sig[:32], checkR[:])
 }

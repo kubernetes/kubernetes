@@ -17,6 +17,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/docker/docker/pkg/longpath:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],
     }),

@@ -8,7 +8,12 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"log"
 )
+
+// debugTransport if set, will print packet types as they go over the
+// wire. No message decoding is done, to minimize the impact on timing.
+const debugTransport = false
 
 const (
 	gcmCipherID    = "aes128-gcm@openssh.com"
@@ -22,7 +27,9 @@ type packetConn interface {
 	// Encrypt and send a packet of data to the remote peer.
 	writePacket(packet []byte) error
 
-	// Read a packet from the connection
+	// Read a packet from the connection. The read is blocking,
+	// i.e. if error is nil, then the returned byte slice is
+	// always non-empty.
 	readPacket() ([]byte, error)
 
 	// Close closes the write-side of the connection.
@@ -38,7 +45,7 @@ type transport struct {
 	bufReader *bufio.Reader
 	bufWriter *bufio.Writer
 	rand      io.Reader
-
+	isClient  bool
 	io.Closer
 }
 
@@ -84,9 +91,38 @@ func (t *transport) prepareKeyChange(algs *algorithms, kexResult *kexResult) err
 	return nil
 }
 
+func (t *transport) printPacket(p []byte, write bool) {
+	if len(p) == 0 {
+		return
+	}
+	who := "server"
+	if t.isClient {
+		who = "client"
+	}
+	what := "read"
+	if write {
+		what = "write"
+	}
+
+	log.Println(what, who, p[0])
+}
+
 // Read and decrypt next packet.
-func (t *transport) readPacket() ([]byte, error) {
-	return t.reader.readPacket(t.bufReader)
+func (t *transport) readPacket() (p []byte, err error) {
+	for {
+		p, err = t.reader.readPacket(t.bufReader)
+		if err != nil {
+			break
+		}
+		if len(p) == 0 || (p[0] != msgIgnore && p[0] != msgDebug) {
+			break
+		}
+	}
+	if debugTransport {
+		t.printPacket(p, false)
+	}
+
+	return p, err
 }
 
 func (s *connectionState) readPacket(r *bufio.Reader) ([]byte, error) {
@@ -129,6 +165,9 @@ func (s *connectionState) readPacket(r *bufio.Reader) ([]byte, error) {
 }
 
 func (t *transport) writePacket(packet []byte) error {
+	if debugTransport {
+		t.printPacket(packet, true)
+	}
 	return t.writer.writePacket(t.bufWriter, t.rand, packet)
 }
 
@@ -169,6 +208,8 @@ func newTransport(rwc io.ReadWriteCloser, rand io.Reader, isClient bool) *transp
 		},
 		Closer: rwc,
 	}
+	t.isClient = isClient
+
 	if isClient {
 		t.reader.dir = serverKeys
 		t.writer.dir = clientKeys
@@ -226,6 +267,7 @@ func newPacketCipher(d direction, algs directionAlgorithms, kex *kexResult) (pac
 
 	c := &streamPacketCipher{
 		mac: macModes[algs.MAC].new(macKey),
+		etm: macModes[algs.MAC].etm,
 	}
 	c.macResult = make([]byte, c.mac.Size())
 

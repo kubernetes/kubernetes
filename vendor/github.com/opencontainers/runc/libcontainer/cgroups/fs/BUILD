@@ -31,6 +31,7 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/system:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/utils:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

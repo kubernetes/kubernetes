@@ -527,7 +527,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
 func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 	// Set lowest possible CpuShares value for the cgroup
-	minimumCPUShares := int64(MinShares)
+	minimumCPUShares := uint64(MinShares)
 	resources := &ResourceConfig{
 		CpuShares: &minimumCPUShares,
 	}

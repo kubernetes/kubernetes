@@ -7,6 +7,7 @@ go_library(
         "registry.go",
     ],
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/opencontainers/image-spec/specs-go/v1:go_default_library"],
 )
 
 filegroup(

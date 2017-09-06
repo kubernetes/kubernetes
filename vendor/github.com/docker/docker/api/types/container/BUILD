@@ -4,11 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "config.go",
+        "container_changes.go",
         "container_create.go",
+        "container_top.go",
         "container_update.go",
         "container_wait.go",
         "host_config.go",
         "hostconfig_unix.go",
+        "waitcondition.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "hostconfig_windows.go",

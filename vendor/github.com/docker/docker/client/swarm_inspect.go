@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// SwarmInspect inspects the Swarm.
+// SwarmInspect inspects the swarm.
 func (cli *Client) SwarmInspect(ctx context.Context) (swarm.Swarm, error) {
 	serverResp, err := cli.get(ctx, "/swarm", nil, nil)
 	if err != nil {

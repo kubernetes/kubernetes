@@ -379,6 +379,74 @@ func (h *Handle) LinkSetVfTxRate(link Link, vf, rate int) error {
 	return err
 }
 
+// LinkSetVfSpoofchk enables/disables spoof check on a vf for the link.
+// Equivalent to: `ip link set $link vf $vf spoofchk $check`
+func LinkSetVfSpoofchk(link Link, vf int, check bool) error {
+	return pkgHandle.LinkSetVfSpoofchk(link, vf, check)
+}
+
+// LinkSetVfSpookfchk enables/disables spoof check on a vf for the link.
+// Equivalent to: `ip link set $link vf $vf spoofchk $check`
+func (h *Handle) LinkSetVfSpoofchk(link Link, vf int, check bool) error {
+	var setting uint32
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(syscall.RTM_SETLINK, syscall.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(syscall.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	data := nl.NewRtAttr(nl.IFLA_VFINFO_LIST, nil)
+	info := nl.NewRtAttrChild(data, nl.IFLA_VF_INFO, nil)
+	if check {
+		setting = 1
+	}
+	vfmsg := nl.VfSpoofchk{
+		Vf:      uint32(vf),
+		Setting: setting,
+	}
+	nl.NewRtAttrChild(info, nl.IFLA_VF_SPOOFCHK, vfmsg.Serialize())
+	req.AddData(data)
+
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	return err
+}
+
+// LinkSetVfTrust enables/disables trust state on a vf for the link.
+// Equivalent to: `ip link set $link vf $vf trust $state`
+func LinkSetVfTrust(link Link, vf int, state bool) error {
+	return pkgHandle.LinkSetVfTrust(link, vf, state)
+}
+
+// LinkSetVfTrust enables/disables trust state on a vf for the link.
+// Equivalent to: `ip link set $link vf $vf trust $state`
+func (h *Handle) LinkSetVfTrust(link Link, vf int, state bool) error {
+	var setting uint32
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(syscall.RTM_SETLINK, syscall.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(syscall.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	data := nl.NewRtAttr(nl.IFLA_VFINFO_LIST, nil)
+	info := nl.NewRtAttrChild(data, nl.IFLA_VF_INFO, nil)
+	if state {
+		setting = 1
+	}
+	vfmsg := nl.VfTrust{
+		Vf:      uint32(vf),
+		Setting: setting,
+	}
+	nl.NewRtAttrChild(info, nl.IFLA_VF_TRUST, vfmsg.Serialize())
+	req.AddData(data)
+
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	return err
+}
+
 // LinkSetMaster sets the master of the link device.
 // Equivalent to: `ip link set $link master $master`
 func LinkSetMaster(link Link, master *Bridge) error {

@@ -31,6 +31,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -74,7 +75,7 @@ type FakeDockerClient struct {
 	ExecInspect     *dockertypes.ContainerExecInspect
 	execCmd         []string
 	EnableSleep     bool
-	ImageHistoryMap map[string][]dockertypes.ImageHistory
+	ImageHistoryMap map[string][]dockerimagetypes.HistoryResponseItem
 }
 
 const (
@@ -713,7 +714,7 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	return f.Images, err
 }
 
-func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
+func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled(calledDetail{name: "remove_image", arguments: []interface{}{image, opts}})
@@ -726,7 +727,7 @@ func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 			}
 		}
 	}
-	return []dockertypes.ImageDelete{{Deleted: image}}, err
+	return []dockertypes.ImageDeleteResponseItem{{Deleted: image}}, err
 }
 
 func (f *FakeDockerClient) InjectImages(images []dockertypes.ImageSummary) {
@@ -822,7 +823,7 @@ func dockerTimestampToString(t time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
-func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+func (f *FakeDockerClient) ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.appendCalled(calledDetail{name: "image_history"})
@@ -830,7 +831,7 @@ func (f *FakeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, 
 	return history, nil
 }
 
-func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockertypes.ImageHistory) {
+func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockerimagetypes.HistoryResponseItem) {
 	f.Lock()
 	defer f.Unlock()
 	f.ImageHistoryMap = data

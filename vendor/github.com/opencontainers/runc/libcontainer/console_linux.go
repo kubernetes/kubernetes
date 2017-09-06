@@ -3,17 +3,21 @@ package libcontainer
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"syscall"
 	"unsafe"
 
-	"github.com/opencontainers/runc/libcontainer/label"
+	"golang.org/x/sys/unix"
 )
 
-// NewConsole returns an initalized console that can be used within a container by copying bytes
+func ConsoleFromFile(f *os.File) Console {
+	return &linuxConsole{
+		master: f,
+	}
+}
+
+// newConsole returns an initialized console that can be used within a container by copying bytes
 // from the master side to the slave that is attached as the tty for the container's init process.
-func NewConsole(uid, gid int) (Console, error) {
-	master, err := os.OpenFile("/dev/ptmx", syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_CLOEXEC, 0)
+func newConsole() (Console, error) {
+	master, err := os.OpenFile("/dev/ptmx", unix.O_RDWR|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -24,24 +28,10 @@ func NewConsole(uid, gid int) (Console, error) {
 	if err := unlockpt(master); err != nil {
 		return nil, err
 	}
-	if err := os.Chmod(console, 0600); err != nil {
-		return nil, err
-	}
-	if err := os.Chown(console, uid, gid); err != nil {
-		return nil, err
-	}
 	return &linuxConsole{
 		slavePath: console,
 		master:    master,
 	}, nil
-}
-
-// newConsoleFromPath is an internal function returning an initialized console for use inside
-// a container's MNT namespace.
-func newConsoleFromPath(slavePath string) *linuxConsole {
-	return &linuxConsole{
-		slavePath: slavePath,
-	}
 }
 
 // linuxConsole is a linux pseudo TTY for use within a container.
@@ -50,8 +40,8 @@ type linuxConsole struct {
 	slavePath string
 }
 
-func (c *linuxConsole) Fd() uintptr {
-	return c.master.Fd()
+func (c *linuxConsole) File() *os.File {
+	return c.master
 }
 
 func (c *linuxConsole) Path() string {
@@ -75,33 +65,29 @@ func (c *linuxConsole) Close() error {
 
 // mount initializes the console inside the rootfs mounting with the specified mount label
 // and applying the correct ownership of the console.
-func (c *linuxConsole) mount(rootfs, mountLabel string) error {
-	oldMask := syscall.Umask(0000)
-	defer syscall.Umask(oldMask)
-	if err := label.SetFileLabel(c.slavePath, mountLabel); err != nil {
-		return err
-	}
-	dest := filepath.Join(rootfs, "/dev/console")
-	f, err := os.Create(dest)
+func (c *linuxConsole) mount() error {
+	oldMask := unix.Umask(0000)
+	defer unix.Umask(oldMask)
+	f, err := os.Create("/dev/console")
 	if err != nil && !os.IsExist(err) {
 		return err
 	}
 	if f != nil {
 		f.Close()
 	}
-	return syscall.Mount(c.slavePath, dest, "bind", syscall.MS_BIND, "")
+	return unix.Mount(c.slavePath, "/dev/console", "bind", unix.MS_BIND, "")
 }
 
 // dupStdio opens the slavePath for the console and dups the fds to the current
 // processes stdio, fd 0,1,2.
 func (c *linuxConsole) dupStdio() error {
-	slave, err := c.open(syscall.O_RDWR)
+	slave, err := c.open(unix.O_RDWR)
 	if err != nil {
 		return err
 	}
 	fd := int(slave.Fd())
 	for _, i := range []int{0, 1, 2} {
-		if err := syscall.Dup3(fd, i, 0); err != nil {
+		if err := unix.Dup3(fd, i, 0); err != nil {
 			return err
 		}
 	}
@@ -110,7 +96,7 @@ func (c *linuxConsole) dupStdio() error {
 
 // open is a clone of os.OpenFile without the O_CLOEXEC used to open the pty slave.
 func (c *linuxConsole) open(flag int) (*os.File, error) {
-	r, e := syscall.Open(c.slavePath, flag, 0)
+	r, e := unix.Open(c.slavePath, flag, 0)
 	if e != nil {
 		return nil, &os.PathError{
 			Op:   "open",
@@ -122,7 +108,7 @@ func (c *linuxConsole) open(flag int) (*os.File, error) {
 }
 
 func ioctl(fd uintptr, flag, data uintptr) error {
-	if _, _, err := syscall.Syscall(syscall.SYS_IOCTL, fd, flag, data); err != 0 {
+	if _, _, err := unix.Syscall(unix.SYS_IOCTL, fd, flag, data); err != 0 {
 		return err
 	}
 	return nil
@@ -132,14 +118,35 @@ func ioctl(fd uintptr, flag, data uintptr) error {
 // unlockpt should be called before opening the slave side of a pty.
 func unlockpt(f *os.File) error {
 	var u int32
-	return ioctl(f.Fd(), syscall.TIOCSPTLCK, uintptr(unsafe.Pointer(&u)))
+	return ioctl(f.Fd(), unix.TIOCSPTLCK, uintptr(unsafe.Pointer(&u)))
 }
 
 // ptsname retrieves the name of the first available pts for the given master.
 func ptsname(f *os.File) (string, error) {
-	var n int32
-	if err := ioctl(f.Fd(), syscall.TIOCGPTN, uintptr(unsafe.Pointer(&n))); err != nil {
+	n, err := unix.IoctlGetInt(int(f.Fd()), unix.TIOCGPTN)
+	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("/dev/pts/%d", n), nil
+}
+
+// SaneTerminal sets the necessary tty_ioctl(4)s to ensure that a pty pair
+// created by us acts normally. In particular, a not-very-well-known default of
+// Linux unix98 ptys is that they have +onlcr by default. While this isn't a
+// problem for terminal emulators, because we relay data from the terminal we
+// also relay that funky line discipline.
+func SaneTerminal(terminal *os.File) error {
+	termios, err := unix.IoctlGetTermios(int(terminal.Fd()), unix.TCGETS)
+	if err != nil {
+		return fmt.Errorf("ioctl(tty, tcgets): %s", err.Error())
+	}
+
+	// Set -onlcr so we don't have to deal with \r.
+	termios.Oflag &^= unix.ONLCR
+
+	if err := unix.IoctlSetTermios(int(terminal.Fd()), unix.TCSETS, termios); err != nil {
+		return fmt.Errorf("ioctl(tty, tcsets): %s", err.Error())
+	}
+
+	return nil
 }
