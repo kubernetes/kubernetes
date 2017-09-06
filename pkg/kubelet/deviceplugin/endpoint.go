@@ -29,10 +29,10 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-// endpoint maps to a single registered device plugin. It is responsible
+// Endpoint maps to a single registered device plugin. It is responsible
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
-type endpoint struct {
+type Endpoint struct {
 	client pluginapi.DevicePluginClient
 
 	socketPath   string
@@ -47,8 +47,8 @@ type endpoint struct {
 	ctx    context.Context
 }
 
-// newEndpoint creates a new endpoint for the given resourceName.
-func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*endpoint, error) {
+// NewEndpoint creates a new endpoint for the given resourceName.
+func NewEndpoint(socketPath, resourceName string, callback MonitorCallback) (*Endpoint, error) {
 	client, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
@@ -57,7 +57,7 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 
 	ctx, stop := context.WithCancel(context.Background())
 
-	return &endpoint{
+	return &Endpoint{
 		client: client,
 
 		socketPath:   socketPath,
@@ -71,52 +71,31 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 	}, nil
 }
 
-func (e *endpoint) getDevices() []*pluginapi.Device {
+func (e *Endpoint) GetDevices() []*pluginapi.Device {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	return copyDevices(e.devices)
+	var clones []*pluginapi.Device
+
+	for _, d := range e.devices {
+		clones = append(clones, cloneDevice(d))
+	}
+
+	return clones
 }
 
-// list initializes ListAndWatch gRPC call for the device plugin and gets the
-// initial list of the devices. Returns ListAndWatch gRPC stream on success.
-func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
-	glog.V(3).Infof("Starting List")
-	stream, err := e.client.ListAndWatch(e.ctx, &pluginapi.Empty{})
-	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
-
-		return nil, err
-	}
-
-	devs, err := stream.Recv()
-	if err != nil {
-		glog.Errorf(errListAndWatch, e.resourceName, err)
-		return nil, err
-	}
-
-	devices := make(map[string]*pluginapi.Device)
-	var added, updated, deleted []*pluginapi.Device
-	for _, d := range devs.Devices {
-		devices[d.ID] = d
-		added = append(added, cloneDevice(d))
-	}
-
-	e.mutex.Lock()
-	e.devices = devices
-	e.mutex.Unlock()
-
-	e.callback(e.resourceName, added, updated, deleted)
-
-	return stream, nil
-}
-
-// listAndWatch blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
+// Run blocks on receiving ListAndWatch gRPC stream updates. Each ListAndWatch
 // stream update contains a new list of device states. listAndWatch compares the new
 // device states with its cached states to get list of new, updated, and deleted devices.
 // It then issues a callback to pass this information to the device_plugin_handler which
 // will adjust the resource available information accordingly.
-func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient) {
+func (e *Endpoint) Run() {
 	glog.V(3).Infof("Starting ListAndWatch")
+
+	stream, err := e.client.ListAndWatch(e.ctx, &pluginapi.Empty{})
+	if err != nil {
+		glog.Errorf(ErrListAndWatch, e.resourceName, err)
+		return
+	}
 
 	devices := make(map[string]*pluginapi.Device)
 
@@ -129,7 +108,7 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 	for {
 		response, err := stream.Recv()
 		if err != nil {
-			glog.Errorf(errListAndWatch, e.resourceName, err)
+			glog.Errorf(ErrListAndWatch, e.resourceName, err)
 			return
 		}
 
@@ -187,14 +166,14 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 
 }
 
-// allocate issues Allocate gRPC call to the device plugin.
-func (e *endpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+// Allocate issues Allocate gRPC call to the device plugin.
+func (e *Endpoint) Allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
 		DevicesIDs: devs,
 	})
 }
 
-func (e *endpoint) stop() {
+func (e *Endpoint) Stop() {
 	e.cancel()
 }
 
@@ -207,8 +186,16 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
+		return nil, fmt.Errorf(ErrFailedToDialDevicePlugin+" %v", err)
 	}
 
 	return pluginapi.NewDevicePluginClient(c), nil
+}
+
+func cloneDevice(d *pluginapi.Device) *pluginapi.Device {
+	return &pluginapi.Device{
+		ID:     d.ID,
+		Health: d.Health,
+	}
+
 }
