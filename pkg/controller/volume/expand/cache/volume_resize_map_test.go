@@ -27,31 +27,87 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
-func Test_AddValidPvcUpdate(t *testing.T) {
-	resizeMap := createTestVolumeResizeMap()
-	claim1 := testVolumeClaim("foo", "ns", v1.PersistentVolumeClaimSpec{
+func Test_AddValidPVCUpdate(t *testing.T) {
+	claim := testVolumeClaim("foo", "ns", v1.PersistentVolumeClaimSpec{
 		AccessModes: []v1.PersistentVolumeAccessMode{
 			v1.ReadWriteOnce,
 			v1.ReadOnlyMany,
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("12G"),
 			},
 		},
 		VolumeName: "foo",
 	})
 
-	claimClone := claim1.DeepCopy()
-	claimClone.Spec.Resources.Requests[v1.ResourceStorage] = resource.MustParse("12G")
-	pv := getPersistentVolume("foo", resource.MustParse("10G"), claim1)
-	resizeMap.AddPVCUpdate(claimClone, pv)
-	pvcr := resizeMap.GetPVCsWithResizeRequest()
-	if len(pvcr) != 1 {
-		t.Fatalf("Expected 1 pvc resize request got 0")
+	unboundClaim := claim.DeepCopy()
+	unboundClaim.Status.Phase = v1.ClaimPending
+
+	noResizeClaim := claim.DeepCopy()
+	noResizeClaim.Status.Capacity = v1.ResourceList{
+		v1.ResourceName(v1.ResourceStorage): resource.MustParse("12G"),
 	}
-	assert.Equal(t, resource.MustParse("12G"), pvcr[0].ExpectedSize)
-	assert.Equal(t, 0, len(resizeMap.pvcrs))
+
+	boundPV := getPersistentVolume("foo", resource.MustParse("10G"), claim)
+	unboundPV := getPersistentVolume("foo", resource.MustParse("10G"), nil)
+	misboundPV := getPersistentVolume("foo", resource.MustParse("10G"), nil)
+	misboundPV.Spec.ClaimRef = &v1.ObjectReference{
+		Namespace: "someOtherNamespace",
+		Name:      "someOtherName",
+	}
+
+	tests := []struct {
+		name         string
+		pvc          *v1.PersistentVolumeClaim
+		pv           *v1.PersistentVolume
+		expectedPVCs int
+	}{
+		{
+			"validPVCUpdate",
+			claim,
+			boundPV,
+			1,
+		},
+		{
+			"noResizeRequired",
+			noResizeClaim,
+			boundPV,
+			0,
+		},
+		{
+			"unboundPVC",
+			unboundClaim,
+			boundPV,
+			0,
+		},
+		{
+			"unboundPV",
+			claim,
+			unboundPV,
+			0,
+		},
+		{
+			"misboundPV",
+			claim,
+			misboundPV,
+			0,
+		},
+	}
+	for _, test := range tests {
+		resizeMap := createTestVolumeResizeMap()
+		pvc := test.pvc.DeepCopy()
+		pv := test.pv.DeepCopy()
+		resizeMap.AddPVCUpdate(pvc, pv)
+		pvcr := resizeMap.GetPVCsWithResizeRequest()
+		if len(pvcr) != test.expectedPVCs {
+			t.Errorf("Test %q expected %d pvc resize request got %d", test.name, test.expectedPVCs, len(pvcr))
+		}
+		if test.expectedPVCs > 0 {
+			assert.Equal(t, resource.MustParse("12G"), pvcr[0].ExpectedSize, test.name)
+		}
+		assert.Equal(t, 0, len(resizeMap.pvcrs), test.name)
+	}
 }
 
 func createTestVolumeResizeMap() *volumeResizeMap {
@@ -73,16 +129,19 @@ func testVolumeClaim(name string, namespace string, spec v1.PersistentVolumeClai
 }
 
 func getPersistentVolume(volumeName string, capacity resource.Quantity, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolume {
-	return &v1.PersistentVolume{
+	volume := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName},
 		Spec: v1.PersistentVolumeSpec{
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): capacity,
 			},
-			ClaimRef: &v1.ObjectReference{
-				Namespace: pvc.Namespace,
-				Name:      pvc.Name,
-			},
 		},
 	}
+	if pvc != nil {
+		volume.Spec.ClaimRef = &v1.ObjectReference{
+			Namespace: pvc.Namespace,
+			Name:      pvc.Name,
+		}
+	}
+	return volume
 }
