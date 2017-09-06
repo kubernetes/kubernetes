@@ -196,6 +196,7 @@ function wait-for-master() {
 function prepare-upgrade() {
   kube::util::ensure-temp-dir
   detect-project
+  detect-subnetworks
   detect-node-names # sets INSTANCE_GROUPS
   write-cluster-name
   tars_from_version

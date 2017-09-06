@@ -511,7 +511,7 @@ function make-gcloud-network-argument() {
   local alias_size="$7"       # optional
 
   local networkURL="projects/${network_project}/global/networks/${network}"
-  local subnetURL="projects/${network_project}/regions/${region}/subnetworks/${subnet}"
+  local subnetURL="projects/${network_project}/regions/${region}/subnetworks/${subnet:-}"
 
   local ret=""
 
@@ -524,8 +524,12 @@ function make-gcloud-network-argument() {
     ret="${ret},aliases=pods-default:${alias_size}"
     ret="${ret} --no-can-ip-forward"
   else
-    ret="${ret} --network ${networkURL}"
-    ret="${ret} --subnet ${subnetURL}"
+    if [[ -n ${subnet:-} ]]; then
+      ret="${ret} --subnet ${subnetURL}"
+    else
+      ret="${ret} --network ${networkURL}"
+    fi
+
     ret="${ret} --can-ip-forward"
     if [[ -n ${address:-} ]]; then
       ret="${ret} --address ${address}"
@@ -547,6 +551,7 @@ function get-template-name-from-version() {
 # $3: String of comma-separated metadata entries (must all be from a file).
 function create-node-template() {
   detect-project
+  detect-subnetworks
   local template_name="$1"
 
   # First, ensure the template doesn't exist.
@@ -595,7 +600,7 @@ function create-node-template() {
     "${NETWORK_PROJECT}" \
     "${REGION}" \
     "${NETWORK}" \
-    "${SUBNETWORK}" \
+    "${SUBNETWORK:-}" \
     "" \
     "${ENABLE_IP_ALIASES:-}" \
     "${IP_ALIAS_SIZE:-}")
@@ -715,6 +720,7 @@ function kube-up() {
     detect-master
     parse-master-env
     create-subnetworks
+    detect-subnetworks
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
@@ -731,6 +737,7 @@ function kube-up() {
     check-existing
     create-network
     create-subnetworks
+    detect-subnetworks
     write-cluster-name
     create-autoscaler-config
     create-master
@@ -815,23 +822,7 @@ function expand-default-subnetwork() {
     --quiet
 }
 
-
-# Vars set:
-#   SUBNETWORK
 function create-subnetworks() {
-  SUBNETWORK=$(gcloud beta compute networks subnets list \
-      --network=${NETWORK} \
-      --regions=${REGION} \
-      --project=${NETWORK_PROJECT} \
-      --limit=1 \
-      --format='value(name)' 2>/dev/null)
-
-  if [[ -z ${SUBNETWORK:-} ]]; then
-    echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${NETWORK_PROJECT}"
-    exit 1
-  fi
-  echo "Found subnet for region ${REGION} in network ${NETWORK}: ${SUBNETWORK}"
-
   case ${ENABLE_IP_ALIASES} in
     true) echo "IP aliases are enabled. Creating subnetworks.";;
     false)
@@ -847,9 +838,6 @@ function create-subnetworks() {
     *) echo "${color_red}Invalid argument to ENABLE_IP_ALIASES${color_norm}"
        exit 1;;
   esac
-
-  SUBNETWORK=${IP_ALIAS_SUBNETWORK}
-  echo "Using IP Alias subnet ${SUBNETWORK}"
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
@@ -886,6 +874,42 @@ function create-subnetworks() {
       exit 1
     fi
   fi
+}
+
+# detect-subnetworks sets the SUBNETWORK var if not already set
+# Assumed vars:
+#   NETWORK
+#   REGION
+#   NETWORK_PROJECT
+#
+# Optional vars:
+#   SUBNETWORK
+#   IP_ALIAS_SUBNETWORK
+function detect-subnetworks() {
+  if [[ -n ${SUBNETWORK:-} ]]; then
+    echo "Using subnet ${SUBNETWORK}"
+    return 0
+  fi
+
+  if [[ -n ${IP_ALIAS_SUBNETWORK:-} ]]; then
+    SUBNETWORK=${IP_ALIAS_SUBNETWORK}
+    echo "Using IP Alias subnet ${SUBNETWORK}"
+    return 0
+  fi
+
+  SUBNETWORK=$(gcloud beta compute networks subnets list \
+    --network=${NETWORK} \
+    --regions=${REGION} \
+    --project=${NETWORK_PROJECT} \
+    --limit=1 \
+    --format='value(name)' 2>/dev/null)
+
+  if [[ -n ${SUBNETWORK:-} ]]; then
+    echo "Found subnet for region ${REGION} in network ${NETWORK}: ${SUBNETWORK}"
+    return 0
+  fi
+
+  echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${NETWORK_PROJECT}"
 }
 
 function delete-firewall-rules() {
@@ -1322,7 +1346,7 @@ function create-heapster-node() {
       "${NETWORK_PROJECT}" \
       "${REGION}" \
       "${NETWORK}"
-      "${SUBNETWORK}" \
+      "${SUBNETWORK:-}" \
       "" \
       "${ENABLE_IP_ALIASES:-}" \
       "${IP_ALIAS_SIZE:-}")
