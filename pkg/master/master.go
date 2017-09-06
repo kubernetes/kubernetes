@@ -62,6 +62,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	// RESTStorage installers
+	"k8s.io/client-go/informers"
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
@@ -163,9 +164,9 @@ type Master struct {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete() CompletedConfig {
+func (cfg *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
 	c := completedConfig{
-		cfg.GenericConfig.Complete(),
+		cfg.GenericConfig.Complete(informers),
 		&cfg.ExtraConfig,
 	}
 

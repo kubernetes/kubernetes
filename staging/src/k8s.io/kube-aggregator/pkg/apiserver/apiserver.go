@@ -88,7 +88,7 @@ type ExtraConfig struct {
 }
 
 type Config struct {
-	GenericConfig *genericapiserver.Config
+	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
 }
 

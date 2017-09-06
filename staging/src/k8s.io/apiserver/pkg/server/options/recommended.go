@@ -17,11 +17,16 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	clientgoinformers "k8s.io/client-go/informers"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 )
 
 // RecommendedOptions contains the recommended options for running an API server
@@ -55,25 +60,32 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Features.AddFlags(fs)
 }
 
-func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
-	if err := o.Etcd.ApplyTo(config); err != nil {
+func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
+	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.SecureServing.ApplyTo(config); err != nil {
+	if err := o.SecureServing.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(config); err != nil {
+	if err := o.Authentication.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Authorization.ApplyTo(config); err != nil {
+	if err := o.Authorization.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Audit.ApplyTo(config); err != nil {
+	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Features.ApplyTo(config); err != nil {
+	if err := o.Features.ApplyTo(&config.Config); err != nil {
 		return err
 	}
+
+	// do convenience work for RecommendedOptions users
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(config.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create real external clientset: %v", err)
+	}
+	config.SharedInformerFactory = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	return nil
 }

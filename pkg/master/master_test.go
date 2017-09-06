@@ -66,11 +66,11 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedInformerFactory, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig(api.Codecs),
+		GenericConfig: genericapiserver.NewConfig(api.Codecs),
 		ExtraConfig: ExtraConfig{
 			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 			APIServerServicePort:    443,
@@ -115,9 +115,9 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	if err != nil {
 		t.Fatalf("unable to create client set due to %v", err)
 	}
-	config.GenericConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
+	sharedInformers := informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
 
-	return server, *config, assert.New(t)
+	return server, *config, sharedInformers, assert.New(t)
 }
 
 // TestLegacyRestStorageStrategies ensures that all Storage objects which are using the generic registry Store have
@@ -180,9 +180,9 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, assert := setUp(t)
+	etcdserver, config, sharedInformers, assert := setUp(t)
 
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -206,7 +206,7 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, assert := setUp(t)
+	etcdserver, config, sharedInformers, assert := setUp(t)
 	config.ExtraConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
 	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {

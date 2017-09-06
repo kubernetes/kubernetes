@@ -24,7 +24,6 @@ import (
 	"net"
 	"path"
 	"strconv"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
@@ -33,9 +32,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -175,26 +171,6 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 		c.SecureServingInfo.SNICerts[server.LoopbackClientServerNameOverride] = &tlsCert
 	}
 
-	// create shared informers, if not explicitly set use in cluster config.
-	// do not fail on an error, this allows an external API server to startup
-	// outside of a kube cluster.
-	var clientCfg *rest.Config
-	err = nil
-	if s.useLoopbackCfg {
-		clientCfg = c.LoopbackClientConfig
-	} else {
-		clientCfg, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		glog.Errorf("Couldn't create in cluster config due to %v. SharedInformerFactory will not be set.", err)
-		return nil
-	}
-	clientset, err := kubernetes.NewForConfig(clientCfg)
-	if err != nil {
-		glog.Errorf("Couldn't create clientset due to %v. SharedInformerFactory will not be set.", err)
-		return nil
-	}
-	c.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, 10*time.Minute)
 	return nil
 }
 

@@ -53,7 +53,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	options.RecommendedOptions.Etcd.StorageConfig.ServerList = []string{etcdURL}
 	options.RecommendedOptions.Etcd.StorageConfig.Prefix = uuid.New()
 
-	genericConfig := genericapiserver.NewConfig(extensionsapiserver.Codecs)
+	genericConfig := genericapiserver.NewRecommendedConfig(extensionsapiserver.Codecs)
 
 	if err := options.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)

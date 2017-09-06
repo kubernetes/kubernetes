@@ -76,7 +76,10 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	}
 
 	aggregatorConfig := &aggregatorapiserver.Config{
-		GenericConfig:     &genericConfig,
+		GenericConfig: &genericapiserver.RecommendedConfig{
+			Config:                genericConfig,
+			SharedInformerFactory: externalInformers,
+		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
 			CoreKubeInformers: externalInformers,
 			ProxyClientCert:   certBytes,

@@ -30,7 +30,6 @@ import (
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/install"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
 	wardleregistry "k8s.io/sample-apiserver/pkg/registry"
 	fischerstorage "k8s.io/sample-apiserver/pkg/registry/wardle/fischer"
 	flunderstorage "k8s.io/sample-apiserver/pkg/registry/wardle/flunder"
@@ -66,7 +65,7 @@ type ExtraConfig struct {
 }
 
 type Config struct {
-	GenericConfig *genericapiserver.Config
+	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
 }
 
