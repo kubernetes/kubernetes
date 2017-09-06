@@ -832,7 +832,13 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 }
 
 func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestReachableHTTP(host, port, "/echo?msg=hello", "hello") }); err != nil {
+	j.TestReachableHTTPWithRetriableErrorCodes(host, port, []int{}, timeout)
+}
+
+func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
+	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		return TestReachableHTTPWithRetriableErrorCodes(host, port, "/echo?msg=hello", "hello", retriableErrCodes)
+	}); err != nil {
 		Failf("Could not reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
