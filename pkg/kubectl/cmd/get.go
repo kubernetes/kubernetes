@@ -278,8 +278,12 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				objsToPrint = append(objsToPrint, obj)
 			}
 			for _, objToPrint := range objsToPrint {
-				if err := printer.PrintObj(objToPrint, writer); err != nil {
-					return fmt.Errorf("unable to output the provided object: %v", err)
+				if isFiltered, err := filterFuncs.Filter(objToPrint, filterOpts); !isFiltered {
+					if err != nil {
+						glog.V(2).Infof("Unable to filter resource: %v", err)
+					} else if err := printer.PrintObj(objToPrint, writer); err != nil {
+						return fmt.Errorf("unable to output the provided object: %v", err)
+					}
 				}
 			}
 			writer.Flush()
@@ -300,7 +304,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					first = false
 					return false, nil
 				}
-				return false, printer.PrintObj(e.Object, out)
+
+				if isFiltered, err := filterFuncs.Filter(e.Object, filterOpts); !isFiltered {
+					if err != nil {
+						glog.V(2).Infof("Unable to filter resource: %v", err)
+					} else if err := printer.PrintObj(e.Object, out); err != nil {
+						return false, err
+					}
+				}
+				return false, nil
 			})
 			return err
 		})
