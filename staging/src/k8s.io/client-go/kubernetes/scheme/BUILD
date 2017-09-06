@@ -20,7 +20,7 @@ go_library(
         "//vendor/k8s.io/api/authorization/v1:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
-        "//vendor/k8s.io/api/autoscaling/v2alpha1:go_default_library",
+        "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v1beta1:go_default_library",
         "//vendor/k8s.io/api/batch/v2alpha1:go_default_library",

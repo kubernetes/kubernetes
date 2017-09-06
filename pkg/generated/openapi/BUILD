@@ -27,7 +27,7 @@ openapi_library(
         "k8s.io/api/authorization/v1",
         "k8s.io/api/authorization/v1beta1",
         "k8s.io/api/autoscaling/v1",
-        "k8s.io/api/autoscaling/v2alpha1",
+        "k8s.io/api/autoscaling/v2beta1",
         "k8s.io/api/batch/v1",
         "k8s.io/api/batch/v1beta1",
         "k8s.io/api/batch/v2alpha1",

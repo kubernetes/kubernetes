@@ -19,7 +19,7 @@ package metrics
 import (
 	"time"
 
-	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	autoscalingv2alpha1 "k8s.io/api/autoscaling/v2alpha1"
+	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -329,11 +329,11 @@ func AddHandlers(h printers.PrintHandler) {
 
 	horizontalPodAutoscalerColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Reference", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
-		{Name: "Targets", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
-		{Name: "MinPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
-		{Name: "MaxPods", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
-		{Name: "Replicas", Type: "string", Description: autoscalingv2alpha1.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
+		{Name: "Reference", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["scaleTargetRef"]},
+		{Name: "Targets", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["metrics"]},
+		{Name: "MinPods", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["minReplicas"]},
+		{Name: "MaxPods", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerSpec{}.SwaggerDoc()["maxReplicas"]},
+		{Name: "Replicas", Type: "string", Description: autoscalingv2beta1.HorizontalPodAutoscalerStatus{}.SwaggerDoc()["currentReplicas"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(horizontalPodAutoscalerColumnDefinitions, printHorizontalPodAutoscaler)

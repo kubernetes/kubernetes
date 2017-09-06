@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	autoscalingapi "k8s.io/api/autoscaling/v2alpha1"
+	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
