@@ -178,6 +178,8 @@ func sortByPriority(specs []openAPISpecInfo) {
 
 // buildOpenAPISpec aggregates all OpenAPI specs.  It is not thread-safe. The caller is responsible to hold proper locks.
 func (s *specAggregator) buildOpenAPISpec() (specToReturn *spec.Swagger, err error) {
+	fmt.Printf("%v buildOpenAPISpec start\n", time.Now().Format(time.StampMilli))
+	defer func() { fmt.Printf("%v buildOpenAPISpec stop\n", time.Now().Format(time.StampMilli)) }()
 	specs := []openAPISpecInfo{}
 	for _, specInfo := range s.openAPISpecs {
 		if specInfo.spec == nil {
