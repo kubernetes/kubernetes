@@ -202,12 +202,9 @@ func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetNam
 	return fmt.Sprintf("%s-%s-%s-%d", getRulePrefix(service), *subnetName, port.Protocol, port.Port)
 }
 
-func getSecurityRuleName(service *v1.Service, port v1.ServicePort, subnetName *string, sourceAddrPrefix string) string {
+func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
 	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
-	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
-	}
-	return fmt.Sprintf("%s-%s-%s-%d-%s", getRulePrefix(service), *subnetName, port.Protocol, port.Port, safePrefix)
+	return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
 }
 
 // This returns a human-readable version of the Service used to tag some resources.
@@ -230,7 +227,7 @@ func serviceOwnsRule(service *v1.Service, rule string) bool {
 	return strings.HasPrefix(strings.ToUpper(rule), strings.ToUpper(prefix))
 }
 
-func serviceOwnsFrontEndIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
+func serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
 	baseName := cloudprovider.GetLoadBalancerName(service)
 	return strings.HasPrefix(*fip.Name, baseName)
 }

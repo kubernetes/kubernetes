@@ -374,7 +374,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 
 		if !isInternalLb {
 			// Find public ip resource to clean up from IP configuration
-			lbFrontendIPConfigName := getFrontendIPConfigName(service, subnet(service))
+			lbFrontendIPConfigName := getFrontendIPConfigName(service, nil)
 			for _, config := range *lb.FrontendIPConfigurations {
 				if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
 					if config.PublicIPAddress != nil {
@@ -576,19 +576,21 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	if !wantLb {
 		for i := len(newConfigs) - 1; i >= 0; i-- {
 			config := newConfigs[i]
-			if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+			if serviceOwnsFrontendIP(config, service) {
 				glog.V(3).Infof("reconcile(%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, lbFrontendIPConfigName)
 				newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
 				dirtyConfigs = true
 			}
 		}
 	} else {
-		for i := len(newConfigs) - 1; i >= 0; i-- {
-			config := newConfigs[i]
-			if serviceOwnsFrontEndIP(config, service) && !strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
-				glog.V(3).Infof("reconcile(%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, *config.Name)
-				newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
-				dirtyConfigs = true
+		if isInternal {
+			for i := len(newConfigs) - 1; i >= 0; i-- {
+				config := newConfigs[i]
+				if serviceOwnsFrontendIP(config, service) && !strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+					glog.V(3).Infof("reconcile(%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, *config.Name)
+					newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
+					dirtyConfigs = true
+				}
 			}
 		}
 		foundConfig := false
@@ -814,7 +816,7 @@ func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName st
 		}
 		for j := range sourceAddressPrefixes {
 			ix := i*len(sourceAddressPrefixes) + j
-			securityRuleName := getSecurityRuleName(service, port, subnet(service), sourceAddressPrefixes[j])
+			securityRuleName := getSecurityRuleName(service, port, sourceAddressPrefixes[j])
 			expectedSecurityRules[ix] = network.SecurityRule{
 				Name: to.StringPtr(securityRuleName),
 				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -1013,8 +1015,11 @@ func requiresInternalLoadBalancer(service *v1.Service) bool {
 }
 
 func subnet(service *v1.Service) *string {
-	if l, ok := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; ok {
-		return &l
+	if requiresInternalLoadBalancer(service) {
+		if l, ok := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; ok {
+			return &l
+		}
 	}
+
 	return nil
 }
