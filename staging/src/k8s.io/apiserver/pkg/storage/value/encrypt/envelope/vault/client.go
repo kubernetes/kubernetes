@@ -18,12 +18,17 @@ limitations under the License.
 package vault
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"reflect"
 
 	"github.com/hashicorp/vault/api"
 )
+
+const defaultTransitPath = "transit"
+const defaultAuthPath = "auth"
 
 // Handle all communication with Vault server.
 type clientWrapper struct {
@@ -42,13 +47,13 @@ func newClientWrapper(config *EnvelopeConfig) (*clientWrapper, error) {
 
 	// Vault transit path is configurable. "path", "/path", "path/" and "/path/"
 	// are the same.
-	transit := "transit"
+	transit := defaultTransitPath
 	if config.TransitPath != "" {
 		transit = config.TransitPath
 	}
 
 	// auth path is configurable. "path", "/path", "path/" and "/path/" are the same.
-	auth := "auth"
+	auth := defaultAuthPath
 	if config.AuthPath != "" {
 		auth = config.AuthPath
 	}
@@ -91,7 +96,6 @@ func newVaultClient(config *EnvelopeConfig) (*api.Client, error) {
 
 // Get token by login and set the value to api.Client.
 func (c *clientWrapper) refreshToken(config *EnvelopeConfig) error {
-
 	switch {
 	case config.ClientCert != "" && config.ClientKey != "":
 		token, err := c.tlsToken(config)
@@ -107,8 +111,7 @@ func (c *clientWrapper) refreshToken(config *EnvelopeConfig) error {
 		c.client.SetToken(token)
 	default:
 		// configuration has already been validated, flow should not reach here
-		err := fmt.Errorf("the Vault authentication configuration is invalid")
-		return err
+		return errors.New("the Vault authentication configuration is invalid")
 	}
 
 	return nil
@@ -178,14 +181,13 @@ func (c *clientWrapper) request(path string, data interface{}) (*api.Secret, err
 	}
 
 	resp, err := c.client.RawRequest(req)
-
 	if resp != nil {
 		defer resp.Body.Close()
-		if resp.StatusCode == 403 {
+		if resp.StatusCode == http.StatusForbidden {
 			return nil, &forbiddenError{err: err}
 		}
 
-		if resp.StatusCode == 200 {
+		if resp.StatusCode == http.StatusOK {
 			secret, err := api.ParseSecret(resp.Body)
 			if err != nil {
 				return nil, err
@@ -198,7 +200,6 @@ func (c *clientWrapper) request(path string, data interface{}) (*api.Secret, err
 		return nil, err
 	}
 	return nil, fmt.Errorf("no response received for POST request to %v", path)
-
 }
 
 // Return this error when get HTTP code 403.

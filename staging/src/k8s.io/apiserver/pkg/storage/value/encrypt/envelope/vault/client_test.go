@@ -96,7 +96,7 @@ func TestCustomTransitPath(t *testing.T) {
 	config.TransitPath = "invalid-" + customPath
 	client, err := newClientWrapper(config)
 	if err != nil {
-		t.Fatal("fail to initialize Vault client:", err)
+		t.Fatalf("fail to initialize Vault client: %s ", err)
 	}
 
 	_, err = client.encrypt("key", "plain")
@@ -139,7 +139,7 @@ func TestCustomAuthPath(t *testing.T) {
 func encryptAndDecrypt(t *testing.T, name string, config *EnvelopeConfig) {
 	client, err := newClientWrapper(config)
 	if err != nil {
-		t.Fatal("name: %s, fail to initialize Vault client: %s", name, err)
+		t.Fatalf("name: %s, fail to initialize Vault client: %s", name, err)
 	}
 
 	key := "key"
@@ -207,7 +207,7 @@ func TestForbiddenRequest(t *testing.T) {
 	}
 	client, err := newClientWrapper(config)
 	if err != nil {
-		t.Fatal("fail to initialize Vault client: %s", err)
+		t.Fatalf("fail to initialize Vault client: %s", err)
 	}
 
 	_, err = client.encrypt("key", "plain")
@@ -285,13 +285,13 @@ func VaultTestServer(tb testing.TB, handlers map[string]http.Handler) *httptest.
 
 	cert, err := tls.LoadX509KeyPair(serverCert, serverKey)
 	if err != nil {
-		tb.Fatal("bad server cert and keys: ", err)
+		tb.Fatalf("bad server cert and keys: %s ", err)
 	}
 	certs := []tls.Certificate{cert}
 
 	ca, err := ioutil.ReadFile(cafile)
 	if err != nil {
-		tb.Fatal("bad ca file: ", err)
+		tb.Fatalf("bad ca file: %s ", err)
 	}
 	certPool := x509.NewCertPool()
 	if !certPool.AppendCertsFromPEM(ca) {
@@ -380,7 +380,7 @@ type approleLoginHandler struct {
 func (h *approleLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	msg, err := parseRequest(r)
 	if err != nil {
-		h.tb.Error("error request message for approle login: ", err)
+		h.tb.Errorf("error request message for approle login: %s ", err)
 	}
 
 	roleID := msg["role_id"].(string)

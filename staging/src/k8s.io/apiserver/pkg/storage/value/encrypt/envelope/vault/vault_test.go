@@ -54,14 +54,14 @@ func TestOneKey(t *testing.T) {
 
 	service, err := serviceTestFactory(configOneKey, server.URL, key)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, error: %s ", err)
 	}
 
 	originalText := []byte(sampleText)
 
 	cipher, err := service.Encrypt(originalText)
 	if err != nil {
-		t.Fatal("fail to encrypt data with Vault", err)
+		t.Fatalf("fail to encrypt data with Vault, error %s", err)
 	}
 	if !strings.HasPrefix(cipher, key+":v1:") {
 		t.Errorf("the cipher has no correct prefix, %s", cipher)
@@ -69,7 +69,7 @@ func TestOneKey(t *testing.T) {
 
 	untransformedData, err := service.Decrypt(cipher)
 	if err != nil {
-		t.Fatal("fail to decrypt data with Vault", err)
+		t.Fatalf("fail to decrypt data with Vault, %s ", err)
 	}
 	if bytes.Compare(untransformedData, originalText) != 0 {
 		t.Fatalf("transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
@@ -83,14 +83,14 @@ func TestMoreThanOneKeys(t *testing.T) {
 	// Create cipher when there is one key
 	service, err := serviceTestFactory(configOneKey, server.URL, key)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, %s ", err)
 	}
 
 	originalText := []byte(sampleText)
 
 	cipher, err := service.Encrypt(originalText)
 	if err != nil {
-		t.Fatal("fail to encrypt data with Vault", err)
+		t.Fatalf("fail to encrypt data with Vault, %s ", err)
 	}
 
 	// Now there are 2 keys in the service
@@ -98,12 +98,12 @@ func TestMoreThanOneKeys(t *testing.T) {
 
 	newService, err := serviceTestFactory(configTwoKey, server.URL, newKey, key)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, %s ", err)
 	}
 
 	newCipher, err := newService.Encrypt(originalText)
 	if err != nil {
-		t.Fatal("fail to encrypt data with Vault", err)
+		t.Fatalf("fail to encrypt data with Vault, %s ", err)
 	}
 	// New cipher should be prefixed with new key
 	if !strings.HasPrefix(newCipher, newKey+":v1:") {
@@ -114,7 +114,7 @@ func TestMoreThanOneKeys(t *testing.T) {
 	for _, cipherData := range []string{cipher, newCipher} {
 		untransformedData, err := newService.Decrypt(cipherData)
 		if err != nil {
-			t.Fatal("fail to decrypt data with Vault", err)
+			t.Fatalf("fail to decrypt data with Vault, %s ", err)
 		}
 		if !bytes.Equal(untransformedData, originalText) {
 			t.Errorf("transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
@@ -128,19 +128,19 @@ func TestWithoutMatchKey(t *testing.T) {
 
 	service, err := serviceTestFactory(configOneKey, server.URL, key)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, error: %s ", err)
 	}
 
 	cipher, err := service.Encrypt([]byte(sampleText))
 	if err != nil {
-		t.Fatal("fail to encrypt data with Vault", err)
+		t.Fatalf("fail to encrypt data with Vault, error: %s ", err)
 	}
 
 	// Create a service with only new key
 	newKey := "new-" + key
 	newService, err := serviceTestFactory(configOneKey, server.URL, newKey)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, error: %s ", err)
 	}
 
 	_, err = newService.Decrypt(cipher)
@@ -160,7 +160,7 @@ func TestWithRefreshToken(t *testing.T) {
 	// Also no retry, the request count should be one.
 	service, err := serviceTestFactory(configOneKey, server.URL, key)
 	if err != nil {
-		t.Fatal("fail to initialize Vault envelope service", err)
+		t.Fatalf("fail to initialize Vault envelope service, error: %s ", err)
 	}
 
 	originalText := []byte(sampleText)

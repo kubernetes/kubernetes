@@ -19,6 +19,7 @@ package vault
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -92,11 +93,11 @@ func KMSFactory(configFile io.Reader) (envelope.Service, error) {
 
 func checkConfig(config *EnvelopeConfig) error {
 	if len(config.KeyNames) == 0 {
-		return fmt.Errorf("vault provider has no valid key names")
+		return errors.New("vault provider has no valid key names")
 	}
 
 	if config.Address == "" {
-		return fmt.Errorf("vault provider has no valid address")
+		return errors.New("vault provider has no valid address")
 	}
 
 	return checkAuthConfig(config)
@@ -111,23 +112,23 @@ func checkAuthConfig(config *EnvelopeConfig) error {
 
 	if config.ClientCert != "" || config.ClientKey != "" {
 		if config.ClientCert == "" || config.ClientKey == "" {
-			return fmt.Errorf("vault provider has invalid TLS authentication information")
+			return errors.New("vault provider has invalid TLS authentication information")
 		}
 		count++
 	}
 
 	if config.RoleID != "" || config.SecretID != "" {
 		if config.RoleID == "" {
-			return fmt.Errorf("vault provider has invalid approle authentication information")
+			return errors.New("vault provider has invalid approle authentication information")
 		}
 		count++
 	}
 
 	if count == 0 {
-		return fmt.Errorf("vault provider has no authentication information")
+		return errors.New("vault provider has no authentication information")
 	}
 	if count > 1 {
-		return fmt.Errorf("vault provider has more than one authentication information")
+		return errors.New("vault provider has more than one authentication information")
 	}
 
 	return nil
@@ -152,7 +153,7 @@ func (s *vaultEnvelopeService) Decrypt(data string) ([]byte, error) {
 		}
 	}
 	if key == "" {
-		return nil, fmt.Errorf("no matching vault key found")
+		return nil, errors.New("no matching vault key found")
 	}
 
 	// Replace the key name with "vault:" for Vault transit API
