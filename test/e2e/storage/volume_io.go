@@ -312,10 +312,10 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 		})
 
 		AfterEach(func() {
-			framework.Logf("AfterEach: deleting Gluster endpoints %q...", name)
-			epErr := cs.CoreV1().Endpoints(ns).Delete(name, nil)
 			framework.Logf("AfterEach: deleting Gluster server pod %q...", serverPod.Name)
 			err := framework.DeletePodWithWait(f, cs, serverPod)
+			framework.Logf("AfterEach: deleting Gluster endpoints %q...", name)
+			epErr := cs.CoreV1().Endpoints(ns).Delete(name, nil)
 			if epErr != nil || err != nil {
 				if epErr != nil {
 					framework.Logf("AfterEach: Gluster delete endpoints failed: %v", err)
