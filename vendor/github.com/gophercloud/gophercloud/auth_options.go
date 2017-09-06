@@ -9,12 +9,32 @@ ProviderClient representing an active session on that provider.
 
 Its fields are the union of those recognized by each identity implementation and
 provider.
+
+An example of manually providing authentication information:
+
+  opts := gophercloud.AuthOptions{
+    IdentityEndpoint: "https://openstack.example.com:5000/v2.0",
+    Username: "{username}",
+    Password: "{password}",
+    TenantID: "{tenant_id}",
+  }
+
+  provider, err := openstack.AuthenticatedClient(opts)
+
+An example of using AuthOptionsFromEnv(), where the environment variables can
+be read from a file, such as a standard openrc file:
+
+  opts, err := openstack.AuthOptionsFromEnv()
+  provider, err := openstack.AuthenticatedClient(opts)
 */
 type AuthOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
 	// all of the identity services, it will often be populated by a provider-level
 	// function.
+	//
+	// The IdentityEndpoint is typically referred to as the "auth_url" or
+	// "OS_AUTH_URL" in the information provided by the cloud operator.
 	IdentityEndpoint string `json:"-"`
 
 	// Username is required if using Identity V2 API. Consult with your provider's
@@ -39,7 +59,7 @@ type AuthOptions struct {
 	// If DomainID or DomainName are provided, they will also apply to TenantName.
 	// It is not currently possible to authenticate with Username and a Domain
 	// and scope to a Project in a different Domain by using TenantName. To
-	// accomplish that, the ProjectID will need to be provided to the TenantID
+	// accomplish that, the ProjectID will need to be provided as the TenantID
 	// option.
 	TenantID   string `json:"tenantId,omitempty"`
 	TenantName string `json:"tenantName,omitempty"`
@@ -50,10 +70,12 @@ type AuthOptions struct {
 	// false, it will not cache these settings, but re-authentication will not be
 	// possible.  This setting defaults to false.
 	//
-	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
-	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client
-	// and provide a transport that implements the RoundTripper interface and stores the number of failed retries.
-	// For an example of this, see here: https://github.com/rackspace/rack/blob/1.0.0/auth/clients.go#L311
+	// NOTE: The reauth function will try to re-authenticate endlessly if left
+	// unchecked. The way to limit the number of attempts is to provide a custom
+	// HTTP client to the provider client and provide a transport that implements
+	// the RoundTripper interface and stores the number of failed retries. For an
+	// example of this, see here:
+	// https://github.com/rackspace/rack/blob/1.0.0/auth/clients.go#L311
 	AllowReauth bool `json:"-"`
 
 	// TokenID allows users to authenticate (possibly as another user) with an
@@ -316,7 +338,12 @@ func (opts *AuthOptions) ToTokenV3ScopeMap() (map[string]interface{}, error) {
 			},
 		}, nil
 	} else if scope.DomainName != "" {
-		return nil, ErrScopeDomainName{}
+		// DomainName
+		return map[string]interface{}{
+			"domain": map[string]interface{}{
+				"name": &scope.DomainName,
+			},
+		}, nil
 	}
 
 	return nil, nil

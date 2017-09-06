@@ -214,6 +214,10 @@ labels:
   color: fbca04
 - name: lgtm
   color: 15dd18
+- name: milestone-labels-complete
+  color: 77bb00
+- name: milestone-labels-incomplete
+  color: e11d21
 - name: needs-ok-to-merge
   color: ededed
 - name: needs-ok-to-test

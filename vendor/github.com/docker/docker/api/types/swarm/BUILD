@@ -4,9 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "common.go",
+        "config.go",
         "container.go",
         "network.go",
         "node.go",
+        "runtime.go",
         "secret.go",
         "service.go",
         "swarm.go",
@@ -16,6 +18,8 @@ go_library(
     deps = [
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",
         "//vendor/github.com/docker/docker/api/types/mount:go_default_library",
+        "//vendor/github.com/docker/docker/api/types/network:go_default_library",
+        "//vendor/github.com/docker/docker/api/types/swarm/runtime:go_default_library",
     ],
 )
 
@@ -28,7 +32,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/docker/docker/api/types/swarm/runtime:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

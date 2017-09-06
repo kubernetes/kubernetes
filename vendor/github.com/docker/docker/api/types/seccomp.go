@@ -10,7 +10,7 @@ type Seccomp struct {
 	Syscalls      []*Syscall     `json:"syscalls"`
 }
 
-// Architecture is used to represent an specific architecture
+// Architecture is used to represent a specific architecture
 // and its sub-architectures
 type Architecture struct {
 	Arch      Arch   `json:"architecture"`

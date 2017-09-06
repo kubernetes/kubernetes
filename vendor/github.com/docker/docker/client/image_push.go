@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 )
 
@@ -16,31 +16,33 @@ import (
 // It executes the privileged function if the operation is unauthorized
 // and it tries one more time.
 // It's up to the caller to handle the io.ReadCloser and close it properly.
-func (cli *Client) ImagePush(ctx context.Context, ref string, options types.ImagePushOptions) (io.ReadCloser, error) {
-	distributionRef, err := distreference.ParseNamed(ref)
+func (cli *Client) ImagePush(ctx context.Context, image string, options types.ImagePushOptions) (io.ReadCloser, error) {
+	ref, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, isCanonical := distributionRef.(distreference.Canonical); isCanonical {
+	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		return nil, errors.New("cannot push a digest reference")
 	}
 
-	var tag = ""
-	if nameTaggedRef, isNamedTagged := distributionRef.(distreference.NamedTagged); isNamedTagged {
+	tag := ""
+	name := reference.FamiliarName(ref)
+
+	if nameTaggedRef, isNamedTagged := ref.(reference.NamedTagged); isNamedTagged {
 		tag = nameTaggedRef.Tag()
 	}
 
 	query := url.Values{}
 	query.Set("tag", tag)
 
-	resp, err := cli.tryImagePush(ctx, distributionRef.Name(), query, options.RegistryAuth)
+	resp, err := cli.tryImagePush(ctx, name, query, options.RegistryAuth)
 	if resp.statusCode == http.StatusUnauthorized && options.PrivilegeFunc != nil {
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
 			return nil, privilegeErr
 		}
-		resp, err = cli.tryImagePush(ctx, distributionRef.Name(), query, newAuthHeader)
+		resp, err = cli.tryImagePush(ctx, name, query, newAuthHeader)
 	}
 	if err != nil {
 		return nil, err

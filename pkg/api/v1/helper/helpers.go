@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,6 +42,31 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 func IsDefaultNamespaceResource(name v1.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+
+}
+
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// HugePageResourceName returns a ResourceName with the canonical hugepage
+// prefix prepended for the specified page size.  The page size is converted
+// to its canonical representation.
+func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
+	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceHugePagesPrefix, pageSize.String()))
+}
+
+// HugePageSizeFromResourceName returns the page size for the specified huge page
+// resource name.  If the specified input is not a valid huge page resource name
+// an error is returned.
+func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
+	if !IsHugePageResourceName(name) {
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+	}
+	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
+	return resource.ParseQuantity(pageSize)
 }
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque

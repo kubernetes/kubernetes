@@ -10,7 +10,7 @@ type FixedIP struct {
 	IPAddress string `json:"ip_address"`
 }
 
-// Interface represents a network interface on an instance.
+// Interface represents a network interface on a server.
 type Interface struct {
 	PortState string    `json:"port_state"`
 	FixedIPs  []FixedIP `json:"fixed_ips"`
@@ -19,9 +19,12 @@ type Interface struct {
 	MACAddr   string    `json:"mac_addr"`
 }
 
-// InterfacePage abstracts the raw results of making a List() request against the API.
-// As OpenStack extensions may freely alter the response bodies of structures returned
-// to the client, you may only safely access the data provided through the ExtractInterfaces call.
+// InterfacePage abstracts the raw results of making a List() request against
+// the API.
+//
+// As OpenStack extensions may freely alter the response bodies of structures
+// returned to the client, you may only safely access the data provided through
+// the ExtractInterfaces call.
 type InterfacePage struct {
 	pagination.SinglePageBase
 }
@@ -33,7 +36,7 @@ func (r InterfacePage) IsEmpty() (bool, error) {
 }
 
 // ExtractInterfaces interprets the results of a single page from a List() call,
-// producing a map of interfaces.
+// producing a slice of Interface structs.
 func ExtractInterfaces(r pagination.Page) ([]Interface, error) {
 	var s struct {
 		Interfaces []Interface `json:"interfaceAttachments"`

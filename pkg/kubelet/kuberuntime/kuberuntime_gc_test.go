@@ -34,11 +34,11 @@ func TestSandboxGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+	podDeletionProvider := m.containerGC.podDeletionProvider.(*fakePodDeletionProvider)
 	makeGCSandbox := func(pod *v1.Pod, attempt uint32, state runtimeapi.PodSandboxState, withPodGetter bool, createdAt int64) sandboxTemplate {
 		if withPodGetter {
 			// initialize the pod getter
-			fakePodGetter.pods[pod.UID] = pod
+			podDeletionProvider.pods[pod.UID] = struct{}{}
 		}
 		return sandboxTemplate{
 			pod:       pod,
@@ -162,13 +162,13 @@ func TestContainerGC(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
-	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+	podDeletionProvider := m.containerGC.podDeletionProvider.(*fakePodDeletionProvider)
 	makeGCContainer := func(podName, containerName string, attempt int, createdAt int64, state runtimeapi.ContainerState) containerTemplate {
 		container := makeTestContainer(containerName, "test-image")
 		pod := makeTestPod(podName, "test-ns", podName, []v1.Container{container})
 		if podName != "deleted" {
 			// initialize the pod getter, explicitly exclude deleted pod
-			fakePodGetter.pods[pod.UID] = pod
+			podDeletionProvider.pods[pod.UID] = struct{}{}
 		}
 		return containerTemplate{
 			pod:       pod,
@@ -361,11 +361,11 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	fakeOS := m.osInterface.(*containertest.FakeOS)
-	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+	podDeletionProvider := m.containerGC.podDeletionProvider.(*fakePodDeletionProvider)
 
 	// pod log directories without corresponding pods should be removed.
-	fakePodGetter.pods["123"] = makeTestPod("foo1", "new", "123", nil)
-	fakePodGetter.pods["456"] = makeTestPod("foo2", "new", "456", nil)
+	podDeletionProvider.pods["123"] = struct{}{}
+	podDeletionProvider.pods["456"] = struct{}{}
 	files := []string{"123", "456", "789", "012"}
 	removed := []string{filepath.Join(podLogsRootDirectory, "789"), filepath.Join(podLogsRootDirectory, "012")}
 

@@ -89,8 +89,8 @@ function create-master-instance-internal() {
   fi
 
   local network=$(make-gcloud-network-argument \
-    "${NETWORK}" "${address:-}" \
-    "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SUBNETWORK:-}" "${IP_ALIAS_SIZE:-}")
+    "${NETWORK_PROJECT}" "${REGION}" "${NETWORK}" "${SUBNETWORK}" \
+    "${address:-}" "${ENABLE_IP_ALIASES:-}" "${IP_ALIAS_SIZE:-}")
 
   local metadata="kube-env=${KUBE_TEMP}/master-kube-env.yaml"
   metadata="${metadata},user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml"

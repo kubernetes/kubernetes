@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -80,6 +81,15 @@ func TestPluginEmptyRootContext(t *testing.T) {
 		expectedTeardownMounts: 0})
 }
 
+func TestPluginHugetlbfs(t *testing.T) {
+	doTestPlugin(t, pluginTestConfig{
+		medium:                        v1.StorageMediumHugepages,
+		expectedSetupMounts:           1,
+		expectedTeardownMounts:        0,
+		shouldBeMountedBeforeTeardown: true,
+	})
+}
+
 type pluginTestConfig struct {
 	medium                        v1.StorageMedium
 	idempotent                    bool
@@ -109,7 +119,22 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 
 		physicalMounter = mount.FakeMounter{}
 		mountDetector   = fakeMountDetector{}
-		pod             = &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+		pod             = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: types.UID("poduid"),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+							},
+						},
+					},
+				},
+			},
+		}
 	)
 
 	if config.idempotent {
@@ -165,7 +190,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if e, a := config.expectedSetupMounts, len(physicalMounter.Log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during setup, got %v", e, a)
 	} else if config.expectedSetupMounts == 1 &&
-		(physicalMounter.Log[0].Action != mount.FakeActionMount || physicalMounter.Log[0].FSType != "tmpfs") {
+		(physicalMounter.Log[0].Action != mount.FakeActionMount || (physicalMounter.Log[0].FSType != "tmpfs" && physicalMounter.Log[0].FSType != "hugetlbfs")) {
 		t.Errorf("Unexpected physicalMounter action during setup: %#v", physicalMounter.Log[0])
 	}
 	physicalMounter.ResetLog()
@@ -274,5 +299,143 @@ func TestMetrics(t *testing.T) {
 	}
 	if metrics.Available.Value() <= 0 {
 		t.Errorf("Expected Available to be greater than 0")
+	}
+}
+
+func TestGetHugePagesMountOptions(t *testing.T) {
+	testCases := map[string]struct {
+		pod            *v1.Pod
+		shouldFail     bool
+		expectedResult string
+	}{
+		"testWithProperValues": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pageSize=2Mi",
+		},
+		"testWithProperValuesAndDifferentPageSize": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pageSize=1Gi",
+		},
+		"InitContainerAndContainerHasProperValues": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     false,
+			expectedResult: "pageSize=1Gi",
+		},
+		"InitContainerAndContainerHasDifferentPageSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"ContainersWithMultiplePageSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"PodWithNoHugePagesRequest": {
+			pod:            &v1.Pod{},
+			shouldFail:     true,
+			expectedResult: "",
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		value, err := getPageSizeMountOptionFromPod(testCase.pod)
+		if testCase.shouldFail && err == nil {
+			t.Errorf("Expected an error in %v", testCaseName)
+		} else if !testCase.shouldFail && err != nil {
+			t.Errorf("Unexpected error in %v, got %v", testCaseName, err)
+		} else if testCase.expectedResult != value {
+			t.Errorf("Unexpected mountOptions for Pod. Expected %v, got %v", testCase.expectedResult, value)
+		}
 	}
 }

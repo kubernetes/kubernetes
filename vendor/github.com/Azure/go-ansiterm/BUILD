@@ -19,7 +19,7 @@ go_library(
         "utilities.go",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
+    deps = ["//vendor/github.com/sirupsen/logrus:go_default_library"],
 )
 
 filegroup(

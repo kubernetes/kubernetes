@@ -7,7 +7,7 @@ import (
 )
 
 // NewTCPSocket creates a TCP socket listener with the specified address and
-// and the specified tls configuration. If TLSConfig is set, will encapsulate the
+// the specified tls configuration. If TLSConfig is set, will encapsulate the
 // TCP listener inside a TLS one.
 func NewTCPSocket(addr string, tlsConfig *tls.Config) (net.Listener, error) {
 	l, err := net.Listen("tcp", addr)

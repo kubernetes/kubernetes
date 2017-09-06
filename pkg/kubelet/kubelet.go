@@ -19,11 +19,13 @@ package kubelet
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -629,7 +631,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeCfg.SeccompProfileRoot,
 			containerRefManager,
 			machineInfo,
-			klet.podManager,
+			klet,
 			kubeDeps.OSInterface,
 			klet,
 			httpClient,
@@ -667,7 +669,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet,
 			kubeDeps.Recorder,
 			containerRefManager,
-			klet.podManager,
+			klet,
 			klet.livenessManager,
 			httpClient,
 			klet.networkPlugin,
@@ -760,7 +762,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// check node capabilities since the mount path is not the default
 	if len(kubeCfg.ExperimentalMounterPath) != 0 {
 		kubeCfg.ExperimentalCheckNodeCapabilitiesBeforeMount = false
+		// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
+		// so that service name could be resolved
+		klet.setupDNSinContainerizedMounter(kubeCfg.ExperimentalMounterPath)
 	}
+
 	// setup volumeManager
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
@@ -2138,6 +2144,36 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+	}
+}
+
+// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
+func (kl *Kubelet) setupDNSinContainerizedMounter(mounterPath string) {
+	resolvePath := filepath.Join(strings.TrimSuffix(mounterPath, "/mounter"), "rootfs", "etc", "resolv.conf")
+	dnsString := ""
+	for _, dns := range kl.clusterDNS {
+		dnsString = dnsString + fmt.Sprintf("nameserver %s\n", dns)
+	}
+	if kl.resolverConfig != "" {
+		f, err := os.Open(kl.resolverConfig)
+		defer f.Close()
+		if err != nil {
+			glog.Error("Could not open resolverConf file")
+		} else {
+			_, hostSearch, err := kl.parseResolvConf(f)
+			if err != nil {
+				glog.Errorf("Error for parsing the reslov.conf file: %v", err)
+			} else {
+				dnsString = dnsString + "search"
+				for _, search := range hostSearch {
+					dnsString = dnsString + fmt.Sprintf(" %s", search)
+				}
+				dnsString = dnsString + "\n"
+			}
+		}
+	}
+	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+		glog.Errorf("Could not write dns nameserver in file %s, with error %v", resolvePath, err)
 	}
 }
 

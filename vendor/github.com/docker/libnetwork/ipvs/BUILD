@@ -13,7 +13,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/github.com/Sirupsen/logrus:go_default_library",
+            "//vendor/github.com/sirupsen/logrus:go_default_library",
             "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
             "//vendor/github.com/vishvananda/netns:go_default_library",
         ],

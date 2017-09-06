@@ -224,9 +224,8 @@ type HeaderResult struct {
 	Result
 }
 
-// ExtractHeader will return the http.Header and error from the HeaderResult.
-//
-//   header, err := objects.Create(client, "my_container", objects.CreateOpts{}).ExtractHeader()
+// ExtractInto allows users to provide an object into which `Extract` will
+// extract the http.Header headers of the result.
 func (r HeaderResult) ExtractInto(to interface{}) error {
 	if r.Err != nil {
 		return r.Err

@@ -7,29 +7,30 @@ import (
 
 // Member represents the application running on a backend server.
 type Member struct {
-	// The status of the member. Indicates whether the member is operational.
+	// Status is the status of the member. Indicates whether the member
+	// is operational.
 	Status string
 
-	// Weight of member.
+	// Weight is the weight of member.
 	Weight int
 
-	// The administrative state of the member, which is up (true) or down (false).
+	// AdminStateUp is the administrative state of the member, which is up
+	// (true) or down (false).
 	AdminStateUp bool `json:"admin_state_up"`
 
-	// Owner of the member. Only an administrative user can specify a tenant ID
-	// other than its own.
+	// TenantID is the owner of the member.
 	TenantID string `json:"tenant_id"`
 
-	// The pool to which the member belongs.
+	// PoolID is the pool to which the member belongs.
 	PoolID string `json:"pool_id"`
 
-	// The IP address of the member.
+	// Address is the IP address of the member.
 	Address string
 
-	// The port on which the application is hosted.
+	// ProtocolPort is the port on which the application is hosted.
 	ProtocolPort int `json:"protocol_port"`
 
-	// The unique ID for the member.
+	// ID is the unique ID for the member.
 	ID string
 }
 
@@ -74,7 +75,7 @@ type commonResult struct {
 	gophercloud.Result
 }
 
-// Extract is a function that accepts a result and extracts a router.
+// Extract is a function that accepts a result and extracts a member.
 func (r commonResult) Extract() (*Member, error) {
 	var s struct {
 		Member *Member `json:"member"`
@@ -83,22 +84,26 @@ func (r commonResult) Extract() (*Member, error) {
 	return s.Member, err
 }
 
-// CreateResult represents the result of a create operation.
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a Member.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a Member.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a Member.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its
+// ExtractErr method to determine if the result succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }

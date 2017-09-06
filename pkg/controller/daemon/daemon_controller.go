@@ -1180,6 +1180,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
+	// TODO(#48843) OutOfDisk taints will be removed in 1.10
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 		kubelettypes.IsCriticalPod(newPod) {
 		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
@@ -1221,7 +1222,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 // summary. Returned booleans are:
 // * wantToRun:
 //     Returns true when a user would expect a pod to run on this node and ignores conditions
-//     such as OutOfDisk or insufficient resource that would cause a daemonset pod not to schedule.
+//     such as DiskPressure or insufficient resource that would cause a daemonset pod not to schedule.
 //     This is primarily used to populate daemonset status.
 // * shouldSchedule:
 //     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
@@ -1257,11 +1258,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			var emitEvent bool
 			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
 			switch reason {
-			case predicates.ErrNodeOutOfDisk:
-				// the kubelet will evict this pod if it needs to. Let kubelet
-				// decide whether to continue running this pod so leave shouldContinueRunning
-				// set to true
-				shouldSchedule = false
 			// intentional
 			case
 				predicates.ErrNodeSelectorNotMatch,
@@ -1344,9 +1340,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
 	} else {
 		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
-		ncFit, ncReasons := NodeConditionPredicates(nodeInfo)
-		fit = ncFit && fit
-		reasons = append(reasons, ncReasons...)
 	}
 	if err != nil {
 		return false, predicateFails, err
@@ -1356,26 +1349,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
-}
-
-func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
-	reasons := []algorithm.PredicateFailureReason{}
-
-	// If TaintNodesByCondition feature was enabled, account PodToleratesNodeTaints predicates.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		return true, nil
-	}
-
-	for _, c := range nodeInfo.Node().Status.Conditions {
-		// TODO: There are other node status that the DaemonSet should ideally respect too,
-		//       e.g. MemoryPressure, and DiskPressure
-		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			reasons = append(reasons, predicates.ErrNodeOutOfDisk)
-			break
-		}
-	}
-
-	return len(reasons) == 0, reasons
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

@@ -2,11 +2,8 @@ package client
 
 import (
 	"crypto/tls"
-	"errors"
 	"net/http"
 )
-
-var errTLSConfigUnavailable = errors.New("TLSConfig unavailable")
 
 // transportFunc allows us to inject a mock transport for testing. We define it
 // here so we can detect the tlsconfig and return nil for only this type.
@@ -16,7 +13,7 @@ func (tf transportFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tf(req)
 }
 
-// resolveTLSConfig attempts to resolve the tls configuration from the
+// resolveTLSConfig attempts to resolve the TLS configuration from the
 // RoundTripper.
 func resolveTLSConfig(transport http.RoundTripper) *tls.Config {
 	switch tr := transport.(type) {

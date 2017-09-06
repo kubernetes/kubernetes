@@ -409,8 +409,10 @@ function kube::build::clean() {
     "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
   fi
 
-  kube::log::status "Removing _output directory"
-  rm -rf "${LOCAL_OUTPUT_ROOT}"
+  if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
+    kube::log::status "Removing _output directory"
+    rm -rf "${LOCAL_OUTPUT_ROOT}"
+  fi
 }
 
 # Set up the context directory for the kube-build image and build it.

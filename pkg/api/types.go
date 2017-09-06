@@ -681,8 +681,9 @@ type EmptyDirVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
-	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -3339,6 +3340,8 @@ const (
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 	// Default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
+	// Name prefix for huge page resources (alpha).
+	ResourceHugePagesPrefix = "hugepages-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

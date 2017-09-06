@@ -369,8 +369,9 @@ func getMasterSSHClient() (*ssh.Client, error) {
 		sshUser = os.Getenv("USER")
 	}
 	config := &ssh.ClientConfig{
-		User: sshUser,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		User:            sshUser,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	host := framework.GetMasterHost() + ":22"

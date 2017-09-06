@@ -43,9 +43,9 @@ func getDockerAPIVersion() (semver.Version, error) {
 	return semver.MustParse(version.APIVersion + ".0"), nil
 }
 
-// isSharedPIDNamespaceEnabled returns true if the Docker version is 1.13.1+
+// isSharedPIDNamespaceSupported returns true if the Docker version is 1.13.1+
 // (API version 1.26+), and false otherwise.
-func isSharedPIDNamespaceEnabled() (bool, error) {
+func isSharedPIDNamespaceSupported() (bool, error) {
 	version, err := getDockerAPIVersion()
 	if err != nil {
 		return false, err

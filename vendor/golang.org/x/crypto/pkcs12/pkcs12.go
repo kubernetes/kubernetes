@@ -109,6 +109,10 @@ func ToPEM(pfxData []byte, password string) ([]*pem.Block, error) {
 
 	bags, encodedPassword, err := getSafeContents(pfxData, encodedPassword)
 
+	if err != nil {
+		return nil, err
+	}
+
 	blocks := make([]*pem.Block, 0, len(bags))
 	for _, bag := range bags {
 		block, err := convertBag(&bag, encodedPassword)

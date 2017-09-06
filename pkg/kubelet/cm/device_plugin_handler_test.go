@@ -128,6 +128,41 @@ func (m *DevicePluginManagerTestStub) Stop() error {
 	return nil
 }
 
+func (m *DevicePluginManagerTestStub) CheckpointFile() string {
+	return "/tmp/device-plugin-checkpoint"
+}
+
+func TestCheckpoint(t *testing.T) {
+	resourceName1 := "domain1.com/resource1"
+	resourceName2 := "domain2.com/resource2"
+
+	m, err := NewDevicePluginManagerTestStub()
+	as := assert.New(t)
+	as.Nil(err)
+
+	testDevicePluginHandler := &DevicePluginHandlerImpl{
+		devicePluginManager: m,
+		allDevices:          make(map[string]sets.String),
+		allocatedDevices:    make(map[string]podDevices),
+	}
+	testDevicePluginHandler.allocatedDevices[resourceName1] = make(podDevices)
+	testDevicePluginHandler.allocatedDevices[resourceName1].insert("pod1", "con1", "dev1")
+	testDevicePluginHandler.allocatedDevices[resourceName1].insert("pod1", "con1", "dev2")
+	testDevicePluginHandler.allocatedDevices[resourceName1].insert("pod1", "con2", "dev1")
+	testDevicePluginHandler.allocatedDevices[resourceName1].insert("pod2", "con1", "dev1")
+	testDevicePluginHandler.allocatedDevices[resourceName2] = make(podDevices)
+	testDevicePluginHandler.allocatedDevices[resourceName2].insert("pod1", "con1", "dev3")
+	testDevicePluginHandler.allocatedDevices[resourceName2].insert("pod1", "con1", "dev4")
+
+	err = testDevicePluginHandler.writeCheckpoint()
+	as.Nil(err)
+	expected := testDevicePluginHandler.allocatedDevices
+	testDevicePluginHandler.allocatedDevices = make(map[string]podDevices)
+	err = testDevicePluginHandler.readCheckpoint()
+	as.Nil(err)
+	as.Equal(expected, testDevicePluginHandler.allocatedDevices)
+}
+
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string

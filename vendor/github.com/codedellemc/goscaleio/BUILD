@@ -18,8 +18,8 @@ go_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/Sirupsen/logrus:go_default_library",
         "//vendor/github.com/codedellemc/goscaleio/types/v1:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
     ],
 )
 

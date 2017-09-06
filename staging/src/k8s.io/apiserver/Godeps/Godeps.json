@@ -404,31 +404,31 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "c0406a133c4a74a838baf0ddff3c2fab21155fba"
+			"Rev": "2bf16b94fdd9b01557c4d076e567fe5cbbe5a961"
 		},
 		{
 			"ImportPath": "github.com/gregjones/httpcache",
@@ -572,27 +572,27 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/blowfish",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/poly1305",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "d172538b2cfce0c13cee31e647d0367aa8cd2486"
+			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
@@ -636,7 +636,11 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "7a4fde3fda8ef580a89dbae8138c26041be14299"
+			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows",
+			"Rev": "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
 		},
 		{
 			"ImportPath": "golang.org/x/text/cases",
