@@ -15,7 +15,6 @@ go_library(
         "endpoint.go",
         "manager.go",
         "types.go",
-        "utils.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -46,7 +45,6 @@ go_test(
     srcs = [
         "endpoint_test.go",
         "manager_test.go",
-        "utils_test.go",
     ],
     library = ":go_default_library",
     deps = [
