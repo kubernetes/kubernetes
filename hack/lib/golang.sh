@@ -112,6 +112,10 @@ else
   # Which platforms we should compile test targets for. Not all client platforms need these tests
   readonly KUBE_TEST_PLATFORMS=(
     linux/amd64
+    linux/arm
+    linux/arm64
+    linux/s390x
+    linux/ppc64le
     darwin/amd64
     windows/amd64
   )
