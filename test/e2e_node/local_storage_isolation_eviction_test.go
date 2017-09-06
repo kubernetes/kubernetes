@@ -75,7 +75,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Name: emptyDirVolumeName,
 							VolumeSource: v1.VolumeSource{
 								EmptyDir: &v1.EmptyDirVolumeSource{
-									SizeLimit: *resource.NewQuantity(int64(1000), resource.BinarySI),
+									SizeLimit: resource.NewQuantity(int64(1000), resource.BinarySI),
 								},
 							},
 						},
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							VolumeSource: v1.VolumeSource{
 								EmptyDir: &v1.EmptyDirVolumeSource{
 									Medium:    "Memory",
-									SizeLimit: *resource.NewQuantity(int64(10000), resource.BinarySI),
+									SizeLimit: resource.NewQuantity(int64(10000), resource.BinarySI),
 								},
 							},
 						},
@@ -148,7 +148,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 							Name: emptyDirVolumeName,
 							VolumeSource: v1.VolumeSource{
 								EmptyDir: &v1.EmptyDirVolumeSource{
-									SizeLimit: *resource.NewQuantity(int64(100000), resource.BinarySI),
+									SizeLimit: resource.NewQuantity(int64(100000), resource.BinarySI),
 								},
 							},
 						},

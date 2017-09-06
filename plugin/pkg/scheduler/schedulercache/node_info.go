@@ -373,7 +373,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 	// Account for storage requested by emptydir volumes
 	// If the storage medium is memory, should exclude the size
 	for _, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
+		if vol.EmptyDir != nil && vol.EmptyDir.SizeLimit != nil && vol.EmptyDir.Medium != v1.StorageMediumMemory {
 			res.StorageScratch += vol.EmptyDir.SizeLimit.Value()
 		}
 	}
