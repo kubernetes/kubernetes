@@ -88,8 +88,18 @@ type ExtraConfig struct {
 }
 
 type Config struct {
-	GenericConfig *genericapiserver.RecommendedConfig
+	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
+}
+
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
 }
 
 // APIAggregator contains state for a Kubernetes cluster master/api server.
@@ -124,41 +134,35 @@ type APIAggregator struct {
 	openAPIAggregationController *openapicontroller.AggregationController
 }
 
-type completedConfig struct {
-	*Config
-}
-
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+func (cfg *Config) Complete() CompletedConfig {
+	c := completedConfig{
+		cfg.GenericConfig.Complete(),
+		&cfg.ExtraConfig,
+	}
+
 	// the kube aggregator wires its own discovery mechanism
 	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Complete()
-
 	version := version.Get()
 	c.GenericConfig.Version = &version
 
-	return completedConfig{c}
-}
-
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+	return CompletedConfig{&c}
 }
 
 // New returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	// Prevent generic API server to install OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
-	openApiConfig := c.Config.GenericConfig.OpenAPIConfig
-	c.Config.GenericConfig.OpenAPIConfig = nil
+	openApiConfig := c.GenericConfig.OpenAPIConfig
+	c.GenericConfig.OpenAPIConfig = nil
 
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New("kube-aggregator", delegationTarget) // completion is done in Complete, no need for a second time
+	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	apiregistrationClient, err := internalclientset.NewForConfig(c.Config.GenericConfig.LoopbackClientConfig)
+	apiregistrationClient, err := internalclientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}

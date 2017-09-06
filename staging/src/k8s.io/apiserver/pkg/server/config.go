@@ -62,6 +62,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
+	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
@@ -302,9 +303,14 @@ type completedConfig struct {
 	*Config
 }
 
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+func (c *Config) Complete() CompletedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
@@ -379,12 +385,7 @@ func (c *Config) Complete() completedConfig {
 		c.RequestInfoResolver = NewRequestInfoResolver(c)
 	}
 
-	return completedConfig{c}
-}
-
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+	return CompletedConfig{&completedConfig{c}}
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.

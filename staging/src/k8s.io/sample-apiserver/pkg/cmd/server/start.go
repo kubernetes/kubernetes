@@ -124,8 +124,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	config := &apiserver.Config{
-		GenericConfig:         serverConfig,
-		SharedInformerFactory: informerFactory,
+		GenericConfig: serverConfig,
 		ExtraConfig:   apiserver.ExtraConfig{},
 	}
 	return config, nil
@@ -143,7 +142,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	}
 
 	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
-		config.SharedInformerFactory.Start(context.StopCh)
+		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 

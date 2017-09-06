@@ -52,7 +52,7 @@ func TestNewWithDelegate(t *testing.T) {
 		return fmt.Errorf("delegate failed healthcheck")
 	}))
 
-	delegateServer, err := delegateConfig.SkipComplete().New("test", EmptyDelegate)
+	delegateServer, err := delegateConfig.Complete().New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatal(err)
 	}

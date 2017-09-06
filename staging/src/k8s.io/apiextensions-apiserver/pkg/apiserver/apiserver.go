@@ -81,11 +81,20 @@ func init() {
 type ExtraConfig struct {
 	CRDRESTOptionsGetter genericregistry.RESTOptionsGetter
 }
+
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
 }
 
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
 }
 
 type CustomResourceDefinitions struct {
@@ -95,31 +104,25 @@ type CustomResourceDefinitions struct {
 	Informers internalinformers.SharedInformerFactory
 }
 
-type completedConfig struct {
-	*Config
-}
-
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
-	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Complete()
+func (cfg *Config) Complete() CompletedConfig {
+	c := completedConfig{
+		cfg.GenericConfig.Complete(),
+		&cfg.ExtraConfig,
+	}
 
+	c.GenericConfig.EnableDiscovery = false
 	c.GenericConfig.Version = &version.Info{
 		Major: "0",
 		Minor: "1",
 	}
 
-	return completedConfig{c}
-}
-
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+	return CompletedConfig{&c}
 }
 
 // New returns a new instance of CustomResourceDefinitions from the given config.
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*CustomResourceDefinitions, error) {
-	genericServer, err := c.Config.GenericConfig.SkipComplete().New("apiextensions-apiserver", delegationTarget) // completion is done in Complete, no need for a second time
+	genericServer, err := c.GenericConfig.New("apiextensions-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
