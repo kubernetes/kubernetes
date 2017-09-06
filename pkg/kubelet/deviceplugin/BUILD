@@ -39,11 +39,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "endpoint_test.go",
-        "manager_test.go",
-        "utils_test.go",
-    ],
+    srcs = ["endpoint_test.go"],
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",

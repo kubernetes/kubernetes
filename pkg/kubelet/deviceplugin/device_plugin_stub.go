@@ -30,8 +30,9 @@ import (
 
 // Stub implementation for DevicePlugin.
 type Stub struct {
-	devs   []*pluginapi.Device
-	socket string
+	resourceName string
+	devs         []*pluginapi.Device
+	socket       string
 
 	stop   chan interface{}
 	update chan []*pluginapi.Device
@@ -40,10 +41,11 @@ type Stub struct {
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
-func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
+func NewDevicePluginStub(devs []*pluginapi.Device, socket, resourceName string) *Stub {
 	return &Stub{
-		devs:   devs,
-		socket: socket,
+		resourceName: resourceName,
+		devs:         devs,
+		socket:       socket,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
@@ -119,8 +121,24 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	log.Printf("Allocate, %+v", r)
 
-	var response pluginapi.AllocateResponse
-	return &response, nil
+	resp := new(pluginapi.AllocateResponse)
+	for _, id := range r.DevicesIDs {
+		devRuntime := new(pluginapi.DeviceRuntimeSpec)
+		devRuntime.Envs = make(map[string]string)
+		devRuntime.Devices = append(devRuntime.Devices, &pluginapi.DeviceSpec{
+			ContainerPath: "/dev/" + id,
+			HostPath:      "/dev/" + id,
+			Permissions:   "mrw",
+		})
+		devRuntime.Mounts = append(devRuntime.Mounts, &pluginapi.Mount{
+			ContainerPath: "/container_dir1/" + m.resourceName,
+			HostPath:      "host_dir1/" + m.resourceName,
+			ReadOnly:      true,
+		})
+		devRuntime.Envs["key_"+m.resourceName] = "value_" + m.resourceName
+		resp.Spec = append(resp.Spec, devRuntime)
+	}
+	return resp, nil
 }
 
 func (m *Stub) cleanup() error {

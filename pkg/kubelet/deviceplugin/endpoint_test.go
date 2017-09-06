@@ -17,7 +17,9 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"math/rand"
 	"path"
+	"strconv"
 	"testing"
 	"time"
 
@@ -26,12 +28,8 @@ import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 )
 
-var (
-	esocketName = "mock.sock"
-)
-
 func TestNewEndpoint(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+	socket := path.Join("/tmp", randSock())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -41,33 +39,8 @@ func TestNewEndpoint(t *testing.T) {
 	defer ecleanup(t, p, e)
 }
 
-func TestList(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
-
-	devs := []*pluginapi.Device{
-		{ID: "ADeviceId", Health: pluginapi.Healthy},
-	}
-
-	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
-	defer ecleanup(t, p, e)
-
-	_, err := e.list()
-	require.NoError(t, err)
-
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-
-	require.Len(t, e.devices, 1)
-
-	d, ok := e.devices[devs[0].ID]
-	require.True(t, ok)
-
-	require.Equal(t, d.ID, devs[0].ID)
-	require.Equal(t, d.Health, devs[0].Health)
-}
-
-func TestListAndWatch(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+func TestRun(t *testing.T) {
+	socket := path.Join("/tmp", randSock())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -93,10 +66,7 @@ func TestListAndWatch(t *testing.T) {
 	})
 	defer ecleanup(t, p, e)
 
-	s, err := e.list()
-	require.NoError(t, err)
-
-	go e.listAndWatch(s)
+	go e.Run()
 	p.Update(updated)
 	time.Sleep(time.Second)
 
@@ -114,19 +84,31 @@ func TestListAndWatch(t *testing.T) {
 
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *endpoint) {
-	p := NewDevicePluginStub(devs, socket)
+func TestCloneDevice(t *testing.T) {
+	d := cloneDevice(&pluginapi.Device{ID: "ADeviceId", Health: pluginapi.Healthy})
+
+	require.Equal(t, d.ID, "ADeviceId")
+	require.Equal(t, d.Health, pluginapi.Healthy)
+}
+
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *Endpoint) {
+	p := NewDevicePluginStub(devs, socket, "mock")
 
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpoint(socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
+	e, err := NewEndpoint(socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
 
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpoint) {
+func ecleanup(t *testing.T, p *Stub, e *Endpoint) {
 	p.Stop()
-	e.stop()
+	e.Stop()
+}
+
+func randSock() string {
+	suffix := strconv.Itoa(rand.Intn(100))
+	return "mock" + suffix + ".sock"
 }
