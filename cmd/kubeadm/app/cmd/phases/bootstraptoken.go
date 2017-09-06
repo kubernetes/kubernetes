@@ -100,7 +100,10 @@ func NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile *string) *cobra.Command 
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = node.AllowBootstrapTokensToPostCSRs(client)
+			clusterVersion, err := getClusterVersion(client)
+			kubeadmutil.CheckErr(err)
+
+			err = node.AllowBootstrapTokensToPostCSRs(client, clusterVersion)
 			kubeadmutil.CheckErr(err)
 		},
 	}
