@@ -1076,8 +1076,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/libnetwork/ipvs",
-			"Comment": "v0.8.0-dev.2-908-gd5c82231",
-			"Rev": "d5c822319097cc01cc9bd5ffedd74c7ce7c894f2"
+			"Rev": "ba46b928444931e6865d8618dc03622cac79aa6f"
 		},
 		{
 			"ImportPath": "github.com/docker/libtrust",

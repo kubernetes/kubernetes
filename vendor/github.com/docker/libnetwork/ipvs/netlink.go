@@ -402,6 +402,13 @@ func (i *Handle) doGetServicesCmd(svc *Service) ([]*Service, error) {
 	return res, nil
 }
 
+// doCmdWithoutAttr a simple wrapper of netlink socket execute command
+func (i *Handle) doCmdWithoutAttr(cmd uint8) ([][]byte, error) {
+	req := newIPVSRequest(cmd)
+	req.Seq = atomic.AddUint32(&i.seq, 1)
+	return execute(i.sock, req, 0)
+}
+
 func assembleDestination(attrs []syscall.NetlinkRouteAttr) (*Destination, error) {
 
 	var d Destination
