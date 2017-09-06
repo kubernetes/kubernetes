@@ -44,4 +44,8 @@ type Interface interface {
 
 	// HasDedicatedImageFs returns true iff a dedicated image filesystem exists for storing images.
 	HasDedicatedImageFs() (bool, error)
+
+	// GetFsInfoByFsUUID returns the stats of the filesystem with the specified
+	// uuid.
+	GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error)
 }

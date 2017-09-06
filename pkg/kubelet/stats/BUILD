@@ -11,6 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -20,6 +21,7 @@ go_library(
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -45,11 +47,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cadvisor_stats_provider_test.go",
+        "cri_stats_provider_test.go",
         "helper_test.go",
         "stats_provider_test.go",
     ],
     library = ":go_default_library",
     deps = [
+        "//pkg/kubelet/apis/cri/testing:go_default_library",
+        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -58,6 +63,7 @@ go_test(
         "//pkg/kubelet/pod/testing:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",

@@ -88,3 +88,8 @@ func (c *Mock) HasDedicatedImageFs() (bool, error) {
 	args := c.Called()
 	return args.Get(0).(bool), args.Error(1)
 }
+
+func (c *Mock) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
+	args := c.Called(uuid)
+	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
+}
