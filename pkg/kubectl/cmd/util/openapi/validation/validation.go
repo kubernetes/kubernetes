@@ -25,9 +25,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	openapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/api"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 type SchemaValidation struct {
@@ -82,7 +82,7 @@ func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVer
 		return nil
 	}
 
-	resource := v.resources.LookupResource(gvk.String())
+	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
 		return []error{fmt.Errorf("unknown object type %#v", gvk)}
 	}
