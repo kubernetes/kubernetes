@@ -133,4 +133,12 @@ func SetDefaults_NetworkPolicy(obj *extensionsv1beta1.NetworkPolicy) {
 			}
 		}
 	}
+
+	if len(obj.Spec.PolicyTypes) == 0 {
+		// Any policy that does not specify policyTypes implies at least "Ingress".
+		obj.Spec.PolicyTypes = []extensionsv1beta1.PolicyType{extensionsv1beta1.PolicyTypeIngress}
+		if len(obj.Spec.Egress) != 0 {
+			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, extensionsv1beta1.PolicyTypeEgress)
+		}
+	}
 }
