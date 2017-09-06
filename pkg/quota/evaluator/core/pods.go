@@ -25,9 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/initialization"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
@@ -135,19 +139,20 @@ func (p *podEvaluator) GroupKind() schema.GroupKind {
 	return api.Kind("Pod")
 }
 
-// Handles returns true of the evaluator should handle the specified attributes.
+// Handles returns true if the evaluator should handle the specified attributes.
 func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
 	if op == admission.Create {
 		return true
 	}
-	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	initializationCompletion, err := util.IsInitializationCompletion(a)
 	if err != nil {
 		// fail closed, will try to give an evaluation.
+		utilruntime.HandleError(err)
 		return true
 	}
 	// only uninitialized pods might be updated.
-	return updateUninitialized
+	return initializationCompletion
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -254,9 +259,18 @@ func PodUsageFunc(obj runtime.Object) (api.ResourceList, error) {
 	if err != nil {
 		return api.ResourceList{}, err
 	}
+
 	// by convention, we do not quota pods that have reached an end-of-life state
 	if !QuotaPod(pod) {
 		return api.ResourceList{}, nil
+	}
+	// Only charge pod count for uninitialized pod.
+	if utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		if !initialization.IsInitialized(pod.Initializers) {
+			result := api.ResourceList{}
+			result[api.ResourcePods] = resource.MustParse("1")
+			return result, nil
+		}
 	}
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
