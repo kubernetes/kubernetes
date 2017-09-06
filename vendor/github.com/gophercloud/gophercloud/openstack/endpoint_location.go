@@ -6,12 +6,16 @@ import (
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 )
 
-// V2EndpointURL discovers the endpoint URL for a specific service from a ServiceCatalog acquired
-// during the v2 identity service. The specified EndpointOpts are used to identify a unique,
-// unambiguous endpoint to return. It's an error both when multiple endpoints match the provided
-// criteria and when none do. The minimum that can be specified is a Type, but you will also often
-// need to specify a Name and/or a Region depending on what's available on your OpenStack
-// deployment.
+/*
+V2EndpointURL discovers the endpoint URL for a specific service from a
+ServiceCatalog acquired during the v2 identity service.
+
+The specified EndpointOpts are used to identify a unique, unambiguous endpoint
+to return. It's an error both when multiple endpoints match the provided
+criteria and when none do. The minimum that can be specified is a Type, but you
+will also often need to specify a Name and/or a Region depending on what's
+available on your OpenStack deployment.
+*/
 func V2EndpointURL(catalog *tokens2.ServiceCatalog, opts gophercloud.EndpointOpts) (string, error) {
 	// Extract Endpoints from the catalog entries that match the requested Type, Name if provided, and Region if provided.
 	var endpoints = make([]tokens2.Endpoint, 0, 1)
@@ -54,12 +58,16 @@ func V2EndpointURL(catalog *tokens2.ServiceCatalog, opts gophercloud.EndpointOpt
 	return "", err
 }
 
-// V3EndpointURL discovers the endpoint URL for a specific service from a Catalog acquired
-// during the v3 identity service. The specified EndpointOpts are used to identify a unique,
-// unambiguous endpoint to return. It's an error both when multiple endpoints match the provided
-// criteria and when none do. The minimum that can be specified is a Type, but you will also often
-// need to specify a Name and/or a Region depending on what's available on your OpenStack
-// deployment.
+/*
+V3EndpointURL discovers the endpoint URL for a specific service from a Catalog
+acquired during the v3 identity service.
+
+The specified EndpointOpts are used to identify a unique, unambiguous endpoint
+to return. It's an error both when multiple endpoints match the provided
+criteria and when none do. The minimum that can be specified is a Type, but you
+will also often need to specify a Name and/or a Region depending on what's
+available on your OpenStack deployment.
+*/
 func V3EndpointURL(catalog *tokens3.ServiceCatalog, opts gophercloud.EndpointOpts) (string, error) {
 	// Extract Endpoints from the catalog entries that match the requested Type, Interface,
 	// Name if provided, and Region if provided.

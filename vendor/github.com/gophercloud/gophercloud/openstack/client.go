@@ -16,10 +16,20 @@ const (
 	v30 = "v3.0"
 )
 
-// NewClient prepares an unauthenticated ProviderClient instance.
-// Most users will probably prefer using the AuthenticatedClient function instead.
-// This is useful if you wish to explicitly control the version of the identity service that's used for authentication explicitly,
-// for example.
+/*
+NewClient prepares an unauthenticated ProviderClient instance.
+Most users will probably prefer using the AuthenticatedClient function
+instead.
+
+This is useful if you wish to explicitly control the version of the identity
+service that's used for authentication explicitly, for example.
+
+A basic example of using this would be:
+
+	ao, err := openstack.AuthOptionsFromEnv()
+	provider, err := openstack.NewClient(ao.IdentityEndpoint)
+	client, err := openstack.NewIdentityV3(provider, gophercloud.EndpointOpts{})
+*/
 func NewClient(endpoint string) (*gophercloud.ProviderClient, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -45,10 +55,26 @@ func NewClient(endpoint string) (*gophercloud.ProviderClient, error) {
 	}, nil
 }
 
-// AuthenticatedClient logs in to an OpenStack cloud found at the identity endpoint specified by options, acquires a token, and
-// returns a Client instance that's ready to operate.
-// It first queries the root identity endpoint to determine which versions of the identity service are supported, then chooses
-// the most recent identity service available to proceed.
+/*
+AuthenticatedClient logs in to an OpenStack cloud found at the identity endpoint
+specified by the options, acquires a token, and returns a Provider Client
+instance that's ready to operate.
+
+If the full path to a versioned identity endpoint was specified  (example:
+http://example.com:5000/v3), that path will be used as the endpoint to query.
+
+If a versionless endpoint was specified (example: http://example.com:5000/),
+the endpoint will be queried to determine which versions of the identity service
+are available, then chooses the most recent or most supported version.
+
+Example:
+
+	ao, err := openstack.AuthOptionsFromEnv()
+	provider, err := openstack.AuthenticatedClient(ao)
+	client, err := openstack.NewNetworkV2(client, gophercloud.EndpointOpts{
+		Region: os.Getenv("OS_REGION_NAME"),
+	})
+*/
 func AuthenticatedClient(options gophercloud.AuthOptions) (*gophercloud.ProviderClient, error) {
 	client, err := NewClient(options.IdentityEndpoint)
 	if err != nil {
@@ -62,7 +88,8 @@ func AuthenticatedClient(options gophercloud.AuthOptions) (*gophercloud.Provider
 	return client, nil
 }
 
-// Authenticate or re-authenticate against the most recent identity service supported at the provided endpoint.
+// Authenticate or re-authenticate against the most recent identity service
+// supported at the provided endpoint.
 func Authenticate(client *gophercloud.ProviderClient, options gophercloud.AuthOptions) error {
 	versions := []*utils.Version{
 		{ID: v20, Priority: 20, Suffix: "/v2.0/"},
@@ -179,7 +206,8 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, opts tokens3.Au
 	return nil
 }
 
-// NewIdentityV2 creates a ServiceClient that may be used to interact with the v2 identity service.
+// NewIdentityV2 creates a ServiceClient that may be used to interact with the
+// v2 identity service.
 func NewIdentityV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	endpoint := client.IdentityBase + "v2.0/"
 	clientType := "identity"
@@ -199,7 +227,8 @@ func NewIdentityV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOp
 	}, nil
 }
 
-// NewIdentityV3 creates a ServiceClient that may be used to access the v3 identity service.
+// NewIdentityV3 creates a ServiceClient that may be used to access the v3
+// identity service.
 func NewIdentityV3(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	endpoint := client.IdentityBase + "v3/"
 	clientType := "identity"
@@ -232,34 +261,40 @@ func initClientOpts(client *gophercloud.ProviderClient, eo gophercloud.EndpointO
 	return sc, nil
 }
 
-// NewObjectStorageV1 creates a ServiceClient that may be used with the v1 object storage package.
+// NewObjectStorageV1 creates a ServiceClient that may be used with the v1
+// object storage package.
 func NewObjectStorageV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "object-store")
 }
 
-// NewComputeV2 creates a ServiceClient that may be used with the v2 compute package.
+// NewComputeV2 creates a ServiceClient that may be used with the v2 compute
+// package.
 func NewComputeV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "compute")
 }
 
-// NewNetworkV2 creates a ServiceClient that may be used with the v2 network package.
+// NewNetworkV2 creates a ServiceClient that may be used with the v2 network
+// package.
 func NewNetworkV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	sc, err := initClientOpts(client, eo, "network")
 	sc.ResourceBase = sc.Endpoint + "v2.0/"
 	return sc, err
 }
 
-// NewBlockStorageV1 creates a ServiceClient that may be used to access the v1 block storage service.
+// NewBlockStorageV1 creates a ServiceClient that may be used to access the v1
+// block storage service.
 func NewBlockStorageV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "volume")
 }
 
-// NewBlockStorageV2 creates a ServiceClient that may be used to access the v2 block storage service.
+// NewBlockStorageV2 creates a ServiceClient that may be used to access the v2
+// block storage service.
 func NewBlockStorageV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "volumev2")
 }
 
-// NewSharedFileSystemV2 creates a ServiceClient that may be used to access the v2 shared file system service.
+// NewSharedFileSystemV2 creates a ServiceClient that may be used to access the
+// v2 shared file system service.
 func NewSharedFileSystemV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "sharev2")
 }
@@ -270,7 +305,8 @@ func NewCDNV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (
 	return initClientOpts(client, eo, "cdn")
 }
 
-// NewOrchestrationV1 creates a ServiceClient that may be used to access the v1 orchestration service.
+// NewOrchestrationV1 creates a ServiceClient that may be used to access the v1
+// orchestration service.
 func NewOrchestrationV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	return initClientOpts(client, eo, "orchestration")
 }
@@ -280,14 +316,16 @@ func NewDBV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*
 	return initClientOpts(client, eo, "database")
 }
 
-// NewDNSV2 creates a ServiceClient that may be used to access the v2 DNS service.
+// NewDNSV2 creates a ServiceClient that may be used to access the v2 DNS
+// service.
 func NewDNSV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	sc, err := initClientOpts(client, eo, "dns")
 	sc.ResourceBase = sc.Endpoint + "v2/"
 	return sc, err
 }
 
-// NewImageServiceV2 creates a ServiceClient that may be used to access the v2 image service.
+// NewImageServiceV2 creates a ServiceClient that may be used to access the v2
+// image service.
 func NewImageServiceV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	sc, err := initClientOpts(client, eo, "image")
 	sc.ResourceBase = sc.Endpoint + "v2/"

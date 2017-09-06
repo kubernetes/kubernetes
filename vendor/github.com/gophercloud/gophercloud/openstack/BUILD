@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "auth_env.go",
         "client.go",
+        "doc.go",
         "endpoint_location.go",
         "errors.go",
     ],

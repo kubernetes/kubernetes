@@ -7,9 +7,9 @@ import (
 
 // ListOpts allows the filtering and sorting of paginated collections through
 // the API. Filtering is achieved by passing in struct field values that map to
-// the security group attributes you want to see returned. SortKey allows you to
-// sort by a particular network attribute. SortDir sets the direction, and is
-// either `asc' or `desc'. Marker and Limit are used for pagination.
+// the security group rule attributes you want to see returned. SortKey allows
+// you to sort by a particular network attribute. SortDir sets the direction,
+// and is either `asc' or `desc'. Marker and Limit are used for pagination.
 type ListOpts struct {
 	Direction      string `q:"direction"`
 	EtherType      string `q:"ethertype"`
@@ -74,48 +74,56 @@ const (
 	ProtocolVRRP      RuleProtocol  = "vrrp"
 )
 
-// CreateOptsBuilder is what types must satisfy to be used as Create
-// options.
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToSecGroupRuleCreateMap() (map[string]interface{}, error)
 }
 
-// CreateOpts contains all the values needed to create a new security group rule.
+// CreateOpts contains all the values needed to create a new security group
+// rule.
 type CreateOpts struct {
-	// Required. Must be either "ingress" or "egress": the direction in which the
-	// security group rule is applied.
+	// Must be either "ingress" or "egress": the direction in which the security
+	// group rule is applied.
 	Direction RuleDirection `json:"direction" required:"true"`
-	// Required. Must be "IPv4" or "IPv6", and addresses represented in CIDR must
-	// match the ingress or egress rules.
+
+	// Must be "IPv4" or "IPv6", and addresses represented in CIDR must match the
+	// ingress or egress rules.
 	EtherType RuleEtherType `json:"ethertype" required:"true"`
-	// Required. The security group ID to associate with this security group rule.
+
+	// The security group ID to associate with this security group rule.
 	SecGroupID string `json:"security_group_id" required:"true"`
-	// Optional. The maximum port number in the range that is matched by the
-	// security group rule. The PortRangeMin attribute constrains the PortRangeMax
-	// attribute. If the protocol is ICMP, this value must be an ICMP type.
+
+	// The maximum port number in the range that is matched by the security group
+	// rule. The PortRangeMin attribute constrains the PortRangeMax attribute. If
+	// the protocol is ICMP, this value must be an ICMP type.
 	PortRangeMax int `json:"port_range_max,omitempty"`
-	// Optional. The minimum port number in the range that is matched by the
-	// security group rule. If the protocol is TCP or UDP, this value must be
-	// less than or equal to the value of the PortRangeMax attribute. If the
-	// protocol is ICMP, this value must be an ICMP type.
+
+	// The minimum port number in the range that is matched by the security group
+	// rule. If the protocol is TCP or UDP, this value must be less than or equal
+	// to the value of the PortRangeMax attribute. If the protocol is ICMP, this
+	// value must be an ICMP type.
 	PortRangeMin int `json:"port_range_min,omitempty"`
-	// Optional. The protocol that is matched by the security group rule. Valid
-	// values are "tcp", "udp", "icmp" or an empty string.
+
+	// The protocol that is matched by the security group rule. Valid values are
+	// "tcp", "udp", "icmp" or an empty string.
 	Protocol RuleProtocol `json:"protocol,omitempty"`
-	// Optional. The remote group ID to be associated with this security group
-	// rule. You can specify either RemoteGroupID or RemoteIPPrefix.
+
+	// The remote group ID to be associated with this security group rule. You can
+	// specify either RemoteGroupID or RemoteIPPrefix.
 	RemoteGroupID string `json:"remote_group_id,omitempty"`
-	// Optional. The remote IP prefix to be associated with this security group
-	// rule. You can specify either RemoteGroupID or RemoteIPPrefix. This
-	// attribute matches the specified IP prefix as the source IP address of the
-	// IP packet.
+
+	// The remote IP prefix to be associated with this security group rule. You can
+	// specify either RemoteGroupID or RemoteIPPrefix. This attribute matches the
+	// specified IP prefix as the source IP address of the IP packet.
 	RemoteIPPrefix string `json:"remote_ip_prefix,omitempty"`
-	// Required for admins. Indicates the owner of the VIP.
+
+	// The UUID of the tenant who owns the Rule. Only administrative users
+	// can specify a tenant UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
 }
 
-// ToSecGroupRuleCreateMap allows CreateOpts to satisfy the CreateOptsBuilder
-// interface
+// ToSecGroupRuleCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToSecGroupRuleCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "security_group_rule")
 }
@@ -138,7 +146,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// Delete will permanently delete a particular security group rule based on its unique ID.
+// Delete will permanently delete a particular security group rule based on its
+// unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = c.Delete(resourceURL(c, id), nil)
 	return

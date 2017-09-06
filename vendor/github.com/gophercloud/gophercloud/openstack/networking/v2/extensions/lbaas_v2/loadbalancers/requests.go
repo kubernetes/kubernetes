@@ -42,11 +42,11 @@ func (opts ListOpts) ToLoadBalancerListQuery() (string, error) {
 }
 
 // List returns a Pager which allows you to iterate over a collection of
-// routers. It accepts a ListOpts struct, which allows you to filter and sort
-// the returned collection for greater efficiency.
+// load balancers. It accepts a ListOpts struct, which allows you to filter
+// and sort the returned collection for greater efficiency.
 //
-// Default policy settings return only those routers that are owned by the
-// tenant who submits the request, unless an admin user submits the request.
+// Default policy settings return only those load balancers that are owned by
+// the tenant who submits the request, unless an admin user submits the request.
 func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
 	url := rootURL(c)
 	if opts != nil {
@@ -61,10 +61,8 @@ func List(c *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pager {
 	})
 }
 
-// CreateOptsBuilder is the interface options structs have to satisfy in order
-// to be used in the main Create operation in this package. Since many
-// extensions decorate or modify the common logic, it is useful for them to
-// satisfy a basic interface in order for them to be used.
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToLoadBalancerCreateMap() (map[string]interface{}, error)
 }
@@ -72,29 +70,36 @@ type CreateOptsBuilder interface {
 // CreateOpts is the common options struct used in this package's Create
 // operation.
 type CreateOpts struct {
-	// Optional. Human-readable name for the Loadbalancer. Does not have to be unique.
+	// Human-readable name for the Loadbalancer. Does not have to be unique.
 	Name string `json:"name,omitempty"`
-	// Optional. Human-readable description for the Loadbalancer.
+
+	// Human-readable description for the Loadbalancer.
 	Description string `json:"description,omitempty"`
-	// Required. The network on which to allocate the Loadbalancer's address. A tenant can
-	// only create Loadbalancers on networks authorized by policy (e.g. networks that
-	// belong to them or networks that are shared).
+
+	// The network on which to allocate the Loadbalancer's address. A tenant can
+	// only create Loadbalancers on networks authorized by policy (e.g. networks
+	// that belong to them or networks that are shared).
 	VipSubnetID string `json:"vip_subnet_id" required:"true"`
-	// Required for admins. The UUID of the tenant who owns the Loadbalancer.
-	// Only administrative users can specify a tenant UUID other than their own.
+
+	// The UUID of the tenant who owns the Loadbalancer. Only administrative users
+	// can specify a tenant UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
-	// Optional. The IP address of the Loadbalancer.
+
+	// The IP address of the Loadbalancer.
 	VipAddress string `json:"vip_address,omitempty"`
-	// Optional. The administrative state of the Loadbalancer. A valid value is true (UP)
+
+	// The administrative state of the Loadbalancer. A valid value is true (UP)
 	// or false (DOWN).
 	AdminStateUp *bool `json:"admin_state_up,omitempty"`
-	// Optional. The UUID of a flavor.
+
+	// The UUID of a flavor.
 	Flavor string `json:"flavor,omitempty"`
-	// Optional. The name of the provider.
+
+	// The name of the provider.
 	Provider string `json:"provider,omitempty"`
 }
 
-// ToLoadBalancerCreateMap casts a CreateOpts struct to a map.
+// ToLoadBalancerCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToLoadBalancerCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "loadbalancer")
 }
@@ -103,9 +108,6 @@ func (opts CreateOpts) ToLoadBalancerCreateMap() (map[string]interface{}, error)
 // configuration defined in the CreateOpts struct. Once the request is
 // validated and progress has started on the provisioning process, a
 // CreateResult will be returned.
-//
-// Users with an admin role can create loadbalancers on behalf of other tenants by
-// specifying a TenantID attribute different than their own.
 func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) (r CreateResult) {
 	b, err := opts.ToLoadBalancerCreateMap()
 	if err != nil {
@@ -122,10 +124,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder is the interface options structs have to satisfy in order
-// to be used in the main Update operation in this package. Since many
-// extensions decorate or modify the common logic, it is useful for them to
-// satisfy a basic interface in order for them to be used.
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToLoadBalancerUpdateMap() (map[string]interface{}, error)
 }
@@ -133,21 +133,24 @@ type UpdateOptsBuilder interface {
 // UpdateOpts is the common options struct used in this package's Update
 // operation.
 type UpdateOpts struct {
-	// Optional. Human-readable name for the Loadbalancer. Does not have to be unique.
+	// Human-readable name for the Loadbalancer. Does not have to be unique.
 	Name string `json:"name,omitempty"`
-	// Optional. Human-readable description for the Loadbalancer.
+
+	// Human-readable description for the Loadbalancer.
 	Description string `json:"description,omitempty"`
-	// Optional. The administrative state of the Loadbalancer. A valid value is true (UP)
+
+	// The administrative state of the Loadbalancer. A valid value is true (UP)
 	// or false (DOWN).
 	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToLoadBalancerUpdateMap casts a UpdateOpts struct to a map.
+// ToLoadBalancerUpdateMap builds a request body from UpdateOpts.
 func (opts UpdateOpts) ToLoadBalancerUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "loadbalancer")
 }
 
-// Update is an operation which modifies the attributes of the specified LoadBalancer.
+// Update is an operation which modifies the attributes of the specified
+// LoadBalancer.
 func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) (r UpdateResult) {
 	b, err := opts.ToLoadBalancerUpdateMap()
 	if err != nil {
@@ -160,12 +163,14 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOpts) (r UpdateR
 	return
 }
 
-// Delete will permanently delete a particular LoadBalancer based on its unique ID.
+// Delete will permanently delete a particular LoadBalancer based on its
+// unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = c.Delete(resourceURL(c, id), nil)
 	return
 }
 
+// GetStatuses will return the status of a particular LoadBalancer.
 func GetStatuses(c *gophercloud.ServiceClient, id string) (r GetStatusesResult) {
 	_, r.Err = c.Get(statusRootURL(c, id), &r.Body, nil)
 	return
