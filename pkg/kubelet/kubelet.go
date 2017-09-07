@@ -1868,8 +1868,8 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		glog.V(4).Infof("SyncLoop (SYNC): %d pods; %s", len(podsToSync), format.Pods(podsToSync))
 		kl.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
+		// The liveness manager detected a failure; sync the pod
 		if update.Result == proberesults.Failure {
-			// The liveness manager detected a failure; sync the pod.
 
 			// We should not use the pod from livenessManager, because it is never updated after
 			// initialization.
@@ -1955,9 +1955,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			continue
 		}
 
+		// Only go through the admission process if the pod is not terminated.
 		if !kl.podIsTerminated(pod) {
-			// Only go through the admission process if the pod is not
-			// terminated.
 
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
