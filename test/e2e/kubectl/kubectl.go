@@ -38,6 +38,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/elazarl/goproxy"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	clientset "k8s.io/client-go/kubernetes"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -68,21 +68,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	nautilusImage            = "gcr.io/google_containers/update-demo:nautilus"
-	kittenImage              = "gcr.io/google_containers/update-demo:kitten"
 	updateDemoSelector       = "name=update-demo"
-	updateDemoContainer      = "update-demo"
-	frontendSelector         = "app=guestbook,tier=frontend"
-	redisMasterSelector      = "app=redis,role=master"
-	redisSlaveSelector       = "app=redis,role=slave"
-	goproxyContainer         = "goproxy"
-	goproxyPodSelector       = "name=goproxy"
-	netexecContainer         = "netexec"
-	netexecPodSelector       = "name=netexec"
-	kubectlProxyPort         = 8011
 	guestbookStartupTimeout  = 10 * time.Minute
 	guestbookResponseTimeout = 3 * time.Minute
 	simplePodSelector        = "name=nginx"
@@ -92,18 +82,41 @@ const (
 	pausePodSelector         = "name=pause"
 	pausePodName             = "pause"
 	runJobTimeout            = 5 * time.Minute
-	busyboxImage             = "gcr.io/google_containers/busybox:1.24"
-	nginxImage               = "gcr.io/google_containers/nginx-slim:0.7"
-	newNginxImage            = "gcr.io/google_containers/nginx-slim:0.8"
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
-	redisControllerFilename  = "redis-master-controller.json"
+	redisControllerFilename  = "redis-master-controller.json.in"
 	redisServiceFilename     = "redis-master-service.json"
-	nginxDeployment1Filename = "nginx-deployment1.yaml"
-	nginxDeployment2Filename = "nginx-deployment2.yaml"
-	nginxDeployment3Filename = "nginx-deployment3.yaml"
-	redisImage               = "gcr.io/k8s-testimages/redis:e2e"
+	nginxDeployment1Filename = "nginx-deployment1.yaml.in"
+	nginxDeployment2Filename = "nginx-deployment2.yaml.in"
+	nginxDeployment3Filename = "nginx-deployment3.yaml.in"
 )
 
+var (
+	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
+	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
+	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
+	nginxImage    = imageutils.GetE2EImage(imageutils.NginxSlim)
+	busyboxImage  = imageutils.GetBusyBoxImage()
+)
+
+var testImages = struct {
+	FrontendImage     string
+	PauseImage        string
+	NginxSlimImage    string
+	NginxSlimNewImage string
+	RedisImage        string
+	RedisslaveImage   string
+	NautilusImage     string
+	KittenImage       string
+}{
+	imageutils.GetE2EImage(imageutils.Frontend),
+	imageutils.GetE2EImage(imageutils.Pause),
+	imageutils.GetE2EImage(imageutils.NginxSlim),
+	imageutils.GetE2EImage(imageutils.NginxSlimNew),
+	imageutils.GetE2EImage(imageutils.Redis),
+	imageutils.GetE2EImage(imageutils.Redisslave),
+	imageutils.GetE2EImage(imageutils.Nautilus),
+	imageutils.GetE2EImage(imageutils.Kitten),
+}
 var (
 	proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 
@@ -145,7 +158,8 @@ var (
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
 	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
 
-	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
@@ -160,6 +174,19 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	// dependencies from this test.
 	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
 	framework.AssertCleanup(ns, selectors...)
+}
+
+func substituteImageName(content string) string {
+	contentWithImageName := new(bytes.Buffer)
+	tmpl, err := template.New("imagemanifest").Parse(content)
+	if err != nil {
+		framework.Failf("Failed Parse the template:", err)
+	}
+	err = tmpl.Execute(contentWithImageName, testImages)
+	if err != nil {
+		framework.Failf("Failed executing template:", err)
+	}
+	return contentWithImageName.String()
 }
 
 func readTestFileOrDie(file string) []byte {
@@ -203,21 +230,21 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 
 		BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			cjName = "e2e-test-echo-cronjob"
+			cjName = "e2e-test-echo-cronjob-alpha"
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
+			framework.RunKubectlOrDie("delete", "cronjob.v2alpha1.batch", cjName, nsFlag)
 		})
 
 		It("should create a CronJob", func() {
-			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceAlpha, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			By("verifying the CronJob " + cjName + " was created")
-			sj, err := c.BatchV2alpha1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
+			sj, err := c.BatchV1beta1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
 			}
@@ -272,25 +299,25 @@ var _ = SIGDescribe("Kubectl client", func() {
 	}
 
 	framework.KubeDescribe("Update Demo", func() {
-		var nautilus, kitten []byte
+		var nautilus, kitten string
 		BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml"))
-			kitten = generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml"))
+			nautilus = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
+			kitten = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
 		It("should create and stop a replication controller [Conformance]", func() {
-			defer cleanupKubectlInputs(string(nautilus), ns, updateDemoSelector)
+			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			By("creating a replication controller")
-			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		It("should scale a replication controller [Conformance]", func() {
-			defer cleanupKubectlInputs(string(nautilus[:]), ns, updateDemoSelector)
+			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			By("creating a replication controller")
-			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling down the replication controller")
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
@@ -344,16 +371,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 	})
 
 	framework.KubeDescribe("Simple pod", func() {
-		var podPath []byte
-
+		podYaml := substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 		BeforeEach(func() {
-			podPath = generated.ReadOrDie(path.Join(kubeCtlManifestPath, "pod-with-readiness-probe.yaml"))
-			By(fmt.Sprintf("creating the pod from %v", string(podPath)))
-			framework.RunKubectlOrDieInput(string(podPath[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			By(fmt.Sprintf("creating the pod from %v", podYaml))
+			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
 		AfterEach(func() {
-			cleanupKubectlInputs(string(podPath[:]), ns, simplePodSelector)
+			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
 		})
 
 		It("should support exec", func() {
@@ -707,13 +732,13 @@ metadata:
 
 	framework.KubeDescribe("Kubectl apply", func() {
 		It("should apply a new configuration to an existing RC", func() {
-			controllerJson := readTestFileOrDie(redisControllerFilename)
+			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
-			framework.RunKubectlOrDieInput(string(controllerJson), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(controllerJson, "create", "-f", "-", nsFlag)
 			By("applying a modified configuration")
-			stdin := modifyReplicationControllerConfiguration(string(controllerJson))
+			stdin := modifyReplicationControllerConfiguration(controllerJson)
 			framework.NewKubectlCommand("apply", "-f", "-", nsFlag).
 				WithStdinReader(stdin).
 				ExecOrDie()
@@ -743,26 +768,26 @@ metadata:
 		})
 
 		It("apply set/view last-applied", func() {
-			deployment1Yaml := readTestFileOrDie(nginxDeployment1Filename)
-			deployment2Yaml := readTestFileOrDie(nginxDeployment2Filename)
-			deployment3Yaml := readTestFileOrDie(nginxDeployment3Filename)
+			deployment1Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment1Filename)))
+			deployment2Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment2Filename)))
+			deployment3Yaml := substituteImageName(string(readTestFileOrDie(nginxDeployment3Filename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("deployment replicas number is 2")
-			framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "-f", "-", nsFlag)
 
 			By("check the last-applied matches expectations annotations")
-			output := framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			output := framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString := "\"replicas\": 2"
 			if !strings.Contains(output, requiredString) {
 				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
 			}
 
 			By("apply file doesn't have replicas")
-			framework.RunKubectlOrDieInput(string(deployment2Yaml[:]), "apply", "set-last-applied", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(deployment2Yaml, "apply", "set-last-applied", "-f", "-", nsFlag)
 
 			By("check last-applied has been updated, annotations doesn't replicas")
-			output = framework.RunKubectlOrDieInput(string(deployment1Yaml[:]), "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			output = framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString = "\"replicas\": 2"
 			if strings.Contains(output, requiredString) {
 				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
@@ -773,11 +798,11 @@ metadata:
 			framework.RunKubectlOrDie("scale", "deployment", nginxDeploy, "--replicas=3", nsFlag)
 
 			By("apply file doesn't have replicas but image changed")
-			framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "apply", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(deployment3Yaml, "apply", "-f", "-", nsFlag)
 
 			By("verify replicas still is 3 and image has been updated")
-			output = framework.RunKubectlOrDieInput(string(deployment3Yaml[:]), "get", "-f", "-", nsFlag, "-o", "json")
-			requiredItems := []string{"\"replicas\": 3", "nginx-slim:0.7"}
+			output = framework.RunKubectlOrDieInput(deployment3Yaml, "get", "-f", "-", nsFlag, "-o", "json")
+			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.NginxSlim)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl apply", item)
@@ -809,11 +834,11 @@ metadata:
 			kv, err := framework.KubectlVersion()
 			Expect(err).NotTo(HaveOccurred())
 			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
-			controllerJson := readTestFileOrDie(redisControllerFilename)
+			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJson := readTestFileOrDie(redisServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(controllerJson, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(string(serviceJson[:]), "create", "-f", "-", nsFlag)
 
 			By("Waiting for Redis master to start.")
@@ -910,7 +935,7 @@ metadata:
 
 	framework.KubeDescribe("Kubectl expose", func() {
 		It("should create services for rc [Conformance]", func() {
-			controllerJson := readTestFileOrDie(redisControllerFilename)
+			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			redisPort := 6379
@@ -918,7 +943,7 @@ metadata:
 			By("creating Redis RC")
 
 			framework.Logf("namespace %v", ns)
-			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(controllerJson, "create", "-f", "-", nsFlag)
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
 			By("Waiting for Redis master to start.")
@@ -988,17 +1013,16 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl label", func() {
-		var pod []byte
+		podYaml := substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 		var nsFlag string
 		BeforeEach(func() {
-			pod = readTestFileOrDie("pause-pod.yaml")
 			By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			framework.RunKubectlOrDieInput(string(pod), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
 		AfterEach(func() {
-			cleanupKubectlInputs(string(pod[:]), ns, pausePodSelector)
+			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
 		})
 
 		It("should update the label on a resource [Conformance]", func() {
@@ -1024,17 +1048,16 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl logs", func() {
-		var rc []byte
 		var nsFlag string
+		rc := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 		containerName := "redis-master"
 		BeforeEach(func() {
-			rc = readTestFileOrDie(redisControllerFilename)
 			By("creating an rc")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			framework.RunKubectlOrDieInput(string(rc[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(rc, "create", "-f", "-", nsFlag)
 		})
 		AfterEach(func() {
-			cleanupKubectlInputs(string(rc[:]), ns, simplePodSelector)
+			cleanupKubectlInputs(rc, ns, simplePodSelector)
 		})
 
 		It("should be able to retrieve and filter logs [Conformance]", func() {
@@ -1091,10 +1114,10 @@ metadata:
 
 	framework.KubeDescribe("Kubectl patch", func() {
 		It("should add annotations for pods in rc [Conformance]", func() {
-			controllerJson := readTestFileOrDie(redisControllerFilename)
+			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
-			framework.RunKubectlOrDieInput(string(controllerJson[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(controllerJson, "create", "-f", "-", nsFlag)
 			By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
 			By("patching all pods")
@@ -1343,6 +1366,43 @@ metadata:
 			}
 			if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
 				framework.Failf("Failed creating a job with correct restart policy for --restart=OnFailure")
+			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl run CronJob", func() {
+		var nsFlag string
+		var cjName string
+
+		BeforeEach(func() {
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			cjName = "e2e-test-echo-cronjob-beta"
+		})
+
+		AfterEach(func() {
+			framework.RunKubectlOrDie("delete", "cronjob.v1beta1.batch", cjName, nsFlag)
+		})
+
+		It("should create a CronJob", func() {
+			framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceBeta, f.Namespace.Name)
+
+			schedule := "*/5 * * * ?"
+			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v1beta1",
+				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
+			By("verifying the CronJob " + cjName + " was created")
+			cj, err := c.BatchV1beta1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("Failed getting CronJob %s: %v", cjName, err)
+			}
+			if cj.Spec.Schedule != schedule {
+				framework.Failf("Failed creating a CronJob with correct schedule %s", schedule)
+			}
+			containers := cj.Spec.JobTemplate.Spec.Template.Spec.Containers
+			if containers == nil || len(containers) != 1 || containers[0].Image != busyboxImage {
+				framework.Failf("Failed creating CronJob %s for 1 pod with expected image %s: %#v", cjName, busyboxImage, containers)
+			}
+			if cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
+				framework.Failf("Failed creating a CronJob with correct restart policy for --restart=OnFailure")
 			}
 		})
 	})

@@ -21,46 +21,47 @@ import (
 // won't participate in its pool's load balancing. In other words, ALL monitors
 // must declare the member to be healthy for it to stay ACTIVE.
 type Monitor struct {
-	// The unique ID for the VIP.
+	// ID is the unique ID for the Monitor.
 	ID string
 
-	// Monitor name. Does not have to be unique.
+	// Name is the monitor name. Does not have to be unique.
 	Name string
 
-	// Owner of the VIP. Only an administrative user can specify a tenant ID
-	// other than its own.
+	// TenantID is the owner of the Monitor.
 	TenantID string `json:"tenant_id"`
 
-	// The type of probe sent by the load balancer to verify the member state,
-	// which is PING, TCP, HTTP, or HTTPS.
+	// Type is the type of probe sent by the load balancer to verify the member
+	// state, which is PING, TCP, HTTP, or HTTPS.
 	Type string
 
-	// The time, in seconds, between sending probes to members.
+	// Delay is the time, in seconds, between sending probes to members.
 	Delay int
 
-	// The maximum number of seconds for a monitor to wait for a connection to be
-	// established before it times out. This value must be less than the delay value.
+	// Timeout is the maximum number of seconds for a monitor to wait for a
+	// connection to be established before it times out. This value must be less
+	// than the delay value.
 	Timeout int
 
-	// Number of allowed connection failures before changing the status of the
-	// member to INACTIVE. A valid value is from 1 to 10.
+	// MaxRetries is the number of allowed connection failures before changing the
+	// status of the member to INACTIVE. A valid value is from 1 to 10.
 	MaxRetries int `json:"max_retries"`
 
-	// The HTTP method that the monitor uses for requests.
+	// HTTPMethod is the HTTP method that the monitor uses for requests.
 	HTTPMethod string `json:"http_method"`
 
-	// The HTTP path of the request sent by the monitor to test the health of a
-	// member. Must be a string beginning with a forward slash (/).
+	// URLPath is the HTTP path of the request sent by the monitor to test the
+	// health of a member. Must be a string beginning with a forward slash (/).
 	URLPath string `json:"url_path"`
 
-	// Expected HTTP codes for a passing HTTP(S) monitor.
+	// ExpectedCodes is the expected HTTP codes for a passing HTTP(S) monitor.
 	ExpectedCodes string `json:"expected_codes"`
 
-	// The administrative state of the health monitor, which is up (true) or down (false).
+	// AdminStateUp is the administrative state of the health monitor, which is up
+	// (true) or down (false).
 	AdminStateUp bool `json:"admin_state_up"`
 
-	// The status of the health monitor. Indicates whether the health monitor is
-	// operational.
+	// Status is the status of the health monitor. Indicates whether the health
+	// monitor is operational.
 	Status string
 }
 
@@ -115,22 +116,26 @@ func (r commonResult) Extract() (*Monitor, error) {
 	return s.Monitor, err
 }
 
-// CreateResult represents the result of a create operation.
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a Monitor.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a Monitor.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a Monitor.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its Extract
+// method to determine if the request succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }

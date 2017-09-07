@@ -547,6 +547,27 @@ type PersistentVolumeClaimSpec struct {
 	StorageClassName *string
 }
 
+type PersistentVolumeClaimConditionType string
+
+// These are valid conditions of Pvc
+const (
+	// An user trigger resize of pvc has been started
+	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
+)
+
+type PersistentVolumeClaimCondition struct {
+	Type   PersistentVolumeClaimConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
+
 type PersistentVolumeClaimStatus struct {
 	// Phase represents the current phase of PersistentVolumeClaim
 	// +optional
@@ -557,6 +578,8 @@ type PersistentVolumeClaimStatus struct {
 	// Represents the actual resources of the underlying volume
 	// +optional
 	Capacity ResourceList
+	// +optional
+	Conditions []PersistentVolumeClaimCondition
 }
 
 type PersistentVolumeAccessMode string
@@ -658,8 +681,9 @@ type EmptyDirVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node
-	StorageMediumMemory  StorageMedium = "Memory" // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -1445,7 +1469,33 @@ type VolumeMount struct {
 	// Defaults to "" (volume's root).
 	// +optional
 	SubPath string
+	// mountPropagation determines how mounts are propagated from the host
+	// to container and the other way around.
+	// When not set, MountPropagationHostToContainer is used.
+	// This field is alpha in 1.8 and can be reworked or removed in a future
+	// release.
+	// +optional
+	MountPropagation *MountPropagationMode
 }
+
+// MountPropagationMode describes mount propagation.
+type MountPropagationMode string
+
+const (
+	// MountPropagationHostToContainer means that the volume in a container will
+	// receive new mounts from the host or other containers, but filesystems
+	// mounted inside the container won't be propagated to the host or other
+	// containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rslave" in Linux terminology).
+	MountPropagationHostToContainer MountPropagationMode = "HostToContainer"
+	// MountPropagationBidirectional means that the volume in a container will
+	// receive new mounts from the host or other containers, and its own mounts
+	// will be propagated from the container to the host or other containers.
+	// Note that this mode is recursively applied to all mounts in the volume
+	// ("rshared" in Linux terminology).
+	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
@@ -2607,6 +2657,8 @@ type ReplicationControllerCondition struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/extensions.Scale,result=k8s.io/kubernetes/pkg/apis/extensions.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3288,6 +3340,8 @@ const (
 	ResourceOpaqueIntPrefix = "pod.alpha.kubernetes.io/opaque-int-resource-"
 	// Default namespace prefix.
 	ResourceDefaultNamespacePrefix = "kubernetes.io/"
+	// Name prefix for huge page resources (alpha).
+	ResourceHugePagesPrefix = "hugepages-"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.

@@ -1006,6 +1006,9 @@ const (
 	MSG_TRUNC                         = 0x10
 	MSG_USERFLAGS                     = 0xffffff
 	MSG_WAITALL                       = 0x40
+	MS_ASYNC                          = 0x1
+	MS_INVALIDATE                     = 0x2
+	MS_SYNC                           = 0x4
 	NAME_MAX                          = 0x1ff
 	NET_RT_DUMP                       = 0x1
 	NET_RT_FLAGS                      = 0x2

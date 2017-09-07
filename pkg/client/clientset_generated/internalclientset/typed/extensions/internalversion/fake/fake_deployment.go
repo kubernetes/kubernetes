@@ -136,3 +136,25 @@ func (c *FakeDeployments) Patch(name string, pt types.PatchType, data []byte, su
 	}
 	return obj.(*extensions.Deployment), err
 }
+
+// GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeDeployments) GetScale(deploymentName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeDeployments) UpdateScale(deploymentName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
+}

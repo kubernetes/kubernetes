@@ -38,11 +38,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
+	openapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
@@ -217,10 +217,10 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 }
 
 type FakeResources struct {
-	resources map[schema.GroupVersionKind]openapi.Schema
+	resources map[string]openapi.Schema
 }
 
-func (f FakeResources) LookupResource(s schema.GroupVersionKind) openapi.Schema {
+func (f FakeResources) LookupResource(s string) openapi.Schema {
 	return f.resources[s]
 }
 
@@ -228,11 +228,11 @@ var _ openapi.Resources = &FakeResources{}
 
 func testOpenAPISchemaData() (openapi.Resources, error) {
 	return &FakeResources{
-		resources: map[schema.GroupVersionKind]openapi.Schema{
-			{
+		resources: map[string]openapi.Schema{
+			schema.GroupVersionKind{
 				Version: "v1",
 				Kind:    "Pod",
-			}: &openapi.Primitive{
+			}.String(): &openapi.Primitive{
 				BaseSchema: openapi.BaseSchema{
 					Extensions: map[string]interface{}{
 						"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",

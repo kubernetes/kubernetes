@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/rand"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
@@ -295,7 +296,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	newRS := extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:            d.Name + "-" + podTemplateSpecHash,
+			Name:            d.Name + "-" + rand.SafeEncodeString(podTemplateSpecHash),
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},

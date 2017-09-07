@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	. "github.com/onsi/ginkgo"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO: Test that the deployment stays available during master (and maybe
@@ -64,7 +65,7 @@ var _ upgrades.Skippable = DeploymentUpgradeTest{}
 func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	deploymentName := "deployment-hash-test"
 	c := f.ClientSet
-	nginxImage := "gcr.io/google_containers/nginx-slim:0.8"
+	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
 
 	ns := f.Namespace.Name
 

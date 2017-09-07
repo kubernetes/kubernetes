@@ -39,6 +39,9 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 		if a.GetVerb() == "delete" {
 			return false, "", nil
 		}
+		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
+			return false, "", nil
+		}
 		return true, "", nil
 	}
 
@@ -46,11 +49,17 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 		if a.GetVerb() == "delete" && a.GetResource() == "pods" {
 			return false, "", nil
 		}
+		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
+			return false, "", nil
+		}
 		return true, "", nil
 	}
 
 	if username == "non-rc-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "replicationcontrollers" {
+			return false, "", nil
+		}
+		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
 			return false, "", nil
 		}
 		return true, "", nil
@@ -326,7 +335,10 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		return err == nil
 	}
 	expectCantSetBlockOwnerDeletionError := func(err error) bool {
-		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete")
+		if err == nil {
+			return false
+		}
+		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on")
 	}
 	tests := []struct {
 		name        string

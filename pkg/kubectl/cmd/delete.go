@@ -133,7 +133,7 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-			if err := options.Complete(f, out, errOut, args); err != nil {
+			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Validate(cmd); err != nil {
@@ -149,8 +149,8 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 	usage := "containing the resource to delete."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on.")
-	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "Select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
+	cmd.Flags().BoolVar(&options.DeleteAll, "all", false, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
 	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
@@ -159,10 +159,11 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
-func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
+func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -180,11 +181,13 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 	}
 
 	o.Mapper = mapper
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		SelectorParam(o.Selector).
+		IncludeUninitialized(includeUninitialized).
 		SelectAllParam(o.DeleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
@@ -241,7 +244,7 @@ func (o *DeleteOptions) RunDelete() error {
 	if o.Cascade {
 		return ReapResult(o.Result, o.f, o.Out, true, o.IgnoreNotFound, o.Timeout, o.GracePeriod, o.WaitForDeletion, shortOutput, o.Mapper, false)
 	}
-	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, shortOutput, o.Mapper)
+	return DeleteResult(o.Result, o.Out, o.IgnoreNotFound, o.GracePeriod, shortOutput, o.Mapper)
 }
 
 func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, waitForDeletion, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
@@ -289,7 +292,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 	return nil
 }
 
-func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortOutput bool, mapper meta.RESTMapper) error {
+func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, gracePeriod int, shortOutput bool, mapper meta.RESTMapper) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
@@ -302,7 +305,12 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, shortO
 
 		// if we're here, it means that cascade=false (not the default), so we should orphan as requested
 		orphan := true
-		return deleteResource(info, out, shortOutput, mapper, &metav1.DeleteOptions{OrphanDependents: &orphan})
+		options := &metav1.DeleteOptions{}
+		if gracePeriod >= 0 {
+			options = metav1.NewDeleteOptions(int64(gracePeriod))
+		}
+		options.OrphanDependents = &orphan
+		return deleteResource(info, out, shortOutput, mapper, options)
 	})
 	if err != nil {
 		return err

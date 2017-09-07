@@ -51,7 +51,6 @@ import (
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	//aggregatorinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	openapi "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
@@ -164,6 +163,9 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	// otherwise go down the normal path of standing the aggregator up in front of the API server
 	// this wires up openapi
 	kubeAPIServer.GenericAPIServer.PrepareRun()
+
+	// This will wire up openapi for extension api server
+	apiExtensionsServer.GenericAPIServer.PrepareRun()
 
 	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions, versionedInformers, serviceResolver, proxyTransport)
@@ -441,7 +443,7 @@ func BuildGenericConfig(s *options.ServerRunOptions) (*genericapiserver.Config, 
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, err = BuildAuthorizer(s, sharedInformers)
+	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -542,7 +544,7 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory) (authorizer.Authorizer, error) {
+func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	return authorizationConfig.New()
 }
@@ -557,9 +559,8 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 	storageFactory, err := kubeapiserver.NewStorageFactory(
 		s.Etcd.StorageConfig, s.Etcd.DefaultStorageMediaType, api.Codecs,
 		serverstorage.NewDefaultResourceEncodingConfig(api.Registry), storageGroupsToEncodingVersion,
-		// FIXME: this GroupVersionResource override should be configurable
-		// TODO we need to update this to batch/v1beta1 when it's enabled by default
-		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
+		// FIXME (soltysh): this GroupVersionResource override should be configurable
+		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v1beta1")},
 		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)

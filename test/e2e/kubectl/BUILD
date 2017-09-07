@@ -13,7 +13,6 @@ go_library(
         "portforward.go",
     ],
     deps = [
-        "//pkg/apis/batch/v2alpha1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/util/version:go_default_library",
@@ -21,6 +20,7 @@ go_library(
         "//test/e2e/generated:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

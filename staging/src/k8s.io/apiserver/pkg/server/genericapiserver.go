@@ -145,6 +145,9 @@ type GenericAPIServer struct {
 	// enableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
 	enableAPIResponseCompression bool
+
+	// delegationTarget is the next delegate in the chain or nil
+	delegationTarget DelegationTarget
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -165,6 +168,9 @@ type DelegationTarget interface {
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
+
+	// NextDelegate returns the next delegationTarget in the chain of delegations
+	NextDelegate() DelegationTarget
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -179,6 +185,10 @@ func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 }
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
+}
+
+func (s *GenericAPIServer) NextDelegate() DelegationTarget {
+	return s.delegationTarget
 }
 
 var EmptyDelegate = emptyDelegate{
@@ -203,6 +213,9 @@ func (s emptyDelegate) ListedPaths() []string {
 }
 func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
+}
+func (s emptyDelegate) NextDelegate() DelegationTarget {
+	return nil
 }
 
 // RequestContextMapper is exposed so that third party resource storage can be build in a different location.

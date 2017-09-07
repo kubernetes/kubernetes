@@ -26,6 +26,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/pkg/util/version"
 
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -407,7 +408,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:        kubeadmapi.Networking{PodSubnet: "bar"},
+				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",
 			},
@@ -423,7 +424,30 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--use-service-account-credentials=true",
 				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--allocate-node-cidrs=true",
-				"--cluster-cidr=bar",
+				"--cluster-cidr=10.0.1.15/16",
+				"--node-cidr-mask-size=24",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				Networking:        kubeadmapi.Networking{PodSubnet: "2001:101:115::/48"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.7.0",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=2001:101:115::/48",
+				"--node-cidr-mask-size=64",
 			},
 		},
 	}
@@ -434,6 +458,88 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
+func TestGetControllerManagerCommandExternalCA(t *testing.T) {
+
+	tests := []struct {
+		cfg             *kubeadmapi.MasterConfiguration
+		caKeyPresent    bool
+		expectedArgFunc func(dir string) []string
+	}{
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				KubernetesVersion: "v1.7.0",
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				NodeName:          "valid-hostname",
+			},
+			caKeyPresent: false,
+			expectedArgFunc: func(tmpdir string) []string {
+				return []string{
+					"kube-controller-manager",
+					"--address=127.0.0.1",
+					"--leader-elect=true",
+					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+					"--root-ca-file=" + tmpdir + "/ca.crt",
+					"--service-account-private-key-file=" + tmpdir + "/sa.key",
+					"--cluster-signing-cert-file=",
+					"--cluster-signing-key-file=",
+					"--use-service-account-credentials=true",
+					"--controllers=*,bootstrapsigner,tokencleaner",
+				}
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				KubernetesVersion: "v1.7.0",
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				NodeName:          "valid-hostname",
+			},
+			caKeyPresent: true,
+			expectedArgFunc: func(tmpdir string) []string {
+				return []string{
+					"kube-controller-manager",
+					"--address=127.0.0.1",
+					"--leader-elect=true",
+					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+					"--root-ca-file=" + tmpdir + "/ca.crt",
+					"--service-account-private-key-file=" + tmpdir + "/sa.key",
+					"--cluster-signing-cert-file=" + tmpdir + "/ca.crt",
+					"--cluster-signing-key-file=" + tmpdir + "/ca.key",
+					"--use-service-account-credentials=true",
+					"--controllers=*,bootstrapsigner,tokencleaner",
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		// Create temp folder for the test case
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+		test.cfg.CertificatesDir = tmpdir
+
+		if err := certs.CreatePKIAssets(test.cfg); err != nil {
+			t.Errorf("failed creating pki assets: %v", err)
+		}
+
+		// delete ca.key if test.caKeyPresent is false
+		if !test.caKeyPresent {
+			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, "ca.key")); err != nil {
+				t.Errorf("failed removing ca.key: %v", err)
+			}
+		}
+
+		actual := getControllerManagerCommand(test.cfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
+		expected := test.expectedArgFunc(tmpdir)
+		sort.Strings(actual)
+		sort.Strings(expected)
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("failed getControllerManagerCommand:\nexpected:\n%v\nsaw:\n%v", expected, actual)
 		}
 	}
 }

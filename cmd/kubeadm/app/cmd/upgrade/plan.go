@@ -50,8 +50,8 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 // RunPlan takes care of outputting available versions to upgrade to for the user
 func RunPlan(parentFlags *cmdUpgradeFlags) error {
 
-	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter.
-	upgradeVars, err := enforceRequirements(parentFlags.kubeConfigPath, parentFlags.cfgPath, parentFlags.printConfig)
+	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never set dry-run for plan.
+	upgradeVars, err := enforceRequirements(parentFlags.kubeConfigPath, parentFlags.cfgPath, parentFlags.printConfig, false)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func RunPlan(parentFlags *cmdUpgradeFlags) error {
 	// Compute which upgrade possibilities there are
 	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades)
 	if err != nil {
-		return err
+		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
 	}
 
 	// Tell the user which upgrades are available

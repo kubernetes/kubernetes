@@ -42,6 +42,9 @@ type ReplicaSetInterface interface {
 	List(opts v1.ListOptions) (*v1beta1.ReplicaSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error)
+	GetScale(replicaSetName string, options v1.GetOptions) (*v1beta1.Scale, error)
+	UpdateScale(replicaSetName string, scale *v1beta1.Scale) (*v1beta1.Scale, error)
+
 	ReplicaSetExpansion
 }
 
@@ -166,6 +169,34 @@ func (c *replicaSets) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the replicaSet, and returns the corresponding v1beta1.Scale object, and an error if there is any.
+func (c *replicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
+	result = &v1beta1.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(replicaSetName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *replicaSets) UpdateScale(replicaSetName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+	result = &v1beta1.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(replicaSetName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

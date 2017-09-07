@@ -1,16 +1,12 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/client-go/informers/autoscaling/v1:go_default_library",
-        "//vendor/k8s.io/client-go/informers/autoscaling/v2alpha1:go_default_library",
+        "//vendor/k8s.io/client-go/informers/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
     ],
 )
@@ -27,7 +23,8 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/client-go/informers/autoscaling/v1:all-srcs",
-        "//staging/src/k8s.io/client-go/informers/autoscaling/v2alpha1:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/autoscaling/v2beta1:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

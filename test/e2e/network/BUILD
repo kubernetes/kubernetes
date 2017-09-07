@@ -41,6 +41,7 @@ go_library(
         "//test/e2e/manifest:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",

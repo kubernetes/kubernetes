@@ -595,6 +595,15 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 				node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
 			}
 		}
+
+		initialCapacity := kl.containerManager.GetCapacity()
+		if initialCapacity != nil {
+			for k, v := range initialCapacity {
+				if v1helper.IsExtendedResourceName(k) {
+					node.Status.Capacity[k] = v
+				}
+			}
+		}
 	}
 
 	// Set Allocatable.
@@ -620,6 +629,19 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			value.Set(0)
 		}
 		node.Status.Allocatable[k] = value
+	}
+	// for every huge page reservation, we need to remove it from allocatable memory
+	for k, v := range node.Status.Capacity {
+		if v1helper.IsHugePageResourceName(k) {
+			allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
+			value := *(v.Copy())
+			allocatableMemory.Sub(value)
+			if allocatableMemory.Sign() < 0 {
+				// Negative Allocatable resources don't make sense.
+				allocatableMemory.Set(0)
+			}
+			node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
+		}
 	}
 }
 

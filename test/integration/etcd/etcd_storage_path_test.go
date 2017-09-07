@@ -43,7 +43,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
-	kclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -182,8 +181,8 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
-	// k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1
-	gvr("autoscaling", "v2alpha1", "horizontalpodautoscalers"): {
+	// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1
+	gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 		stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 		expectedEtcdPath: "/registry/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa1",
 		expectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
@@ -201,8 +200,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("batch", "v1beta1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cjv1beta1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv1beta1",
-		// TODO this needs to be updated to batch/v1beta1 when it's enabed by default
-		expectedGVK: gvkP("batch", "v2alpha1", "CronJob"),
 	},
 	// --
 
@@ -210,6 +207,7 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("batch", "v2alpha1", "cronjobs"): {
 		stub:             `{"metadata": {"name": "cjv2alpha1"}, "spec": {"jobTemplate": {"spec": {"template": {"metadata": {"labels": {"controller-uid": "uid0"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container0"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}, "schedule": "* * * * *"}}`,
 		expectedEtcdPath: "/registry/cronjobs/etcdstoragepathtestnamespace/cjv2alpha1",
+		expectedGVK:      gvkP("batch", "v1beta1", "CronJob"),
 	},
 	// --
 
@@ -394,6 +392,8 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1beta1
 
+	// SRR objects that are not stored in etcd
+	gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"),
@@ -402,6 +402,8 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/authorization/v1
 
+	// SRR objects that are not stored in etcd
+	gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"),
 	// SAR objects that are not stored in etcd
 	gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"),
 	gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"),
@@ -655,6 +657,13 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 	storageConfigValue := atomic.Value{}
 
 	go func() {
+		// Catch panics that occur in this go routine so we get a comprehensible failure
+		defer func() {
+			if err := recover(); err != nil {
+				t.Errorf("Unexpected panic trying to start API master: %#v", err)
+			}
+		}()
+
 		for {
 			kubeAPIServerOptions := options.NewServerRunOptions()
 			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
@@ -695,26 +704,35 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 				t.Log(err)
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(time.Second)
 		}
 	}()
 
-	if err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		obj := kubeClientConfigValue.Load()
 		if obj == nil {
 			return false, nil
 		}
 		kubeClientConfig := kubeClientConfigValue.Load().(*restclient.Config)
-		kubeClient, err := kclient.NewForConfig(kubeClientConfig)
+		// make a copy so we can mutate it to set GroupVersion and NegotiatedSerializer
+		cfg := *kubeClientConfig
+		cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
+		cfg.ContentConfig.NegotiatedSerializer = kapi.Codecs
+		privilegedClient, err := restclient.RESTClientFor(&cfg)
 		if err != nil {
 			// this happens because we race the API server start
 			t.Log(err)
 			return false, nil
 		}
-		if _, err := kubeClient.Discovery().ServerVersion(); err != nil {
+		// wait for the server to be healthy
+		result := privilegedClient.Get().AbsPath("/healthz").Do()
+		if errResult := result.Error(); errResult != nil {
+			t.Log(errResult)
 			return false, nil
 		}
-		return true, nil
+		var status int
+		result.StatusCode(&status)
+		return status == http.StatusOK, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

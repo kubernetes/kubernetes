@@ -22,6 +22,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
 	"github.com/golang/glog"
 )
@@ -54,8 +55,8 @@ type Interface interface {
 	InspectImageByID(imageID string) (*dockertypes.ImageInspect, error)
 	ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error)
 	PullImage(image string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error
-	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error)
-	ImageHistory(id string) ([]dockertypes.ImageHistory, error)
+	RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error)
+	ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error)
 	Logs(string, dockertypes.ContainerLogsOptions, StreamOptions) error
 	Version() (*dockertypes.Version, error)
 	Info() (*dockertypes.Info, error)

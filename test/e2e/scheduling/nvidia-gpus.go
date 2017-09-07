@@ -31,6 +31,7 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -38,7 +39,6 @@ import (
 
 const (
 	testPodNamePrefix = "nvidia-gpu-"
-	testCUDAImage     = "gcr.io/google_containers/cuda-vector-add:v0.1"
 	cosOSImage        = "Container-Optimized OS from Google"
 	// Nvidia driver installation can take upwards of 5 minutes.
 	driverInstallTimeout = 10 * time.Minute
@@ -57,7 +57,7 @@ func makeCudaAdditionTestPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "vector-addition",
-					Image: testCUDAImage,
+					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							v1.ResourceNvidiaGPU: *resource.NewQuantity(1, resource.DecimalSI),

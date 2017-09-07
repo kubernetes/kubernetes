@@ -31,9 +31,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGDescribe("PodPreset", func() {
+var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	f := framework.NewDefaultFramework("podpreset")
 
 	var podClient *framework.PodClient
@@ -91,7 +92,7 @@ var _ = SIGDescribe("PodPreset", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 					},
 				},
 			},
@@ -196,7 +197,7 @@ var _ = SIGDescribe("PodPreset", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 						Env:   []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
 					},
 				},

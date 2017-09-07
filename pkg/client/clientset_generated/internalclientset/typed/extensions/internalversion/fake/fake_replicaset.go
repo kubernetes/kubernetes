@@ -136,3 +136,25 @@ func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, su
 	}
 	return obj.(*extensions.ReplicaSet), err
 }
+
+// GetScale takes name of the replicaSet, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeReplicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(replicasetsResource, c.ns, "scale", replicaSetName), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeReplicaSets) UpdateScale(replicaSetName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &extensions.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*extensions.Scale), err
+}

@@ -200,6 +200,35 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
+// TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
+func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	privateKeyPath := pathForKey(pkiPath, name)
+
+	// Parse the private key from a file
+	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
+	}
+
+	publicKeyPath := pathForPublicKey(pkiPath, name)
+
+	// Parse the public key from a file
+	pubKeys, err := certutil.PublicKeysFromFile(publicKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't load the public key file %s: %v", publicKeyPath, err)
+	}
+
+	// Allow RSA format only
+	k, ok := privKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+	}
+
+	p := pubKeys[0].(*rsa.PublicKey)
+
+	return k, p, nil
+}
+
 func pathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
 }

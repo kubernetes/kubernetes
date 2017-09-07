@@ -209,7 +209,7 @@ func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Comman
 		ChangeCause:        f.Command(cmd, false),
 		Include3rdParty:    cmdutil.GetFlagBool(cmd, "include-extended-apis"),
 	}
-	err := editOptions.Complete(f, out, errOut, []string{})
+	err := editOptions.Complete(f, out, errOut, []string{}, cmd)
 	if err != nil {
 		return err
 	}

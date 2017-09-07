@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -1129,7 +1130,7 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		t.Name = "slow-terminating-unready-pod"
-		t.Image = "gcr.io/google_containers/netexec:1.7"
+		t.Image = imageutils.GetE2EImage(imageutils.Netexec)
 		port := 80
 		terminateSeconds := int64(600)
 

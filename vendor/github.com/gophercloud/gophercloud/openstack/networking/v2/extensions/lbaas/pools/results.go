@@ -11,47 +11,48 @@ import (
 // method to handle the new requests or connections received on the VIP address.
 // There is only one pool per virtual IP.
 type Pool struct {
-	// The status of the pool. Indicates whether the pool is operational.
+	// Status of the pool. Indicates whether the pool is operational.
 	Status string
 
-	// The load-balancer algorithm, which is round-robin, least-connections, and
-	// so on. This value, which must be supported, is dependent on the provider.
-	// Round-robin must be supported.
+	// LBMethod is the load-balancer algorithm, which is round-robin,
+	// least-connections, and so on. This value, which must be supported, is
+	// dependent on the provider.
 	LBMethod string `json:"lb_method"`
 
-	// The protocol of the pool, which is TCP, HTTP, or HTTPS.
+	// Protocol of the pool, which is TCP, HTTP, or HTTPS.
 	Protocol string
 
 	// Description for the pool.
 	Description string
 
-	// The IDs of associated monitors which check the health of the pool members.
+	// MonitorIDs are the IDs of associated monitors which check the health of
+	// the pool members.
 	MonitorIDs []string `json:"health_monitors"`
 
-	// The network on which the members of the pool will be located. Only members
-	// that are on this network can be added to the pool.
+	// SubnetID is the network on which the members of the pool will be located.
+	// Only members that are on this network can be added to the pool.
 	SubnetID string `json:"subnet_id"`
 
-	// Owner of the pool. Only an administrative user can specify a tenant ID
-	// other than its own.
+	// TenantID is the owner of the pool.
 	TenantID string `json:"tenant_id"`
 
-	// The administrative state of the pool, which is up (true) or down (false).
+	// AdminStateUp is the administrative state of the pool, which is up
+	// (true) or down (false).
 	AdminStateUp bool `json:"admin_state_up"`
 
-	// Pool name. Does not have to be unique.
+	// Name of the pool.
 	Name string
 
-	// List of member IDs that belong to the pool.
+	// MemberIDs is the list of member IDs that belong to the pool.
 	MemberIDs []string `json:"members"`
 
-	// The unique ID for the pool.
+	// ID is the unique ID for the pool.
 	ID string
 
-	// The ID of the virtual IP associated with this pool
+	// VIPID is the ID of the virtual IP associated with this pool.
 	VIPID string `json:"vip_id"`
 
-	// The provider
+	// The provider.
 	Provider string
 }
 
@@ -81,7 +82,7 @@ func (r PoolPage) IsEmpty() (bool, error) {
 	return len(is) == 0, err
 }
 
-// ExtractPools accepts a Page struct, specifically a RouterPage struct,
+// ExtractPools accepts a Page struct, specifically a PoolPage struct,
 // and extracts the elements into a slice of Router structs. In other words,
 // a generic collection is mapped into a relevant slice.
 func ExtractPools(r pagination.Page) ([]Pool, error) {
@@ -105,27 +106,32 @@ func (r commonResult) Extract() (*Pool, error) {
 	return s.Pool, err
 }
 
-// CreateResult represents the result of a create operation.
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a Pool.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a Pool.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a Pool.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its
+// ExtractErr method to interpret it as a Pool.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
 
-// AssociateResult represents the result of an association operation.
+// AssociateResult represents the result of an association operation. Call its Extract
+// method to interpret it as a Pool.
 type AssociateResult struct {
 	commonResult
 }

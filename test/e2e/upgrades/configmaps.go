@@ -22,6 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -103,7 +104,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						fmt.Sprintf("--file_content=%s/data", volumeMountPath),
 						fmt.Sprintf("--file_mode=%s/data", volumeMountPath),
@@ -117,7 +118,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "configmap-env-test",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   imageutils.GetBusyBoxImage(),
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -61,6 +62,8 @@ func (deploymentStrategy) PrepareForCreate(ctx genericapirequest.Context, obj ru
 	deployment := obj.(*extensions.Deployment)
 	deployment.Status = extensions.DeploymentStatus{}
 	deployment.Generation = 1
+
+	pod.DropDisabledAlphaFields(&deployment.Spec.Template.Spec)
 }
 
 // Validate validates a new deployment.
@@ -83,6 +86,9 @@ func (deploymentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, o
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Status = oldDeployment.Status
+
+	pod.DropDisabledAlphaFields(&newDeployment.Spec.Template.Spec)
+	pod.DropDisabledAlphaFields(&oldDeployment.Spec.Template.Spec)
 
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation

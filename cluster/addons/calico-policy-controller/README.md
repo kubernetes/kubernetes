@@ -9,6 +9,6 @@ Calico is an implementation of the Kubernetes network policy API.  The provided 
 
 ### Learn More
 
-Learn more about Calico at http://docs.projectcalico.org
+Learn more about Calico at https://docs.projectcalico.org
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/calico-policy-controller/README.md?pixel)]()

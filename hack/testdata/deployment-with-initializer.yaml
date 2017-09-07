@@ -1,0 +1,25 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    run: web
+  initializers:
+    pending:
+    - name: podimage.initializer.com
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      run: web
+  template:
+    metadata:
+      labels:
+        run: web
+    spec:
+      containers:
+      - image: nginx:1.10
+        name: web
+        ports:
+        - containerPort: 80
+          protocol: TCP

@@ -22,7 +22,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -74,7 +73,7 @@ func TestRemoveTerminatedContainerInfo(t *testing.T) {
 	}
 }
 
-func TestListPodStats(t *testing.T) {
+func TestCadvisorListPodStats(t *testing.T) {
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -236,36 +235,31 @@ func TestListPodStats(t *testing.T) {
 	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
 }
 
-func TestImagesFsStats(t *testing.T) {
+func TestCadvisorImagesFsStats(t *testing.T) {
 	var (
 		assert       = assert.New(t)
 		mockCadvisor = new(cadvisortest.Mock)
 		mockRuntime  = new(containertest.Mock)
 
-		seed          = 100
-		options       = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
-		imageFsInfo   = getTestFsInfo(100)
-		containerInfo = map[string]cadvisorapiv2.ContainerInfo{"/": getTestContainerInfo(seed, "test-pod", "test-ns", "test-container")}
-		imageStats    = &kubecontainer.ImageStats{TotalStorageBytes: 100}
+		seed        = 1000
+		imageFsInfo = getTestFsInfo(seed)
+		imageStats  = &kubecontainer.ImageStats{TotalStorageBytes: 100}
 	)
 
-	mockCadvisor.
-		On("ImagesFsInfo").Return(imageFsInfo, nil).
-		On("ContainerInfoV2", "/", options).Return(containerInfo, nil)
-	mockRuntime.
-		On("ImageStats").Return(imageStats, nil)
+	mockCadvisor.On("ImagesFsInfo").Return(imageFsInfo, nil)
+	mockRuntime.On("ImageStats").Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime)
 	stats, err := provider.ImageFsStats()
 	assert.NoError(err)
 
-	assert.Equal(stats.Time, metav1.NewTime(containerInfo["/"].Stats[0].Timestamp))
-	assert.Equal(*stats.AvailableBytes, imageFsInfo.Available)
-	assert.Equal(*stats.CapacityBytes, imageFsInfo.Capacity)
-	assert.Equal(*stats.UsedBytes, imageStats.TotalStorageBytes)
-	assert.Equal(stats.InodesFree, imageFsInfo.InodesFree)
-	assert.Equal(stats.Inodes, imageFsInfo.Inodes)
-	assert.Equal(*stats.InodesUsed, *imageFsInfo.Inodes-*imageFsInfo.InodesFree)
+	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
+	assert.Equal(imageFsInfo.Available, *stats.AvailableBytes)
+	assert.Equal(imageFsInfo.Capacity, *stats.CapacityBytes)
+	assert.Equal(imageStats.TotalStorageBytes, *stats.UsedBytes)
+	assert.Equal(imageFsInfo.InodesFree, stats.InodesFree)
+	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
+	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *stats.InodesUsed)
 
 	mockCadvisor.AssertExpectations(t)
 }

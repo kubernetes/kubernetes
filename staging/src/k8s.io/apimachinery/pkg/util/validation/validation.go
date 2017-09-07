@@ -22,6 +22,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
@@ -65,6 +67,21 @@ func IsQualifiedName(value string) []string {
 		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc"))
 	}
 	return errs
+}
+
+// IsFullyQualifiedName checks if the name is fully qualified.
+func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(name) == 0 {
+		return append(allErrors, field.Required(fldPath, ""))
+	}
+	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+	}
+	if len(strings.Split(name, ".")) < 3 {
+		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least three segments separated by dots"))
+	}
+	return allErrors
 }
 
 const labelValueFmt string = "(" + qualifiedNameFmt + ")?"

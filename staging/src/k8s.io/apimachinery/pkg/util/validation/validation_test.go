@@ -19,6 +19,8 @@ package validation
 import (
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestIsDNS1123Label(t *testing.T) {
@@ -471,6 +473,41 @@ func TestIsWildcardDNS1123Subdomain(t *testing.T) {
 	for _, val := range badValues {
 		if errs := IsWildcardDNS1123Subdomain(val); len(errs) == 0 {
 			t.Errorf("expected errors for %q", val)
+		}
+	}
+}
+
+func TestIsFullyQualifiedName(t *testing.T) {
+	tests := []struct {
+		name       string
+		targetName string
+		err        string
+	}{
+		{
+			name:       "name needs to be fully qualified, i.e., contains at least 2 dots",
+			targetName: "k8s.io",
+			err:        "should be a domain with at least three segments separated by dots",
+		},
+		{
+			name:       "name cannot be empty",
+			targetName: "",
+			err:        "Required value",
+		},
+		{
+			name:       "name must conform to RFC 1123",
+			targetName: "A.B.C",
+			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+		},
+	}
+	for _, tc := range tests {
+		err := IsFullyQualifiedName(field.NewPath(""), tc.targetName).ToAggregate()
+		switch {
+		case tc.err == "" && err != nil:
+			t.Errorf("%q: unexpected error: %v", tc.name, err)
+		case tc.err != "" && err == nil:
+			t.Errorf("%q: unexpected no error, expected %s", tc.name, tc.err)
+		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
+			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
 		}
 	}
 }

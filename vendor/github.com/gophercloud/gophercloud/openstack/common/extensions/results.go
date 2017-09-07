@@ -41,8 +41,8 @@ func (r ExtensionPage) IsEmpty() (bool, error) {
 	return len(is) == 0, err
 }
 
-// ExtractExtensions accepts a Page struct, specifically an ExtensionPage struct, and extracts the
-// elements into a slice of Extension structs.
+// ExtractExtensions accepts a Page struct, specifically an ExtensionPage
+// struct, and extracts the elements into a slice of Extension structs.
 // In other words, a generic collection is mapped into a relevant slice.
 func ExtractExtensions(r pagination.Page) ([]Extension, error) {
 	var s struct {

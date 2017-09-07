@@ -57,6 +57,7 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	}
 	out.Format = in.Format
 	out.Title = in.Title
+	out.Maximum = in.Maximum
 	out.ExclusiveMaximum = in.ExclusiveMaximum
 	out.Minimum = in.Minimum
 	out.ExclusiveMinimum = in.ExclusiveMinimum

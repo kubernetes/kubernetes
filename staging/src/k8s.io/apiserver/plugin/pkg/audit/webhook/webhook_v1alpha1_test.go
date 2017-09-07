@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 )
@@ -45,7 +44,7 @@ func TestBatchWebhookMaxEventsV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 
 	backend.ProcessEvents(events...)
 
@@ -77,7 +76,7 @@ func TestBatchWebhookStopChV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 	backend.ProcessEvents(events...)
 
 	stopCh := make(chan struct{})
@@ -103,7 +102,7 @@ func TestBatchWebhookProcessEventsAfterStopV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 	stopCh := make(chan struct{})
 
 	backend.Run(stopCh)
@@ -128,7 +127,7 @@ func TestBatchWebhookShutdownV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 	backend.ProcessEvents(events...)
 
 	go func() {
@@ -172,7 +171,7 @@ func TestBatchWebhookEmptyBufferV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 
 	stopCh := make(chan struct{})
 	timer := make(chan time.Time, 1)
@@ -205,7 +204,7 @@ func TestBatchBufferFullV1Alpha1(t *testing.T) {
 	}))
 	defer s.Close()
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 
 	// Make sure this doesn't block.
 	backend.ProcessEvents(events...)
@@ -243,7 +242,7 @@ func TestBatchRunV1Alpha1(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 
 	// Test the Run codepath. E.g. that the spawned goroutines behave correctly.
 	backend.Run(stopCh)
@@ -281,7 +280,7 @@ func TestBatchConcurrentRequestsV1Alpha1(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	backend := newTestBatchWebhook(t, s.URL, []schema.GroupVersion{auditv1alpha1.SchemeGroupVersion})
+	backend := newTestBatchWebhook(t, s.URL, auditv1alpha1.SchemeGroupVersion)
 	backend.Run(stopCh)
 
 	backend.ProcessEvents(events...)

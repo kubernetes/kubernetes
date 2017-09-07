@@ -102,7 +102,8 @@ func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
 	}
 }
 
-// AllocateNext allocates the next free CIDR range.
+// AllocateNext allocates the next free CIDR range. This will set the range
+// as occupied and return the allocated range.
 func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	s.Lock()
 	defer s.Unlock()
@@ -186,7 +187,8 @@ func (s *CidrSet) Release(cidr *net.IPNet) error {
 	return nil
 }
 
-// Occupy marks the given CIDR range as used.
+// Occupy marks the given CIDR range as used. Occupy does not check if the CIDR
+// range was previously used.
 func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 	begin, end, err := s.getBeginingAndEndIndices(cidr)
 	if err != nil {
@@ -203,21 +205,24 @@ func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
 }
 
 func (s *CidrSet) getIndexForCIDR(cidr *net.IPNet) (int, error) {
-	var cidrIndex uint32
-	if cidr.IP.To4() != nil {
-		cidrIndex = (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(cidr.IP.To4())) >> uint32(32-s.subNetMaskSize)
-		if cidrIndex >= uint32(s.maxCIDRs) {
-			return 0, fmt.Errorf("CIDR: %v is out of the range of CIDR allocator", cidr)
-		}
-	} else if cidr.IP.To16() != nil {
-		cidrIndex64 := (binary.BigEndian.Uint64(s.clusterIP) ^ binary.BigEndian.Uint64(cidr.IP.To16())) >> uint64(64-s.subNetMaskSize)
+	return s.getIndexForIP(cidr.IP)
+}
 
-		if cidrIndex64 >= uint64(s.maxCIDRs) {
-			return 0, fmt.Errorf("CIDR: %v is out of the range of CIDR allocator", cidr)
+func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
+	if ip.To4() != nil {
+		cidrIndex := (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(ip.To4())) >> uint32(32-s.subNetMaskSize)
+		if cidrIndex >= uint32(s.maxCIDRs) {
+			return 0, fmt.Errorf("CIDR: %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
 		}
-		cidrIndex = uint32(cidrIndex64)
-	} else {
-		return 0, fmt.Errorf("invalid CIDR block: %v", cidr)
+		return int(cidrIndex), nil
 	}
-	return int(cidrIndex), nil
+	if ip.To16() != nil {
+		cidrIndex := (binary.BigEndian.Uint64(s.clusterIP) ^ binary.BigEndian.Uint64(ip.To16())) >> uint64(64-s.subNetMaskSize)
+		if cidrIndex >= uint64(s.maxCIDRs) {
+			return 0, fmt.Errorf("CIDR: %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
+		}
+		return int(cidrIndex), nil
+	}
+
+	return 0, fmt.Errorf("invalid IP: %v", ip)
 }

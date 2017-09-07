@@ -1636,7 +1636,7 @@ func TestGarbageCollect(t *testing.T) {
 	fs := newFakeSystemd()
 	cli := newFakeRktCli()
 	fakeOS := kubetesting.NewFakeOS()
-	getter := newFakePodGetter()
+	deletionProvider := newFakePodDeletionProvider()
 	fug := newfakeUnitGetter()
 	frh := &containertesting.FakeRuntimeHelper{}
 
@@ -1644,7 +1644,7 @@ func TestGarbageCollect(t *testing.T) {
 		os:                  fakeOS,
 		cli:                 cli,
 		apisvc:              fr,
-		podGetter:           getter,
+		podDeletionProvider: deletionProvider,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
 		unitGetter:          fug,
@@ -1830,7 +1830,7 @@ func TestGarbageCollect(t *testing.T) {
 
 		fr.pods = tt.pods
 		for _, p := range tt.apiPods {
-			getter.pods[p.UID] = p
+			deletionProvider.pods[p.UID] = struct{}{}
 		}
 
 		allSourcesReady := true
@@ -1862,7 +1862,7 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		fs.resetFailedUnits = []string{}
-		getter.pods = make(map[kubetypes.UID]*v1.Pod)
+		deletionProvider.pods = make(map[kubetypes.UID]struct{})
 	}
 }
 

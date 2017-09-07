@@ -31,8 +31,11 @@ import (
 	"k8s.io/client-go/testing"
 )
 
+// FakeDiscovery implements discovery.DiscoveryInterface and sometimes calls testing.Fake.Invoke with an action,
+// but doesn't respect the return value if any. There is a way to fake static values like ServerVersion by using the Faked... fields on the struct.
 type FakeDiscovery struct {
 	*testing.Fake
+	FakedServerVersion *version.Info
 }
 
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -74,8 +77,12 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
-
 	c.Invokes(action, nil)
+
+	if c.FakedServerVersion != nil {
+		return c.FakedServerVersion, nil
+	}
+
 	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }

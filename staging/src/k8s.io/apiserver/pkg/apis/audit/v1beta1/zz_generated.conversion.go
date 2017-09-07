@@ -239,6 +239,7 @@ func autoConvert_v1beta1_PolicyRule_To_audit_PolicyRule(in *PolicyRule, out *aud
 	out.Resources = *(*[]audit.GroupResources)(unsafe.Pointer(&in.Resources))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	out.OmitStages = *(*[]audit.Stage)(unsafe.Pointer(&in.OmitStages))
 	return nil
 }
 
@@ -255,6 +256,7 @@ func autoConvert_audit_PolicyRule_To_v1beta1_PolicyRule(in *audit.PolicyRule, ou
 	out.Resources = *(*[]GroupResources)(unsafe.Pointer(&in.Resources))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
 	return nil
 }
 

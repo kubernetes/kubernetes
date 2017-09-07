@@ -101,6 +101,11 @@ type Manager interface {
 	// Get version information about different components we depend on.
 	GetVersionInfo() (*info.VersionInfo, error)
 
+	// GetFsInfoByFsUUID returns the information of the device having the
+	// specified filesystem uuid. If no such device with the UUID exists, this
+	// function will return the fs.ErrNoSuchDevice error.
+	GetFsInfoByFsUUID(uuid string) (v2.FsInfo, error)
+
 	// Get filesystem information for the filesystem that contains the given directory
 	GetDirFsInfo(dir string) (v2.FsInfo, error)
 
@@ -136,7 +141,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	}
 
 	// Detect the container we are running on.
-	selfContainer, err := cgroups.GetThisCgroupDir("cpu")
+	selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
 	if err != nil {
 		return nil, err
 	}
@@ -676,24 +681,19 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 }
 
 func (self *manager) GetDirFsInfo(dir string) (v2.FsInfo, error) {
-	dirDevice, err := self.fsInfo.GetDirFsDevice(dir)
+	device, err := self.fsInfo.GetDirFsDevice(dir)
 	if err != nil {
-		return v2.FsInfo{}, fmt.Errorf("error trying to get filesystem Device for dir %v: err: %v", dir, err)
+		return v2.FsInfo{}, fmt.Errorf("failed to get device for dir %q: %v", dir, err)
 	}
-	dirMountpoint, err := self.fsInfo.GetMountpointForDevice(dirDevice.Device)
-	if err != nil {
-		return v2.FsInfo{}, fmt.Errorf("error trying to get MountPoint for Root Device: %v, err: %v", dirDevice, err)
-	}
-	infos, err := self.GetFsInfo("")
+	return self.getFsInfoByDeviceName(device.Device)
+}
+
+func (self *manager) GetFsInfoByFsUUID(uuid string) (v2.FsInfo, error) {
+	device, err := self.fsInfo.GetDeviceInfoByFsUUID(uuid)
 	if err != nil {
 		return v2.FsInfo{}, err
 	}
-	for _, info := range infos {
-		if info.Mountpoint == dirMountpoint {
-			return info, nil
-		}
-	}
-	return v2.FsInfo{}, fmt.Errorf("did not find fs info for dir: %v", dir)
+	return self.getFsInfoByDeviceName(device.Device)
 }
 
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
@@ -726,6 +726,7 @@ func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
 		}
 
 		fi := v2.FsInfo{
+			Timestamp:  stats[0].Timestamp,
 			Device:     fs.Device,
 			Mountpoint: mountpoint,
 			Capacity:   fs.Limit,
@@ -1263,6 +1264,23 @@ func (m *manager) DebugInfo() map[string][]string {
 
 	debugInfo["Managed containers"] = lines
 	return debugInfo
+}
+
+func (self *manager) getFsInfoByDeviceName(deviceName string) (v2.FsInfo, error) {
+	mountPoint, err := self.fsInfo.GetMountpointForDevice(deviceName)
+	if err != nil {
+		return v2.FsInfo{}, fmt.Errorf("failed to get mount point for device %q: %v", deviceName, err)
+	}
+	infos, err := self.GetFsInfo("")
+	if err != nil {
+		return v2.FsInfo{}, err
+	}
+	for _, info := range infos {
+		if info.Mountpoint == mountPoint {
+			return info, nil
+		}
+	}
+	return v2.FsInfo{}, fmt.Errorf("cannot find filesystem info for device %q", deviceName)
 }
 
 func getVersionInfo() (*info.VersionInfo, error) {

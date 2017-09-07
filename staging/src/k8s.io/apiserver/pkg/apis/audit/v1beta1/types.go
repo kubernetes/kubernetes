@@ -201,6 +201,10 @@ type PolicyRule struct {
 	//  "/healthz*" - Log all health checks
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
+
+	// OmitStages specify events generated in which stages will not be emitted to backend.
+	// An empty list means no restrictions will apply.
+	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -210,9 +214,9 @@ type GroupResources struct {
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/logs"
-	// would match request to the logs subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/logs".
+	// matched using a "/" to indicate the subresource. For example, "pods/log"
+	// would match request to the log subresource of pods. The top level resource
+	// does not match subresources, "pods" doesn't match "pods/log".
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.

@@ -7,6 +7,7 @@ go_library(
         "doc.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
+            "const_amd64.h",
             "const_amd64.s",
             "cswap_amd64.s",
             "freeze_amd64.s",
@@ -16,6 +17,7 @@ go_library(
             "square_amd64.s",
         ],
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "const_amd64.h",
             "const_amd64.s",
             "cswap_amd64.s",
             "freeze_amd64.s",
@@ -25,6 +27,7 @@ go_library(
             "square_amd64.s",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "const_amd64.h",
             "const_amd64.s",
             "cswap_amd64.s",
             "freeze_amd64.s",

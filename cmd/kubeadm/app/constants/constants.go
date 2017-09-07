@@ -18,6 +18,8 @@ package constants
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -31,6 +33,7 @@ var KubernetesDir = "/etc/kubernetes"
 
 const (
 	ManifestsSubDirName = "manifests"
+	TempDirForKubeadm   = "/etc/kubernetes/tmp"
 
 	CACertAndKeyBaseName = "ca"
 	CACertName           = "ca.crt"
@@ -119,9 +122,11 @@ const (
 	// KubeConfigVolumeName specifies the name for the Volume that is used for injecting the kubeconfig to talk securely to the api server for a control plane component if applicable
 	KubeConfigVolumeName = "kubeconfig"
 
-	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
-	// TODO: This should be changed in the v1.8 dev cycle to a node-BT-specific group instead of the generic Bootstrap Token group that is used now
-	NodeBootstrapTokenAuthGroup = "system:bootstrappers"
+	// V17NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.7
+	V17NodeBootstrapTokenAuthGroup = "system:bootstrappers"
+
+	// V18NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.8
+	V18NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
@@ -180,4 +185,26 @@ func GetAdminKubeConfigPath() string {
 // AddSelfHostedPrefix adds the self-hosted- prefix to the component name
 func AddSelfHostedPrefix(componentName string) string {
 	return fmt.Sprintf("%s%s", SelfHostingPrefix, componentName)
+}
+
+// CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
+func CreateTempDirForKubeadm(dirName string) (string, error) {
+	// creates target folder if not already exists
+	if err := os.MkdirAll(TempDirForKubeadm, 0700); err != nil {
+		return "", fmt.Errorf("failed to create directory %q: %v", TempDirForKubeadm, err)
+	}
+
+	tempDir, err := ioutil.TempDir(TempDirForKubeadm, dirName)
+	if err != nil {
+		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+	}
+	return tempDir, nil
+}
+
+// GetNodeBootstrapTokenAuthGroup gets the bootstrap token auth group conditionally based on version
+func GetNodeBootstrapTokenAuthGroup(k8sVersion *version.Version) string {
+	if k8sVersion.AtLeast(UseEnableBootstrapTokenAuthFlagVersion) {
+		return V18NodeBootstrapTokenAuthGroup
+	}
+	return V17NodeBootstrapTokenAuthGroup
 }

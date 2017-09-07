@@ -70,6 +70,10 @@ var _ = SIGDescribe("Aggregator", func() {
 })
 
 func cleanTest(f *framework.Framework, block bool) {
+	// delete the APIService first to avoid causing discovery errors
+	aggrclient := f.AggregatorClient
+	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
+
 	namespace := "sample-system"
 	client := f.ClientSet
 	_ = client.ExtensionsV1beta1().Deployments(namespace).Delete("sample-apiserver", nil)
@@ -80,8 +84,6 @@ func cleanTest(f *framework.Framework, block bool) {
 	_ = client.CoreV1().Namespaces().Delete(namespace, nil)
 	_ = client.RbacV1beta1().ClusterRoles().Delete("wardler", nil)
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:sample-system:anonymous", nil)
-	aggrclient := f.AggregatorClient
-	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
 	if block {
 		_ = wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
 			_, err := client.CoreV1().Namespaces().Get("sample-system", metav1.GetOptions{})

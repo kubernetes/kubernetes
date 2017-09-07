@@ -160,15 +160,8 @@ func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 		imageFsInodesUsed = &imageFsIU
 	}
 
-	// Get the root container stats's timestamp, which will be used as the
-	// imageFs stats timestamp.
-	rootStats, err := getCgroupStats(p.cadvisor, "/")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get root container stats: %v", err)
-	}
-
 	return &statsapi.FsStats{
-		Time:           metav1.NewTime(rootStats.Timestamp),
+		Time:           metav1.NewTime(imageFsInfo.Timestamp),
 		AvailableBytes: &imageFsInfo.Available,
 		CapacityBytes:  &imageFsInfo.Capacity,
 		UsedBytes:      &imageStats.TotalStorageBytes,

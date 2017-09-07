@@ -1122,6 +1122,18 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeClaim
 }
 
+var map_PersistentVolumeClaimCondition = map[string]string{
+	"":                   "PersistentVolumeClaimCondition contails details about state of pvc",
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"ResizeStarted\" that means the underlying persistent volume is being resized.",
+	"message":            "Human-readable message indicating details about last transition.",
+}
+
+func (PersistentVolumeClaimCondition) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeClaimCondition
+}
+
 var map_PersistentVolumeClaimList = map[string]string{
 	"":         "PersistentVolumeClaimList is a list of PersistentVolumeClaim items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1150,6 +1162,7 @@ var map_PersistentVolumeClaimStatus = map[string]string{
 	"phase":       "Phase represents the current phase of PersistentVolumeClaim.",
 	"accessModes": "AccessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
 	"capacity":    "Represents the actual resources of the underlying volume.",
+	"conditions":  "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
 }
 
 func (PersistentVolumeClaimStatus) SwaggerDoc() map[string]string {
@@ -2019,11 +2032,12 @@ func (Volume) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeMount = map[string]string{
-	"":          "VolumeMount describes a mounting of a Volume within a container.",
-	"name":      "This must match the Name of a Volume.",
-	"readOnly":  "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
-	"mountPath": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
-	"subPath":   "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
+	"":                 "VolumeMount describes a mounting of a Volume within a container.",
+	"name":             "This must match the Name of a Volume.",
+	"readOnly":         "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
+	"mountPath":        "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+	"subPath":          "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
+	"mountPropagation": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is alpha in 1.8 and can be reworked or removed in a future release.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {

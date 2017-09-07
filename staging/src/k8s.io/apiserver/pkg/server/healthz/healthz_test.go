@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -79,4 +80,33 @@ func TestMulitipleChecks(t *testing.T) {
 			t.Errorf("case[%d] Expected:\n%v\ngot:\n%v\n", i, test.expectedResponse, w.Body.String())
 		}
 	}
+}
+
+func TestCheckerNames(t *testing.T) {
+	n1 := "n1"
+	n2 := "n2"
+	c1 := &healthzCheck{name: n1}
+	c2 := &healthzCheck{name: n2}
+
+	testCases := []struct {
+		desc string
+		have []HealthzChecker
+		want []string
+	}{
+		{"no checker", []HealthzChecker{}, []string{}},
+		{"one checker", []HealthzChecker{c1}, []string{n1}},
+		{"other checker", []HealthzChecker{c2}, []string{n2}},
+		{"checker order", []HealthzChecker{c1, c2}, []string{n1, n2}},
+		{"different checker order", []HealthzChecker{c2, c1}, []string{n2, n1}},
+	}
+
+	for _, tc := range testCases {
+		result := checkerNames(tc.have...)
+		t.Run(tc.desc, func(t *testing.T) {
+			if reflect.DeepEqual(tc.want, result) {
+				t.Errorf("want %#v, got %#v", tc.want, result)
+			}
+		})
+	}
+
 }

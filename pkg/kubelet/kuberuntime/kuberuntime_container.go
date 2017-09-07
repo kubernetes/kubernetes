@@ -116,6 +116,11 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
 		return grpc.ErrorDesc(err), ErrCreateContainer
 	}
+	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
+	if err != nil {
+		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", err)
+		return "Internal PreStartContainer hook failed", err
+	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
 
 	if ref != nil {
@@ -294,6 +299,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			ContainerPath:  v.ContainerPath,
 			Readonly:       v.ReadOnly,
 			SelinuxRelabel: selinuxRelabel,
+			Propagation:    v.Propagation,
 		}
 
 		volumeMounts = append(volumeMounts, mount)
@@ -340,29 +346,18 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeapi.Container, error) {
 	filter := &runtimeapi.ContainerFilter{}
 	if !allContainers {
-		runningState := runtimeapi.ContainerState_CONTAINER_RUNNING
 		filter.State = &runtimeapi.ContainerStateValue{
-			State: runningState,
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
 
-	containers, err := m.getContainersHelper(filter)
+	containers, err := m.runtimeService.ListContainers(filter)
 	if err != nil {
 		glog.Errorf("getKubeletContainers failed: %v", err)
 		return nil, err
 	}
 
 	return containers, nil
-}
-
-// getContainers lists containers by filter.
-func (m *kubeGenericRuntimeManager) getContainersHelper(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
-	resp, err := m.runtimeService.ListContainers(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, err
 }
 
 // makeUID returns a randomly generated string.
@@ -573,6 +568,11 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	}
 
 	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
+
+	// Run internal pre-stop lifecycle hook
+	if err := m.internalLifecycle.PreStopContainer(containerID.ID); err != nil {
+		return err
+	}
 
 	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
@@ -805,6 +805,11 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 // it will not write container logs anymore in that state.
 func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 	glog.V(4).Infof("Removing container %q", containerID)
+	// Call internal container post-stop lifecycle hook.
+	if err := m.internalLifecycle.PostStopContainer(containerID); err != nil {
+		return err
+	}
+
 	// Remove the container log.
 	// TODO: Separate log and container lifecycle management.
 	if err := m.removeContainerLog(containerID); err != nil {

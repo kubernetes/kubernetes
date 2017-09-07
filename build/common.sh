@@ -85,7 +85,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  debian_iptables_version=v7
+  debian_iptables_version=v8
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD.
   case $1 in
@@ -100,20 +100,20 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm")
         local targets=(
-          cloud-controller-manager,armel/busybox
-          kube-apiserver,armel/busybox
-          kube-controller-manager,armel/busybox
-          kube-scheduler,armel/busybox
-          kube-aggregator,armel/busybox
+          cloud-controller-manager,arm32v7/busybox
+          kube-apiserver,arm32v7/busybox
+          kube-controller-manager,arm32v7/busybox
+          kube-scheduler,arm32v7/busybox
+          kube-aggregator,arm32v7/busybox
           kube-proxy,gcr.io/google-containers/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
-          cloud-controller-manager,aarch64/busybox
-          kube-apiserver,aarch64/busybox
-          kube-controller-manager,aarch64/busybox
-          kube-scheduler,aarch64/busybox
-          kube-aggregator,aarch64/busybox
+          cloud-controller-manager,arm64v8/busybox
+          kube-apiserver,arm64v8/busybox
+          kube-controller-manager,arm64v8/busybox
+          kube-scheduler,arm64v8/busybox
+          kube-aggregator,arm64v8/busybox
           kube-proxy,gcr.io/google-containers/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
@@ -409,8 +409,10 @@ function kube::build::clean() {
     "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
   fi
 
-  kube::log::status "Removing _output directory"
-  rm -rf "${LOCAL_OUTPUT_ROOT}"
+  if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
+    kube::log::status "Removing _output directory"
+    rm -rf "${LOCAL_OUTPUT_ROOT}"
+  fi
 }
 
 # Set up the context directory for the kube-build image and build it.
@@ -617,6 +619,7 @@ function kube::build::start_rsyncd_container() {
   V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
     "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT} -d \
+    -e ALLOW_HOST="$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
     -- /rsyncd.sh >/dev/null
 
   local mapped_port

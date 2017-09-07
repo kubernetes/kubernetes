@@ -404,6 +404,11 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	if err != nil {
 		return err
 	}
+	if deployment.Initializers != nil {
+		var falseVar = false
+		nonOrphanOption := metav1.DeleteOptions{OrphanDependents: &falseVar}
+		return deployments.Delete(name, &nonOrphanOption)
+	}
 
 	// Use observedGeneration to determine if the deployment controller noticed the pause.
 	if err := deploymentutil.WaitForObservedDeploymentInternal(func() (*extensions.Deployment, error) {

@@ -17,37 +17,45 @@ type Endpoint struct {
 	URL       string `json:"url"`
 }
 
-// CatalogEntry provides a type-safe interface to an Identity API V3 service catalog listing.
-// Each class of service, such as cloud DNS or block storage services, could have multiple
-// CatalogEntry representing it (one by interface type, e.g public, admin or internal).
+// CatalogEntry provides a type-safe interface to an Identity API V3 service
+// catalog listing. Each class of service, such as cloud DNS or block storage
+// services, could have multiple CatalogEntry representing it (one by interface
+// type, e.g public, admin or internal).
 //
-// Note: when looking for the desired service, try, whenever possible, to key off the type field.
-// Otherwise, you'll tie the representation of the service to a specific provider.
+// Note: when looking for the desired service, try, whenever possible, to key
+// off the type field. Otherwise, you'll tie the representation of the service
+// to a specific provider.
 type CatalogEntry struct {
 	// Service ID
 	ID string `json:"id"`
+
 	// Name will contain the provider-specified name for the service.
 	Name string `json:"name"`
-	// Type will contain a type string if OpenStack defines a type for the service.
-	// Otherwise, for provider-specific services, the provider may assign their own type strings.
+
+	// Type will contain a type string if OpenStack defines a type for the
+	// service. Otherwise, for provider-specific services, the provider may
+	// assign their own type strings.
 	Type string `json:"type"`
-	// Endpoints will let the caller iterate over all the different endpoints that may exist for
-	// the service.
+
+	// Endpoints will let the caller iterate over all the different endpoints that
+	// may exist for the service.
 	Endpoints []Endpoint `json:"endpoints"`
 }
 
-// ServiceCatalog provides a view into the service catalog from a previous, successful authentication.
+// ServiceCatalog provides a view into the service catalog from a previous,
+// successful authentication.
 type ServiceCatalog struct {
 	Entries []CatalogEntry `json:"catalog"`
 }
 
-// Domain provides information about the domain to which this token grants access.
+// Domain provides information about the domain to which this token grants
+// access.
 type Domain struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// User represents a user resource that exists on the API.
+// User represents a user resource that exists in the Identity Service.
 type User struct {
 	Domain Domain `json:"domain"`
 	ID     string `json:"id"`
@@ -67,7 +75,8 @@ type Project struct {
 	Name   string `json:"name"`
 }
 
-// commonResult is the deferred result of a Create or a Get call.
+// commonResult is the response from a request. A commonResult has various
+// methods which can be used to extract different details about the result.
 type commonResult struct {
 	gophercloud.Result
 }
@@ -92,7 +101,8 @@ func (r commonResult) ExtractToken() (*Token, error) {
 	return &s, err
 }
 
-// ExtractServiceCatalog returns the ServiceCatalog that was generated along with the user's Token.
+// ExtractServiceCatalog returns the ServiceCatalog that was generated along
+// with the user's Token.
 func (r commonResult) ExtractServiceCatalog() (*ServiceCatalog, error) {
 	var s ServiceCatalog
 	err := r.ExtractInto(&s)
@@ -126,27 +136,31 @@ func (r commonResult) ExtractProject() (*Project, error) {
 	return s.Project, err
 }
 
-// CreateResult defers the interpretation of a created token.
-// Use ExtractToken() to interpret it as a Token, or ExtractServiceCatalog() to interpret it as a service catalog.
+// CreateResult is the response from a Create request. Use ExtractToken()
+// to interpret it as a Token, or ExtractServiceCatalog() to interpret it
+// as a service catalog.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult is the deferred response from a Get call.
+// GetResult is the response from a Get request. Use ExtractToken()
+// to interpret it as a Token, or ExtractServiceCatalog() to interpret it
+// as a service catalog.
 type GetResult struct {
 	commonResult
 }
 
-// RevokeResult is the deferred response from a Revoke call.
+// RevokeResult is response from a Revoke request.
 type RevokeResult struct {
 	commonResult
 }
 
-// Token is a string that grants a user access to a controlled set of services in an OpenStack provider.
-// Each Token is valid for a set length of time.
+// Token is a string that grants a user access to a controlled set of services
+// in an OpenStack provider. Each Token is valid for a set length of time.
 type Token struct {
 	// ID is the issued token.
 	ID string `json:"id"`
+
 	// ExpiresAt is the timestamp at which this token will no longer be accepted.
 	ExpiresAt time.Time `json:"expires_at"`
 }

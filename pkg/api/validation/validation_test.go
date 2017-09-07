@@ -530,6 +530,17 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 	}
 }
 
+func testVolumeClaimWithStatus(
+	name, namespace string,
+	spec api.PersistentVolumeClaimSpec,
+	status api.PersistentVolumeClaimStatus) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       spec,
+		Status:     status,
+	}
+}
+
 func testVolumeClaimStorageClass(name string, namespace string, annval string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	annotations := map[string]string{
 		v1.BetaStorageClassAnnotation: annval,
@@ -728,7 +739,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -738,7 +749,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
+
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadOnlyMany,
@@ -828,50 +842,125 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	validSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	invalidSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	unboundSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("12G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
 		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
+			enableResize:      false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
+			enableResize:      false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
+			enableResize:      false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
+			enableResize:      false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-disabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-enabled": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      true,
+		},
+		"invalid-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidSizeUpdate,
+			enableResize:      true,
+		},
+		"unbound-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          unboundSizeUpdate,
+			enableResize:      true,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
 		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -880,6 +969,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func togglePVExpandFeature(toggleFlag bool, t *testing.T) {
+	if toggleFlag {
+		// Enable alpha feature LocalStorageCapacityIsolation
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+		if err != nil {
+			t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
+			return
+		}
+	} else {
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+		if err != nil {
+			t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
+			return
 		}
 	}
 }
@@ -2651,6 +2757,128 @@ func TestValidateVolumes(t *testing.T) {
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
+
+	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
+	hugePagesCase := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumHugePages}}
+
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
+		t.Errorf("Unexpected error when HugePages feature is enabled.")
+	}
+
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
+		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
+	}
+
+}
+
+func TestAlphaHugePagesIsolation(t *testing.T) {
+	successCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	failureCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+		return
+	}
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) != 0 {
+			t.Errorf("Unexpected error for case[%d], err: %v", i, errs)
+		}
+	}
+	for i := range failureCases {
+		pod := &failureCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+		return
+	}
+	// Disable alpha feature HugePages and ensure all success cases fail
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
 }
 
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
@@ -3405,6 +3633,10 @@ func TestValidateEnvFrom(t *testing.T) {
 
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := sets.NewString("abc", "123", "abc-123")
+	container := api.Container{
+		SecurityContext: nil,
+	}
+	propagation := api.MountPropagationBidirectional
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
@@ -3415,26 +3647,152 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 	}
-	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, volumes, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]api.VolumeMount{
-		"empty name":          {{Name: "", MountPath: "/foo"}},
-		"name not found":      {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":     {{Name: "abc", MountPath: ""}},
-		"relative mountpath":  {{Name: "abc", MountPath: "bar"}},
-		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..": {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"empty name":                             {{Name: "", MountPath: "/foo"}},
+		"name not found":                         {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
+		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
+		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, volumes, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
+}
+
+func TestValidateMountPropagation(t *testing.T) {
+	bTrue := true
+	bFalse := false
+	privilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bTrue,
+		},
+	}
+	nonPrivilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bFalse,
+		},
+	}
+	defaultContainer := &api.Container{}
+
+	propagationBidirectional := api.MountPropagationBidirectional
+	propagationHostToContainer := api.MountPropagationHostToContainer
+	propagationInvalid := api.MountPropagationMode("invalid")
+
+	tests := []struct {
+		mount       api.VolumeMount
+		container   *api.Container
+		expectError bool
+	}{
+		{
+			// implicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			defaultContainer,
+			false,
+		},
+		{
+			// implicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			defaultContainer,
+			false,
+		},
+		{
+			// error: implicitly non-privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			defaultContainer,
+			true,
+		},
+		{
+			// explicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nonPrivilegedContainer,
+			true,
+		},
+		{
+			// privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			privilegedContainer,
+			false,
+		},
+		{
+			// error: privileged container + invalid mount propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationInvalid},
+			privilegedContainer,
+			true,
+		},
+		{
+			// no container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nil,
+			false,
+		},
+	}
+
+	// Enable MountPropagation for this test
+	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
+	defer func() {
+		var err error
+		// restoring the old value
+		if priorityEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
+		}
+	}()
+	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
+		return
+	}
+
+	for i, test := range tests {
+		volumes := sets.NewString("foo")
+		errs := ValidateVolumeMounts([]api.VolumeMount{test.mount}, volumes, test.container, field.NewPath("field"))
+		if test.expectError && len(errs) == 0 {
+			t.Errorf("test %d expected error, got none", i)
+		}
+		if !test.expectError && len(errs) != 0 {
+			t.Errorf("test %d expected success, got error: %v", i, errs)
+		}
+	}
+
 }
 
 func TestValidateProbe(t *testing.T) {
@@ -7602,6 +7960,8 @@ func TestValidateNode(t *testing.T) {
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -7877,6 +8237,27 @@ func TestValidateNode(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
+		"multiple-pre-allocated-hugepages": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "abc",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "something"},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("10Gi"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -8243,6 +8624,33 @@ func TestValidateNodeUpdate(t *testing.T) {
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					helper.OpaqueIntResourceName("A"):    resource.MustParse("4.5"),
 				},
+			},
+		}, false},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///old",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
 			},
 		}, false},
 	}
@@ -9073,6 +9481,68 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+	validConditionUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+		Conditions: []api.PersistentVolumeClaimCondition{
+			{Type: api.PersistentVolumeClaimResizing, Status: api.ConditionTrue},
+		},
+	})
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
+	}{
+		"condition-update-with-disabled-feature-gate": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      false,
+		},
+		"condition-update-with-enabled-feature-gate": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      true,
+		},
+	}
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
+		scenario.oldClaim.ResourceVersion = "1"
+		scenario.newClaim.ResourceVersion = "1"
+		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func TestValidateResourceQuota(t *testing.T) {

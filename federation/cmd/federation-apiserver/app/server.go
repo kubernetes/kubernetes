@@ -190,7 +190,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
-	apiAuthorizer, err := authorizationConfig.New()
+	apiAuthorizer, _, err := authorizationConfig.New()
 	if err != nil {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}

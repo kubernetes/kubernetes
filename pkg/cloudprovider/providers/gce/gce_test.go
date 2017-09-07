@@ -27,6 +27,7 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	computev1 "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 func TestReadConfigFile(t *testing.T) {
@@ -281,7 +282,7 @@ func TestSplitProviderID(t *testing.T) {
 	for _, test := range providers {
 		project, zone, instance, err := splitProviderID(test.providerID)
 		if (err != nil) != test.fail {
-			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
+			t.Errorf("Expected to fail=%t, with pattern %v", test.fail, test)
 		}
 
 		if test.fail {
@@ -296,6 +297,61 @@ func TestSplitProviderID(t *testing.T) {
 		}
 		if instance != test.instance {
 			t.Errorf("Expected %v, but got %v", test.instance, instance)
+		}
+	}
+}
+
+func TestGetZoneByProviderID(t *testing.T) {
+	tests := []struct {
+		providerID string
+
+		expectedZone cloudprovider.Zone
+
+		fail        bool
+		description string
+	}{
+		{
+			providerID:   ProviderName + "://project-example-164317/us-central1-f/kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{FailureDomain: "us-central1-f", Region: "us-central1"},
+			fail:         false,
+			description:  "standard gce providerID",
+		},
+		{
+			providerID:   ProviderName + "://project-example-164317/us-central1-f/kubernetes-node-fhx1/",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "too many slashes('/') trailing",
+		},
+		{
+			providerID:   ProviderName + "://project-example.164317//kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "too many slashes('/') embedded",
+		},
+		{
+			providerID:   ProviderName + "://project-example-164317/uscentral1f/kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "invalid name of the GCE zone",
+		},
+	}
+
+	gce := &GCECloud{
+		localZone: "us-central1-f",
+		region:    "us-central1",
+	}
+	for _, test := range tests {
+		zone, err := gce.GetZoneByProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("Expected to fail=%t, provider ID %v, tests %s", test.fail, test, test.description)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if zone != test.expectedZone {
+			t.Errorf("Expected %v, but got %v", test.expectedZone, zone)
 		}
 	}
 }

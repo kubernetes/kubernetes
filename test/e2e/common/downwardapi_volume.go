@@ -211,8 +211,8 @@ func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMod
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--file_mode=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -237,8 +237,8 @@ func downwardAPIVolumePodForSimpleTest(name string, filePath string) *v1.Pod {
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--file_content=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -268,8 +268,8 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []v1.Container {
 	return []v1.Container{
 		{
 			Name:    name,
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--file_content=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--file_content=" + filePath},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("250m"),
@@ -296,8 +296,8 @@ func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []v1.Container
 	return []v1.Container{
 		{
 			Name:    name,
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--file_content=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--file_content=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -315,8 +315,8 @@ func downwardAPIVolumePodForUpdateTest(name string, labels, annotations map[stri
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",

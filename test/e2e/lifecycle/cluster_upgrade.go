@@ -59,6 +59,18 @@ var statefulsetUpgradeTests = []upgrades.Test{
 	&upgrades.CassandraUpgradeTest{},
 }
 
+var kubeProxyUpgradeTests = []upgrades.Test{
+	&upgrades.KubeProxyUpgradeTest{},
+	&upgrades.ServiceUpgradeTest{},
+	&upgrades.IngressUpgradeTest{},
+}
+
+var kubeProxyDowngradeTests = []upgrades.Test{
+	&upgrades.KubeProxyDowngradeTest{},
+	&upgrades.ServiceUpgradeTest{},
+	&upgrades.IngressUpgradeTest{},
+}
+
 var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
@@ -219,15 +231,13 @@ var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func()
 var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
 
-	// Create the frameworks here because we can only create them
-	// in a "Describe".
-	testFrameworks := createUpgradeFrameworks(upgradeTests)
-
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
 	})
 
 	Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
+		testFrameworks := createUpgradeFrameworks(kubeProxyUpgradeTests)
+
 		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -248,11 +258,13 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, true))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
 	Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
+		testFrameworks := createUpgradeFrameworks(kubeProxyDowngradeTests)
+
 		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
 			framework.ExpectNoError(err)
@@ -274,7 +286,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

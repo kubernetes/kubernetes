@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
 	"strconv"
@@ -105,7 +106,7 @@ var _ = SIGDescribe("EmptyDir wrapper volumes", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-test",
-						Image: "gcr.io/google_containers/test-webserver:e2e",
+						Image: imageutils.GetE2EImage(imageutils.TestWebserver),
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -187,7 +188,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 			Containers: []v1.Container{
 				{
 					Name:            "git-repo",
-					Image:           "gcr.io/google_containers/fakegitserver:0.1",
+					Image:           imageutils.GetE2EImage(imageutils.Fakegitserver),
 					ImagePullPolicy: "IfNotPresent",
 					Ports: []v1.ContainerPort{
 						{ContainerPort: int32(containerPort)},
@@ -350,7 +351,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 					Containers: []v1.Container{
 						{
 							Name:    "test-container",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   imageutils.GetBusyBoxImage(),
 							Command: []string{"sleep", "10000"},
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{

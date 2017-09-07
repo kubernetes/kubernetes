@@ -24,7 +24,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
+	informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/api/core/v1"
@@ -141,4 +142,17 @@ func (ca *cloudCIDRAllocator) ReleaseCIDR(node *v1.Node) error {
 	glog.V(2).Infof("Node %v PodCIDR (%v) will be released by external cloud provider (not managed by controller)",
 		node.Name, node.Spec.PodCIDR)
 	return nil
+}
+
+func (ca *cloudCIDRAllocator) Register(nodeInformer informers.NodeInformer) {
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: util.CreateAddNodeHandler(ca.AllocateOrOccupyCIDR),
+		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+			if newNode.Spec.PodCIDR == "" {
+				return ca.AllocateOrOccupyCIDR(newNode)
+			}
+			return nil
+		}),
+		DeleteFunc: util.CreateDeleteNodeHandler(ca.ReleaseCIDR),
+	})
 }

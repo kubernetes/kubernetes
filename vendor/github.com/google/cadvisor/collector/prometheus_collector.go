@@ -72,7 +72,7 @@ func NewPrometheusCollector(collectorName string, configFile []byte, metricCount
 	}
 
 	if metricCountLimit < 0 {
-		return nil, fmt.Errorf("Metric count limit must be greater than 0")
+		return nil, fmt.Errorf("Metric count limit must be greater than or equal to 0")
 	}
 
 	var metricsSet map[string]bool

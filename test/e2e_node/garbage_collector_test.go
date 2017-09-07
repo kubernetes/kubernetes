@@ -278,7 +278,7 @@ func getPods(specs []*testPodSpec) (pods []*v1.Pod) {
 		containers := []v1.Container{}
 		for i := 0; i < spec.numContainers; i++ {
 			containers = append(containers, v1.Container{
-				Image:   "gcr.io/google_containers/busybox:1.24",
+				Image:   busyboxImage,
 				Name:    spec.getContainerName(i),
 				Command: getRestartingContainerCommand("/test-empty-dir-mnt", i, spec.restartCount, ""),
 				VolumeMounts: []v1.VolumeMount{

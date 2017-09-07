@@ -27,9 +27,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	units "github.com/docker/go-units"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -97,14 +101,21 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
-			minShares := int64(MinShares)
+			minShares := uint64(MinShares)
 			resourceParameters.CpuShares = &minShares
 		}
+
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               absoluteContainerName,
 			ResourceParameters: resourceParameters,
 		}
+
+		// for each enumerated huge page size, the qos tiers are unbounded
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
+			m.setHugePagesUnbounded(containerConfig)
+		}
+
 		// check if it exists
 		if !cm.Exists(absoluteContainerName) {
 			if err := cm.Create(containerConfig); err != nil {
@@ -138,6 +149,29 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 	return nil
 }
 
+// setHugePagesUnbounded ensures hugetlb is effectively unbounded
+func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
+	hugePageLimit := map[int64]int64{}
+	for _, pageSize := range cgroupfs.HugePageSizes {
+		pageSizeBytes, err := units.RAMInBytes(pageSize)
+		if err != nil {
+			return err
+		}
+		hugePageLimit[pageSizeBytes] = int64(1 << 62)
+	}
+	cgroupConfig.ResourceParameters.HugePageLimit = hugePageLimit
+	return nil
+}
+
+func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
+	for _, v := range configs {
+		if err := m.setHugePagesUnbounded(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
@@ -155,13 +189,13 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	}
 
 	// make sure best effort is always 2 shares
-	bestEffortCPUShares := int64(MinShares)
+	bestEffortCPUShares := uint64(MinShares)
 	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
-	if burstableCPUShares < int64(MinShares) {
-		burstableCPUShares = int64(MinShares)
+	if burstableCPUShares < uint64(MinShares) {
+		burstableCPUShares = uint64(MinShares)
 	}
 	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
 	return nil
@@ -260,6 +294,13 @@ func (m *qosContainerManagerImpl) UpdateCgroups() error {
 	// update the qos level cgroup settings for cpu shares
 	if err := m.setCPUCgroupConfig(qosConfigs); err != nil {
 		return err
+	}
+
+	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
+		if err := m.setHugePagesConfig(qosConfigs); err != nil {
+			return err
+		}
 	}
 
 	for resource, percentReserve := range m.qosReserved {

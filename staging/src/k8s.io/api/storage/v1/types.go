@@ -55,6 +55,10 @@ type StorageClass struct {
 	// mount of the PVs will simply fail if one is invalid.
 	// +optional
 	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,5,opt,name=mountOptions"`
+
+	// AllowVolumeExpansion shows whether the storage class allow volume expand
+	// +optional
+	AllowVolumeExpansion *bool `json:"allowVolumeExpansion,omitempty" protobuf:"varint,6,opt,name=allowVolumeExpansion"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

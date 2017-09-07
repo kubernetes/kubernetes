@@ -125,6 +125,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - batch
+    resources:
+    - cronjobs/finalizers
+    verbs:
+    - update
+  - apiGroups:
     - ""
     resources:
     - pods
@@ -163,6 +169,13 @@ items:
     - extensions
     resources:
     - daemonsets/status
+    verbs:
+    - update
+  - apiGroups:
+    - apps
+    - extensions
+    resources:
+    - daemonsets/finalizers
     verbs:
     - update
   - apiGroups:
@@ -232,6 +245,13 @@ items:
     - extensions
     resources:
     - deployments/status
+    verbs:
+    - update
+  - apiGroups:
+    - apps
+    - extensions
+    resources:
+    - deployments/finalizers
     verbs:
     - update
   - apiGroups:
@@ -496,6 +516,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - batch
+    resources:
+    - jobs/finalizers
+    verbs:
+    - update
+  - apiGroups:
     - ""
     resources:
     - pods
@@ -742,6 +768,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - extensions
+    resources:
+    - replicasets/finalizers
+    verbs:
+    - update
+  - apiGroups:
     - ""
     resources:
     - pods
@@ -782,6 +814,12 @@ items:
     - ""
     resources:
     - replicationcontrollers/status
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - replicationcontrollers/finalizers
     verbs:
     - update
   - apiGroups:
@@ -956,6 +994,12 @@ items:
     - apps
     resources:
     - statefulsets/status
+    verbs:
+    - update
+  - apiGroups:
+    - apps
+    resources:
+    - statefulsets/finalizers
     verbs:
     - update
   - apiGroups:

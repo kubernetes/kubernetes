@@ -18,11 +18,12 @@ package util
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/initialization"
 	"k8s.io/apiserver/pkg/admission"
 )
 
-// IsUpdatingInitializedObject returns if the operation is trying to update an
-// already initialized object.
+// IsUpdatingInitializedObject returns true if the operation is trying to update
+// an already initialized object.
 func IsUpdatingInitializedObject(a admission.Attributes) (bool, error) {
 	if a.GetOperation() != admission.Update {
 		return false, nil
@@ -32,14 +33,14 @@ func IsUpdatingInitializedObject(a admission.Attributes) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if accessor.GetInitializers() == nil {
+	if initialization.IsInitialized(accessor.GetInitializers()) {
 		return true, nil
 	}
 	return false, nil
 }
 
-// IsUpdatingUninitializedObject returns if the operation is trying to update an
-// object that is not initialized yet.
+// IsUpdatingUninitializedObject returns true if the operation is trying to
+// update an object that is not initialized yet.
 func IsUpdatingUninitializedObject(a admission.Attributes) (bool, error) {
 	if a.GetOperation() != admission.Update {
 		return false, nil
@@ -49,8 +50,30 @@ func IsUpdatingUninitializedObject(a admission.Attributes) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if accessor.GetInitializers() == nil {
+	if initialization.IsInitialized(accessor.GetInitializers()) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// IsInitializationCompletion returns true if the operation removes all pending
+// initializers.
+func IsInitializationCompletion(a admission.Attributes) (bool, error) {
+	if a.GetOperation() != admission.Update {
+		return false, nil
+	}
+	oldObj := a.GetOldObject()
+	oldInitialized, err := initialization.IsObjectInitialized(oldObj)
+	if err != nil {
+		return false, err
+	}
+	if oldInitialized {
+		return false, nil
+	}
+	newObj := a.GetObject()
+	newInitialized, err := initialization.IsObjectInitialized(newObj)
+	if err != nil {
+		return false, err
+	}
+	return newInitialized, nil
 }

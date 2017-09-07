@@ -101,6 +101,19 @@ func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
 	}
+	if obj.Spec.SessionAffinity == v1.ServiceAffinityNone {
+		obj.Spec.SessionAffinityConfig = nil
+	}
+	if obj.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+		if obj.Spec.SessionAffinityConfig == nil || obj.Spec.SessionAffinityConfig.ClientIP == nil || obj.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds == nil {
+			timeoutSeconds := v1.DefaultClientIPServiceAffinitySeconds
+			obj.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{
+					TimeoutSeconds: &timeoutSeconds,
+				},
+			}
+		}
+	}
 	if obj.Spec.Type == "" {
 		obj.Spec.Type = v1.ServiceTypeClusterIP
 	}

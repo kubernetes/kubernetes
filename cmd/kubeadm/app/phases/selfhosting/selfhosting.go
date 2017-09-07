@@ -39,7 +39,7 @@ const (
 	selfHostingWaitTimeout = 2 * time.Minute
 
 	// selfHostingFailureThreshold describes how many times kubeadm will retry creating the DaemonSets
-	selfHostingFailureThreshold uint8 = 5
+	selfHostingFailureThreshold int = 5
 )
 
 // CreateSelfHostedControlPlane is responsible for turning a Static Pod-hosted control plane to a self-hosted one
@@ -60,7 +60,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's podspec is stored
-	mutators := getDefaultMutators()
+	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
 	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
@@ -72,10 +72,6 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		if err := uploadKubeConfigSecrets(client, kubeConfigDir); err != nil {
 			return err
 		}
-		// Add the store-certs-in-secrets-specific mutators here so that the self-hosted component starts using them
-		mutators[kubeadmconstants.KubeAPIServer] = append(mutators[kubeadmconstants.KubeAPIServer], setSelfHostedVolumesForAPIServer)
-		mutators[kubeadmconstants.KubeControllerManager] = append(mutators[kubeadmconstants.KubeControllerManager], setSelfHostedVolumesForControllerManager)
-		mutators[kubeadmconstants.KubeScheduler] = append(mutators[kubeadmconstants.KubeScheduler], setSelfHostedVolumesForScheduler)
 	}
 
 	for _, componentName := range kubeadmconstants.MasterComponents {
@@ -95,7 +91,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		}
 
 		// Build a DaemonSet object from the loaded PodSpec
-		ds := buildDaemonSet(componentName, podSpec, mutators)
+		ds := BuildDaemonSet(componentName, podSpec, mutators)
 
 		// Create or update the DaemonSet in the API Server, and retry selfHostingFailureThreshold times if it errors out
 		if err := apiclient.TryRunCommand(func() error {
@@ -105,7 +101,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		}
 
 		// Wait for the self-hosted component to come up
-		if err := waiter.WaitForPodsWithLabel(buildSelfHostedWorkloadLabelQuery(componentName)); err != nil {
+		if err := waiter.WaitForPodsWithLabel(BuildSelfHostedComponentLabelQuery(componentName)); err != nil {
 			return err
 		}
 
@@ -132,8 +128,8 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	return nil
 }
 
-// buildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
-func buildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *extensions.DaemonSet {
+// BuildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
+func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *extensions.DaemonSet {
 
 	// Mutate the PodSpec so it's suitable for self-hosting
 	mutatePodSpec(mutators, name, podSpec)
@@ -143,18 +139,18 @@ func buildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodS
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.AddSelfHostedPrefix(name),
 			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
-			},
+			Labels:    BuildSelfhostedComponentLabels(name),
 		},
 		Spec: extensions.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
-					},
+					Labels: BuildSelfhostedComponentLabels(name),
 				},
 				Spec: *podSpec,
+			},
+			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+				// Make the DaemonSet utilize the RollingUpdate rollout strategy
+				Type: extensions.RollingUpdateDaemonSetStrategyType,
 			},
 		},
 	}
@@ -176,7 +172,14 @@ func loadPodSpecFromFile(manifestPath string) (*v1.PodSpec, error) {
 	return &staticPod.Spec, nil
 }
 
-// buildSelfHostedWorkloadLabelQuery creates the right query for matching a self-hosted Pod
-func buildSelfHostedWorkloadLabelQuery(componentName string) string {
+// BuildSelfhostedComponentLabels returns the labels for a self-hosted component
+func BuildSelfhostedComponentLabels(component string) map[string]string {
+	return map[string]string{
+		"k8s-app": kubeadmconstants.AddSelfHostedPrefix(component),
+	}
+}
+
+// BuildSelfHostedComponentLabelQuery creates the right query for matching a self-hosted Pod
+func BuildSelfHostedComponentLabelQuery(componentName string) string {
 	return fmt.Sprintf("k8s-app=%s", kubeadmconstants.AddSelfHostedPrefix(componentName))
 }

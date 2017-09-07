@@ -121,7 +121,7 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 	origPairs := port.AllowedAddressPairs // shallow copy
 
 	_, err := neutronports.Update(network, port.ID, neutronports.UpdateOpts{
-		AllowedAddressPairs: newPairs,
+		AllowedAddressPairs: &newPairs,
 	}).Extract()
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 	unwinder := func() {
 		glog.V(4).Info("Reverting allowed-address-pairs change to port ", port.ID)
 		_, err := neutronports.Update(network, port.ID, neutronports.UpdateOpts{
-			AllowedAddressPairs: origPairs,
+			AllowedAddressPairs: &origPairs,
 		}).Extract()
 		if err != nil {
 			glog.Warning("Unable to reset allowed-address-pairs during error unwind: ", err)

@@ -43,7 +43,7 @@ const (
 // first time it is run and succeeds subsequently. name is the Name of the Job. RestartPolicy indicates the restart
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
-func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64) *batch.Job {
+func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batch.Job {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -55,6 +55,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			ActiveDeadlineSeconds: activeDeadlineSeconds,
 			Parallelism:           &parallelism,
 			Completions:           &completions,
+			BackoffLimit:          &backoffLimit,
 			ManualSelector:        newBool(false),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -73,7 +74,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{

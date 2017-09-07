@@ -24,6 +24,7 @@ go_library(
     name = "go_default_library",
     srcs = ["qos.go"],
     deps = [
+        "//pkg/api/v1/helper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

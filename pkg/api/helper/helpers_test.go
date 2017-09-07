@@ -58,10 +58,28 @@ func TestIsStandardResource(t *testing.T) {
 		{"disk", false},
 		{"blah", false},
 		{"x.y.z", false},
+		{"hugepages-2Mi", true},
 	}
 	for i, tc := range testCases {
 		if IsStandardResourceName(tc.input) != tc.output {
-			t.Errorf("case[%d], expected: %t, got: %t", i, tc.output, !tc.output)
+			t.Errorf("case[%d], input: %s, expected: %t, got: %t", i, tc.input, tc.output, !tc.output)
+		}
+	}
+}
+
+func TestIsStandardContainerResource(t *testing.T) {
+	testCases := []struct {
+		input  string
+		output bool
+	}{
+		{"cpu", true},
+		{"memory", true},
+		{"disk", false},
+		{"hugepages-2Mi", true},
+	}
+	for i, tc := range testCases {
+		if IsStandardContainerResourceName(tc.input) != tc.output {
+			t.Errorf("case[%d], input: %s, expected: %t, got: %t", i, tc.input, tc.output, !tc.output)
 		}
 	}
 }
@@ -350,6 +368,123 @@ func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}
+
+func TestIsHugePageResourceName(t *testing.T) {
+	testCases := []struct {
+		name   api.ResourceName
+		result bool
+	}{
+		{
+			name:   api.ResourceName("hugepages-2Mi"),
+			result: true,
+		},
+		{
+			name:   api.ResourceName("hugepages-1Gi"),
+			result: true,
+		},
+		{
+			name:   api.ResourceName("cpu"),
+			result: false,
+		},
+		{
+			name:   api.ResourceName("memory"),
+			result: false,
+		},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceName(testCase.name) {
+			t.Errorf("resource: %v expected result: %v", testCase.name, testCase.result)
+		}
+	}
+}
+
+func TestHugePageResourceName(t *testing.T) {
+	testCases := []struct {
+		pageSize resource.Quantity
+		name     api.ResourceName
+	}{
+		{
+			pageSize: resource.MustParse("2Mi"),
+			name:     api.ResourceName("hugepages-2Mi"),
+		},
+		{
+			pageSize: resource.MustParse("1Gi"),
+			name:     api.ResourceName("hugepages-1Gi"),
+		},
+		{
+			// verify we do not regress our canonical representation
+			pageSize: *resource.NewQuantity(int64(2097152), resource.BinarySI),
+			name:     api.ResourceName("hugepages-2Mi"),
+		},
+	}
+	for _, testCase := range testCases {
+		if result := HugePageResourceName(testCase.pageSize); result != testCase.name {
+			t.Errorf("pageSize: %v, expected: %v, but got: %v", testCase.pageSize.String(), testCase.name, result.String())
+		}
+	}
+}
+
+func TestHugePageSizeFromResourceName(t *testing.T) {
+	testCases := []struct {
+		name      api.ResourceName
+		expectErr bool
+		pageSize  resource.Quantity
+	}{
+		{
+			name:      api.ResourceName("hugepages-2Mi"),
+			pageSize:  resource.MustParse("2Mi"),
+			expectErr: false,
+		},
+		{
+			name:      api.ResourceName("hugepages-1Gi"),
+			pageSize:  resource.MustParse("1Gi"),
+			expectErr: false,
+		},
+		{
+			name:      api.ResourceName("hugepages-bad"),
+			expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		value, err := HugePageSizeFromResourceName(testCase.name)
+		if testCase.expectErr && err == nil {
+			t.Errorf("Expected an error for %v", testCase.name)
+		} else if !testCase.expectErr && err != nil {
+			t.Errorf("Unexpected error for %v, got %v", testCase.name, err)
+		} else if testCase.pageSize.Value() != value.Value() {
+			t.Errorf("Unexpected pageSize for resource %v got %v", testCase.name, value.String())
+		}
+	}
+}
+
+func TestIsOvercommitAllowed(t *testing.T) {
+	testCases := []struct {
+		name    api.ResourceName
+		allowed bool
+	}{
+		{
+			name:    api.ResourceCPU,
+			allowed: true,
+		},
+		{
+			name:    api.ResourceMemory,
+			allowed: true,
+		},
+		{
+			name:    api.ResourceNvidiaGPU,
+			allowed: false,
+		},
+		{
+			name:    HugePageResourceName(resource.MustParse("2Mi")),
+			allowed: false,
+		},
+	}
+	for _, testCase := range testCases {
+		if testCase.allowed != IsOvercommitAllowed(testCase.name) {
+			t.Errorf("Unexpected result for %v", testCase.name)
 		}
 	}
 }

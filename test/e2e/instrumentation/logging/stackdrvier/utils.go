@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -210,13 +209,8 @@ func (p *sdLogProvider) buildFilter() (string, error) {
 		return fmt.Sprintf("resource.type=\"gke_cluster\" AND jsonPayload.metadata.namespace=\"%s\"",
 			p.framework.Namespace.Name), nil
 	case systemScope:
-		nodeFilters := []string{}
-		for _, nodeID := range utils.GetNodeIds(p.framework.ClientSet) {
-			nodeFilter := fmt.Sprintf("resource.labels.instance_id=%s", nodeID)
-			nodeFilters = append(nodeFilters, nodeFilter)
-		}
-		return fmt.Sprintf("resource.type=\"gce_instance\" AND (%s)",
-			strings.Join(nodeFilters, " OR ")), nil
+		// TODO(instrumentation): Filter logs from the current project only.
+		return "resource.type=\"gce_instance\"", nil
 	}
 	return "", fmt.Errorf("Unknown log provider scope: %v", p.scope)
 }

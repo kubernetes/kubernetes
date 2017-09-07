@@ -196,6 +196,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &serviceInfo{

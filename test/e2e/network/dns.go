@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const dnsTestPodHostName = "dns-querier-1"
@@ -65,7 +66,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 				// TODO: Consider scraping logs instead of running a webserver.
 				{
 					Name:  "webserver",
-					Image: "gcr.io/google_containers/test-webserver:e2e",
+					Image: imageutils.GetE2EImage(imageutils.TestWebserver),
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
@@ -81,7 +82,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 				},
 				{
 					Name:    "querier",
-					Image:   "gcr.io/google_containers/dnsutils:e2e",
+					Image:   imageutils.GetE2EImage(imageutils.Dnsutils),
 					Command: []string{"sh", "-c", wheezyProbeCmd},
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -92,7 +93,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 				},
 				{
 					Name:    "jessie-querier",
-					Image:   "gcr.io/google_containers/jessie-dnsutils:e2e",
+					Image:   imageutils.GetE2EImage(imageutils.JessieDnsutils),
 					Command: []string{"sh", "-c", jessieProbeCmd},
 					VolumeMounts: []v1.VolumeMount{
 						{

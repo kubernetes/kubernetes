@@ -1,34 +1,37 @@
 package client
 
 import (
-	"errors"
-	"fmt"
 	"net/url"
 
+	"github.com/docker/distribution/reference"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-
-	distreference "github.com/docker/distribution/reference"
-	"github.com/docker/docker/api/types/reference"
 )
 
 // ImageTag tags an image in the docker host
-func (cli *Client) ImageTag(ctx context.Context, imageID, ref string) error {
-	distributionRef, err := distreference.ParseNamed(ref)
-	if err != nil {
-		return fmt.Errorf("Error parsing reference: %q is not a valid repository/tag", ref)
+func (cli *Client) ImageTag(ctx context.Context, source, target string) error {
+	if _, err := reference.ParseAnyReference(source); err != nil {
+		return errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", source)
 	}
 
-	if _, isCanonical := distributionRef.(distreference.Canonical); isCanonical {
+	ref, err := reference.ParseNormalizedNamed(target)
+	if err != nil {
+		return errors.Wrapf(err, "Error parsing reference: %q is not a valid repository/tag", target)
+	}
+
+	if _, isCanonical := ref.(reference.Canonical); isCanonical {
 		return errors.New("refusing to create a tag with a digest reference")
 	}
 
-	tag := reference.GetTagFromNamedRef(distributionRef)
+	ref = reference.TagNameOnly(ref)
 
 	query := url.Values{}
-	query.Set("repo", distributionRef.Name())
-	query.Set("tag", tag)
+	query.Set("repo", reference.FamiliarName(ref))
+	if tagged, ok := ref.(reference.Tagged); ok {
+		query.Set("tag", tagged.Tag())
+	}
 
-	resp, err := cli.post(ctx, "/images/"+imageID+"/tag", query, nil, nil)
+	resp, err := cli.post(ctx, "/images/"+source+"/tag", query, nil, nil)
 	ensureReaderClosed(resp)
 	return err
 }

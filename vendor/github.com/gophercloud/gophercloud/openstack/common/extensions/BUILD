@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "errors.go",
         "requests.go",
         "results.go",
         "urls.go",

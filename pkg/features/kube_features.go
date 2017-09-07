@@ -37,10 +37,6 @@ const (
 	// alpha: v1.4
 	ExternalTrafficLocalOnly utilfeature.Feature = "AllowExtTrafficLocalEndpoints"
 
-	// owner: @saad-ali
-	// alpha: v1.3
-	DynamicVolumeProvisioning utilfeature.Feature = "DynamicVolumeProvisioning"
-
 	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
@@ -72,6 +68,13 @@ const (
 	// Only Nvidia GPUs are supported as of v1.6.
 	// Works only with Docker Container Runtime.
 	Accelerators utilfeature.Feature = "Accelerators"
+
+	// owner: @jiayingz
+	// alpha: v1.8
+	//
+	// Enables support for Device Plugins
+	// Only Nvidia GPUs are tested as of v1.8.
+	DevicePlugins utilfeature.Feature = "DevicePlugins"
 
 	// owner: @gmarek
 	// alpha: v1.6
@@ -107,6 +110,11 @@ const (
 	// New local storage types to support local storage capacity isolation
 	LocalStorageCapacityIsolation utilfeature.Feature = "LocalStorageCapacityIsolation"
 
+	// owner: @gnufied
+	// alpha: v1.8
+	// Ability to Expand persistent volumes
+	ExpandPersistentVolumes utilfeature.Feature = "ExpandPersistentVolumes"
+
 	// owner: @verb
 	// alpha: v1.8
 	//
@@ -137,6 +145,24 @@ const (
 	//
 	// Implement IPVS-based in-cluster service load balancing
 	SupportIPVSProxyMode utilfeature.Feature = "SupportIPVSProxyMode"
+
+	// owner: @jsafrane
+	// alpha: v1.8
+	//
+	// Enable mount propagation of volumes.
+	MountPropagation utilfeature.Feature = "MountPropagation"
+
+	// owner: @ConnorDoyle
+	// alpha: v1.8
+	//
+	// Alternative container-level CPU affinity policies.
+	CPUManager utilfeature.Feature = "CPUManager"
+
+	// owner: @derekwaynecarr
+	// alpha: v1.8
+	//
+	// Enable pods to consume pre-allocated huge pages of varying page sizes
+	HugePages utilfeature.Feature = "HugePages"
 )
 
 func init() {
@@ -151,26 +177,31 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicVolumeProvisioning:                   {Default: true, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
+	HugePages:                                   {Default: false, PreRelease: utilfeature.Alpha},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
+	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
+	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
+	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing:        {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.APIListChunking:         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -284,6 +284,30 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 2, 0, 0)
 }
 
+// Tell the controller to create 100 replicas, but simulate a limit (like a quota limit)
+// of 10, and verify that the controller doesn't make 100 create calls per sync pass
+func TestSyncReplicationControllerCreateFailures(t *testing.T) {
+	fakePodControl := controller.FakePodControl{}
+	fakePodControl.CreateLimit = 10
+
+	rc := newReplicationController(fakePodControl.CreateLimit * 10)
+	c := fake.NewSimpleClientset(rc)
+	manager, _ /*podInformer*/, rcInformer := newReplicationManagerFromClient(c, BurstReplicas)
+
+	rcInformer.Informer().GetIndexer().Add(rc)
+
+	manager.podControl = &fakePodControl
+	manager.syncReplicationController(getKey(rc, t))
+	validateSyncReplication(t, &fakePodControl, fakePodControl.CreateLimit, 0, 0)
+	expectedLimit := 0
+	for pass := uint8(0); expectedLimit <= fakePodControl.CreateLimit; pass++ {
+		expectedLimit += controller.SlowStartInitialBatchSize << pass
+	}
+	if fakePodControl.CreateCallCount > expectedLimit {
+		t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
+	}
+}
+
 func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	// Setup a fake server to listen for requests, and run the rc manager in steady state
 	fakeHandler := utiltesting.FakeHandler{

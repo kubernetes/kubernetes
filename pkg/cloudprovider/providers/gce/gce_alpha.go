@@ -22,14 +22,21 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
+const (
+	// alpha: v1.8 (for Services)
+	//
+	// Allows Services backed by a GCP load balancer to choose what network
+	// tier to use. Currently supports "Standard" and "Premium" (default).
+	AlphaFeatureNetworkTiers = "NetworkTiers"
+
+	GCEDiskAlphaFeatureGate = "DiskAlphaAPI"
+)
+
 // All known alpha features
 var knownAlphaFeatures = map[string]bool{
-	GCEDiskAlphaFeatureGate: true,
+	AlphaFeatureNetworkTiers: true,
+	GCEDiskAlphaFeatureGate:  true,
 }
-
-const (
-	GCEDiskAlphaFeatureGate = "GCEDiskAlphaAPI"
-)
 
 type AlphaFeatureGate struct {
 	features map[string]bool

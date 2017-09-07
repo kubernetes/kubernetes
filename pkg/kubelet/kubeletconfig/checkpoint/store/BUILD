@@ -16,8 +16,8 @@ go_test(
     deps = [
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
-        "//pkg/kubelet/kubeletconfig/util/filesystem:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
+        "//pkg/util/filesystem:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -35,8 +35,8 @@ go_library(
     deps = [
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
-        "//pkg/kubelet/kubeletconfig/util/filesystem:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
+        "//pkg/util/filesystem:go_default_library",
     ],
 )
 

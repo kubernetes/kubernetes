@@ -84,7 +84,7 @@ done`, testCmd)
 		Spec: api.PodSpec{
 			Containers: []api.Container{{
 				Name:    "test",
-				Image:   "gcr.io/google_containers/busybox:1.24",
+				Image:   busyboxImage,
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: api.RestartPolicyNever,
