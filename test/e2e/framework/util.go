@@ -3920,6 +3920,33 @@ func WaitForControllerManagerUp() error {
 	return fmt.Errorf("waiting for controller-manager timed out")
 }
 
+// CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
+func CheckForControllerManagerHealthy(duration time.Duration) error {
+	var PID string
+	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1"
+	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
+		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		if err != nil {
+			// We don't necessarily know that it crashed, pipe could just be broken
+			LogSSHResult(result)
+			return fmt.Errorf("master unreachable after %v", time.Since(start))
+		} else if result.Code != 0 {
+			LogSSHResult(result)
+			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
+		} else if result.Stdout != PID {
+			if PID == "" {
+				PID = result.Stdout
+			} else {
+				//its dead
+				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
+			}
+		} else {
+			Logf("kube-controller-manager still healthy after %v", time.Since(start))
+		}
+	}
+	return nil
+}
+
 // Returns number of ready Nodes excluding Master Node.
 func NumberOfReadyNodes(c clientset.Interface) (int, error) {
 	nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{

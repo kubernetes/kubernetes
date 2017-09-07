@@ -42,17 +42,6 @@ const (
 	pvReadCmd  string = "cat " + pvTestFile
 )
 
-func (t *PersistentVolumeUpgradeTest) createGCEVolume() *v1.PersistentVolumeSource {
-	diskName, err := framework.CreatePDWithRetry()
-	framework.ExpectNoError(err)
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   diskName,
-			FSType:   "ext3",
-			ReadOnly: false,
-		},
-	}
-}
 func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVolumeSource) error {
 	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
@@ -67,7 +56,7 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 
 	By("Initializing PV source")
-	t.pvSource = t.createGCEVolume()
+	t.pvSource, _ = framework.CreateGCEVolume()
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix: "pv-upgrade",
 		PVSource:   *t.pvSource,
