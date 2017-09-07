@@ -30,7 +30,7 @@ import (
 
 type deleteContextTest struct {
 	config           clientcmdapi.Config
-	contextToDelete  string
+	contextToDelete  []string
 	expectedContexts []string
 	expectedOut      string
 }
@@ -44,9 +44,26 @@ func TestDeleteContext(t *testing.T) {
 	}
 	test := deleteContextTest{
 		config:           conf,
-		contextToDelete:  "minikube",
+		contextToDelete:  []string{"minikube"},
 		expectedContexts: []string{"otherkube"},
 		expectedOut:      "deleted context minikube from %s\n",
+	}
+
+	test.run(t)
+}
+
+func TestDeleteMultiContext(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"minikube":  {Cluster: "minikube"},
+			"otherkube": {Cluster: "otherkube"},
+		},
+	}
+	test := deleteContextTest{
+		config:           conf,
+		contextToDelete:  []string{"minikube", "otherkube"},
+		expectedContexts: []string{},
+		expectedOut:      "deleted context minikube from %s\ndeleted context otherkube from %s\n",
 	}
 
 	test.run(t)
@@ -70,12 +87,12 @@ func (test deleteContextTest) run(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdConfigDeleteContext(buf, errBuf, pathOptions)
-	cmd.SetArgs([]string{test.contextToDelete})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
+	cmd.Run(cmd, test.contextToDelete)
+	name := []interface{}{}
+	for range test.contextToDelete {
+		name = append(name, fakeKubeFile.Name())
 	}
-
-	expectedOutWithFile := fmt.Sprintf(test.expectedOut, fakeKubeFile.Name())
+	expectedOutWithFile := fmt.Sprintf(test.expectedOut, name...)
 	if expectedOutWithFile != buf.String() {
 		t.Errorf("expected output %s, but got %s", expectedOutWithFile, buf.String())
 		return
@@ -91,8 +108,7 @@ func (test deleteContextTest) run(t *testing.T) {
 	for k := range config.Contexts {
 		contexts = append(contexts, k)
 	}
-
 	if !reflect.DeepEqual(test.expectedContexts, contexts) {
-		t.Errorf("expected contexts %v, but found %v in kubeconfig", test.expectedContexts, contexts)
+		t.Errorf("expected contexts:\n %v,\n but found:\n %v in kubeconfig", test.expectedContexts, contexts)
 	}
 }
