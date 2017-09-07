@@ -135,7 +135,7 @@ func (s *StatefulSetTester) CheckMount(ss *apps.StatefulSet, mountPath string) e
 func (s *StatefulSetTester) ExecInStatefulPods(ss *apps.StatefulSet, cmd string) error {
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {
-		stdout, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, 3)
+		stdout, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
 		if err != nil {
 			return err
@@ -149,7 +149,7 @@ func (s *StatefulSetTester) CheckHostname(ss *apps.StatefulSet) error {
 	cmd := "printf $(hostname)"
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {
-		hostname, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, 3)
+		hostname, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -530,7 +530,7 @@ func (s *StatefulSetTester) BreakPodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod)
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
-	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, 3)
+	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -554,7 +554,7 @@ func (s *StatefulSetTester) RestorePodHttpProbe(ss *apps.StatefulSet, pod *v1.Po
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
-	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, 3)
+	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -599,7 +599,7 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 		if resumedPod != "" {
 			Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "touch /data/statefulset-continue", StatefulSetPoll, 3)
+		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "touch /data/statefulset-continue; sync", StatefulSetPoll, StatefulPodTimeout)
 		ExpectNoError(err)
 		Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
