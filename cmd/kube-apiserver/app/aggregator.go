@@ -24,21 +24,24 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeexternalinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
+	apiregistrationinformers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -104,39 +107,23 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		autoRegistrationController)
 
 	aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go autoRegistrationController.Run(5, context.StopCh)
 		go tprRegistrationController.Run(5, context.StopCh)
+		go func() {
+			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
+			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
+			tprRegistrationController.WaitForInitialSync()
+			autoRegistrationController.Run(5, context.StopCh)
+		}()
 		return nil
 	})
-	aggregatorServer.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("autoregister-completion", func(r *http.Request) error {
-		items, err := aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices().Lister().List(labels.Everything())
-		if err != nil {
-			return err
-		}
 
-		missing := []apiregistration.APIService{}
-		for _, apiService := range apiServices {
-			found := false
-			for _, item := range items {
-				if item.Name != apiService.Name {
-					continue
-				}
-				if apiregistration.IsAPIServiceConditionTrue(item, apiregistration.Available) {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				missing = append(missing, *apiService)
-			}
-		}
-
-		if len(missing) > 0 {
-			return fmt.Errorf("missing APIService: %v", missing)
-		}
-		return nil
-	}))
+	aggregatorServer.GenericAPIServer.AddHealthzChecks(
+		makeAPIServiceAvailableHealthzCheck(
+			"autoregister-completion",
+			apiServices,
+			aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(),
+		),
+	)
 
 	return aggregatorServer, nil
 }
@@ -158,6 +145,45 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 			VersionPriority:      apiServicePriority.version,
 		},
 	}
+}
+
+// makeAPIServiceAvailableHealthzCheck returns a healthz check that returns healthy
+// once all of the specified services have been observed to be available at least once.
+func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistration.APIService, apiServiceInformer apiregistrationinformers.APIServiceInformer) healthz.HealthzChecker {
+	// Track the auto-registered API services that have not been observed to be available yet
+	pendingServiceNamesLock := &sync.RWMutex{}
+	pendingServiceNames := sets.NewString()
+	for _, service := range apiServices {
+		pendingServiceNames.Insert(service.Name)
+	}
+
+	// When an APIService in the list is seen as available, remove it from the pending list
+	handleAPIServiceChange := func(service *apiregistration.APIService) {
+		pendingServiceNamesLock.Lock()
+		defer pendingServiceNamesLock.Unlock()
+		if !pendingServiceNames.Has(service.Name) {
+			return
+		}
+		if apiregistration.IsAPIServiceConditionTrue(service, apiregistration.Available) {
+			pendingServiceNames.Delete(service.Name)
+		}
+	}
+
+	// Watch add/update events for APIServices
+	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*apiregistration.APIService)) },
+		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*apiregistration.APIService)) },
+	})
+
+	// Don't return healthy until the pending list is empty
+	return healthz.NamedCheck(name, func(r *http.Request) error {
+		pendingServiceNamesLock.RLock()
+		defer pendingServiceNamesLock.RUnlock()
+		if pendingServiceNames.Len() > 0 {
+			return fmt.Errorf("missing APIService: %v", pendingServiceNames.List())
+		}
+		return nil
+	})
 }
 
 type priority struct {
@@ -202,7 +228,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 	for _, curr := range delegateAPIServer.ListedPaths() {
 		if curr == "/api/v1" {
 			apiService := makeAPIService(schema.GroupVersion{Group: "", Version: "v1"})
-			registration.AddAPIServiceToSync(apiService)
+			registration.AddAPIServiceToSyncOnStart(apiService)
 			apiServices = append(apiServices, apiService)
 			continue
 		}
@@ -220,7 +246,7 @@ func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, 
 		if apiService == nil {
 			continue
 		}
-		registration.AddAPIServiceToSync(apiService)
+		registration.AddAPIServiceToSyncOnStart(apiService)
 		apiServices = append(apiServices, apiService)
 	}
 

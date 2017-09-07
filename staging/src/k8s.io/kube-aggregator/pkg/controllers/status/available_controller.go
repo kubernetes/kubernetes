@@ -126,10 +126,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 	// local API services are always considered available
 	if apiService.Spec.Service == nil {
-		availableCondition.Status = apiregistration.ConditionTrue
-		availableCondition.Reason = "Local"
-		availableCondition.Message = "Local APIServices are always available"
-		apiregistration.SetAPIServiceCondition(apiService, availableCondition)
+		apiregistration.SetAPIServiceCondition(apiService, apiregistration.NewLocalAvailableAPIServiceCondition())
 		_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
 		return err
 	}
