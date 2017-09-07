@@ -29,8 +29,8 @@ import (
 type getContextsTest struct {
 	startingConfig clientcmdapi.Config
 	names          []string
-	noHeader       bool
-	nameOnly       bool
+	noHeader       string
+	output         string
 	expectedOut    string
 }
 
@@ -42,8 +42,8 @@ func TestGetContextsAll(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
-		noHeader:       false,
-		nameOnly:       false,
+		noHeader:       "false",
+		output:         "",
 		expectedOut: `CURRENT   NAME             CLUSTER       AUTHINFO    NAMESPACE
 *         shaker-context   big-cluster   blue-user   saw-ns
 `,
@@ -59,8 +59,8 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
-		noHeader:       true,
-		nameOnly:       false,
+		noHeader:       "true",
+		output:         "",
 		expectedOut:    "*         shaker-context   big-cluster   blue-user   saw-ns\n",
 	}
 	test.run(t)
@@ -73,8 +73,8 @@ func TestGetContextsAllName(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
-		noHeader:       false,
-		nameOnly:       true,
+		noHeader:       "false",
+		output:         "name",
 		expectedOut:    "shaker-context\n",
 	}
 	test.run(t)
@@ -88,8 +88,8 @@ func TestGetContextsAllNameNoHeader(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{},
-		noHeader:       true,
-		nameOnly:       true,
+		noHeader:       "true",
+		output:         "name",
 		expectedOut:    "shaker-context\n",
 	}
 	test.run(t)
@@ -99,8 +99,8 @@ func TestGetContextsAllNone(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: *clientcmdapi.NewConfig(),
 		names:          []string{},
-		noHeader:       true,
-		nameOnly:       false,
+		noHeader:       "true",
+		output:         "",
 		expectedOut:    "",
 	}
 	test.run(t)
@@ -115,9 +115,26 @@ func TestGetContextsSelectOneOfTwo(t *testing.T) {
 	test := getContextsTest{
 		startingConfig: tconf,
 		names:          []string{"shaker-context"},
-		noHeader:       true,
-		nameOnly:       true,
+		noHeader:       "true",
+		output:         "name",
 		expectedOut:    "shaker-context\n",
+	}
+	test.run(t)
+}
+
+func TestGetContextsWithErrorOutput(t *testing.T) {
+	tconf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+	test := getContextsTest{
+		startingConfig: tconf,
+		names:          []string{"shaker-context"},
+		noHeader:       "true",
+		output:         "unknow",
+		expectedOut: `--output unknow is not available in kubectl config get-contexts; resetting to default output format
+*         shaker-context   big-cluster   blue-user   saw-ns` + "\n",
 	}
 	test.run(t)
 }
@@ -141,16 +158,12 @@ func (test getContextsTest) run(t *testing.T) {
 		configAccess: pathOptions,
 	}
 	cmd := NewCmdConfigGetContexts(buf, options.configAccess)
-	if test.nameOnly {
-		cmd.Flags().Set("output", "name")
-	}
-	if test.noHeader {
-		cmd.Flags().Set("no-headers", "true")
-	}
+	cmd.Flags().Set("output", test.output)
+	cmd.Flags().Set("no-headers", test.noHeader)
 	cmd.Run(cmd, test.names)
 	if len(test.expectedOut) != 0 {
 		if buf.String() != test.expectedOut {
-			t.Errorf("Expected %v, but got %v", test.expectedOut, buf.String())
+			t.Errorf("Expected:\n %v\n but got:\n %v", test.expectedOut, buf.String())
 		}
 		return
 	}
