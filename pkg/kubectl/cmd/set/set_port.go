@@ -19,11 +19,11 @@ package set
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
-	"strconv"
-
 	"github.com/spf13/cobra"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,8 +96,8 @@ func NewCmdPort(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "port (-f FILENAME | TYPE NAME)",
-		Short:   i18n.T("Update port of a pod template"),
+		Use:     "port (-f FILENAME | TYPE NAME) [--port=PORT]",
+		Short:   i18n.T("Update existing container port(s) of resources"),
 		Long:    portLong,
 		Example: portExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -114,7 +114,7 @@ func NewCmdPort(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set port will NOT contact api-server but run locally.")
-	cmd.Flags().Int("port", 80, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
+	cmd.Flags().Int("port", 0, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
 	cmd.Flags().String("protocol", "tcp", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 	cmdutil.AddRecordFlag(cmd)
@@ -169,8 +169,8 @@ func (o *PortOptions) Validate() error {
 	if o.protocol != "TCP" && o.protocol != "UDP" {
 		errors = append(errors, fmt.Errorf("protocol must tcp or udp"))
 	}
-	if o.port < 0 {
-		errors = append(errors, fmt.Errorf("port must greater than 0"))
+	if o.port <= 0 {
+		errors = append(errors, fmt.Errorf("must special port and port must greater than 0"))
 	}
 	return utilerrors.NewAggregate(errors)
 }
@@ -184,8 +184,7 @@ func (o *PortOptions) Run() error {
 			containers, _ := selectContainers(spec.Containers, o.containerSelector)
 			if len(containers) == 0 {
 				fmt.Println(info.Mapping.Resource, info.Name, o.containerSelector)
-				_, err := fmt.Fprintf(o.Err, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.containerSelector)
-				if err != nil {
+				if _, err := fmt.Fprintf(o.Err, "warning: %s/%s does not have any containers matching %q\n", info.Mapping.Resource, info.Name, o.containerSelector); err != nil {
 					return err
 				}
 				return nil
@@ -195,14 +194,14 @@ func (o *PortOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			for _, c := range containers {
-				if !o.overwrite {
-					for _, port := range ports {
-						if port == strconv.Itoa(o.port) {
-							return fmt.Errorf("'%s' already has a port %v, and --overwrite is false", c.Name, port)
-						}
+			if !o.overwrite {
+				for _, port := range ports {
+					if port == strconv.Itoa(o.port) {
+						return fmt.Errorf("'%s' already has a port %v, and --overwrite is false", c.Name, port)
 					}
 				}
+			}
+			for _, c := range containers {
 				for _, port := range c.Ports {
 					if port.ContainerPort != int32(o.port) || string(port.Protocol) != o.protocol {
 						transformed = true
@@ -221,7 +220,7 @@ func (o *PortOptions) Run() error {
 		})
 		if !transformed {
 			if _, err := fmt.Fprintln(o.Out, "no resources changed"); err != nil {
-				return nil, err
+				return nil, nil
 			}
 			return nil, err
 		}
