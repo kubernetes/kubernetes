@@ -33,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	bootstraptoken "k8s.io/client-go/tools/token"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -227,7 +227,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 	}
 
 	// TODO: Validate usages here so we don't allow something unsupported
-	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, extraGroups, description)
+	err := bootstraptoken.CreateNewToken(client, token, tokenDuration, usages, extraGroups, description)
 	if err != nil {
 		return err
 	}
