@@ -11,11 +11,13 @@ go_library(
     srcs = [
         "cadvisor_unsupported.go",
         "doc.go",
+        "helpers_unsupported.go",
         "types.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "cadvisor_linux.go",
+            "helpers_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cadvisor_windows.go",

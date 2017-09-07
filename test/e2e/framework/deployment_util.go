@@ -35,29 +35,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-type updateDeploymentFunc func(d *extensions.Deployment)
-
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (*extensions.Deployment, error) {
-	var deployment *extensions.Deployment
-	var updateErr error
-	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		var err error
-		if deployment, err = c.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(deployment)
-		if deployment, err = c.Extensions().Deployments(namespace).Update(deployment); err == nil {
-			Logf("Updating deployment %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to deployment %q: %v", name, updateErr)
-	}
-	return deployment, pollErr
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*extensions.Deployment, error) {
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf)
 }
 
 // Waits for the deployment to clean up old rcs.
@@ -90,9 +69,7 @@ func logReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 }
 
 func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
-	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
-		return c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	}, desiredGeneration, Poll, 1*time.Minute)
+	return testutils.WaitForObservedDeployment(c, ns, deploymentName, desiredGeneration)
 }
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {

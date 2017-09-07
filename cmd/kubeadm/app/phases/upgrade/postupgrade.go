@@ -83,7 +83,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	}
 
 	// Upgrade kube-dns and kube-proxy
-	if err := dns.EnsureDNSAddon(cfg, client, k8sVersion); err != nil {
+	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
 		errs = append(errs, err)
 	}
 	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {

@@ -32,7 +32,6 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
-	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorhttp "github.com/google/cadvisor/http"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -44,8 +43,8 @@ import (
 )
 
 type cadvisorClient struct {
-	runtime  string
-	rootPath string
+	imageFsInfoProvider ImageFsInfoProvider
+	rootPath            string
 	manager.Manager
 }
 
@@ -106,7 +105,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
@@ -126,9 +125,9 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 	}
 
 	cadvisorClient := &cadvisorClient{
-		runtime:  runtime,
-		rootPath: rootPath,
-		Manager:  m,
+		imageFsInfoProvider: imageFsInfoProvider,
+		rootPath:            rootPath,
+		Manager:             m,
 	}
 
 	err = cadvisorClient.exportHTTP(address, port)
@@ -208,17 +207,10 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 }
 
 func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	var label string
-
-	switch cc.runtime {
-	case "docker":
-		label = cadvisorfs.LabelDockerImages
-	case "rkt":
-		label = cadvisorfs.LabelRktImages
-	default:
-		return cadvisorapiv2.FsInfo{}, fmt.Errorf("ImagesFsInfo: unknown runtime: %v", cc.runtime)
+	label, err := cc.imageFsInfoProvider.ImageFsInfoLabel()
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
 	}
-
 	return cc.getFsInfo(label)
 }
 
