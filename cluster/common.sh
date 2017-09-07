@@ -757,6 +757,11 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+  if [ -n "${ROTATE_CERTIFICATES:-}" ]; then
+    cat >>$file <<EOF
+ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
+EOF
+  fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     cat >>$file <<EOF
