@@ -87,6 +87,10 @@ func NewAuditOptions() *AuditOptions {
 
 // Validate checks invalid config combination
 func (o *AuditOptions) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 
 	if !advancedAuditingEnabled() {
@@ -137,6 +141,10 @@ func (o *AuditOptions) Validate() []error {
 }
 
 func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
 	fs.StringVar(&o.PolicyFile, "audit-policy-file", o.PolicyFile,
 		"Path to the file that defines the audit policy configuration. Requires the 'AdvancedAuditing' feature gate."+
 			" With AdvancedAuditing, a profile is required to enable auditing.")
@@ -146,6 +154,10 @@ func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *AuditOptions) ApplyTo(c *server.Config) error {
+	if o == nil {
+		return nil
+	}
+
 	// Apply legacy audit options if advanced audit is not enabled.
 	if !advancedAuditingEnabled() {
 		return o.LogOptions.legacyApplyTo(c)

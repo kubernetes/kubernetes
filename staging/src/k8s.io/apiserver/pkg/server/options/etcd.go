@@ -71,6 +71,10 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 }
 
 func (s *EtcdOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 	if len(s.StorageConfig.ServerList) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
@@ -85,6 +89,10 @@ func (s *EtcdOptions) Validate() []error {
 
 // AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
 func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
@@ -132,6 +140,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		return nil
+	}
+
 	s.addEtcdHealthEndpoint(c)
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
 	return nil

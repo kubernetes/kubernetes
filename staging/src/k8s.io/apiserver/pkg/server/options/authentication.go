@@ -43,6 +43,10 @@ type RequestHeaderAuthenticationOptions struct {
 }
 
 func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringSliceVar(&s.UsernameHeaders, "requestheader-username-headers", s.UsernameHeaders, ""+
 		"List of request headers to inspect for usernames. X-Remote-User is common.")
 

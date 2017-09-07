@@ -40,6 +40,10 @@ func NewCoreAPIOptions() *CoreAPIOptions {
 }
 
 func (o *CoreAPIOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+
 	fs.StringVar(&o.CoreAPIKubeconfigPath, "kubeconfig", o.CoreAPIKubeconfigPath,
 		"kubeconfig file pointing at the 'core' kubernetes server.")
 }
