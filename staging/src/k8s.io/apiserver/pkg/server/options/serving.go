@@ -43,9 +43,6 @@ type SecureServingOptions struct {
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
 	SNICertKeys []utilflag.NamedCertKey
-
-	// when set determines whether to use loopback configuration to create shared informers.
-	useLoopbackCfg bool
 }
 
 type CertKey struct {
@@ -172,16 +169,6 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	}
 
 	return nil
-}
-
-// ForceLoopbackConfigUsage forces the usage of the loopback configuration
-// to create SharedInformerFactory. The primary client of this method
-// is kube API server, no other API server is the source of truth for kube APIs.
-//
-// Note:
-// this method MUST be called prior to ApplyTo to take an effect.
-func (s *SecureServingOptions) ForceLoopbackConfigUsage() {
-	s.useLoopbackCfg = true
 }
 
 func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {

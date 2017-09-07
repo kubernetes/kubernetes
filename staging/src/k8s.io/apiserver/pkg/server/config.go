@@ -188,7 +188,9 @@ type Config struct {
 type RecommendedConfig struct {
 	Config
 
-	// SharedInformerFactory provides shared informers for resources
+	// SharedInformerFactory provides shared informers for Kubernetes resources. This value is set by
+	// RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo. It uses an in-cluster client config
+	// by default, or the kubeconfig given with kubeconfig command line flag.
 	SharedInformerFactory informers.SharedInformerFactory
 }
 

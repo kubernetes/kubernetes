@@ -105,7 +105,6 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
-	s.SecureServing.ForceLoopbackConfigUsage()
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 

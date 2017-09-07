@@ -49,6 +49,9 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 		StdErr: errOut,
 	}
 
+	// the shared informer is not needed for kube-aggregator. Disable the kubeconfig flag and the client creation.
+	o.RecommendedOptions.CoreAPI = nil
+
 	return o
 }
 

@@ -618,8 +618,6 @@ func defaultOptions(s *options.ServerRunOptions) error {
 	if err != nil {
 		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
-	s.SecureServing.ForceLoopbackConfigUsage()
-
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}

@@ -99,6 +99,10 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 		StdOut: out,
 		StdErr: err,
 	}
+
+	// the shared informer is not needed for kube-aggregator. Disable the kubeconfig flag and the client creation.
+	o.RecommendedOptions.CoreAPI = nil
+
 	return o
 }
 

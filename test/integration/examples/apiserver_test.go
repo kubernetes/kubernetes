@@ -192,6 +192,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
 				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", wardleCertDir,
+				"--kubeconfig", kubeconfigFile.Name(),
 			})
 			if err := wardleCmd.Execute(); err != nil {
 				t.Log(err)

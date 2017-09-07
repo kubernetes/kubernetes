@@ -17,20 +17,16 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	clientgoinformers "k8s.io/client-go/informers"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 )
 
-// RecommendedOptions contains the recommended options for running an API server
-// If you add something to this list, it should be in a logical grouping
+// RecommendedOptions contains the recommended options for running an API server.
+// If you add something to this list, it should be in a logical grouping.
+// Each of them can be nil to leave the feature unconfigured on ApplyTo.
 type RecommendedOptions struct {
 	Etcd           *EtcdOptions
 	SecureServing  *SecureServingOptions
@@ -38,6 +34,7 @@ type RecommendedOptions struct {
 	Authorization  *DelegatingAuthorizationOptions
 	Audit          *AuditOptions
 	Features       *FeatureOptions
+	CoreAPI        *CoreAPIOptions
 }
 
 func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
@@ -48,6 +45,7 @@ func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec run
 		Authorization:  NewDelegatingAuthorizationOptions(),
 		Audit:          NewAuditOptions(),
 		Features:       NewFeatureOptions(),
+		CoreAPI:        NewCoreAPIOptions(),
 	}
 }
 
@@ -58,6 +56,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Authorization.AddFlags(fs)
 	o.Audit.AddFlags(fs)
 	o.Features.AddFlags(fs)
+	o.CoreAPI.AddFlags(fs)
 }
 
 func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
@@ -79,14 +78,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.Features.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-
-	// do convenience work for RecommendedOptions users
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(config.LoopbackClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create real external clientset: %v", err)
+	if err := o.CoreAPI.ApplyTo(config); err != nil {
+		return err
 	}
-	config.SharedInformerFactory = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
-
 	return nil
 }
 
@@ -98,6 +92,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.Authorization.Validate()...)
 	errors = append(errors, o.Audit.Validate()...)
 	errors = append(errors, o.Features.Validate()...)
+	errors = append(errors, o.CoreAPI.Validate()...)
 
 	return errors
 }
