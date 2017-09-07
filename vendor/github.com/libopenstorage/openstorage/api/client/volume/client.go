@@ -195,6 +195,21 @@ func (v *volumeClient) Snapshot(volumeID string, readonly bool,
 	return "", nil
 }
 
+// Restore specified volume to given snapshot state
+func (v *volumeClient) Restore(volumeID string, snapID string) error {
+	response := &api.VolumeResponse{}
+	req := v.c.Post().Resource(snapPath + "/restore").Instance(volumeID)
+	req.QueryOption(api.OptSnapID, snapID)
+
+	if err := req.Do().Unmarshal(response); err != nil {
+		return err
+	}
+	if response.Error != "" {
+		return errors.New(response.Error)
+	}
+	return nil
+}
+
 // Stats for specified volume.
 // Errors ErrEnoEnt may be returned
 func (v *volumeClient) Stats(
@@ -205,21 +220,20 @@ func (v *volumeClient) Stats(
 	req := v.c.Get().Resource(volumePath + "/stats").Instance(volumeID)
 	req.QueryOption(api.OptCumulative, strconv.FormatBool(cumulative))
 
-	if err := req.Do().Unmarshal(stats); err != nil {
-		return nil, err
-	}
+	err := req.Do().Unmarshal(stats)
+	return stats, err
 
-	return stats, nil
 }
 
-// Alerts on this volume.
+// UsedSize returns allocated volume size.
 // Errors ErrEnoEnt may be returned
-func (v *volumeClient) Alerts(volumeID string) (*api.Alerts, error) {
-	alerts := &api.Alerts{}
-	if err := v.c.Get().Resource(volumePath + "/alerts").Instance(volumeID).Do().Unmarshal(alerts); err != nil {
-		return nil, err
-	}
-	return alerts, nil
+func (v *volumeClient) UsedSize(
+	volumeID string,
+) (uint64, error) {
+	var usedSize uint64
+	req := v.c.Get().Resource(volumePath + "/usedsize").Instance(volumeID)
+	err := req.Do().Unmarshal(&usedSize)
+	return usedSize, err
 }
 
 // Active Requests on all volume.
@@ -289,13 +303,14 @@ func (v *volumeClient) SnapEnumerate(ids []string,
 // Attach map device to the host.
 // On success the devicePath specifies location where the device is exported
 // Errors ErrEnoEnt, ErrVolAttached may be returned.
-func (v *volumeClient) Attach(volumeID string) (string, error) {
+func (v *volumeClient) Attach(volumeID string, attachOptions map[string]string) (string, error) {
 	response, err := v.doVolumeSetGetResponse(
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
 				Attach: api.VolumeActionParam_VOLUME_ACTION_PARAM_ON,
 			},
+			Options: attachOptions,
 		},
 	)
 	if err != nil {
@@ -313,12 +328,13 @@ func (v *volumeClient) Attach(volumeID string) (string, error) {
 
 // Detach device from the host.
 // Errors ErrEnoEnt, ErrVolDetached may be returned.
-func (v *volumeClient) Detach(volumeID string) error {
+func (v *volumeClient) Detach(volumeID string, unmountBeforeDetach bool) error {
 	return v.doVolumeSet(
 		volumeID,
 		&api.VolumeSetRequest{
 			Action: &api.VolumeStateAction{
-				Attach: api.VolumeActionParam_VOLUME_ACTION_PARAM_OFF,
+				Attach:              api.VolumeActionParam_VOLUME_ACTION_PARAM_OFF,
+				UnmountBeforeDetach: unmountBeforeDetach,
 			},
 		},
 	)
