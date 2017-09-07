@@ -90,6 +90,13 @@ enum CosType {
   HIGH = 3;
 }
 
+enum IoProfile {
+  IO_PROFILE_SEQUENTIAL = 0;
+  IO_PROFILE_RANDOM= 1;
+  IO_PROFILE_DB = 2;
+  IO_PROFILE_DB_REMOTE = 3;
+}
+
 // VolumeState represents the state of a volume.
 enum VolumeState {
   VOLUME_STATE_NONE = 0;
@@ -108,6 +115,10 @@ enum VolumeState {
   // Volume is deleted, it will remain in this state
   // while resources are asynchronously reclaimed
   VOLUME_STATE_DELETED = 7;
+  // Volume is trying to be detached
+  VOLUME_STATE_TRY_DETACHING = 8;
+  // Volume is undergoing restore
+  VOLUME_STATE_RESTORE = 9;
 }
 
 // VolumeStatus represents a health status for a volume.
@@ -138,6 +149,15 @@ enum ClusterNotify {
  CLUSTER_NOTIFY_DOWN = 0;
 }
 
+enum AttachState {
+    // Attached and available externally
+    ATTACH_STATE_EXTERNAL = 0;
+    // Attached but only available internally
+    ATTACH_STATE_INTERNAL = 1;
+    // Switching from External to Internal
+    ATTACH_STATE_INTERNAL_SWITCH = 2;
+}
+
 // StorageResource groups properties of a storage device.
 message StorageResource {
   // Id is the LUN identifier.
@@ -166,6 +186,24 @@ message StorageResource {
   google.protobuf.Timestamp last_scan = 12;
 }
 
+// StoragePool groups different storage devices based on their CosType
+message StoragePool {
+  // ID pool ID
+  int32 ID = 1;
+  // Cos reflects the capabilities of this drive pool
+  CosType Cos = 2;
+  // Medium underlying storage type
+  StorageMedium Medium = 3;
+  // RaidLevel storage raid level
+  string RaidLevel = 4;
+  // TotalSize of the pool
+  uint64 TotalSize = 7;
+  // Used size of the pool
+  uint64 Used = 8;
+  // Labels is a list of user defined name-value pairs
+  map<string, string> labels = 9;
+}
+
 // VolumeLocator is a structure that is attached to a volume
 // and is used to carry opaque metadata.
 message VolumeLocator {
@@ -183,89 +221,115 @@ message Source {
   string seed = 2;
 }
 
+message Group {
+  // Id common identifier across volumes that have the same group.
+  string id = 1;
+}
+
 // VolumeSpec has the properties needed to create a volume.
 message VolumeSpec {
   // Ephemeral storage
   bool ephemeral = 1;
-  // Thin provisioned volume size in bytes
+  // Size specifies the thin provisioned volume size.
   uint64 size = 2;
-  // Format disk with this FSType
+  // Format specifies the filesystem for this volume.
   FSType format = 3;
-  // Block size for filesystem
+  // BlockSize for the filesystem.
   int64 block_size = 4;
-  // Specifies the number of nodes that are
-  // allowed to fail, and yet data is available
-  // A value of 0 implies that data is not erasure coded,
-  // a failure of a node will lead to data loss
+  // HaLevel specifies the number of copies of data.
   int64 ha_level = 5;
-  // The COS, 1 to 9
+  // Cos specifies the relative class of service.
   CosType cos = 6;
-  // Perform dedupe on this disk
-  bool dedupe = 7;
+  // IoProfile provides a hint about application using this volume.
+  IoProfile io_profile = 7;
+  // Dedupe specifies if the volume data is to be de-duplicated.
+  bool dedupe = 8;
   // SnapshotInterval in minutes, set to 0 to disable snapshots
-  uint32 snapshot_interval = 8;
-  // Volume configuration labels
-  map<string, string> volume_labels = 9;
+  uint32 snapshot_interval = 9;
+  // VolumeLabels configuration labels
+  map<string, string> volume_labels = 10;
   // Shared is true if this volume can be remotely accessed.
-  bool shared = 10;
-  // ReplicaSet is the desired replicaSet the volume want to be placed.
-  ReplicaSet replica_set = 11;
-  // Specifies the number of parts the volume can be aggregated from.
-  uint32 aggregation_level = 12;
+  bool shared = 11;
+  // ReplicaSet is the desired set of nodes for the volume data.
+  ReplicaSet replica_set = 12;
+  // Aggregatiokn level Specifies the number of parts the volume can be aggregated from.
+  uint32 aggregation_level = 13;
   // Encrypted is true if this volume will be cryptographically secured.
-  bool encrypted = 13;
-  // User passphrase if this is an encrypted volume
-  string passphrase = 14;
-  // SnapshotSchedule 
-  string snapshot_schedule = 15;
+  bool encrypted = 14;
+  // Passphrase for an encrypted volume
+  string passphrase = 15;
+  // SnapshotSchedule a well known string that specifies when snapshots should be taken. 
+  string snapshot_schedule = 16;
   // Scale allows autocreation of volumes.
-  uint32 scale = 16;
+  uint32 scale = 17;
+  // Sticky volumes cannot be deleted until the flag is removed.
+  bool sticky = 18;
+  // Group identifies a consistency group
+  Group group = 21;
+  // GroupEnforced is true if consistency group creation is enforced.
+  bool group_enforced = 22;
+  // Compressed is true if this volume is to be compressed.
+  bool compressed = 23;
 }
 
-// Set of machine IDs (nodes) to which part of this volume is erasure coded - for clustered storage arrays
+// ReplicaSet set of machine IDs (nodes) to which part of this volume is erasure 
+// coded - for clustered storage arrays
 message ReplicaSet {
   repeated string nodes = 1;
 }
 
- // List of name value mapping of driver specific runtime information.
+// RuntimeStateMap is a list of name value mapping of driver specific runtime 
+// information.
 message RuntimeStateMap {
   map<string, string> runtime_state = 1;
 }
 
-// Volume represents a live, created volume.
+// Volume represents an abstract storage volume.
+// Volume represents an abstract storage volume.
 message Volume {
-  // Self referential volume ID
+  // Self referential volume ID.
   string id = 1;
+  // Source specified seed data for the volume.
   Source source = 2;
-  bool readonly = 3;
+  // Group volumes in the same group have the same group id.
+  Group group = 3;
+  // Readonly is true if this volume is to be mounted with readonly access.
+  bool readonly = 4;
   // User specified locator
-  VolumeLocator locator = 4;
+  VolumeLocator locator = 5;
   // Volume creation time
-  google.protobuf.Timestamp ctime = 5;
+  google.protobuf.Timestamp ctime = 6;
   // User specified VolumeSpec
-  VolumeSpec spec = 6;
-  // Volume usage
-  uint64 usage = 7;
-  // Time when an integrity check for run
-  google.protobuf.Timestamp last_scan = 8;
-  // Format FSType type if any
-  FSType format = 9;
-  VolumeStatus status = 10;
-  VolumeState state = 11;
-  // Machine ID (node) on which this volume is attached
-  // Machine ID is a node instance identifier for clustered systems.
-  string attached_on = 12;
-  string device_path = 14;
-  repeated string attach_path = 15;
-  // List of ReplicaSets which provide storage for this volume, for clustered storage arrays
-  repeated ReplicaSet  replica_sets = 16;
-  // Last recorded error
-  string error = 17;
-  // List of name value mapping of driver specific runtime information.
-  repeated RuntimeStateMap runtime_state = 18;
-  string secure_device_path = 19;
-  // BackgroundProcessing is true if volume is attached but not by the user
-  bool background_processing = 20;
+  VolumeSpec spec = 7;
+  // Usage is bytes consumed by vtheis volume.
+  uint64 usage = 8;
+  // LastScan is the time when an integrity check was run.
+  google.protobuf.Timestamp last_scan = 9;
+  // Format specifies the filesytem for this volume.
+  FSType format = 10;
+  // Status is the availability status of this volume.
+  VolumeStatus status = 11;
+  // State is the current runtime state of this volume.
+  VolumeState state = 12;
+  // AttachedOn is the node instance identifier for clustered systems.
+  string attached_on = 13;
+  // AttachedState shows whether the device is attached for internal or external use.
+  AttachState attached_state = 14;
+  // DevicePath is the device exported by block device implementations.
+  string device_path = 15;
+  // SecureDevicePath is the device path for an encrypted volume.
+  string secure_device_path = 16;
+  // AttachPath is the mounted path in the host namespace.
+  repeated string attach_path = 17;
+  // AttachInfo is a list of name value mappings that provides attach information.
+  map<string, string> attach_info = 18;
+  // ReplicatSets storage for this volumefor clustered storage arrays.
+  repeated ReplicaSet replica_sets = 19;
+  // RuntimeState is a lst of name value mapping of driver specific runtime 
+  // information.
+  repeated RuntimeStateMap runtime_state = 20;
+  // Error is the Last recorded error.
+  string error = 21;
 }
 
 message Stats {
@@ -308,6 +372,8 @@ message Alert {
   bool cleared = 8;
   // TTL in seconds for this Alert
   uint64 ttl = 9;
+  // UniqueTag helps identify a unique alert for a given resouce
+  string unique_tag = 10;
 }
 
 message Alerts {
@@ -339,9 +405,13 @@ message VolumeStateAction {
   VolumeActionParam attach = 1;
   // Mount or unmount volume
   VolumeActionParam mount = 2;
+  // MountPath Path where the device is mounted
   string mount_path = 3;
-  // Device path returned in attach
+  // DevicePath Path returned in attach
   string device_path = 4;
+  // UnmountBeforeDetach is used to check whether unmount should be done before
+  // a detach
+  bool unmount_before_detach = 5;
 }
 
 message VolumeSetRequest {
@@ -351,6 +421,9 @@ message VolumeSetRequest {
   VolumeSpec spec = 2;
   // State modification on this volume.
   VolumeStateAction action = 3;
+  // additional options
+  // required for the Set operation.
+  map<string, string> options = 4;
 }
 
 message VolumeSetResponse {

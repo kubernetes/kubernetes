@@ -13,6 +13,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/libopenstorage/openstorage/api:go_default_library",
+        "//vendor/github.com/libopenstorage/openstorage/pkg/parser:go_default_library",
         "//vendor/github.com/libopenstorage/openstorage/pkg/units:go_default_library",
     ],
 )
