@@ -1099,7 +1099,7 @@ func TestDeploymentTimedOut(t *testing.T) {
 	timeFn := func(min, sec int) time.Time {
 		return time.Date(2016, 1, 1, 0, min, sec, 0, time.UTC)
 	}
-	deployment := func(condType extensions.DeploymentConditionType, status v1.ConditionStatus, pds *int32, from time.Time) extensions.Deployment {
+	deployment := func(condType extensions.DeploymentConditionType, status v1.ConditionStatus, reason string, pds *int32, from time.Time) extensions.Deployment {
 		return extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
 				ProgressDeadlineSeconds: pds,
@@ -1109,6 +1109,7 @@ func TestDeploymentTimedOut(t *testing.T) {
 					{
 						Type:           condType,
 						Status:         status,
+						Reason:         reason,
 						LastUpdateTime: metav1.Time{Time: from},
 					},
 				},
@@ -1127,22 +1128,28 @@ func TestDeploymentTimedOut(t *testing.T) {
 		{
 			name: "no progressDeadlineSeconds specified - no timeout",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, null, timeFn(1, 9)),
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, "", null, timeFn(1, 9)),
 			nowFn:    func() time.Time { return timeFn(1, 20) },
 			expected: false,
 		},
 		{
 			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:09 => 11s",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 9)),
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, "", &ten, timeFn(1, 9)),
 			nowFn:    func() time.Time { return timeFn(1, 20) },
 			expected: true,
 		},
 		{
 			name: "progressDeadlineSeconds: 10s, now - started => 00:01:20 - 00:01:11 => 9s",
 
-			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, &ten, timeFn(1, 11)),
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, "", &ten, timeFn(1, 11)),
 			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: false,
+		},
+		{
+			name: "previous status was a complete deployment",
+
+			d:        deployment(extensions.DeploymentProgressing, v1.ConditionTrue, NewRSAvailableReason, nil, time.Time{}),
 			expected: false,
 		},
 	}
