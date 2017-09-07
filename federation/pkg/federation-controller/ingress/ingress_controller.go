@@ -393,8 +393,9 @@ func (ic *IngressController) deliverConfigMap(cluster string, configMap types.Na
 	ic.configMapDeliverer.DeliverAfter(key, configMap, delay)
 }
 
-// Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
-// synced with the corresponding api server.
+// Check whether all data stores are in sync. False is returned if any
+// of the informer/stores is not yet synced with the corresponding api
+// server.
 func (ic *IngressController) isSynced() bool {
 	if !ic.ingressFederatedInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced for ingress federated informer")
@@ -426,8 +427,9 @@ func (ic *IngressController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconciliation of all federated ingresses.  clusterName is the name of the cluster that changed
-// but all ingresses in all clusters are reconciled
+// The function triggers reconciliation of all federated ingresses.
+// clusterName is the name of the cluster that changed but all ingresses
+// in all clusters are reconciled.
 func (ic *IngressController) reconcileIngressesOnClusterChange(clusterName string) {
 	glog.V(4).Infof("Reconciling ingresses on cluster change for cluster %q", clusterName)
 	if !ic.isSynced() {
@@ -447,11 +449,11 @@ func (ic *IngressController) reconcileIngressesOnClusterChange(clusterName strin
 	}
 }
 
-/*
-  reconcileConfigMapForCluster ensures that the configmap for the ingress controller in the cluster has objectmeta.data.UID
-  consistent with all the other clusters in the federation. If clusterName == allClustersKey, then all available clusters
-  configmaps are reconciled.
-*/
+// reconcileConfigMapForCluster ensures that the configmap for the
+// ingress controller in the cluster has objectmeta.data.UID
+// consistent with all the other clusters in the federation. If
+// clusterName == allClustersKey, then all available clusters
+// configmaps are reconciled.
 func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 	glog.V(4).Infof("Reconciling ConfigMap for cluster(s) %q", clusterName)
 
@@ -511,18 +513,19 @@ func getProviderUid(clusterName string) string {
 	return fmt.Sprintf("%x", hashedName[:8])
 }
 
-/*
-  reconcileConfigMap ensures that the configmap in the cluster has a UID
-  consistent with the federation cluster's associated annotation.
-
-  1. If the UID in the configmap differs from the UID stored in the cluster's annotation, the configmap is updated.
-  2. If the UID annotation is missing from the cluster, the cluster's UID annotation is updated to be consistent
-  with the master cluster.
-  3. If there is no elected master cluster, this cluster attempts to elect itself as the master cluster.
-
-  In cases 2 and 3, the configmaps will be updated in the next cycle, triggered by the federation cluster update(s)
-
-*/
+// reconcileConfigMap ensures that the configmap in the cluster has a UID
+// consistent with the federation cluster's associated annotation.
+//
+//  1. If the UID in the configmap differs from the UID stored in the
+//     cluster's annotation, the configmap is updated.
+//  2. If the UID annotation is missing from the cluster, the cluster's
+//     UID annotation is updated to be consistent with the master
+//     cluster.
+//  3. If there is no elected master cluster, this cluster attempts to
+//     elect itself as the master cluster.
+//
+//  In cases 2 and 3, the configmaps will be updated in the next cycle,
+// triggered by the federation cluster update(s).
 func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, configMap *v1.ConfigMap) {
 	ic.Lock() // TODO: Reduce the scope of this master election lock.
 	defer ic.Unlock()
@@ -576,11 +579,10 @@ func (ic *IngressController) reconcileConfigMap(cluster *federationapi.Cluster, 
 	}
 }
 
-/*
-  getMasterCluster returns the cluster which is the elected master w.r.t. ingress UID, and it's ingress UID.
-  If there is no elected master cluster, an error is returned.
-  All other clusters must use the ingress UID of the elected master.
-*/
+// getMasterCluster returns the cluster which is the elected master
+// w.r.t. ingress UID, and it's ingress UID. If there is no elected
+// master cluster, an error is returned. All other clusters must use
+// the ingress UID of the elected master.
 func (ic *IngressController) getMasterCluster() (master *federationapi.Cluster, ingressUID string, err error) {
 	clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 	if err != nil {
@@ -598,10 +600,10 @@ func (ic *IngressController) getMasterCluster() (master *federationapi.Cluster, 
 	return nil, "", fmt.Errorf("Failed to find master cluster with annotation %q", uidAnnotationKey)
 }
 
-/*
-  updateClusterIngressUIDToMasters takes the ingress UID annotation on the master cluster and applies it to cluster.
-  If there is no master cluster, then fallbackUID is used (and hence this cluster becomes the master).
-*/
+// updateClusterIngressUIDToMasters takes the ingress UID annotation on
+// the master cluster and applies it to cluster. If there is no master
+// cluster, then fallbackUID is used (and hence this cluster becomes
+// the master).
 func (ic *IngressController) updateClusterIngressUIDToMasters(cluster *federationapi.Cluster, fallbackUID string) (string, error) {
 	masterCluster, masterUID, err := ic.getMasterCluster()
 	clusterObj, clusterErr := api.Scheme.DeepCopy(cluster) // Make a clone so that we don't clobber our input param
@@ -655,8 +657,9 @@ func (ic *IngressController) isClusterReady(clusterName string) bool {
 	return isReady && err == nil && cluster != nil
 }
 
-// updateAnnotationOnIngress updates the annotation with the given key on the given federated ingress.
-// Queues the ingress for resync when done.
+// updateAnnotationOnIngress updates the annotation with the given key
+// on the given federated ingress. Queues the ingress for resync when
+// done.
 func (ic *IngressController) updateAnnotationOnIngress(ingress *extensionsv1beta1.Ingress, key, value string) {
 	if ingress.ObjectMeta.Annotations == nil {
 		ingress.ObjectMeta.Annotations = make(map[string]string)
@@ -739,7 +742,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 
 	for _, cluster := range clusters {
 		baseIPName, baseIPAnnotationExists := baseIngress.ObjectMeta.Annotations[staticIPNameKeyWritable]
-		firstClusterName, firstClusterExists := baseIngress.ObjectMeta.Annotations[firstClusterAnnotation]
 		clusterIngressObj, clusterIngressFound, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get cached ingress %s for cluster %s, will retry: %v", ingress, cluster.Name, err)
@@ -775,41 +777,26 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 
 		switch {
 		case !clusterIngressFound && send:
-			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
+			_, exists := cluster.ObjectMeta.Annotations[uidAnnotationKey]
+			if !exists {
+				glog.V(4).Infof("Cluster %q UID configmap not synced, skipping create operation for Ingress %q in this cluster", cluster.Name, types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace})
+				ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
+				continue
+			}
+
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
 
-			// We always first create an ingress in the first available cluster. Once that ingress
-			// has been created and allocated a global IP (visible via an annotation),
-			// we record that annotation on the federated ingress, and create all other cluster
-			// ingresses with that same global IP.
-			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the
-			// second cluster will become the first cluster, but eventually all ingresses
-			// will share the single global IP recorded in the annotation of the
-			// federated ingress.
-			haveFirstCluster := firstClusterExists && firstClusterName != "" && ic.isClusterReady(firstClusterName)
-			if !haveFirstCluster {
-				glog.V(4).Infof("No cluster has been chosen as the first cluster. Electing cluster %s as the first cluster to create ingress in", cluster.Name)
-				ic.updateAnnotationOnIngress(baseIngress, firstClusterAnnotation, cluster.Name)
-				return
-			}
-			if baseIPAnnotationExists || firstClusterName == cluster.Name {
-				if baseIPAnnotationExists {
-					glog.V(4).Infof("No existing Ingress %s in cluster %s and static IP annotation (%q) exists on base ingress - queuing a create operation", ingress, cluster.Name, staticIPNameKeyWritable)
-				} else {
-					glog.V(4).Infof("No existing Ingress %s in cluster %s and no static IP annotation (%q) on base ingress - queuing a create operation in first cluster", ingress, cluster.Name, staticIPNameKeyWritable)
-				}
-				operations = append(operations, util.FederatedOperation{
-					Type:        util.OperationTypeAdd,
-					Obj:         desiredIngress,
-					ClusterName: cluster.Name,
-					Key:         key,
-				})
-			} else {
-				glog.V(4).Infof("No annotation %q exists on ingress %q in federation and waiting for ingress in cluster %s. Not queueing create operation for ingress until annotation exists", staticIPNameKeyWritable, ingress, firstClusterName)
-			}
+			glog.V(4).Infof("No existing Ingress %q in cluster %q - queuing a create operation", types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, cluster.Name)
+
+			operations = append(operations, util.FederatedOperation{
+				Type:        util.OperationTypeAdd,
+				Obj:         desiredIngress,
+				ClusterName: cluster.Name,
+				Key:         key,
+			})
 		case clusterIngressFound && !send:
-			glog.V(5).Infof("Removing Ingress: %s from cluster: %s reason: cluster selectors do not match: %-v %-v", key, cluster.Name, cluster.ObjectMeta.Labels, desiredIngress.ObjectMeta.Annotations[federationapi.FederationClusterSelectorAnnotation])
+			glog.V(4).Infof("Removing Ingress: %q from cluster: %q reason: cluster selectors do not match: %-v %-v", key, cluster.Name, cluster.ObjectMeta.Labels, desiredIngress.ObjectMeta.Annotations[federationapi.FederationClusterSelectorAnnotation])
 			operations = append(operations, util.FederatedOperation{
 				Type:        util.OperationTypeDelete,
 				Obj:         desiredIngress,
@@ -824,7 +811,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			clusterLBStatusExists := len(clusterIngress.Status.LoadBalancer.Ingress) > 0
 			logStr := fmt.Sprintf("Cluster ingress %q has annotation %q=%q, loadbalancer status exists? [%v], federated ingress has annotation %q=%q, loadbalancer status exists? [%v].  %%s annotation and/or loadbalancer status from cluster ingress to federated ingress.", ingress, staticIPNameKeyReadonly, clusterIPName, clusterLBStatusExists, staticIPNameKeyWritable, baseIPName, baseLBStatusExists)
 			if (!baseIPAnnotationExists && clusterIPNameExists) || (!baseLBStatusExists && clusterLBStatusExists) { // copy the IP name from the readonly annotation on the cluster ingress, to the writable annotation on the federated ingress
-				glog.V(4).Infof(logStr, "Transferring")
+				glog.V(4).Infof(logStr, "Transferring status")
 				if !baseIPAnnotationExists && clusterIPNameExists {
 					ic.updateAnnotationOnIngress(baseIngress, staticIPNameKeyWritable, clusterIPName)
 					return

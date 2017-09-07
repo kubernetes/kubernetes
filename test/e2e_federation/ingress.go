@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 	})
 
 	// e2e cases for federation ingress controller
-	var _ = Describe("Federated Ingresses [Slow]", func() {
+	var _ = Describe("Federated Ingresses", func() {
 		var (
 			clusters           fedframework.ClusterSlice
 			federationName, ns string

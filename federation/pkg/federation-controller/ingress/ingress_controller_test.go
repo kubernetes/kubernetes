@@ -173,6 +173,12 @@ func TestIngressController(t *testing.T) {
 	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, cluster1Ingress.ObjectMeta),
 		"Metadata of created object is not equivalent")
 
+	t.Log("Checking that Ingress was correctly created in cluster 2")
+	createdIngress2 := GetIngressFromChan(t, cluster2IngressCreateChan)
+	assert.NotNil(t, createdIngress2)
+	assert.True(t, reflect.DeepEqual(fedIngress.Spec, createdIngress2.Spec), "Spec of created ingress is not equal")
+	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, createdIngress2.ObjectMeta), "Metadata of created object is not equivalent")
+
 	// Wait for finalizers to appear in federation store.
 	assert.NoError(t, WaitForFinalizersInFederationStore(ingressController, ingressController.ingressInformerStore,
 		types.NamespacedName{Namespace: fedIngress.Namespace, Name: fedIngress.Name}.String()), "finalizers not found in federated ingress")
@@ -253,16 +259,6 @@ func TestIngressController(t *testing.T) {
 
 	assert.True(t, reflect.DeepEqual(updatedIngress2.Spec, fedIngress.Spec), "Spec of updated ingress is not equal")
 	assert.Equal(t, updatedIngress2.ObjectMeta.Annotations["A"], fedIngress.ObjectMeta.Annotations["A"], "Updated annotation not transferred from federated to cluster ingress.")
-
-	fedIngress.Annotations[staticIPNameKeyWritable] = "foo" // Make sure that the base object has a static IP name first.
-	fedIngressWatch.Modify(&fedIngress)
-
-	t.Log("Checking that the ingress got created in cluster 2 after a global ip was assigned")
-	createdIngress2 := GetIngressFromChan(t, cluster2IngressCreateChan)
-	assert.NotNil(t, createdIngress2)
-	assert.True(t, reflect.DeepEqual(fedIngress.Spec, createdIngress2.Spec), "Spec of created ingress is not equal")
-	t.Logf("created meta: %v fed meta: %v", createdIngress2.ObjectMeta, fedIngress.ObjectMeta)
-	assert.True(t, util.ObjectMetaEquivalent(fedIngress.ObjectMeta, createdIngress2.ObjectMeta), "Metadata of created object is not equivalent")
 
 	close(stop)
 }
