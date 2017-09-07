@@ -4107,6 +4107,15 @@ type PodExecOptions struct {
 
 	// Command is the remote command to execute. argv array. Not executed within a shell.
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
+
+	// Name is the name of the Debug Container. Its presence will cause
+	// exec to create a Debug Container rather than performing a runtime exec.
+	AlphaName string `json:"name" protobuf:"bytes,7,opt,name=name"`
+
+	// Image is an optional container image name that will be used to for the Debug
+	// Container in the specified Pod with Command as ENTRYPOINT. If omitted a
+	// default image will be used.
+	AlphaImage string `json:"image" protobuf:"bytes,8,opt,name=image"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4870,6 +4879,11 @@ const (
 	ExecTTYParam = "tty"
 	// Command to run for remote command execution
 	ExecCommandParam = "command"
+	// Name of Debug Container when executing container image
+	// TODO(verb): will this conflict with target container name?
+	ExecDebugNameParam = "name"
+	// Container Image for Debug Container
+	ExecImageParam = "image"
 
 	// Name of header that specifies stream type
 	StreamType = "streamType"
