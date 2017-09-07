@@ -221,7 +221,8 @@ func (t *Tester) emitObject(obj runtime.Object, action string) error {
 	case etcdstorage.EtcdCreate:
 		err = t.createObject(ctx, obj)
 	case etcdstorage.EtcdDelete:
-		accessor, err := meta.Accessor(obj)
+		var accessor metav1.Object
+		accessor, err = meta.Accessor(obj)
 		if err != nil {
 			return err
 		}
