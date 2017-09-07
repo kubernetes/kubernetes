@@ -91,12 +91,19 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive] [Flak
 			pod:              getInnocentPod(),
 		},
 	}
-	evictionTestTimeout := 30 * time.Minute
+	evictionTestTimeout := 15 * time.Minute
 	testCondition := "Disk Pressure due to Inodes"
+	inodesConsumed := uint64(200000)
 
 	Context(fmt.Sprintf("when we run containers that should cause %s", testCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.EvictionHard = "nodefs.inodesFree<70%"
+			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
+			inodesFree := getInodesFree()
+			if inodesFree <= inodesConsumed {
+				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+			}
+			initialConfig.EvictionHard = fmt.Sprintf("nodefs.inodesFree<%d", getInodesFree()-inodesConsumed)
+			initialConfig.EvictionMinimumReclaim = ""
 		})
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 		Context("With kubeconfig updated", func() {
@@ -172,7 +179,8 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				Expect(priorityPod).NotTo(BeNil())
 
 				// Check eviction ordering.
-				// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round
+				// Note: it is alright for a priority 1 and priority 2 pod (for example) to fail in the same round,
+				// but never alright for a priority 1 pod to fail while the priority 2 pod is still running
 				for _, lowPriorityPodSpec := range podTestSpecs {
 					var lowPriorityPod v1.Pod
 					for _, p := range updatedPods {
@@ -249,6 +257,14 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 			}
 			return nil
 		}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(BeNil())
+	})
+
+	AfterEach(func() {
+		By("deleting pods")
+		for _, spec := range podTestSpecs {
+			By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
+			f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
+		}
 
 		By("making sure we can start a new pod after the test")
 		podName := "test-admit-pod"
@@ -266,22 +282,10 @@ func runEvictionTest(f *framework.Framework, testCondition string, podTestSpecs 
 				},
 			},
 		})
-	})
 
-	AfterEach(func() {
-		By("deleting pods")
-		for _, spec := range podTestSpecs {
-			By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-			f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-		}
-
-		if CurrentGinkgoTestDescription().Failed {
-			if framework.TestContext.DumpLogsOnFailure {
-				logPodEvents(f)
-				logNodeEvents(f)
-			}
-			By("sleeping to allow for cleanup of test")
-			time.Sleep(postTestConditionMonitoringPeriod)
+		if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			logPodEvents(f)
+			logNodeEvents(f)
 		}
 	})
 }
@@ -319,6 +323,22 @@ func hasInodePressure(f *framework.Framework, testCondition string) (bool, error
 		}
 	}
 	return hasPressure, nil
+}
+
+func getInodesFree() uint64 {
+	var inodesFree uint64
+	Eventually(func() error {
+		summary, err := getNodeSummary()
+		if err != nil {
+			return err
+		}
+		if summary == nil || summary.Node.Fs == nil || summary.Node.Fs.InodesFree == nil {
+			return fmt.Errorf("some part of data is nil")
+		}
+		inodesFree = *summary.Node.Fs.InodesFree
+		return nil
+	}, time.Minute, evictionPollInterval).Should(BeNil())
+	return inodesFree
 }
 
 // returns a pod that does not use any resources
