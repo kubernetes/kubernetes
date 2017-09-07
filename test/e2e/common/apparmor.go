@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -109,10 +111,17 @@ done`, testCmd)
 		pod = f.PodClient().Create(pod)
 		framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(
 			f.ClientSet, pod.Name, f.Namespace.Name))
+		var err error
+		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
 	} else {
 		pod = f.PodClient().CreateSync(pod)
 		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 	}
+
+	// Verify Pod affinity colocated the Pods.
+	loader := getRunningLoaderPod(f)
+	Expect(pod.Spec.NodeName).To(Equal(loader.Spec.NodeName))
 
 	return pod
 }
@@ -211,8 +220,14 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.
+	getRunningLoaderPod(f)
+}
+
+func getRunningLoaderPod(f *framework.Framework) *api.Pod {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{loaderLabelKey: loaderLabelValue}))
 	pods, err := framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
 	framework.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, &pods.Items[0]), "Failed to run apparmor-loader Pod")
+	pod := &pods.Items[0]
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod), "Failed to run apparmor-loader Pod")
+	return pod
 }
