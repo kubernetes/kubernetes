@@ -29,6 +29,17 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
+var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
+	{Group: "", Resource: "replicationControllers"}:        "controllers",
+	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
+	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
+	{Group: "", Resource: "nodes"}:                         "minions",
+	{Group: "", Resource: "services"}:                      "services/specs",
+	{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
+}
+
 // NewStorageFactory builds the DefaultStorageFactory.
 // Merges defaultResourceConfig with the user specified overrides and merges
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
@@ -42,7 +53,7 @@ func NewStorageFactory(storageConfig storagebackend.Config, defaultMediaType str
 	if err != nil {
 		return nil, err
 	}
-	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig), nil
+	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, specialDefaultResourcePrefixes), nil
 }
 
 // Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.

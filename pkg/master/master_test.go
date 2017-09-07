@@ -86,7 +86,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), schema.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), schema.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
-	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
+	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
 	err := options.NewEtcdOptions(storageConfig).ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {

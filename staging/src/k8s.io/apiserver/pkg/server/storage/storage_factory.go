@@ -151,19 +151,7 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
-// TODO: move out of this package, it is not generic
-var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
-	{Group: "", Resource: "replicationControllers"}:        "controllers",
-	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
-	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
-	{Group: "", Resource: "nodes"}:                         "minions",
-	{Group: "", Resource: "services"}:                      "services/specs",
-	{Group: "extensions", Resource: "ingresses"}:           "ingress",
-	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
-}
-
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource, specialDefaultResourcePrefixes map[schema.GroupResource]string) *DefaultStorageFactory {
 	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
