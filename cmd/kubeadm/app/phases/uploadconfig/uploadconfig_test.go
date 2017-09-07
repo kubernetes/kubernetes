@@ -19,37 +19,95 @@ package uploadconfig
 import (
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestUploadConfiguration(t *testing.T) {
 	tests := []struct {
-		name    string
-		cfg     *kubeadmapi.MasterConfiguration
-		wantErr bool
+		name           string
+		errOnCreate    error
+		errOnUpdate    error
+		updateExisting bool
+		errExpected    bool
+		verifyResult   bool
 	}{
 		{
-			"basic validation with correct key",
-			&kubeadmapi.MasterConfiguration{
-				KubernetesVersion: "1.7.3",
-			},
-			false,
+			name:         "basic validation with correct key",
+			verifyResult: true,
+		},
+		{
+			name:           "update existing should report no error",
+			updateExisting: true,
+			verifyResult:   true,
+		},
+		{
+			name:        "unexpected errors for create should be returned",
+			errOnCreate: apierrors.NewUnauthorized(""),
+			errExpected: true,
+		},
+		{
+			name:           "update existing show report error if unexpected error for update is returned",
+			errOnUpdate:    apierrors.NewUnauthorized(""),
+			updateExisting: true,
+			errExpected:    true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			if err := UploadConfiguration(tt.cfg, client); (err != nil) != tt.wantErr {
-				t.Errorf("UploadConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+			cfg := &kubeadmapi.MasterConfiguration{
+				KubernetesVersion: "1.7.3",
 			}
-			masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.MasterConfigurationConfigMap, metav1.GetOptions{})
-			if err != nil {
-				t.Errorf("Fail to query ConfigMap error = %v", err)
-			} else if masterCfg.Data[kubeadmconstants.MasterConfigurationConfigMapKey] == "" {
-				t.Errorf("Fail to find ConfigMap key = %v", err)
+			client := clientsetfake.NewSimpleClientset()
+			if tt.errOnCreate != nil {
+				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+					return true, nil, tt.errOnCreate
+				})
+			}
+			// For idempotent test, we check the result of the second call.
+			if err := UploadConfiguration(cfg, client); !tt.updateExisting && (err != nil) != tt.errExpected {
+				t.Errorf("UploadConfiguration() error = %v, wantErr %v", err, tt.errExpected)
+			}
+			if tt.updateExisting {
+				if tt.errOnUpdate != nil {
+					client.PrependReactor("update", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+						return true, nil, tt.errOnUpdate
+					})
+				}
+				if err := UploadConfiguration(cfg, client); (err != nil) != tt.errExpected {
+					t.Errorf("UploadConfiguration() error = %v", err)
+				}
+			}
+			if tt.verifyResult {
+				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.MasterConfigurationConfigMap, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Fail to query ConfigMap error = %v", err)
+				}
+				configData := masterCfg.Data[kubeadmconstants.MasterConfigurationConfigMapKey]
+				if configData == "" {
+					t.Errorf("Fail to find ConfigMap key")
+				}
+
+				decodedExtCfg := &kubeadmapiext.MasterConfiguration{}
+				decodedCfg := &kubeadmapi.MasterConfiguration{}
+
+				if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(configData), decodedExtCfg); err != nil {
+					t.Errorf("unable to decode config from bytes: %v", err)
+				}
+				// Default and convert to the internal version
+				api.Scheme.Default(decodedExtCfg)
+				api.Scheme.Convert(decodedExtCfg, decodedCfg, nil)
+
+				if decodedCfg.KubernetesVersion != cfg.KubernetesVersion {
+					t.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
+				}
 			}
 		})
 	}
