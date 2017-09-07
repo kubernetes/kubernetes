@@ -3420,6 +3420,8 @@ func autoConvert_v1_PodExecOptions_To_api_PodExecOptions(in *v1.PodExecOptions, 
 	out.TTY = in.TTY
 	out.Container = in.Container
 	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.AlphaName = in.AlphaName
+	out.AlphaImage = in.AlphaImage
 	return nil
 }
 
@@ -3435,6 +3437,8 @@ func autoConvert_api_PodExecOptions_To_v1_PodExecOptions(in *api.PodExecOptions,
 	out.TTY = in.TTY
 	out.Container = in.Container
 	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.AlphaName = in.AlphaName
+	out.AlphaImage = in.AlphaImage
 	return nil
 }
 

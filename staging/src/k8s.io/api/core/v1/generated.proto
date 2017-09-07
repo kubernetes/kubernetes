@@ -2612,6 +2612,15 @@ message PodExecOptions {
 
   // Command is the remote command to execute. argv array. Not executed within a shell.
   repeated string command = 6;
+
+  // Name is the name of the Debug Container. Its presence will cause
+  // exec to create a Debug Container rather than performing a runtime exec.
+  optional string name = 7;
+
+  // Image is an optional container image name that will be used to for the Debug
+  // Container in the specified Pod with Command as ENTRYPOINT. If omitted a
+  // default image will be used.
+  optional string image = 8;
 }
 
 // PodList is a list of Pods.
