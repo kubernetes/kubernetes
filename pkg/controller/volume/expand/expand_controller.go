@@ -203,7 +203,15 @@ func (expc *expandController) GetPluginDir(pluginName string) string {
 	return ""
 }
 
+func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string {
+	return ""
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
+	return ""
+}
+
+func (expc *expandController) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
 	return ""
 }
 

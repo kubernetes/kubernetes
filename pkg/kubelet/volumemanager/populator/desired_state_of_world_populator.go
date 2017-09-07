@@ -260,11 +260,12 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 	}
 
 	allVolumesAdded := true
+	volumeDevicesMap := makeVolumeDevicesMap(pod.Spec.Containers)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod.Namespace)
+			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, volumeDevicesMap)
 		if err != nil {
 			glog.Errorf(
 				"Error processing volume %q for pod %q: %v",
@@ -336,7 +337,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, podNamespace string) (*volume.Spec, string, error) {
+	podVolume v1.Volume, podName string, podNamespace string, devicesMap map[string]bool) (*volume.Spec, string, error) {
 	if pvcSource :=
 		podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		glog.V(10).Infof(
@@ -345,7 +346,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName)
 
 		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvName, pvcUID, err := dswp.getPVCExtractPV(
+		pvName, pvcUID, volumeMode, err := dswp.getPVCExtractPV(
 			podNamespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, "", fmt.Errorf(
@@ -381,6 +382,18 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName,
 			pvcUID)
 
+		// Error if a container definition doesn't have volumeDevices but the volumeMode of PVC is Block
+		// or if a container definition has volumeDevices but the volumeMode of PVC is Filesystem
+		if (len(devicesMap) == 0 && volumeMode == v1.PersistentVolumeBlock) ||
+			(devicesMap[podVolume.Name] && volumeMode != v1.PersistentVolumeBlock) {
+			return nil, "", fmt.Errorf(
+				"Invalid volumeMode. volumeMounts only supports 'Filesystem' mode and volumeDevices only supports 'Block' mode, pod: %q/%q, volume name: %v, volumeMode: %v",
+				podNamespace,
+				podName,
+				podVolume.Name,
+				volumeMode)
+		}
+
 		return volumeSpec, volumeGidValue, nil
 	}
 
@@ -392,13 +405,14 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from
 // the API server extracts the name of the PV it is pointing to and returns it.
+// Also this returns pvc volumeMode to check combination of volumeMode and volumeDevices.
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
-	namespace string, claimName string) (string, types.UID, error) {
+	namespace string, claimName string) (string, types.UID, v1.PersistentVolumeMode, error) {
 	pvc, err :=
 		dswp.kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
-		return "", "", fmt.Errorf(
+		return "", "", "", fmt.Errorf(
 			"failed to fetch PVC %s/%s from API server. err=%v",
 			namespace,
 			claimName,
@@ -407,15 +421,15 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
 
-		return "", "", fmt.Errorf(
+		return "", "", "", fmt.Errorf(
 			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
 			namespace,
 			claimName,
 			pvc.Status.Phase,
 			pvc.Spec.VolumeName)
 	}
-
-	return pvc.Spec.VolumeName, pvc.UID, nil
+	volumeMode := volumehelper.GetPersistentVolumeClaimVolumeMode(pvc)
+	return pvc.Spec.VolumeName, pvc.UID, volumeMode, nil
 }
 
 // getPVSpec fetches the PV object with the given name from the API server
@@ -455,4 +469,19 @@ func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {
 	}
 
 	return ""
+}
+
+func makeVolumeDevicesMap(containers []v1.Container) map[string]bool {
+	volumeDevicesMap := make(map[string]bool)
+
+	for _, container := range containers {
+		if container.VolumeDevices == nil {
+			continue
+		}
+		for _, device := range container.VolumeDevices {
+			volumeDevicesMap[device.Name] = true
+		}
+	}
+
+	return volumeDevicesMap
 }

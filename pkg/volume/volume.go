@@ -132,6 +132,44 @@ type Unmounter interface {
 	TearDownAt(dir string) error
 }
 
+// BlockVolumeMapper interface provides methods to set up/map the volume.
+type BlockVolumeMapper interface {
+	Volume
+	// SetUpDevice prepares the volume to a self-determined directory path,
+	// which may or may not exist yet and returns combination of physical
+	// device path of a block volume and error.
+	// If the plugin is non-attachable, it should prepare the device
+	// in /dev/ (or where appropriate) and return device path.
+	// If the plugin is attachable, it should not do anything, just return
+	// empty string for device path.
+	// This may be called more than once, so implementations must be idempotent.
+	SetUpDevice() (string, error)
+	// GetGlobalMapPath returns a global map path which contains
+	// a symbolic links associated to a block device.
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeName}
+	GetGlobalMapPath(spec *Spec) (string, error)
+	// GetPodDeviceMapPath returns a pod device map path
+	// and name of a symbolic link associated to a block device.
+	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	GetPodDeviceMapPath() (string, string)
+}
+
+// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
+type BlockVolumeUnmapper interface {
+	Volume
+	// TearDownDevice removes traces of the SetUpDevice procedure under
+	// a self-determined directory.
+	// If the plugin is non-attachable, this method detaches the volume
+	// from a node.
+	TearDownDevice() error
+	// GetGlobalUnmapPath returns a path to symbolic link of a
+	// block device under a global map path.
+	GetGlobalUnmapPath(spec *Spec) (string, error)
+	// GetPodDeviceUnmapPath returns a pod device map path
+	// and name of symbolic link associated to a block device.
+	GetPodDeviceUnmapPath() (string, string)
+}
+
 // Provisioner is an interface that creates templates for PersistentVolumes
 // and can create the volume as a new resource in the infrastructure provider.
 type Provisioner interface {

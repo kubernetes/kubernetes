@@ -21,7 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -269,4 +269,119 @@ func stringToSet(str, delimiter string) (sets.String, error) {
 		zonesSet.Insert(trimmedZone)
 	}
 	return zonesSet, nil
+}
+
+// MapDevice creates a symbolic link to block device under specified map path
+func MapDevice(devicePath string, mapDir string, linkName string) error {
+	// example of global map path:
+	//   devicePath: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeName}
+	//   linkName: {podUid}
+	//
+	// example of pod device map path:
+	//   devicePath: pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}
+	//   linkName: {volumeName}
+	if len(devicePath) == 0 {
+		return fmt.Errorf("Failed to map device to map path. devicePath is empty")
+	}
+	if len(mapDir) == 0 {
+		return fmt.Errorf("Failed to map device to map path. mapDir is empty")
+	}
+	if !filepath.IsAbs(mapDir) {
+		return fmt.Errorf("The map path should be absolute: map path: %s", mapDir)
+	}
+	glog.V(5).Infof("MapDevice: devicePath %s", devicePath)
+	glog.V(5).Infof("MapDevice: mapDir %s", mapDir)
+	glog.V(5).Infof("MapDevice: linkName %s", linkName)
+
+	_, err := os.Stat(mapDir)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate map path: %s", mapDir)
+		return err
+	}
+	if err = os.MkdirAll(mapDir, 0750); err != nil {
+		return fmt.Errorf("Failed to mkdir %s, error", mapDir)
+	}
+	// If old symlink exits, remove it then create new one
+	linkPath := mapDir + "/" + string(linkName)
+	if islinkExist, checkErr := IsSymlinkExist(linkPath); checkErr != nil {
+		return checkErr
+	} else if islinkExist {
+		if err = os.Remove(linkPath); err != nil {
+			return err
+		}
+	}
+	if err := os.Symlink(devicePath, linkPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmapDevice removes a symbolic link to block device under specified map path
+func UnmapDevice(mapDir string, linkName string) error {
+	if len(mapDir) == 0 {
+		return fmt.Errorf("Failed to unmap device from map path. mapDir is empty")
+	}
+	glog.V(5).Infof("UnmapDevice: mapDir %s", mapDir)
+	glog.V(5).Infof("UnmapDevice: linkName %s", linkName)
+
+	// Check symbolic link exists
+	linkPath := mapDir + "/" + string(linkName)
+	if islinkExist, checkErr := IsSymlinkExist(linkPath); checkErr != nil {
+		return checkErr
+	} else if !islinkExist {
+		glog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
+		return nil
+	}
+	if err := os.Remove(linkPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RemovePath removes a file or directory on specified map path
+func RemoveMapPath(mapPath string) error {
+	if len(mapPath) == 0 {
+		return fmt.Errorf("Failed to remove map path. mapPath is empty")
+	}
+	glog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
+	err := os.Remove(mapPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// IsSymlinkExist retruns true if specified symbolic link exists
+func IsSymlinkExist(mapPath string) (bool, error) {
+	fi, err := os.Lstat(mapPath)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+// GetDeviceSymlinkRefs searches symbolic links under global map path
+func GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
+	var refs []string
+	fis, err := ioutil.ReadDir(mapPath)
+	if err != nil {
+		return nil, fmt.Errorf("Directory cannot read %v", err)
+	}
+	for _, fi := range fis {
+		if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
+			continue
+		}
+		filename := fi.Name()
+		path, err := os.Readlink(mapPath + "/" + filename)
+		if err != nil {
+			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
+		}
+		if strings.Contains(path, devPath) {
+			refs = append(refs, mapPath+"/"+filename)
+		}
+	}
+	return refs, nil
 }

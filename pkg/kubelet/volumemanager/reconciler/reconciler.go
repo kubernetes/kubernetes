@@ -22,6 +22,7 @@ package reconciler
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -171,10 +173,8 @@ func (rc *reconciler) reconcile() {
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
-			// Volume is mounted, unmount it
-			glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
-			err := rc.operationExecutor.UnmountVolume(
-				mountedVolume.MountedVolume, rc.actualStateOfWorld)
+			mountedVolume.VolumeHandler = operationexecutor.NewVolumeHandler(mountedVolume.VolumeSpec, rc.operationExecutor)
+			err := mountedVolume.VolumeHandler.HandleUnmounted(mountedVolume.MountedVolume, rc.actualStateOfWorld)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -239,12 +239,8 @@ func (rc *reconciler) reconcile() {
 			if isRemount {
 				remountingLogStr = "Volume is already mounted to pod, but remount was requested."
 			}
-			glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
-			err := rc.operationExecutor.MountVolume(
-				rc.waitForAttachTimeout,
-				volumeToMount.VolumeToMount,
-				rc.actualStateOfWorld,
-				isRemount)
+			volumeToMount.VolumeHandler = operationexecutor.NewVolumeHandler(volumeToMount.VolumeSpec, rc.operationExecutor)
+			err := volumeToMount.VolumeHandler.HandleAttachedMounted(rc.waitForAttachTimeout, volumeToMount.VolumeToMount, rc.actualStateOfWorld, isRemount, remountingLogStr)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -268,10 +264,8 @@ func (rc *reconciler) reconcile() {
 		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
 			if attachedVolume.GloballyMounted {
-				// Volume is globally mounted to device, unmount it
-				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
-				err := rc.operationExecutor.UnmountDevice(
-					attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
+				attachedVolume.VolumeHandler = operationexecutor.NewVolumeHandler(attachedVolume.VolumeSpec, rc.operationExecutor)
+				err := attachedVolume.VolumeHandler.HandleDetachedUnmounted(attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
 				if err != nil &&
 					!nestedpendingoperations.IsAlreadyExists(err) &&
 					!exponentialbackoff.IsExponentialBackoff(err) {
@@ -332,6 +326,7 @@ type podVolume struct {
 	volumeSpecName string
 	mountPath      string
 	pluginName     string
+	volumeMode     v1.PersistentVolumeMode
 }
 
 type reconstructedVolume struct {
@@ -345,6 +340,7 @@ type reconstructedVolume struct {
 	devicePath          string
 	reportedInUse       bool
 	mounter             volumepkg.Mounter
+	blockVolumeMapper   volumepkg.BlockVolumeMapper
 }
 
 // reconstructFromDisk scans the volume directories under the given pod directory. If the volume is not
@@ -437,6 +433,11 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		return nil, err
 	}
 
+	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
 	volumeName, err := plugin.GetVolumeName(volumeSpec)
 	if err != nil {
 		return nil, err
@@ -448,17 +449,31 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
 	}
 
-	if attachablePlugin != nil {
-		if isNotMount, mountCheckErr := rc.mounter.IsLikelyNotMountPoint(volume.mountPath); mountCheckErr != nil {
+	// Check existence of mount point for filesystem volume or symbolic link for block volume
+	var isNotMount, islinkExist bool
+	var mountCheckErr, checkErr error
+	if attachablePlugin != nil && volume.volumeMode == v1.PersistentVolumeFilesystem {
+		if isNotMount, mountCheckErr = rc.mounter.IsLikelyNotMountPoint(volume.mountPath); mountCheckErr != nil {
 			return nil, fmt.Errorf("Could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
 				uniqueVolumeName,
 				volumeSpec.Name(),
 				volume.podName,
 				pod.UID,
 				mountCheckErr)
-		} else if isNotMount {
-			return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
 		}
+	} else if volume.volumeMode == v1.PersistentVolumeBlock {
+		if islinkExist, checkErr = volumeutil.IsSymlinkExist(volume.mountPath); checkErr != nil {
+			return nil, fmt.Errorf("Could not check whether the block volume %q (spec.Name: %q) pod %q (UID: %q) is mapped to: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				checkErr)
+		}
+	}
+	// If both mount and symlink doesn't exist, volume reconstruction should be failed
+	if isNotMount && !islinkExist {
+		return nil, fmt.Errorf("Volume: %q is not mounted", uniqueVolumeName)
 	}
 
 	volumeMounter, newMounterErr := plugin.NewMounter(
@@ -475,6 +490,24 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 			newMounterErr)
 	}
 
+	var volumeMapper volumepkg.BlockVolumeMapper
+	var newMapperErr error
+	if mapperPlugin != nil {
+		volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
+			volumeSpec,
+			pod,
+			volumepkg.VolumeOptions{})
+		if newMapperErr != nil {
+			return nil, fmt.Errorf(
+				"MountVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				newMapperErr)
+		}
+	}
+
 	reconstructedVolume := &reconstructedVolume{
 		volumeName: uniqueVolumeName,
 		podName:    volume.podName,
@@ -489,6 +522,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumeGidValue:      "",
 		devicePath:          "",
 		mounter:             volumeMounter,
+		blockVolumeMapper:   volumeMapper,
 	}
 	return reconstructedVolume, nil
 }
@@ -518,7 +552,6 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 				volumeToMount.VolumeName, volume.outerVolumeSpecName)
 		}
 	}
-
 	for _, volume := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
 			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
@@ -532,6 +565,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			types.UID(volume.podName),
 			volume.volumeName,
 			volume.mounter,
+			volume.blockVolumeMapper,
 			volume.outerVolumeSpecName,
 			volume.volumeGidValue)
 		if err != nil {
@@ -574,34 +608,45 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		}
 		podName := podsDirInfo[i].Name()
 		podDir := path.Join(podDir, podName)
-		volumesDir := path.Join(podDir, config.DefaultKubeletVolumesDirName)
-		volumesDirInfo, err := ioutil.ReadDir(volumesDir)
-		if err != nil {
-			glog.Errorf("Could not read volume directory %q: %v", volumesDir, err)
-			continue
+		// Find both filesystem volume and block volume information
+		// ex. filesystem volume: /pods/{podUid}}/volume/{escapeQualifiedPluginName}/{volumeName}
+		//     block volume:      /pods/{podUid}}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
+		volumesDirs := map[v1.PersistentVolumeMode]string{
+			v1.PersistentVolumeFilesystem: path.Join(podDir, config.DefaultKubeletVolumesDirName),
+			v1.PersistentVolumeBlock:      path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName),
 		}
-		for _, volumeDir := range volumesDirInfo {
-			pluginName := volumeDir.Name()
-			volumePluginPath := path.Join(volumesDir, pluginName)
-
-			volumePluginDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
-			if err != nil {
-				glog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
+		for volumeMode, volumesDir := range volumesDirs {
+			var volumesDirInfo []os.FileInfo
+			if volumesDirInfo, err = ioutil.ReadDir(volumesDir); err != nil {
+				// Just skip the loop becuase given volumesDir doesn't exist depending on volumeMode
 				continue
 			}
-
-			unescapePluginName := strings.UnescapeQualifiedNameForDisk(pluginName)
-			for _, volumeName := range volumePluginDirs {
-				mountPath := path.Join(volumePluginPath, volumeName)
-				volumes = append(volumes, podVolume{
-					podName:        volumetypes.UniquePodName(podName),
-					volumeSpecName: volumeName,
-					mountPath:      mountPath,
-					pluginName:     unescapePluginName,
-				})
+			for _, volumeDir := range volumesDirInfo {
+				pluginName := volumeDir.Name()
+				volumePluginPath := path.Join(volumesDir, pluginName)
+				volumePluginDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
+				if err != nil {
+					glog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
+					continue
+				}
+				unescapePluginName := strings.UnescapeQualifiedNameForDisk(pluginName)
+				for _, volumeName := range volumePluginDirs {
+					mountPath := path.Join(volumePluginPath, volumeName)
+					//glog.V(10).Infof("Obtained mount path from volume plugin directory: %v", mountPath)
+					glog.Infof("Obtained mount path from volume plugin directory: %v", mountPath)
+					volumes = append(volumes, podVolume{
+						podName:        volumetypes.UniquePodName(podName),
+						volumeSpecName: volumeName,
+						mountPath:      mountPath,
+						pluginName:     unescapePluginName,
+						volumeMode:     volumeMode,
+					})
+				}
 			}
-
 		}
+	}
+	if len(volumes) == 0 {
+		return nil, fmt.Errorf("Could not read volumes under the given pod directory %q", podDir)
 	}
 	glog.V(10).Infof("Get volumes from pod directory %q %+v", podDir, volumes)
 	return volumes, nil
