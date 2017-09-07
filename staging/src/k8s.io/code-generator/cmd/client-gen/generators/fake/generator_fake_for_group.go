@@ -45,7 +45,7 @@ var _ generator.Generator = &genFakeForGroup{}
 
 // We only want to call GenerateType() once per group.
 func (g *genFakeForGroup) Filter(c *generator.Context, t *types.Type) bool {
-	return t == g.types[0]
+	return len(g.types) == 0 || t == g.types[0]
 }
 
 func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {

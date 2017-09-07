@@ -36,7 +36,7 @@ type genExpansion struct {
 
 // We only want to call GenerateType() once per group.
 func (g *genExpansion) Filter(c *generator.Context, t *types.Type) bool {
-	return t == g.types[0]
+	return len(g.types) == 0 || t == g.types[0]
 }
 
 func (g *genExpansion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
