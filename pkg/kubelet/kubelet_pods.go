@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -91,9 +92,9 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
-// makeDevices determines the devices for the given container.
+// makeGPUDevices determines the devices for the given container.
 // Experimental.
-func (kl *Kubelet) makeDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
+func (kl *Kubelet) makeGPUDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
 	if container.Resources.Limits.NvidiaGPU().IsZero() {
 		return nil, nil
 	}
@@ -126,6 +127,39 @@ func makeAbsolutePath(goos, path string) string {
 	}
 	// Otherwise, add 'c:\'
 	return "c:\\" + path
+}
+
+// makeBlockVolumes maps the raw block devices specified in the path of the container
+// Experimental
+func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumeutil.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
+	var devices []kubecontainer.DeviceInfo
+	for _, device := range container.VolumeDevices {
+		// check path is absolute
+		if !filepath.IsAbs(device.DevicePath) {
+			return nil, fmt.Errorf("error DevicePath `%s` must be an absolute path", device.DevicePath)
+		}
+		vol, ok := podVolumes[device.Name]
+		if !ok || vol.BlockVolumeMapper == nil {
+			glog.Errorf("Block volume cannot be satisfied for container %q, because the volume is missing or the volume mapper is nil: %+v", container.Name, device)
+			return nil, fmt.Errorf("cannot find volume %q to pass into container %q", device.Name, container.Name)
+		}
+		// Get a symbolic link associated to a block device under pod device path
+		dirPath, volName := vol.BlockVolumeMapper.GetPodDeviceMapPath()
+		symlinkPath := path.Join(dirPath, volName)
+		if islinkExist, checkErr := blkutil.IsSymlinkExist(symlinkPath); checkErr != nil {
+			return nil, checkErr
+		} else if islinkExist {
+			// Check readOnly in PVCVolumeSource and set read only permission if it's true.
+			permission := "mrw"
+			if vol.ReadOnly {
+				permission = "r"
+			}
+			glog.V(4).Infof("Device will be attached to container %q. Path on host: %v", container.Name, symlinkPath)
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: symlinkPath, PathInContainer: device.DevicePath, Permissions: permission})
+		}
+	}
+
+	return devices, nil
 }
 
 // makeMounts determines the mount points for the given container.
@@ -416,11 +450,21 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	devices, err := kl.makeDevices(pod, container)
+	devices, err := kl.makeGPUDevices(pod, container)
 	if err != nil {
 		return nil, err
 	}
 	opts.Devices = append(opts.Devices, devices...)
+
+	// TODO: remove feature gate check after no longer needed
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		blkutil := volumeutil.NewBlockVolumePathHandler()
+		blkVolumes, err := kl.makeBlockVolumes(pod, container, volumes, blkutil)
+		if err != nil {
+			return nil, err
+		}
+		opts.Devices = append(opts.Devices, blkVolumes...)
+	}
 
 	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
