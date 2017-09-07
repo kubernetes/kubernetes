@@ -115,6 +115,8 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 		KubeClient: client,
 		Recorder:   dc.eventRecorder,
 	}
+	dc.syncHandler = dc.syncDeployment
+	dc.enqueueDeployment = dc.enqueue
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addDeployment,
@@ -130,9 +132,6 @@ func NewDeploymentController(dInformer extensionsinformers.DeploymentInformer, r
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: dc.deletePod,
 	})
-
-	dc.syncHandler = dc.syncDeployment
-	dc.enqueueDeployment = dc.enqueue
 
 	dc.dLister = dInformer.Lister()
 	dc.rsLister = rsInformer.Lister()

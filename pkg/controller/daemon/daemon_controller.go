@@ -154,6 +154,9 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
 		suspendedDaemonPods: map[string]sets.String{},
 	}
+	dsc.syncHandler = dsc.syncDaemonSet
+	dsc.enqueueDaemonSet = dsc.enqueue
+	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -198,9 +201,6 @@ func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInfo
 	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
 	dsc.nodeLister = nodeInformer.Lister()
 
-	dsc.syncHandler = dsc.syncDaemonSet
-	dsc.enqueueDaemonSet = dsc.enqueue
-	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
 	return dsc
 }
 
