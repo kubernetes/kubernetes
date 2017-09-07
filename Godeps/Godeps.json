@@ -826,6 +826,14 @@
 			"Rev": "71acacd42f85e5e82f70a55327789582a5200a90"
 		},
 		{
+			"ImportPath": "github.com/d2g/dhcp4",
+			"Rev": "a1d1b6c41b1ce8a71a5121a9cee31809c4707d9c"
+		},
+		{
+			"ImportPath": "github.com/d2g/dhcp4client",
+			"Rev": "6e570ed0a266b730a860ba1068090f683b2c213a"
+		},
+		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Comment": "v1.1.0-1-g782f496",
 			"Rev": "782f4967f2dc4564575ca782fe2d04090b5faca8"

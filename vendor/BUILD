@@ -119,6 +119,8 @@ filegroup(
         "//vendor/github.com/coreos/pkg/timeutil:all-srcs",
         "//vendor/github.com/coreos/rkt/api/v1alpha:all-srcs",
         "//vendor/github.com/cpuguy83/go-md2man/md2man:all-srcs",
+        "//vendor/github.com/d2g/dhcp4:all-srcs",
+        "//vendor/github.com/d2g/dhcp4client:all-srcs",
         "//vendor/github.com/davecgh/go-spew/spew:all-srcs",
         "//vendor/github.com/daviddengcn/go-colortext:all-srcs",
         "//vendor/github.com/dgrijalva/jwt-go:all-srcs",
