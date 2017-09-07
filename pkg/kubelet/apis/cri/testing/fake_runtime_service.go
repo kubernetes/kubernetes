@@ -50,9 +50,10 @@ type FakeRuntimeService struct {
 
 	Called []string
 
-	FakeStatus *runtimeapi.RuntimeStatus
-	Containers map[string]*FakeContainer
-	Sandboxes  map[string]*FakePodSandbox
+	FakeStatus         *runtimeapi.RuntimeStatus
+	Containers         map[string]*FakeContainer
+	Sandboxes          map[string]*FakePodSandbox
+	FakeContainerStats map[string]*runtimeapi.ContainerStats
 }
 
 func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
@@ -102,9 +103,10 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
-		Called:     make([]string, 0),
-		Containers: make(map[string]*FakeContainer),
-		Sandboxes:  make(map[string]*FakePodSandbox),
+		Called:             make([]string, 0),
+		Containers:         make(map[string]*FakeContainer),
+		Sandboxes:          make(map[string]*FakePodSandbox),
+		FakeContainerStats: make(map[string]*runtimeapi.ContainerStats),
 	}
 }
 
@@ -406,10 +408,54 @@ func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeapi.Runti
 	return nil
 }
 
+func (r *FakeRuntimeService) SetFakeContainerStats(containerStats []*runtimeapi.ContainerStats) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.FakeContainerStats = make(map[string]*runtimeapi.ContainerStats)
+	for _, s := range containerStats {
+		r.FakeContainerStats[s.Attributes.Id] = s
+	}
+}
+
 func (r *FakeRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ContainerStats")
+
+	s, found := r.FakeContainerStats[req.ContainerId]
+	if !found {
+		return nil, fmt.Errorf("no stats for container %q", req.ContainerId)
+	}
+	return &runtimeapi.ContainerStatsResponse{Stats: s}, nil
 }
 
 func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ListContainerStats")
+
+	var result []*runtimeapi.ContainerStats
+	for _, c := range r.Containers {
+		if req.Filter != nil {
+			if req.Filter.Id != "" && req.Filter.Id != c.Id {
+				continue
+			}
+			if req.Filter.PodSandboxId != "" && req.Filter.PodSandboxId != c.SandboxID {
+				continue
+			}
+			if req.Filter.LabelSelector != nil && !filterInLabels(req.Filter.LabelSelector, c.GetLabels()) {
+				continue
+			}
+		}
+		s, found := r.FakeContainerStats[c.Id]
+		if !found {
+			continue
+		}
+		result = append(result, s)
+	}
+
+	return &runtimeapi.ListContainerStatsResponse{Stats: result}, nil
 }

@@ -53,6 +53,8 @@ type crdRegistrationController struct {
 
 	syncHandler func(groupVersion schema.GroupVersion) error
 
+	syncedInitialSet chan struct{}
+
 	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors
 	// this is actually keyed by a groupVersion
 	queue workqueue.RateLimitingInterface
@@ -67,7 +69,8 @@ func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefini
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
+		syncedInitialSet:       make(chan struct{}),
+		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
 	}
 	c.syncHandler = c.handleVersionUpdate
 
@@ -114,6 +117,18 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 		return
 	}
 
+	// process each item in the list once
+	if crds, err := c.crdLister.List(labels.Everything()); err != nil {
+		utilruntime.HandleError(err)
+	} else {
+		for _, crd := range crds {
+			if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version}); err != nil {
+				utilruntime.HandleError(err)
+			}
+		}
+	}
+	close(c.syncedInitialSet)
+
 	// start up your worker threads based on threadiness.  Some controllers have multiple kinds of workers
 	for i := 0; i < threadiness; i++ {
 		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
@@ -123,6 +138,11 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 
 	// wait until we're told to stop
 	<-stopCh
+}
+
+// WaitForInitialSync blocks until the initial set of CRD resources has been processed
+func (c *crdRegistrationController) WaitForInitialSync() {
+	<-c.syncedInitialSet
 }
 
 func (c *crdRegistrationController) runWorker() {

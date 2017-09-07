@@ -32692,7 +32692,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/": {
+   "/apis/autoscaling/v2beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -32709,9 +32709,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "getAutoscalingV2alpha1APIResources",
+     "operationId": "getAutoscalingV2beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -32725,7 +32725,7 @@
      }
     }
    },
-   "/apis/autoscaling/v2alpha1/horizontalpodautoscalers": {
+   "/apis/autoscaling/v2beta1/horizontalpodautoscalers": {
     "get": {
      "description": "list or watch objects of kind HorizontalPodAutoscaler",
      "consumes": [
@@ -32742,14 +32742,14 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "listAutoscalingV2alpha1HorizontalPodAutoscalerForAllNamespaces",
+     "operationId": "listAutoscalingV2beta1HorizontalPodAutoscalerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerList"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
        }
       },
       "401": {
@@ -32760,7 +32760,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -32829,7 +32829,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers": {
+   "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers": {
     "get": {
      "description": "list or watch objects of kind HorizontalPodAutoscaler",
      "consumes": [
@@ -32846,9 +32846,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "listAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "listAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -32911,7 +32911,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerList"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList"
        }
       },
       "401": {
@@ -32922,7 +32922,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "post": {
@@ -32939,16 +32939,16 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "createAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "createAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       }
      ],
@@ -32956,7 +32956,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -32967,7 +32967,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "delete": {
@@ -32984,9 +32984,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "deleteAutoscalingV2alpha1CollectionNamespacedHorizontalPodAutoscaler",
+     "operationId": "deleteAutoscalingV2beta1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -33060,7 +33060,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -33081,7 +33081,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+   "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
     "get": {
      "description": "read the specified HorizontalPodAutoscaler",
      "consumes": [
@@ -33096,9 +33096,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "readAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -33119,7 +33119,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33130,7 +33130,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "put": {
@@ -33147,16 +33147,16 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "replaceAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       }
      ],
@@ -33164,7 +33164,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33175,7 +33175,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "delete": {
@@ -33192,9 +33192,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "deleteAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "deleteAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -33241,7 +33241,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "patch": {
@@ -33260,9 +33260,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "patchAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -33277,7 +33277,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33288,7 +33288,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -33317,7 +33317,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
+   "/apis/autoscaling/v2beta1/namespaces/{namespace}/horizontalpodautoscalers/{name}/status": {
     "get": {
      "description": "read status of the specified HorizontalPodAutoscaler",
      "consumes": [
@@ -33332,14 +33332,14 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "readAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "readAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33350,7 +33350,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "put": {
@@ -33367,16 +33367,16 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "replaceAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "replaceAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       }
      ],
@@ -33384,7 +33384,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33395,7 +33395,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "patch": {
@@ -33414,9 +33414,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "patchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "patchAutoscalingV2beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -33431,7 +33431,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
       "401": {
@@ -33442,7 +33442,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -33471,7 +33471,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/watch/horizontalpodautoscalers": {
+   "/apis/autoscaling/v2beta1/watch/horizontalpodautoscalers": {
     "get": {
      "description": "watch individual changes to a list of HorizontalPodAutoscaler",
      "consumes": [
@@ -33488,9 +33488,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "watchAutoscalingV2alpha1HorizontalPodAutoscalerListForAllNamespaces",
+     "operationId": "watchAutoscalingV2beta1HorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -33506,7 +33506,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -33575,7 +33575,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
+   "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers": {
     "get": {
      "description": "watch individual changes to a list of HorizontalPodAutoscaler",
      "consumes": [
@@ -33592,9 +33592,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscalerList",
+     "operationId": "watchAutoscalingV2beta1NamespacedHorizontalPodAutoscalerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -33610,7 +33610,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -33687,7 +33687,7 @@
      }
     ]
    },
-   "/apis/autoscaling/v2alpha1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
+   "/apis/autoscaling/v2beta1/watch/namespaces/{namespace}/horizontalpodautoscalers/{name}": {
     "get": {
      "description": "watch changes to an object of kind HorizontalPodAutoscaler",
      "consumes": [
@@ -33704,9 +33704,9 @@
       "https"
      ],
      "tags": [
-      "autoscaling_v2alpha1"
+      "autoscaling_v2beta1"
      ],
-     "operationId": "watchAutoscalingV2alpha1NamespacedHorizontalPodAutoscaler",
+     "operationId": "watchAutoscalingV2beta1NamespacedHorizontalPodAutoscaler",
      "responses": {
       "200": {
        "description": "OK",
@@ -33722,7 +33722,7 @@
      "x-kubernetes-group-version-kind": {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     },
     "parameters": [
@@ -62500,7 +62500,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference": {
+   "io.k8s.api.autoscaling.v2beta1.CrossVersionObjectReference": {
     "description": "CrossVersionObjectReference contains enough information to let you identify the referred resource.",
     "required": [
      "kind",
@@ -62521,7 +62521,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler": {
+   "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler": {
     "description": "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
     "properties": {
      "apiVersion": {
@@ -62538,22 +62538,22 @@
      },
      "spec": {
       "description": "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerSpec"
      },
      "status": {
       "description": "status is the current information about the autoscaler.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerStatus"
      }
     },
     "x-kubernetes-group-version-kind": [
      {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscaler",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     ]
    },
-   "io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition": {
+   "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerCondition": {
     "description": "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
     "required": [
      "type",
@@ -62582,7 +62582,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerList": {
+   "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerList": {
     "description": "HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.",
     "required": [
      "items"
@@ -62596,7 +62596,7 @@
       "description": "items is the list of horizontal pod autoscaler objects.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
+       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
       }
      },
      "kind": {
@@ -62612,11 +62612,11 @@
      {
       "group": "autoscaling",
       "kind": "HorizontalPodAutoscalerList",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      }
     ]
    },
-   "io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec": {
+   "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerSpec": {
     "description": "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
     "required": [
      "scaleTargetRef",
@@ -62632,7 +62632,7 @@
       "description": "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.MetricSpec"
+       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.MetricSpec"
       }
      },
      "minReplicas": {
@@ -62642,11 +62642,11 @@
      },
      "scaleTargetRef": {
       "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.CrossVersionObjectReference"
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus": {
+   "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerStatus": {
     "description": "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
     "required": [
      "currentReplicas",
@@ -62659,14 +62659,14 @@
       "description": "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition"
+       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscalerCondition"
       }
      },
      "currentMetrics": {
       "description": "currentMetrics is the last read state of the metrics used by this autoscaler.",
       "type": "array",
       "items": {
-       "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.MetricStatus"
+       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.MetricStatus"
       }
      },
      "currentReplicas": {
@@ -62690,7 +62690,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.MetricSpec": {
+   "io.k8s.api.autoscaling.v2beta1.MetricSpec": {
     "description": "MetricSpec specifies how to scale based on a single metric (only `type` and one other matching field should be set at once).",
     "required": [
      "type"
@@ -62698,15 +62698,15 @@
     "properties": {
      "object": {
       "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ObjectMetricSource"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ObjectMetricSource"
      },
      "pods": {
       "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.PodsMetricSource"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.PodsMetricSource"
      },
      "resource": {
       "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ResourceMetricSource"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ResourceMetricSource"
      },
      "type": {
       "description": "type is the type of metric source.  It should match one of the fields below.",
@@ -62714,7 +62714,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.MetricStatus": {
+   "io.k8s.api.autoscaling.v2beta1.MetricStatus": {
     "description": "MetricStatus describes the last-read state of a single metric.",
     "required": [
      "type"
@@ -62722,15 +62722,15 @@
     "properties": {
      "object": {
       "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ObjectMetricStatus"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ObjectMetricStatus"
      },
      "pods": {
       "description": "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.PodsMetricStatus"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.PodsMetricStatus"
      },
      "resource": {
       "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ResourceMetricStatus"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ResourceMetricStatus"
      },
      "type": {
       "description": "type is the type of metric source.  It will match one of the fields below.",
@@ -62738,7 +62738,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.ObjectMetricSource": {
+   "io.k8s.api.autoscaling.v2beta1.ObjectMetricSource": {
     "description": "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
     "required": [
      "target",
@@ -62752,7 +62752,7 @@
      },
      "target": {
       "description": "target is the described Kubernetes object.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.CrossVersionObjectReference"
      },
      "targetValue": {
       "description": "targetValue is the target value of the metric (as a quantity).",
@@ -62760,7 +62760,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.ObjectMetricStatus": {
+   "io.k8s.api.autoscaling.v2beta1.ObjectMetricStatus": {
     "description": "ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
     "required": [
      "target",
@@ -62778,11 +62778,11 @@
      },
      "target": {
       "description": "target is the described Kubernetes object.",
-      "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference"
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.CrossVersionObjectReference"
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.PodsMetricSource": {
+   "io.k8s.api.autoscaling.v2beta1.PodsMetricSource": {
     "description": "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
     "required": [
      "metricName",
@@ -62799,7 +62799,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.PodsMetricStatus": {
+   "io.k8s.api.autoscaling.v2beta1.PodsMetricStatus": {
     "description": "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
     "required": [
      "metricName",
@@ -62816,7 +62816,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.ResourceMetricSource": {
+   "io.k8s.api.autoscaling.v2beta1.ResourceMetricSource": {
     "description": "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
     "required": [
      "name"
@@ -62837,7 +62837,7 @@
      }
     }
    },
-   "io.k8s.api.autoscaling.v2alpha1.ResourceMetricStatus": {
+   "io.k8s.api.autoscaling.v2beta1.ResourceMetricStatus": {
     "description": "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
     "required": [
      "name",
@@ -71669,7 +71669,7 @@
      {
       "group": "autoscaling",
       "kind": "DeleteOptions",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      },
      {
       "group": "batch",
@@ -72183,7 +72183,7 @@
      {
       "group": "autoscaling",
       "kind": "WatchEvent",
-      "version": "v2alpha1"
+      "version": "v2beta1"
      },
      {
       "group": "batch",
@@ -73316,62 +73316,6 @@
    "io.k8s.kubernetes.pkg.apis.autoscaling.v1.ScaleStatus": {
     "description": "Deprecated. Please use io.k8s.api.autoscaling.v1.ScaleStatus instead.",
     "$ref": "#/definitions/io.k8s.api.autoscaling.v1.ScaleStatus"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.CrossVersionObjectReference": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.CrossVersionObjectReference"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscaler": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscaler"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerCondition"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerList": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerList instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerList"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerSpec"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.HorizontalPodAutoscalerStatus"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricSpec": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.MetricSpec instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.MetricSpec"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.MetricStatus": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.MetricStatus instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.MetricStatus"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricSource": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.ObjectMetricSource instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ObjectMetricSource"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ObjectMetricStatus": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.ObjectMetricStatus instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ObjectMetricStatus"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricSource": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.PodsMetricSource instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.PodsMetricSource"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.PodsMetricStatus": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.PodsMetricStatus instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.PodsMetricStatus"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricSource": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.ResourceMetricSource instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ResourceMetricSource"
-   },
-   "io.k8s.kubernetes.pkg.apis.autoscaling.v2alpha1.ResourceMetricStatus": {
-    "description": "Deprecated. Please use io.k8s.api.autoscaling.v2alpha1.ResourceMetricStatus instead.",
-    "$ref": "#/definitions/io.k8s.api.autoscaling.v2alpha1.ResourceMetricStatus"
    },
    "io.k8s.kubernetes.pkg.apis.batch.v1.Job": {
     "description": "Deprecated. Please use io.k8s.api.batch.v1.Job instead.",

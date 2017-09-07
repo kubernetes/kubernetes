@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -147,83 +148,130 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should create a ResourceQuota and capture the life of an uninitialized pod.", func() {
-		// TODO: uncomment the test when #50344 is merged.
-		// By("Creating a ResourceQuota")
-		//	quotaName := "test-quota"
-		//	resourceQuota := newTestResourceQuota(quotaName)
-		//	resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
-		//	Expect(err).NotTo(HaveOccurred())
+	It("[Feature:Initializers] should create a ResourceQuota and capture the life of an uninitialized pod.", func() {
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Ensuring resource quota status is calculated")
-		//	usedResources := v1.ResourceList{}
-		//	usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		//	err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		//	Expect(err).NotTo(HaveOccurred())
+		By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Creating an uninitialized Pod that fits quota")
-		//	podName := "test-pod"
-		//	requests := v1.ResourceList{}
-		//	requests[v1.ResourceCPU] = resource.MustParse("500m")
-		//	requests[v1.ResourceMemory] = resource.MustParse("252Mi")
-		//	pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
-		//	pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
-		//	_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
-		//	// because no one is handling the initializer, server will return a 504 timeout
-		//	if err != nil && !errors.IsTimeout(err) {
-		//		framework.Failf("expect err to be timeout error, got %v", err)
-		//	}
-		//	podToUpdate, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
-		//	Expect(err).NotTo(HaveOccurred())
+		By("Creating an uninitialized Pod that fits quota")
+		podName := "test-pod"
+		requests := v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
+		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
+		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		// because no one is handling the initializer, server will return a 504 timeout
+		if err != nil && !errors.IsTimeout(err) {
+			framework.Failf("expect err to be timeout error, got %v", err)
+		}
+		createdPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Ensuring ResourceQuota status captures the pod usage")
-		//	usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		//	usedResources[v1.ResourcePods] = resource.MustParse("1")
-		//	usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
-		//	usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
-		//	err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		//	Expect(err).NotTo(HaveOccurred())
+		By("Ensuring only pod count is charged")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Not allowing an uninitialized pod to be created that exceeds remaining quota")
-		//	requests = v1.ResourceList{}
-		//	requests[v1.ResourceCPU] = resource.MustParse("600m")
-		//	requests[v1.ResourceMemory] = resource.MustParse("100Mi")
-		//	pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
-		//	pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
-		//	pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
-		//	Expect(err).To(HaveOccurred())
-		//	fmt.Println("CHAO: err=", err)
+		By("Ensuring an uninitialized pod can update its resource requirements")
+		// a pod cannot dynamically update its resource requirements.
+		requests = v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("100m")
+		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+		_, err = framework.UpdatePodWithRetries(f.ClientSet, f.Namespace.Name, createdPod.Name, func(p *v1.Pod) {
+			p.Spec.Containers[0].Resources.Requests = requests
+		})
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Ensuring an uninitialized pod can update its resource requirements")
-		//	// a pod cannot dynamically update its resource requirements.
-		//	requests = v1.ResourceList{}
-		//	requests[v1.ResourceCPU] = resource.MustParse("100m")
-		//	requests[v1.ResourceMemory] = resource.MustParse("100Mi")
-		//	podToUpdate.Spec.Containers[0].Resources.Requests = requests
-		//	_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Update(podToUpdate)
-		//	Expect(err).NotTo(HaveOccurred())
+		By("Ensuring ResourceQuota status doesn't change")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
 
-		//	By("Ensuring attempts to update pod resource requirements did change quota usage")
-		//	usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		//	usedResources[v1.ResourcePods] = resource.MustParse("1")
-		//	usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
-		//	usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
-		//	err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		//	Expect(err).NotTo(HaveOccurred())
+		By("Allowing initializing a Pod that fits quota")
+		_, err = framework.UpdatePodWithRetries(f.ClientSet, f.Namespace.Name, createdPod.Name, func(p *v1.Pod) {
+			p.Initializers = nil
+		})
+		Expect(err).NotTo(HaveOccurred())
 
-		// TODO: uncomment the test when the replenishment_controller uses the
-		// sharedInformer that list/watches uninitialized objects.
-		// By("Deleting the pod")
-		// err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(podName, metav1.NewDeleteOptions(0))
-		// Expect(err).NotTo(HaveOccurred())
-		//
-		// By("Ensuring resource quota status released the pod usage")
-		// usedResources[v1.ResourceQuotas] = resource.MustParse("1")
-		// usedResources[v1.ResourcePods] = resource.MustParse("0")
-		// usedResources[v1.ResourceCPU] = resource.MustParse("0")
-		// usedResources[v1.ResourceMemory] = resource.MustParse("0")
-		// err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
-		// Expect(err).NotTo(HaveOccurred())
+		By("Ensuring ResourceQuota status captures the usage of the intialized pod")
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
+		usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(createdPod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released the pod usage")
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("0")
+		usedResources[v1.ResourceCPU] = resource.MustParse("0")
+		usedResources[v1.ResourceMemory] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Allowing creating an uninitialized pod that exceeds remaining quota")
+		requests = v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("1100m")
+		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+		podName = "too-large-pod"
+		pod = newTestPodForQuota(f, podName, requests, v1.ResourceList{})
+		pod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "unhandled"}}}
+		_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		// because no one is handling the initializer, server will return a 504 timeout
+		if err != nil && !errors.IsTimeout(err) {
+			framework.Failf("expect err to be timeout error, got %v", err)
+		}
+		createdPod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring only charges pod count")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Disallowing initializing a Pod that doesn't fit quota")
+		_, err = framework.UpdatePodWithRetries(f.ClientSet, f.Namespace.Name, createdPod.Name, func(p *v1.Pod) {
+			p.Initializers = nil
+		})
+		Expect(err).To(HaveOccurred())
+
+		By("Ensuring ResourceQuota status doesn't change")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting the pod")
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(createdPod.Name, metav1.NewDeleteOptions(0))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring ResourceQuota status doesn't change")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		// TODO: This is a bug. We need 51247 to fix it.
+		usedResources[v1.ResourcePods] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should create a ResourceQuota and capture the life of a pod.", func() {

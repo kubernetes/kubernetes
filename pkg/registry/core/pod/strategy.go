@@ -26,7 +26,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,9 +36,11 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper/qos"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -95,9 +99,31 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		return false, nil
+	}
+	oldMeta, err := meta.Accessor(old)
+	if err != nil {
+		return false, err
+	}
+	oldInitializers := oldMeta.GetInitializers()
+	if oldInitializers != nil && len(oldInitializers.Pending) != 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePod(obj.(*api.Pod))
+	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
+	if err != nil {
+		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
+	}
+	if uninitializedUpdate {
+		return errorList
+	}
 	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
@@ -166,6 +192,14 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	var errorList field.ErrorList
+	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
+	if err != nil {
+		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
+	}
+	if uninitializedUpdate {
+		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
+	}
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }

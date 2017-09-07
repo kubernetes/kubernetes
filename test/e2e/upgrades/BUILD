@@ -14,6 +14,7 @@ go_library(
         "etcd.go",
         "horizontal_pod_autoscalers.go",
         "ingress.go",
+        "kube_proxy_migration.go",
         "mysql.go",
         "secrets.go",
         "services.go",
@@ -32,10 +33,13 @@ go_library(
         "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
     ],
 )
 

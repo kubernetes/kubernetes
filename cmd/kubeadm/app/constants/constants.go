@@ -122,9 +122,11 @@ const (
 	// KubeConfigVolumeName specifies the name for the Volume that is used for injecting the kubeconfig to talk securely to the api server for a control plane component if applicable
 	KubeConfigVolumeName = "kubeconfig"
 
-	// NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in
-	// TODO: This should be changed in the v1.8 dev cycle to a node-BT-specific group instead of the generic Bootstrap Token group that is used now
-	NodeBootstrapTokenAuthGroup = "system:bootstrappers"
+	// V17NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.7
+	V17NodeBootstrapTokenAuthGroup = "system:bootstrappers"
+
+	// V18NodeBootstrapTokenAuthGroup specifies which group a Node Bootstrap Token should be authenticated in, in v1.8
+	V18NodeBootstrapTokenAuthGroup = "system:bootstrappers:kubeadm:default-node-token"
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
@@ -197,4 +199,12 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
 	}
 	return tempDir, nil
+}
+
+// GetNodeBootstrapTokenAuthGroup gets the bootstrap token auth group conditionally based on version
+func GetNodeBootstrapTokenAuthGroup(k8sVersion *version.Version) string {
+	if k8sVersion.AtLeast(UseEnableBootstrapTokenAuthFlagVersion) {
+		return V18NodeBootstrapTokenAuthGroup
+	}
+	return V17NodeBootstrapTokenAuthGroup
 }

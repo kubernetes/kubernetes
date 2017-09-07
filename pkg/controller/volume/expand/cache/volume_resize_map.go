@@ -89,8 +89,8 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 
 // AddPVCUpdate adds pvc for resizing
 func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
-	if pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
-		glog.V(4).Infof("Persistent Volume is not mapped to PVC being updated : %s", util.ClaimToClaimKey(pvc))
+	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
+		glog.V(4).Infof("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		return
 	}
 

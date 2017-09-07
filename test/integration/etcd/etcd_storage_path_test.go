@@ -181,8 +181,8 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
-	// k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1
-	gvr("autoscaling", "v2alpha1", "horizontalpodautoscalers"): {
+	// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1
+	gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 		stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 		expectedEtcdPath: "/registry/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa1",
 		expectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),

@@ -170,6 +170,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/capabilities:go_default_library",
+        "//pkg/cloudprovider/providers/fake:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",

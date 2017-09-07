@@ -379,7 +379,7 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
+	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client, k8sVersion); err != nil {
 		return err
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically

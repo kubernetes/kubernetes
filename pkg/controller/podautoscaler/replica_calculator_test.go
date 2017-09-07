@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	autoscalingv2 "k8s.io/api/autoscaling/v2alpha1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +36,7 @@ import (
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -243,7 +243,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,

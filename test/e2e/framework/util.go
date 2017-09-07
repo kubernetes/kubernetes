@@ -1151,7 +1151,7 @@ func isDynamicDiscoveryError(err error) bool {
 			return false
 		}
 	}
-	return false
+	return true
 }
 
 // hasRemainingContent checks if there is remaining content in the namespace via API discovery

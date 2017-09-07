@@ -34,7 +34,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGDescribe("PodPreset", func() {
+var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	f := framework.NewDefaultFramework("podpreset")
 
 	var podClient *framework.PodClient
