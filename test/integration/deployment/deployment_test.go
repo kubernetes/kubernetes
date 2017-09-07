@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -39,9 +40,10 @@ func TestNewDeployment(t *testing.T) {
 	tester.deployment.Spec.MinReadySeconds = 4
 
 	tester.deployment.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
-	deploy, err := c.Extensions().Deployments(ns.Name).Create(tester.deployment)
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
-		t.Fatalf("failed to create deployment %s: %v", deploy.Name, err)
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
 	}
 
 	// Start informer and controllers
@@ -52,24 +54,25 @@ func TestNewDeployment(t *testing.T) {
 	go dc.Run(5, stopCh)
 
 	// Wait for the Deployment to be updated to revision 1
-	err = tester.waitForDeploymentRevisionAndImage("1", fakeImage)
-	if err != nil {
-		t.Fatalf("failed to wait for Deployment revision %s: %v", deploy.Name, err)
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
 	}
 
 	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	tester.waitForDeploymentStatusValidAndMarkPodsReady()
+	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check new RS annotations
-	newRS, err := deploymentutil.GetNewReplicaSet(deploy, c.ExtensionsV1beta1())
+	newRS, err := tester.expectNewReplicaSet()
 	if err != nil {
-		t.Fatalf("failed to get new ReplicaSet of Deployment %s: %v", deploy.Name, err)
+		t.Fatal(err)
 	}
 	if newRS.Annotations["test"] != "should-copy-to-replica-set" {
-		t.Errorf("expected new ReplicaSet annotations copied from Deployment %s, got: %v", deploy.Name, newRS.Annotations)
+		t.Errorf("expected new ReplicaSet annotations copied from Deployment %s, got: %v", tester.deployment.Name, newRS.Annotations)
 	}
 	if newRS.Annotations[v1.LastAppliedConfigAnnotation] != "" {
-		t.Errorf("expected new ReplicaSet last-applied annotation not copied from Deployment %s", deploy.Name)
+		t.Errorf("expected new ReplicaSet last-applied annotation not copied from Deployment %s", tester.deployment.Name)
 	}
 }
 
@@ -132,5 +135,187 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	expectedErrDetail := "field is immutable"
 	if !strings.Contains(err.Error(), expectedErrType) || !strings.Contains(err.Error(), expectedErrDetail) {
 		t.Errorf("error message does not match, expected type: %s, expected detail: %s, got: %s", expectedErrType, expectedErrDetail, err.Error())
+	}
+}
+
+// Paused deployment should not start new rollout
+func TestPausedDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-paused-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tester.deployment.Spec.Paused = true
+	tgps := int64(1)
+	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
+
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Verify that the paused deployment won't create new replica set.
+	if err := tester.expectNoNewReplicaSet(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Resume the deployment
+	tester.deployment, err = tester.updateDeployment(resumeFn())
+	if err != nil {
+		t.Fatalf("failed to resume deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the controller to notice the resume.
+	if err := tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the Deployment to be updated to revision 1
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
+	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A new replicaset should be created.
+	if _, err := tester.expectNewReplicaSet(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pause the deployment.
+	// The paused deployment shouldn't trigger a new rollout.
+	tester.deployment, err = tester.updateDeployment(pauseFn())
+	if err != nil {
+		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the controller to notice the pause.
+	if err := tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the deployment template
+	newTGPS := int64(0)
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &newTGPS
+	})
+	if err != nil {
+		t.Fatalf("failed updating template of deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the controller to notice the rollout.
+	if err := tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the paused deployment won't create new replica set.
+	if err := tester.expectNoNewReplicaSet(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, allOldRs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
+	}
+	if len(allOldRs) != 1 {
+		t.Errorf("expected an old replica set, got %v", allOldRs)
+	}
+	if *allOldRs[0].Spec.Template.Spec.TerminationGracePeriodSeconds == newTGPS {
+		t.Errorf("TerminationGracePeriodSeconds on the replica set should be %d, got %d", tgps, newTGPS)
+	}
+}
+
+// Paused deployment can be scaled
+func TestScalePausedDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-scale-paused-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tgps := int64(1)
+	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
+
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Wait for the Deployment to be updated to revision 1
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
+	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A new replicaset should be created.
+	if _, err := tester.expectNewReplicaSet(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pause the deployment.
+	tester.deployment, err = tester.updateDeployment(pauseFn())
+	if err != nil {
+		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the controller to notice the scale.
+	if err := tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scale the paused deployment.
+	newReplicas := int32(10)
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the controller to notice the scale.
+	if err := tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that the new replicaset is scaled.
+	rs, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *rs.Spec.Replicas != newReplicas {
+		t.Errorf("expected new replicaset replicas = %d, got %d", newReplicas, *rs.Spec.Replicas)
+	}
+
+	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
+	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
 	}
 }
