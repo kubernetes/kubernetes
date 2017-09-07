@@ -48,11 +48,12 @@ const defaultContainerName = "test-c"
 // an authorizer that always returns true.
 func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
-		Handler:         kadmission.NewHandler(kadmission.Create),
-		strategyFactory: kpsp.NewSimpleStrategyFactory(),
-		pspMatcher:      getMatchingPolicies,
-		authz:           &TestAuthorizer{},
-		lister:          lister,
+		Handler:          kadmission.NewHandler(kadmission.Create),
+		strategyFactory:  kpsp.NewSimpleStrategyFactory(),
+		pspMatcher:       getMatchingPolicies,
+		authz:            &TestAuthorizer{},
+		lister:           lister,
+		failOnNoPolicies: true,
 	}
 }
 
@@ -1792,4 +1793,8 @@ func userIDPtr(i int) *int64 {
 func groupIDPtr(i int) *int64 {
 	groupID := int64(i)
 	return &groupID
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
