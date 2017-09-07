@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -163,6 +164,10 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 	}
 	if err := o.WebhookOptions.applyTo(c); err != nil {
 		return err
+	}
+
+	if c.AuditBackend != nil && c.AuditPolicyChecker == nil {
+		glog.V(2).Info("No audit policy file provided for AdvancedAuditing, no events will be recorded.")
 	}
 	return nil
 }
