@@ -373,7 +373,7 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			Memory:           300,
 			AllowedPodNumber: 4,
 		},
-		podPorts: map[int]bool{1234: true, 456: false},
+		podPorts: map[string]bool{"1234": true, "456": false},
 		matchingAntiAffinityTerms: map[string][]matchingPodAntiAffinityTerm{
 			"term1": {
 				{

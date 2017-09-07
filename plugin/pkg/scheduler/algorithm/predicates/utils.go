@@ -17,6 +17,8 @@ limitations under the License.
 package predicates
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -88,4 +90,25 @@ func GetEquivalencePod(pod *v1.Pod) interface{} {
 // EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
 type EquivalencePod struct {
 	ControllerRef metav1.OwnerReference
+}
+
+type hostPortInfo struct {
+	protocol string
+	hostIP   string
+	hostPort string
+}
+
+// decode a string ("protocol/hostIP/hostPort") to *hostPortInfo object
+func decode(info string) *hostPortInfo {
+	hostPortInfoSlice := strings.Split(info, "/")
+
+	protocol := hostPortInfoSlice[0]
+	hostIP := hostPortInfoSlice[1]
+	hostPort := hostPortInfoSlice[2]
+
+	return &hostPortInfo{
+		protocol: protocol,
+		hostIP:   hostIP,
+		hostPort: hostPort,
+	}
 }

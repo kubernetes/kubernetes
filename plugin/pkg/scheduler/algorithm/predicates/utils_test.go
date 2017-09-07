@@ -18,6 +18,8 @@ package predicates
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,4 +69,47 @@ func ExampleFindLabelsInSet() {
 	// will_see_this
 	// label1=value1,label2=value2,label3=will_see_this
 	// pod1,pod2,
+}
+
+func Test_decode(t *testing.T) {
+	tests := []struct {
+		name string
+		args string
+		want *hostPortInfo
+	}{
+		{
+			name: "test1",
+			args: "UDP/127.0.0.1/80",
+			want: &hostPortInfo{
+				protocol: "UDP",
+				hostIP:   "127.0.0.1",
+				hostPort: "80",
+			},
+		},
+		{
+			name: "test2",
+			args: "TCP/127.0.0.1/80",
+			want: &hostPortInfo{
+				protocol: "TCP",
+				hostIP:   "127.0.0.1",
+				hostPort: "80",
+			},
+		},
+		{
+			name: "test3",
+			args: "TCP/0.0.0.0/80",
+			want: &hostPortInfo{
+				protocol: "TCP",
+				hostIP:   "0.0.0.0",
+				hostPort: "80",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		if got := decode(tt.args); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("test name = %v, decode() = %v, want %v", tt.name, got, tt.want)
+		}
+
+	}
 }

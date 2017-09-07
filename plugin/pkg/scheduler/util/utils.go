@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"sort"
 
 	"k8s.io/api/core/v1"
@@ -25,8 +26,8 @@ import (
 
 // GetUsedPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
 // will be in the result; but it does not resolve port conflict.
-func GetUsedPorts(pods ...*v1.Pod) map[int]bool {
-	ports := make(map[int]bool)
+func GetUsedPorts(pods ...*v1.Pod) map[string]bool {
+	ports := make(map[string]bool)
 	for _, pod := range pods {
 		for j := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[j]
@@ -35,7 +36,20 @@ func GetUsedPorts(pods ...*v1.Pod) map[int]bool {
 				// "0" is explicitly ignored in PodFitsHostPorts,
 				// which is the only function that uses this value.
 				if podPort.HostPort != 0 {
-					ports[int(podPort.HostPort)] = true
+					// user does not explicitly set protocol, default is tcp
+					portProtocol := podPort.Protocol
+					if podPort.Protocol == "" {
+						portProtocol = v1.ProtocolTCP
+					}
+
+					// user does not explicitly set hostIP, default is 0.0.0.0
+					portHostIP := podPort.HostIP
+					if podPort.HostIP == "" {
+						portHostIP = "0.0.0.0"
+					}
+
+					str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)
+					ports[str] = true
 				}
 			}
 		}
