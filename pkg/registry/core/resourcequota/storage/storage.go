@@ -24,7 +24,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/resourcequota"
 )
 
@@ -39,7 +38,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &api.ResourceQuota{} },
 		NewListFunc:              func() runtime.Object { return &api.ResourceQuotaList{} },
 		DefaultQualifiedResource: api.Resource("resourcequotas"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("resourcequotas"),
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,

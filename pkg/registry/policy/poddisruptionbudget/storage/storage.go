@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget"
 )
 
@@ -44,7 +43,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
 		NewListFunc:              func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
 		DefaultQualifiedResource: policyapi.Resource("poddisruptionbudgets"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("poddisruptionbudgets"),
 
 		CreateStrategy: poddisruptionbudget.Strategy,
 		UpdateStrategy: poddisruptionbudget.Strategy,
