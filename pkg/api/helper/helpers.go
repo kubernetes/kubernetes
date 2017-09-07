@@ -613,7 +613,7 @@ func PersistentVolumeClaimHasClass(claim *api.PersistentVolumeClaim) bool {
 	}
 
 	if claim.Spec.StorageClassName != nil {
-		return true
+		return len(*claim.Spec.StorageClassName) > 0
 	}
 
 	return false
