@@ -500,7 +500,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})
@@ -536,7 +536,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})
