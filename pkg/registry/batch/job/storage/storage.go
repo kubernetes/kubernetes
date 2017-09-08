@@ -29,7 +29,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // JobStorage includes dummy storage for Job.
@@ -60,7 +59,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewListFunc:              func() runtime.Object { return &batch.JobList{} },
 		PredicateFunc:            job.MatchJob,
 		DefaultQualifiedResource: batch.Resource("jobs"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("jobs"),
 
 		CreateStrategy: job.Strategy,
 		UpdateStrategy: job.Strategy,

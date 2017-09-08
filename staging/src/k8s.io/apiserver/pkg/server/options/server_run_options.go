@@ -43,7 +43,6 @@ type ServerRunOptions struct {
 	RequestTimeout              time.Duration
 	MinRequestTimeout           int
 	TargetRAMMB                 int
-	WatchCacheSizes             []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -150,11 +149,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
-
-	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
-		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
-		"The individual override format: resource#size, where size is a number. It takes effect "+
-		"when watch-cache is enabled.")
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
