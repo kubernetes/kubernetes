@@ -201,7 +201,7 @@ var _ = framework.KubeDescribe("Kubectl alpha client", func() {
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
+			framework.RunKubectlOrDie("delete", "cronjob.v2alpha1.batch", cjName, nsFlag)
 		})
 
 		It("should create a CronJob", func() {
