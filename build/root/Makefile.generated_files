@@ -35,7 +35,7 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
+generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_default_config_yaml
 
 .PHONY: verify_generated_files
 verify_generated_files: verify_gen_deepcopy    \
@@ -803,3 +803,14 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 $(CONVERSION_GEN):
 	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
 	touch $@
+
+
+DEFAULT_CONFIG_YAML_GEN := $(BIN_DIR)/config-doc-gen
+$(DEFAULT_CONFIG_YAML_GEN): hack/cmd/config-doc-gen/main.go
+	hack/make-rules/build.sh ./hack/cmd/config-doc-gen
+	touch $@
+
+cmd/kube-proxy/app/zz_generated.default_config_yaml.go: pkg/apis/componentconfig/v1alpha1/types.go $(DEFAULT_CONFIG_YAML_GEN)
+	hack/run-in-gopath.sh $(BIN_DIR)/config-doc-gen
+
+gen_default_config_yaml: cmd/kube-proxy/app/zz_generated.default_config_yaml.go
