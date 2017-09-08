@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+FROM BASEIMAGE
 
-TAG = e2e
-PREFIX = gcr.io/google_containers/zookeeper-install-3.5.0-alpha
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-container:
-	docker build --pull -t $(PREFIX):$(TAG) .
+RUN clean-install wget bash dnsutils
 
-push: container
-	gcloud docker -- push $(PREFIX):$(TAG)
+COPY peer-finder /
 
-clean:
-	docker rmi $(PREFIX):$(TAG)
+EXPOSE 9376
+ENTRYPOINT ["/peer-finder"]
