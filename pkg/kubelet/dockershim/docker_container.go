@@ -75,15 +75,6 @@ func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*
 
 		result = append(result, converted)
 	}
-	// Include legacy containers if there are still legacy containers not cleaned up yet.
-	if !ds.legacyCleanup.Done() {
-		legacyContainers, err := ds.ListLegacyContainers(filter)
-		if err != nil {
-			return nil, err
-		}
-		// Legacy containers are always older, so we can safely append them to the end.
-		result = append(result, legacyContainers...)
-	}
 	return result, nil
 }
 
@@ -369,15 +360,6 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	// Convert to unix timestamps.
 	ct, st, ft := createdAt.UnixNano(), startedAt.UnixNano(), finishedAt.UnixNano()
 	exitCode := int32(r.State.ExitCode)
-
-	// If the container has no containerTypeLabelKey label, treat it as a legacy container.
-	if _, ok := r.Config.Labels[containerTypeLabelKey]; !ok {
-		names, labels, err := convertLegacyNameAndLabels([]string{r.Name}, r.Config.Labels)
-		if err != nil {
-			return nil, err
-		}
-		r.Name, r.Config.Labels = names[0], labels
-	}
 
 	metadata, err := parseContainerName(r.Name)
 	if err != nil {

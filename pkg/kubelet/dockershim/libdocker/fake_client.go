@@ -83,6 +83,9 @@ const (
 	fakeDockerVersion = "1.11.2"
 
 	fakeImageSize = 1024
+
+	// Docker prepends '/' to the container name.
+	dockerNamePrefix = "/"
 )
 
 func NewFakeDockerClient() *FakeDockerClient {
@@ -289,11 +292,7 @@ func (f *FakeDockerClient) AssertCallDetails(calls ...calledDetail) (err error) 
 func (f *FakeDockerClient) idsToNames(ids []string) ([]string, error) {
 	names := []string{}
 	for _, id := range ids {
-		dockerName, _, err := ParseDockerName(f.ContainerMap[id].Name)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected error: %v", err)
-		}
-		names = append(names, dockerName.ContainerName)
+		names = append(names, strings.TrimPrefix(f.ContainerMap[id].Name, dockerNamePrefix))
 	}
 	return names, nil
 }
@@ -523,8 +522,7 @@ func (f *FakeDockerClient) CreateContainer(c dockertypes.ContainerCreateConfig) 
 		return nil, err
 	}
 	// This is not a very good fake. We'll just add this container's name to the list.
-	// Docker likes to add a '/', so copy that behavior.
-	name := "/" + c.Name
+	name := dockerNamePrefix + c.Name
 	id := GetFakeContainerID(name)
 	f.appendContainerTrace("Created", id)
 	timestamp := f.Clock.Now()

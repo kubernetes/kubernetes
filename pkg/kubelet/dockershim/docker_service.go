@@ -258,8 +258,6 @@ type dockerService struct {
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
 	checkpointHandler CheckpointHandler
-	// legacyCleanup indicates whether legacy cleanup has finished or not.
-	legacyCleanup legacyCleanupFlag
 	// caches the version of the runtime.
 	// To be compatible with multiple docker versions, we need to perform
 	// version checking for some operations. Use this cache to avoid querying
@@ -352,7 +350,6 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	// Initialize the legacy cleanup flag.
-	ds.LegacyCleanupInit()
 	return ds.containerManager.Start()
 }
 
