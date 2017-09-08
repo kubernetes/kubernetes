@@ -61,6 +61,9 @@ func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
 
+// Destroy releases resources
+func (r *ScaleREST) Destroy() {}
+
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	rc, err := (*r.registry).GetController(ctx, name, options)
 	if err != nil {
@@ -127,3 +130,6 @@ type RcREST struct{}
 func (r *RcREST) New() runtime.Object {
 	return &extensions.ReplicationControllerDummy{}
 }
+
+// Destroy releases resources
+func (r *RcREST) Destroy() {}

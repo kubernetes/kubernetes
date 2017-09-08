@@ -148,6 +148,9 @@ type GenericAPIServer struct {
 
 	// delegationTarget is the next delegate in the chain or nil
 	delegationTarget DelegationTarget
+	// stopCh is to be used to clean up any resources that the
+	// server creates or maintains.
+	stopCh <-chan struct{}
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -312,6 +315,16 @@ func (s *GenericAPIServer) EffectiveSecurePort() int {
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
+	go func() {
+		<-s.stopCh
+
+		for _, m := range apiGroupInfo.VersionedResourcesStorageMap {
+			for _, storage := range m {
+				storage.Destroy()
+			}
+		}
+	}()
+
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
 			glog.Warningf("Skipping API %v because it has no resources.", groupVersion)
@@ -347,6 +360,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
+
 	return nil
 }
 

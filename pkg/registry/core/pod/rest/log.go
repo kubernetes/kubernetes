@@ -46,6 +46,11 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy releases resources
+func (r *LogREST) Destroy() {
+	r.Store.Destroy()
+}
+
 // LogREST implements StorageMetadata
 func (r *LogREST) ProducesMIMETypes(verb string) []string {
 	// Since the default list does not include "plain/text", we need to

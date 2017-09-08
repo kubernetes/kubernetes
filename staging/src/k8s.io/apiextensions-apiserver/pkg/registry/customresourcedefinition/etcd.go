@@ -167,6 +167,11 @@ func (r *StatusREST) New() runtime.Object {
 	return &apiextensions.CustomResourceDefinition{}
 }
 
+// Destroy releases resources
+func (r *StatusREST) Destroy() {
+	r.store.Destroy()
+}
+
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo)

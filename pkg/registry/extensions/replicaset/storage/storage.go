@@ -113,6 +113,11 @@ func (r *StatusREST) New() runtime.Object {
 	return &extensions.ReplicaSet{}
 }
 
+// Destroy releases resources
+func (r *StatusREST) Destroy() {
+	r.store.Destroy()
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -139,6 +144,9 @@ func (r *ScaleREST) GroupVersionKind() schema.GroupVersionKind {
 func (r *ScaleREST) New() runtime.Object {
 	return &extensions.Scale{}
 }
+
+// Destroy releases resources
+func (r *ScaleREST) Destroy() {}
 
 func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	rs, err := r.registry.GetReplicaSet(ctx, name, options)

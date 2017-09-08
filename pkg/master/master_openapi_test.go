@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
@@ -54,7 +55,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 	config.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	master, err := config.Complete().New(genericapiserver.EmptyDelegate, wait.NeverStop)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}

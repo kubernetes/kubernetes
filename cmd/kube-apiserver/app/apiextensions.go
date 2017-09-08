@@ -48,8 +48,8 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, comm
 
 }
 
-func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
-	apiextensionsServer, err := apiextensionsConfig.Complete().New(delegateAPIServer)
+func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, stopCh <-chan struct{}) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
+	apiextensionsServer, err := apiextensionsConfig.Complete().New(delegateAPIServer, stopCh)
 	if err != nil {
 		return nil, err
 	}

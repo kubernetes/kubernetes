@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
@@ -52,7 +53,7 @@ func TestNewWithDelegate(t *testing.T) {
 		return fmt.Errorf("delegate failed healthcheck")
 	}))
 
-	delegateServer, err := delegateConfig.SkipComplete().New("test", EmptyDelegate)
+	delegateServer, err := delegateConfig.SkipComplete().New("test", EmptyDelegate, wait.NeverStop)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestNewWithDelegate(t *testing.T) {
 		return fmt.Errorf("wrapping failed healthcheck")
 	}))
 
-	wrappingServer, err := wrappingConfig.Complete().New("test", delegateServer)
+	wrappingServer, err := wrappingConfig.Complete().New("test", delegateServer, wait.NeverStop)
 	if err != nil {
 		t.Fatal(err)
 	}

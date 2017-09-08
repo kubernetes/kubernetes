@@ -219,6 +219,9 @@ func (*REST) New() runtime.Object {
 	return &api.Service{}
 }
 
+// Destroy releases resources
+func (r *REST) Destroy() {}
+
 func (*REST) NewList() runtime.Object {
 	return &api.ServiceList{}
 }

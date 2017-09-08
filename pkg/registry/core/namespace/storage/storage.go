@@ -84,6 +84,11 @@ func (r *REST) New() runtime.Object {
 	return r.store.New()
 }
 
+// Destroy releases resources
+func (r *REST) Destroy() {
+	r.store.Destroy()
+}
+
 func (r *REST) NewList() runtime.Object {
 	return r.store.NewList()
 }
@@ -216,6 +221,11 @@ func (r *StatusREST) New() runtime.Object {
 	return r.store.New()
 }
 
+// Destroy releases resources
+func (r *StatusREST) Destroy() {
+	r.store.Destroy()
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -228,6 +238,11 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
+}
+
+// Destroy releases resources
+func (r *FinalizeREST) Destroy() {
+	r.store.Destroy()
 }
 
 // Update alters the status finalizers subset of an object.
