@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"strings"
 
+	"k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -89,6 +91,9 @@ type Disks interface {
 // GCECloud implements Disks.
 var _ Disks = (*GCECloud)(nil)
 
+// GCECloud implements PVLabeler.
+var _ cloudprovider.PVLabeler = (*GCECloud)(nil)
+
 type GCEDisk struct {
 	ZoneInfo zoneType
 	Region   string
@@ -118,6 +123,23 @@ func newDiskMetricContextZonal(request, region, zone string) *metricContext {
 
 func newDiskMetricContextRegional(request, region string) *metricContext {
 	return newGenericMetricContext("disk", request, region, unusedMetricLabel, computeV1Version)
+}
+
+func (gce *GCECloud) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if pv.Spec.GCEPersistentDisk.PDName == volume.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	// If the zone is already labeled, honor the hint
+	zone := pv.Labels[kubeletapis.LabelZoneFailureDomain]
+
+	labels, err := gce.GetAutoLabelsForPD(pv.Spec.GCEPersistentDisk.PDName, zone)
+	if err != nil {
+		return nil, err
+	}
+
+	return labels, nil
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {
