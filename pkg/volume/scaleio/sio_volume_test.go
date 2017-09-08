@@ -60,8 +60,14 @@ func newPluginMgr(t *testing.T) (*volume.VolumePluginMgr, string) {
 			"password": []byte("password"),
 		},
 	}
+
 	fakeClient := fakeclient.NewSimpleClientset(config)
-	host := volumetest.NewFakeVolumeHost(tmpDir, fakeClient, nil)
+	host := volumetest.NewFakeVolumeHostWithNodeLabels(
+		tmpDir,
+		fakeClient,
+		nil,
+		map[string]string{sdcGuidLabelName: "abc-123"},
+	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
@@ -195,6 +201,11 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Errorf("SetUp() - expecting multiple volume disabled by default")
 	}
 
+	// did we read sdcGuid label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
+	}
+
 	// rebuild spec
 	builtSpec, err := sioPlug.ConstructVolumeSpec(volume.NewSpecFromVolume(vol).Name(), path)
 	if err != nil {
@@ -320,6 +331,11 @@ func TestVolumeProvisioner(t *testing.T) {
 	sioVol.sioMgr.client = sio
 	if err := sioMounter.SetUp(nil); err != nil {
 		t.Fatalf("Expected success, got: %v", err)
+	}
+
+	// did we read sdcGuid label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
 	}
 
 	// isMultiMap applied

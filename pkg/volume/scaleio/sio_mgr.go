@@ -81,6 +81,7 @@ func (m *sioMgr) getClient() (sioInterface, error) {
 		client.spName = configs[confKey.storagePool]
 		client.sdcPath = configs[confKey.sdcRootPath]
 		client.provisionMode = configs[confKey.storageMode]
+		client.sdcGuid = configs[confKey.sdcGuid]
 
 		m.client = client
 
@@ -215,21 +216,10 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 	if err != nil {
 		return err
 	}
-	iid, err := client.IID()
-	if err != nil {
-		glog.Error(log("failed to get instanceID: %v", err))
-		return err
-	}
 
 	vol, err := client.FindVolume(volName)
 	if err != nil {
 		return err
-	}
-
-	// if still attached, stop
-	if m.isSdcMappedToVol(iid, vol) {
-		glog.Error(log("volume %s still attached,  unable to delete", volName))
-		return errors.New("volume still attached")
 	}
 
 	if err := client.DeleteVolume(sioVolumeID(vol.ID)); err != nil {
@@ -241,10 +231,6 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 	return nil
 
 }
-
-//*****************************************************************
-// Helpers
-//*****************************************************************
 
 // isSdcMappedToVol returns true if the sdc is mapped to the volume
 func (m *sioMgr) isSdcMappedToVol(sdcID string, vol *siotypes.Volume) bool {
