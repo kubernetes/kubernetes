@@ -66,7 +66,7 @@ func (sched *Scheduler) StopEverything() {
 type Configurator interface {
 	GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error)
 	GetPriorityMetadataProducer() (algorithm.MetadataProducer, error)
-	GetPredicateMetadataProducer() (algorithm.MetadataProducer, error)
+	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
 	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
 	GetHardPodAffinitySymmetricWeight() int
 	GetSchedulerName() string

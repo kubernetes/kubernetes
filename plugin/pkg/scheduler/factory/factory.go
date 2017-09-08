@@ -753,7 +753,7 @@ func (f *ConfigFactory) GetPriorityMetadataProducer() (algorithm.MetadataProduce
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.MetadataProducer, error) {
+func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
 	pluginArgs, err := f.getPluginArgs()
 	if err != nil {
 		return nil, err
