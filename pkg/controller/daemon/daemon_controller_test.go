@@ -492,7 +492,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 }
 
 // DaemonSets should place onto NotReady nodes
-func TestNotReadNodeDaemonDoesNotLaunchPod(t *testing.T) {
+func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy

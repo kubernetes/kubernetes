@@ -36,6 +36,7 @@ filegroup(
         "//test/integration/auth:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
+        "//test/integration/daemonset:all-srcs",
         "//test/integration/defaulttolerationseconds:all-srcs",
         "//test/integration/deployment:all-srcs",
         "//test/integration/etcd:all-srcs",
