@@ -209,7 +209,9 @@ func (n *NsenterMounter) DeviceOpened(pathname string) (bool, error) {
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
 func (n *NsenterMounter) PathIsDevice(pathname string) (bool, error) {
-	return pathIsDevice(pathname)
+	pathType, err := n.GetFileType(pathname)
+	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
+	return isDevice, err
 }
 
 //GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
@@ -219,4 +221,52 @@ func (n *NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (st
 
 func (n *NsenterMounter) MakeRShared(path string) error {
 	return doMakeRShared(path, hostProcMountinfoPath)
+}
+
+func (mounter *NsenterMounter) GetFileType(pathname string) (FileType, error) {
+	var pathType FileType
+	outputBytes, err := mounter.ne.Exec("stat", []string{"-L", `--printf "%F"`, pathname}).CombinedOutput()
+	if err != nil {
+		return pathType, err
+	}
+
+	switch string(outputBytes) {
+	case "socket":
+		return FileTypeSocket, nil
+	case "character special file":
+		return FileTypeCharDev, nil
+	case "block special file":
+		return FileTypeBlockDev, nil
+	case "directory":
+		return FileTypeDirectory, nil
+	case "regular file":
+		return FileTypeFile, nil
+	}
+
+	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+}
+
+func (mounter *NsenterMounter) MakeDir(pathname string) error {
+	args := []string{"-p", pathname}
+	if _, err := mounter.ne.Exec("mkdir", args).CombinedOutput(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mounter *NsenterMounter) MakeFile(pathname string) error {
+	args := []string{pathname}
+	if _, err := mounter.ne.Exec("touch", args).CombinedOutput(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mounter *NsenterMounter) ExistsPath(pathname string) bool {
+	args := []string{pathname}
+	_, err := mounter.ne.Exec("ls", args).CombinedOutput()
+	if err == nil {
+		return true
+	}
+	return false
 }
