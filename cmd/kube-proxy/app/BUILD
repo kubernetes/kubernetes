@@ -12,6 +12,7 @@ go_library(
         "conntrack.go",
         "server.go",
         "server_others.go",
+        "zz_generated.default_config_yaml.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "server_windows.go",
