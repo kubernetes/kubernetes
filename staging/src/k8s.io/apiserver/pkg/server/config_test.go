@@ -44,7 +44,6 @@ func TestNewWithDelegate(t *testing.T) {
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
 	}
-	delegateConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, delegateConfig.LoopbackClientConfig.Timeout)
 
 	delegateHealthzCalled := false
 	delegateConfig.HealthzChecks = append(delegateConfig.HealthzChecks, healthz.NamedCheck("delegate-health", func(r *http.Request) error {
@@ -52,7 +51,8 @@ func TestNewWithDelegate(t *testing.T) {
 		return fmt.Errorf("delegate failed healthcheck")
 	}))
 
-	delegateServer, err := delegateConfig.SkipComplete().New("test", EmptyDelegate)
+	sharedInformers := informers.NewSharedInformerFactory(clientset, delegateConfig.LoopbackClientConfig.Timeout)
+	delegateServer, err := delegateConfig.Complete(sharedInformers).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,6 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 	wrappingConfig.SwaggerConfig = DefaultSwaggerConfig()
-	wrappingConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, wrappingConfig.LoopbackClientConfig.Timeout)
 
 	wrappingHealthzCalled := false
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
@@ -81,7 +80,8 @@ func TestNewWithDelegate(t *testing.T) {
 		return fmt.Errorf("wrapping failed healthcheck")
 	}))
 
-	wrappingServer, err := wrappingConfig.Complete().New("test", delegateServer)
+	sharedInformers = informers.NewSharedInformerFactory(clientset, wrappingConfig.LoopbackClientConfig.Timeout)
+	wrappingServer, err := wrappingConfig.Complete(sharedInformers).New("test", delegateServer)
 	if err != nil {
 		t.Fatal(err)
 	}

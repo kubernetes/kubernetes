@@ -39,6 +39,8 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	clientgoinformers "k8s.io/client-go/informers"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -103,7 +105,6 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
 		return fmt.Errorf("error setting the external host value: %v", err)
 	}
-	s.SecureServing.ForceLoopbackConfigUsage()
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
@@ -189,6 +190,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create real external clientset: %v", err)
+	}
+	versionedInformers := clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
 	apiAuthorizer, _, err := authorizationConfig.New()
 	if err != nil {
@@ -210,6 +217,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
+		versionedInformers,
 		pluginInitializer,
 	)
 	if err != nil {
@@ -235,7 +243,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
 	}
 
-	m, err := genericConfig.Complete().New("federation", genericapiserver.EmptyDelegate)
+	m, err := genericConfig.Complete(versionedInformers).New("federation", genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}

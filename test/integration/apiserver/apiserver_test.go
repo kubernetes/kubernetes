@@ -44,7 +44,7 @@ import (
 
 func setup(t *testing.T) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.EnableCoreControllers = false
+	masterConfig.ExtraConfig.EnableCoreControllers = false
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})

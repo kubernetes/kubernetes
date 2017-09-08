@@ -75,7 +75,7 @@ type testRESTOptionsGetter struct {
 }
 
 func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := getter.config.StorageFactory.NewConfig(resource)
+	storageConfig, err := getter.config.ExtraConfig.StorageFactory.NewConfig(resource)
 	if err != nil {
 		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %v", err)
 	}

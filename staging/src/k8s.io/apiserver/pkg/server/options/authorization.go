@@ -57,6 +57,10 @@ func (s *DelegatingAuthorizationOptions) Validate() []error {
 }
 
 func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
 		" subjectaccessreviews.authorization.k8s.io.")
@@ -71,6 +75,11 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		c.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+		return nil
+	}
+
 	cfg, err := s.ToAuthorizationConfig()
 	if err != nil {
 		return err

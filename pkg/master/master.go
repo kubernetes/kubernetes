@@ -62,6 +62,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	// RESTStorage installers
+	"k8s.io/client-go/informers"
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
@@ -85,9 +86,7 @@ const (
 	DefaultEndpointReconcilerInterval = 10 * time.Second
 )
 
-type Config struct {
-	GenericConfig *genericapiserver.Config
-
+type ExtraConfig struct {
 	ClientCARegistrationHook ClientCARegistrationHook
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
@@ -135,6 +134,21 @@ type Config struct {
 	MasterCount int
 }
 
+type Config struct {
+	GenericConfig *genericapiserver.Config
+	ExtraConfig   ExtraConfig
+}
+
+type completedConfig struct {
+	GenericConfig genericapiserver.CompletedConfig
+	ExtraConfig   *ExtraConfig
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
+}
+
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
 // used by the master.
 type EndpointReconcilerConfig struct {
@@ -149,61 +163,55 @@ type Master struct {
 	ClientCARegistrationHook ClientCARegistrationHook
 }
 
-type completedConfig struct {
-	*Config
-}
-
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
-	c.GenericConfig.Complete()
+func (cfg *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+	c := completedConfig{
+		cfg.GenericConfig.Complete(informers),
+		&cfg.ExtraConfig,
+	}
 
-	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if c.ServiceIPRange.IP == nil {
-		c.ServiceIPRange = serviceIPRange
+	if c.ExtraConfig.ServiceIPRange.IP == nil {
+		c.ExtraConfig.ServiceIPRange = serviceIPRange
 	}
-	if c.APIServerServiceIP == nil {
-		c.APIServerServiceIP = apiServerServiceIP
+	if c.ExtraConfig.APIServerServiceIP == nil {
+		c.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
 	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
-		discovery.CIDRRule{IPRange: c.ServiceIPRange, Address: net.JoinHostPort(c.APIServerServiceIP.String(), strconv.Itoa(c.APIServerServicePort))})
+		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(c.ExtraConfig.APIServerServicePort))})
 	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
-	if c.ServiceNodePortRange.Size == 0 {
+	if c.ExtraConfig.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
-		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
+		c.ExtraConfig.ServiceNodePortRange = options.DefaultServiceNodePortRange
+		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
 
 	// enable swagger UI only if general UI support is on
-	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.EnableUISupport
+	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.ExtraConfig.EnableUISupport
 
-	if c.EndpointReconcilerConfig.Interval == 0 {
-		c.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
+		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
 
-	if c.EndpointReconcilerConfig.Reconciler == nil {
+	if c.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
 		// use a default endpoint reconciler if nothing is set
 		endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.MasterCount, endpointClient)
+		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
 	}
 
 	// this has always been hardcoded true in the past
 	c.GenericConfig.EnableMetrics = true
 
-	return completedConfig{c}
-}
-
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+	return CompletedConfig{&c}
 }
 
 // New returns a new instance of Master from the given config.
@@ -211,19 +219,19 @@ func (c *Config) SkipComplete() completedConfig {
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
-	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
+	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.Config.GenericConfig.SkipComplete().New("kube-apiserver", delegationTarget) // completion is done in Complete, no need for a second time
+	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
 	}
 
-	if c.EnableUISupport {
+	if c.ExtraConfig.EnableUISupport {
 		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
 	}
-	if c.EnableLogsSupport {
+	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
@@ -232,17 +240,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	// install legacy rest storage
-	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+	if c.ExtraConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-			StorageFactory:       c.StorageFactory,
-			ProxyTransport:       c.ProxyTransport,
-			KubeletClientConfig:  c.KubeletClientConfig,
-			EventTTL:             c.EventTTL,
-			ServiceIPRange:       c.ServiceIPRange,
-			ServiceNodePortRange: c.ServiceNodePortRange,
+			StorageFactory:       c.ExtraConfig.StorageFactory,
+			ProxyTransport:       c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:  c.ExtraConfig.KubeletClientConfig,
+			EventTTL:             c.ExtraConfig.EventTTL,
+			ServiceIPRange:       c.ExtraConfig.ServiceIPRange,
+			ServiceNodePortRange: c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
 		}
-		m.InstallLegacyAPI(c.Config, c.Config.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
+		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
 	// The order here is preserved in discovery.
@@ -270,24 +278,24 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		appsrest.RESTStorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.APIResourceConfigSource, c.Config.GenericConfig.RESTOptionsGetter, restStorageProviders...)
+	m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
-	if c.Tunneler != nil {
-		m.installTunneler(c.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+	if c.ExtraConfig.Tunneler != nil {
+		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
-	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ClientCARegistrationHook.PostStartHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
 
 	return m, nil
 }
 
-func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		glog.Fatalf("Error building core storage: %v", err)
 	}
 
-	if c.EnableCoreControllers {
+	if c.ExtraConfig.EnableCoreControllers {
 		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient)
 		m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
