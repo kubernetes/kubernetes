@@ -137,13 +137,13 @@ func (r *Resource) Clone() *Resource {
 		EphemeralStorage: r.EphemeralStorage,
 	}
 	if r.ExtendedResources != nil {
-		res.ExtendedResources = make(map[v1.ResourceName]int64)
+		res.ExtendedResources = make(map[v1.ResourceName]int64, len(r.ExtendedResources))
 		for k, v := range r.ExtendedResources {
 			res.ExtendedResources[k] = v
 		}
 	}
 	if r.HugePages != nil {
-		res.HugePages = make(map[v1.ResourceName]int64)
+		res.HugePages = make(map[v1.ResourceName]int64, len(r.HugePages))
 		for k, v := range r.HugePages {
 			res.HugePages[k] = v
 		}
