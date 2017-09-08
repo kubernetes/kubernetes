@@ -108,9 +108,23 @@ func TestMatchPod(t *testing.T) {
 		},
 		{
 			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "custom-scheduler"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=custom-scheduler"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
 				Status: api.PodStatus{PodIP: "1.2.3.4"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{SchedulerName: "default-scheduler"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=custom-scheduler"),
 			expectMatch:   false,
 		},
 	}
