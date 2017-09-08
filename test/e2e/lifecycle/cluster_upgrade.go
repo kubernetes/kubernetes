@@ -255,7 +255,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, true))
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, framework.TestContext.UpgradeImage, true))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
@@ -281,7 +281,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				defer finalizeUpgradeTest(start, kubeProxyDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, false))
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, framework.TestContext.UpgradeImage, false))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
