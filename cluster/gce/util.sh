@@ -1833,7 +1833,8 @@ function set-replica-name() {
 #
 # $1: project
 function get-template() {
-  gcloud compute instance-templates list -r "${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?" \
+  gcloud compute instance-templates list \
+    --filter="name ~ '${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?'" \
     --project="${1}" --format='value(name)'
 }
 
