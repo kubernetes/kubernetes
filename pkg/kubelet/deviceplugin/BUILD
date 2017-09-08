@@ -44,7 +44,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "endpoint_test.go",
-        "manager_test.go",
         "utils_test.go",
     ],
     library = ":go_default_library",

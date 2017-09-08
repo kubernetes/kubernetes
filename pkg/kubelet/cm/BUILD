@@ -96,6 +96,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//pkg/kubelet/deviceplugin:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

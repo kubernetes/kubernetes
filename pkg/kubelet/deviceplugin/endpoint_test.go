@@ -51,7 +51,7 @@ func TestList(t *testing.T) {
 	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
 	defer ecleanup(t, p, e)
 
-	_, err := e.list()
+	_, err := e.List()
 	require.NoError(t, err)
 
 	e.mutex.Lock()
@@ -93,10 +93,10 @@ func TestListAndWatch(t *testing.T) {
 	})
 	defer ecleanup(t, p, e)
 
-	s, err := e.list()
+	s, err := e.List()
 	require.NoError(t, err)
 
-	go e.listAndWatch(s)
+	go e.ListAndWatch(s)
 	p.Update(updated)
 	time.Sleep(time.Second)
 
@@ -114,19 +114,19 @@ func TestListAndWatch(t *testing.T) {
 
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *endpoint) {
-	p := NewDevicePluginStub(devs, socket)
+func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *Endpoint) {
+	p := NewDevicePluginStub(devs, socket, "mock")
 
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpoint(socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
+	e, err := NewEndpoint(socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
 
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *Stub, e *endpoint) {
+func ecleanup(t *testing.T, p *Stub, e *Endpoint) {
 	p.Stop()
-	e.stop()
+	e.Stop()
 }
