@@ -32,8 +32,8 @@ func (h *DevicePluginHandlerStub) Start() error {
 	return nil
 }
 
-func (h *DevicePluginHandlerStub) Devices() map[string][]*pluginapi.Device {
-	return make(map[string][]*pluginapi.Device)
+func (h *DevicePluginHandlerStub) Devices() map[string][]pluginapi.Device {
+	return make(map[string][]pluginapi.Device)
 }
 
 func (h *DevicePluginHandlerStub) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) ([]*pluginapi.AllocateResponse, error) {

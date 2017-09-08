@@ -38,7 +38,7 @@ type endpoint struct {
 	socketPath   string
 	resourceName string
 
-	devices map[string]*pluginapi.Device
+	devices map[string]pluginapi.Device
 	mutex   sync.Mutex
 
 	callback MonitorCallback
@@ -71,10 +71,16 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 	}, nil
 }
 
-func (e *endpoint) getDevices() []*pluginapi.Device {
+func (e *endpoint) getDevices() []pluginapi.Device {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	return copyDevices(e.devices)
+	var devs []pluginapi.Device
+
+	for _, d := range e.devices {
+		devs = append(devs, d)
+	}
+
+	return devs
 }
 
 // list initializes ListAndWatch gRPC call for the device plugin and gets the
@@ -94,11 +100,11 @@ func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
 		return nil, err
 	}
 
-	devices := make(map[string]*pluginapi.Device)
-	var added, updated, deleted []*pluginapi.Device
+	devices := make(map[string]pluginapi.Device)
+	var added, updated, deleted []pluginapi.Device
 	for _, d := range devs.Devices {
-		devices[d.ID] = d
-		added = append(added, cloneDevice(d))
+		devices[d.ID] = *d
+		added = append(added, *d)
 	}
 
 	e.mutex.Lock()
@@ -118,11 +124,11 @@ func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
 func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient) {
 	glog.V(3).Infof("Starting ListAndWatch")
 
-	devices := make(map[string]*pluginapi.Device)
+	devices := make(map[string]pluginapi.Device)
 
 	e.mutex.Lock()
 	for _, d := range e.devices {
-		devices[d.ID] = cloneDevice(d)
+		devices[d.ID] = d
 	}
 	e.mutex.Unlock()
 
@@ -137,7 +143,7 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 		glog.V(2).Infof("State pushed for device plugin %s", e.resourceName)
 
 		newDevs := make(map[string]*pluginapi.Device)
-		var added, updated []*pluginapi.Device
+		var added, updated []pluginapi.Device
 
 		for _, d := range devs {
 			dOld, ok := devices[d.ID]
@@ -146,8 +152,8 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 			if !ok {
 				glog.V(2).Infof("New device for Endpoint %s: %v", e.resourceName, d)
 
-				devices[d.ID] = d
-				added = append(added, cloneDevice(d))
+				devices[d.ID] = *d
+				added = append(added, *d)
 
 				continue
 			}
@@ -162,11 +168,11 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 				glog.V(2).Infof("Device %s is now Healthy", d.ID)
 			}
 
-			devices[d.ID] = d
-			updated = append(updated, cloneDevice(d))
+			devices[d.ID] = *d
+			updated = append(updated, *d)
 		}
 
-		var deleted []*pluginapi.Device
+		var deleted []pluginapi.Device
 		for id, d := range devices {
 			if _, ok := newDevs[id]; ok {
 				continue
@@ -174,7 +180,7 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 
 			glog.Errorf("Device %s was deleted", d.ID)
 
-			deleted = append(deleted, cloneDevice(d))
+			deleted = append(deleted, d)
 			delete(devices, id)
 		}
 

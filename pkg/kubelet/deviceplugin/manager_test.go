@@ -33,15 +33,15 @@ const (
 )
 
 func TestNewManagerImpl(t *testing.T) {
-	_, err := NewManagerImpl("", func(n string, a, u, r []*pluginapi.Device) {})
+	_, err := NewManagerImpl("", func(n string, a, u, r []pluginapi.Device) {})
 	require.Error(t, err)
 
-	_, err = NewManagerImpl(socketName, func(n string, a, u, r []*pluginapi.Device) {})
+	_, err = NewManagerImpl(socketName, func(n string, a, u, r []pluginapi.Device) {})
 	require.NoError(t, err)
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []*pluginapi.Device) {})
+	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []pluginapi.Device) {})
 	cleanup(t, m, p)
 }
 
@@ -58,7 +58,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	callbackChan := make(chan int)
 	var stopping int32
 	stopping = 0
-	callback := func(n string, a, u, r []*pluginapi.Device) {
+	callback := func(n string, a, u, r []pluginapi.Device) {
 		// Should be called twice, one for each plugin registration, till we are stopping.
 		if callbackCount > 1 && atomic.LoadInt32(&stopping) <= 0 {
 			t.FailNow()
