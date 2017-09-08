@@ -41,6 +41,8 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectRulesReview{}
 }
 
+func (r *REST) Destroy() {}
+
 // Create attempts to get self subject rules in specific namespace.
 func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	selfSRR, ok := obj.(*authorizationapi.SelfSubjectRulesReview)
