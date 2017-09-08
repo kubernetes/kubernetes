@@ -264,7 +264,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-username-headers", "",
 				"--proxy-client-cert-file", proxyClientCertFile.Name(),
 				"--proxy-client-key-file", proxyClientKeyFile.Name(),
-				"--core-kubeconfig", kubeconfigFile.Name(),
+				"--kubeconfig", kubeconfigFile.Name(),
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
 				"--etcd-servers", framework.GetEtcdURL(),

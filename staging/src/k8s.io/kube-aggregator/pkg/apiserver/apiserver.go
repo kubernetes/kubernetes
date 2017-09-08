@@ -30,7 +30,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -71,9 +70,6 @@ func init() {
 const legacyAPIServiceName = "v1."
 
 type ExtraConfig struct {
-	// CoreKubeInformers is used to watch kube resources
-	CoreKubeInformers kubeinformers.SharedInformerFactory
-
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
 	ProxyClientCert []byte
@@ -205,17 +201,17 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.ExtraConfig.CoreKubeInformers.Core().V1().Services(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.GenericConfig.SharedInformerFactory.Core().V1().Services(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().InternalVersion().APIServices(),
-		c.ExtraConfig.CoreKubeInformers.Core().V1().Services(),
-		c.ExtraConfig.CoreKubeInformers.Core().V1().Endpoints(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
+		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),
 	)
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(context.StopCh)
-		c.ExtraConfig.CoreKubeInformers.Start(context.StopCh)
+		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {

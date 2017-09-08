@@ -81,11 +81,10 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			CoreKubeInformers: externalInformers,
-			ProxyClientCert:   certBytes,
-			ProxyClientKey:    keyBytes,
-			ServiceResolver:   serviceResolver,
-			ProxyTransport:    proxyTransport,
+			ProxyClientCert: certBytes,
+			ProxyClientKey:  keyBytes,
+			ServiceResolver: serviceResolver,
+			ProxyTransport:  proxyTransport,
 		},
 	}
 
