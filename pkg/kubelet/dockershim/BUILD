@@ -57,6 +57,7 @@ go_library(
         "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/hash:go_default_library",
+        "//pkg/util/parsers:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
