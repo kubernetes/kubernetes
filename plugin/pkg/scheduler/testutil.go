@@ -45,7 +45,7 @@ func (fc *FakeConfigurator) GetPriorityMetadataProducer() (algorithm.MetadataPro
 }
 
 // GetPredicateMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.MetadataProducer, error) {
+func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

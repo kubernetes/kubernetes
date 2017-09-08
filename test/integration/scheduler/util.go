@@ -205,6 +205,7 @@ type pausePodConfig struct {
 	Tolerations                       []v1.Toleration
 	NodeName                          string
 	SchedulerName                     string
+	Priority                          *int32
 }
 
 // initPausePod initializes a pod API object from the given config. It is used
@@ -213,6 +214,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        conf.Name,
+			Namespace:   conf.Namespace,
 			Labels:      conf.Labels,
 			Annotations: conf.Annotations,
 		},
@@ -228,6 +230,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 			Tolerations:   conf.Tolerations,
 			NodeName:      conf.NodeName,
 			SchedulerName: conf.SchedulerName,
+			Priority:      conf.Priority,
 		},
 	}
 	if conf.Resources != nil {
@@ -238,9 +241,8 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 
 // createPausePod creates a pod with "Pause" image and the given config and
 // return its pointer and error status.
-func createPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, error) {
-	p := initPausePod(cs, conf)
-	return cs.CoreV1().Pods(conf.Namespace).Create(p)
+func createPausePod(cs clientset.Interface, p *v1.Pod) (*v1.Pod, error) {
+	return cs.CoreV1().Pods(p.Namespace).Create(p)
 }
 
 // createPausePodWithResource creates a pod with "Pause" image and the given
@@ -262,22 +264,21 @@ func createPausePodWithResource(cs clientset.Interface, podName string, nsName s
 			},
 		}
 	}
-	return createPausePod(cs, &conf)
+	return createPausePod(cs, initPausePod(cs, &conf))
 }
 
 // runPausePod creates a pod with "Pause" image and the given config and waits
 // until it is scheduled. It returns its pointer and error status.
-func runPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, error) {
-	p := initPausePod(cs, conf)
-	pod, err := cs.CoreV1().Pods(conf.Namespace).Create(p)
+func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
 	}
-	if pod, err = cs.CoreV1().Pods(conf.Namespace).Get(conf.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", conf.Name, err)
+	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
 	}
 	return pod, nil
 }
@@ -285,8 +286,25 @@ func runPausePod(cs clientset.Interface, conf *pausePodConfig) (*v1.Pod, error) 
 // podDeleted returns true if a pod is not found in the given namespace.
 func podDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if pod.DeletionTimestamp != nil {
+			return true, nil
+		}
 		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	}
+}
+
+// podIsGettingEvicted returns true if the pod's deletion timestamp is set.
+func podIsGettingEvicted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
 		return false, nil

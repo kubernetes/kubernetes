@@ -355,3 +355,46 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 		}
 	}
 }
+
+// TestPredicateMetadata_ShallowCopy tests the ShallowCopy function. It is based
+// on the idea that shallow-copy should produce an object that is deep-equal to the original
+// object.
+func TestPredicateMetadata_ShallowCopy(t *testing.T) {
+	source := predicateMetadata{
+		pod: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "testns",
+			},
+		},
+		podBestEffort: true,
+		podRequest: &schedulercache.Resource{
+			MilliCPU:         1000,
+			Memory:           300,
+			AllowedPodNumber: 4,
+		},
+		podPorts: map[int]bool{1234: true, 456: false},
+		matchingAntiAffinityTerms: map[string][]matchingPodAntiAffinityTerm{
+			"term1": {
+				{
+					term: &v1.PodAffinityTerm{TopologyKey: "node"},
+					node: &v1.Node{
+						ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+					},
+				},
+			},
+		},
+		serviceAffinityInUse: true,
+		serviceAffinityMatchingPodList: []*v1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
+		},
+		serviceAffinityMatchingPodServices: []*v1.Service{
+			{ObjectMeta: metav1.ObjectMeta{Name: "service1"}},
+		},
+	}
+
+	if !reflect.DeepEqual(source.ShallowCopy().(*predicateMetadata), &source) {
+		t.Errorf("Copy is not equal to source!")
+	}
+}
