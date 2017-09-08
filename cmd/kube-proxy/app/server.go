@@ -329,7 +329,6 @@ func NewProxyCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: "kube-proxy",
 		Long: `The Kubernetes network proxy runs on each node. This
 reflects services as defined in the Kubernetes API on each node and can do simple
 TCP,UDP stream forwarding or round robin TCP,UDP forwarding across a set of backends.
@@ -349,6 +348,14 @@ with the apiserver API to configure the proxy.`,
 	if err != nil {
 		glog.Fatalf("unable to create flag defaults: %v", err)
 	}
+
+	cmd.Use = fmt.Sprintf(`kube-proxy [flags]
+
+Most flags have been deprecated and instead you should simply pass a --config to use.
+
+The default config file contains these values:
+
+%s`, defaultConfigYaml)
 
 	flags := cmd.Flags()
 	AddFlags(opts, flags)
