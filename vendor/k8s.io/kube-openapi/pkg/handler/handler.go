@@ -22,12 +22,13 @@ import (
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"mime"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful"
@@ -119,6 +120,9 @@ func RegisterOpenAPIService(openapiSpec *spec.Swagger, servePath string, handler
 		getDataAndETag := file.getDataAndETag
 		handler.Handle(path, gziphandler.GzipHandler(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
+				fmt.Printf("%v openapi handler start\n", time.Now().Format(time.StampMilli))
+				defer func() { fmt.Printf("%v openapi handler stop\n", time.Now().Format(time.StampMilli)) }()
+
 				data, etag, lastModified := getDataAndETag()
 				w.Header().Set("Etag", etag)
 

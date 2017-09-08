@@ -27,6 +27,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
     ],
 )
 
