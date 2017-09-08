@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	"k8s.io/kubernetes/plugin/pkg/admission/defaultpodlabels"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
@@ -57,6 +58,7 @@ func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
+	defaultpodlabels.Register(plugins)
 	deny.Register(plugins)
 	exec.Register(plugins)
 	gc.Register(plugins)
