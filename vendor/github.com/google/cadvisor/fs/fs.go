@@ -43,6 +43,7 @@ const (
 	LabelSystemRoot   = "root"
 	LabelDockerImages = "docker-images"
 	LabelRktImages    = "rkt-images"
+	LabelCrioImages   = "crio-images"
 )
 
 // The maximum number of `du` and `find` tasks that can be running at once.
@@ -91,12 +92,17 @@ type Context struct {
 	// docker root directory.
 	Docker  DockerContext
 	RktPath string
+	Crio    CrioContext
 }
 
 type DockerContext struct {
 	Root         string
 	Driver       string
 	DriverStatus map[string]string
+}
+
+type CrioContext struct {
+	Root string
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
@@ -128,6 +134,7 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	// need to call this before the log line below printing out the partitions, as this function may
 	// add a "partition" for devicemapper to fsInfo.partitions
 	fsInfo.addDockerImagesLabel(context, mounts)
+	fsInfo.addCrioImagesLabel(context, mounts)
 
 	glog.Infof("Filesystem UUIDs: %+v", fsInfo.fsUUIDToDeviceName)
 	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
@@ -275,6 +282,23 @@ func (self *RealFsInfo) addDockerImagesLabel(context Context, mounts []*mount.In
 		self.labels[LabelDockerImages] = dockerDev
 	} else {
 		self.updateContainerImagesPath(LabelDockerImages, mounts, getDockerImagePaths(context))
+	}
+}
+
+func (self *RealFsInfo) addCrioImagesLabel(context Context, mounts []*mount.Info) {
+	if context.Crio.Root != "" {
+		crioPath := context.Crio.Root
+		crioImagePaths := map[string]struct{}{
+			"/": {},
+		}
+		for _, dir := range []string{"overlay", "overlay2"} {
+			crioImagePaths[path.Join(crioPath, dir+"-images")] = struct{}{}
+		}
+		for crioPath != "/" && crioPath != "." {
+			crioImagePaths[crioPath] = struct{}{}
+			crioPath = filepath.Dir(crioPath)
+		}
+		self.updateContainerImagesPath(LabelCrioImages, mounts, crioImagePaths)
 	}
 }
 
