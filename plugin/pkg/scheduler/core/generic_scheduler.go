@@ -115,6 +115,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 			Pod:              pod,
 			FailedPredicates: failedPredicateMap,
 		}
+	} else if len(filteredNodes) == 1 {
+		return filteredNodes[0].Name, nil
 	}
 
 	trace.Step("Prioritizing")
