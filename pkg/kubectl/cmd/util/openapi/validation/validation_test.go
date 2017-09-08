@@ -24,10 +24,9 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	// This dependency is needed to register API types.
-	oapi "k8s.io/kube-openapi/pkg/util/proto"
-	tst "k8s.io/kube-openapi/pkg/util/proto/testing"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 )
 
@@ -38,7 +37,7 @@ var _ = Describe("resource validation using OpenAPI Schema", func() {
 	BeforeEach(func() {
 		s, err := fakeSchema.OpenAPISchema()
 		Expect(err).To(BeNil())
-		resources, err := oapi.NewOpenAPIData(s, openapi.ParseGroupVersionKind)
+		resources, err := openapi.NewOpenAPIData(s)
 		Expect(err).To(BeNil())
 		validator = validation.NewSchemaValidation(resources)
 		Expect(validator).ToNot(BeNil())

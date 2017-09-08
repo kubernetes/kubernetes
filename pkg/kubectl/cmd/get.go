@@ -578,7 +578,7 @@ func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMappin
 		return nil, false
 	}
 	// Found openapi metadata for this resource
-	schema := api.LookupResource(mapping.GroupVersionKind.String())
+	schema := api.LookupResource(mapping.GroupVersionKind)
 	if schema == nil {
 		// Schema not found, return empty columns
 		return nil, false

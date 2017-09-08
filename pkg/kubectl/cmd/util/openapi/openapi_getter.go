@@ -20,14 +20,13 @@ import (
 	"sync"
 
 	"k8s.io/client-go/discovery"
-	openapi "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // synchronizedOpenAPIGetter fetches the openapi schema once and then caches it in memory
 type synchronizedOpenAPIGetter struct {
 	// Cached results
 	sync.Once
-	openAPISchema openapi.Resources
+	openAPISchema Resources
 	err           error
 
 	openAPIClient discovery.OpenAPISchemaInterface
@@ -38,7 +37,7 @@ var _ Getter = &synchronizedOpenAPIGetter{}
 // Getter is an interface for fetching openapi specs and parsing them into an Resources struct
 type Getter interface {
 	// OpenAPIData returns the parsed OpenAPIData
-	Get() (openapi.Resources, error)
+	Get() (Resources, error)
 }
 
 // NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
@@ -50,7 +49,7 @@ func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
 }
 
 // Resources implements Getter
-func (g *synchronizedOpenAPIGetter) Get() (openapi.Resources, error) {
+func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
 	g.Do(func() {
 		s, err := g.openAPIClient.OpenAPISchema()
 		if err != nil {
@@ -58,7 +57,7 @@ func (g *synchronizedOpenAPIGetter) Get() (openapi.Resources, error) {
 			return
 		}
 
-		g.openAPISchema, g.err = openapi.NewOpenAPIData(s, ParseGroupVersionKind)
+		g.openAPISchema, g.err = NewOpenAPIData(s)
 	})
 
 	// Return the save result
