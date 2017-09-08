@@ -257,8 +257,12 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
-		io.Copy(outFile, tarReader)
+		if _, err := io.Copy(outFile, tarReader); err != nil {
+			return err
+		}
+		if err := outFile.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
