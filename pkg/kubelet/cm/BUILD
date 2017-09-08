@@ -31,6 +31,7 @@ go_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
@@ -43,6 +44,8 @@ go_library(
         "//pkg/kubelet/status:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -52,7 +55,6 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/api:go_default_library",
-            "//pkg/api/v1/helper:go_default_library",
             "//pkg/api/v1/helper/qos:go_default_library",
             "//pkg/api/v1/resource:go_default_library",
             "//pkg/kubelet/cm/util:go_default_library",

@@ -20,14 +20,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/deviceplugin"
 )
@@ -95,9 +100,14 @@ type DevicePluginHandler interface {
 
 type DevicePluginHandlerImpl struct {
 	sync.Mutex
-	devicePluginManager deviceplugin.Manager
-	// devicePluginManagerMonitorCallback is used for testing only.
-	devicePluginManagerMonitorCallback deviceplugin.MonitorCallback
+	socketname string
+	socketdir  string
+
+	endpoints map[string]*deviceplugin.Endpoint // Key is ResourceName
+
+	server *grpc.Server
+	// deviceMonitorCallback is used for testing only.
+	deviceMonitorCallback deviceplugin.MonitorCallback
 	// allDevices contains all of registered resourceNames and their exported device IDs.
 	allDevices map[string]sets.String
 	// allocatedDevices contains pod to allocated device mapping, keyed by resourceName.
@@ -109,12 +119,17 @@ type DevicePluginHandlerImpl struct {
 // device capacity changes.
 func NewDevicePluginHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*DevicePluginHandlerImpl, error) {
 	glog.V(2).Infof("Creating Device Plugin Handler")
+
+	socketdir, socketname := filepath.Split(pluginapi.KubeletSocket)
 	handler := &DevicePluginHandlerImpl{
+		socketname:       socketname,
+		socketdir:        socketdir,
+		endpoints:        make(map[string]*deviceplugin.Endpoint),
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]podDevices),
 	}
 
-	deviceManagerMonitorCallback := func(resourceName string, added, updated, deleted []*pluginapi.Device) {
+	deviceMonitorCallback := func(resourceName string, added, updated, deleted []*pluginapi.Device) {
 		var capacity = v1.ResourceList{}
 		kept := append(updated, added...)
 		if _, ok := handler.allDevices[resourceName]; !ok {
@@ -136,15 +151,9 @@ func NewDevicePluginHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*Devi
 		updateCapacityFunc(capacity)
 	}
 
-	mgr, err := deviceplugin.NewManagerImpl(pluginapi.KubeletSocket, deviceManagerMonitorCallback)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to initialize device plugin manager: %+v", err)
-	}
-
-	handler.devicePluginManager = mgr
-	handler.devicePluginManagerMonitorCallback = deviceManagerMonitorCallback
+	handler.deviceMonitorCallback = deviceMonitorCallback
 	// Loads in allocatedDevices information from disk.
-	err = handler.readCheckpoint()
+	err := handler.readCheckpoint()
 	if err != nil {
 		glog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
 	}
@@ -152,11 +161,47 @@ func NewDevicePluginHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*Devi
 }
 
 func (h *DevicePluginHandlerImpl) Start() error {
-	return h.devicePluginManager.Start()
+	glog.V(2).Infof("Starting Device Plugin Handler")
+
+	socketPath := filepath.Join(h.socketdir, h.socketname)
+	os.MkdirAll(h.socketdir, 0755)
+
+	// Removes all stale sockets in h.socketdir. Device plugins can monitor
+	// this and use it as a signal to re-register with the new Kubelet.
+	if err := removeContents(h.socketdir); err != nil {
+		glog.Errorf("Fail to clean up stale contents under %s: %+v", h.socketdir, err)
+	}
+
+	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+		glog.Errorf(deviceplugin.ErrRemoveSocket+" %+v", err)
+		return err
+	}
+
+	s, err := net.Listen("unix", socketPath)
+	if err != nil {
+		glog.Errorf(deviceplugin.ErrListenSocket+" %+v", err)
+		return err
+	}
+
+	h.server = grpc.NewServer([]grpc.ServerOption{}...)
+
+	pluginapi.RegisterRegistrationServer(h.server, h)
+	go h.server.Serve(s)
+
+	return nil
 }
 
 func (h *DevicePluginHandlerImpl) Devices() map[string][]*pluginapi.Device {
-	return h.devicePluginManager.Devices()
+	h.Lock()
+	defer h.Unlock()
+
+	devs := make(map[string][]*pluginapi.Device)
+	for k, e := range h.endpoints {
+		glog.V(3).Infof("Endpoint: %+v: %+v", k, e)
+		devs[k] = e.GetDevices()
+	}
+
+	return devs
 }
 
 func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) ([]*pluginapi.AllocateResponse, error) {
@@ -193,8 +238,9 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 			// Update internal allocated device cache.
 			h.allocatedDevices[resource].insert(string(pod.UID), container.Name, device)
 		}
+		e, ok := h.endpoints[resource]
 		h.Unlock()
-		// devicePluginManager.Allocate involves RPC calls to device plugin, which
+		// Allocate involves RPC calls to device plugin, which
 		// could be heavy-weight. Therefore we want to perform this operation outside
 		// mutex lock. Note if Allcate call fails, we may leave container resources
 		// partially allocated for the failed container. We rely on updateAllocatedDevices()
@@ -204,7 +250,10 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		// requests may fail if we serve them in mixed order.
 		// TODO: may revisit this part later if we see inefficient resource allocation
 		// in real use as the result of this.
-		resp, err := h.devicePluginManager.Allocate(resource, append(devices.UnsortedList(), allocated...))
+		if !ok {
+			return nil, fmt.Errorf("Unknown Device Plugin %s", resource)
+		}
+		resp, err := e.Allocate(append(devices.UnsortedList(), allocated...))
 		if err != nil {
 			return nil, err
 		}
@@ -215,6 +264,30 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		return nil, err
 	}
 	return ret, nil
+}
+
+// Register registers a device plugin.
+func (h *DevicePluginHandlerImpl) Register(ctx context.Context,
+	r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
+	glog.V(2).Infof("Got request for Device Plugin %s", r.ResourceName)
+	if r.Version != pluginapi.Version {
+		return &pluginapi.Empty{}, fmt.Errorf(deviceplugin.ErrUnsuportedVersion)
+	}
+
+	if r.ResourceName == "" {
+		return &pluginapi.Empty{}, fmt.Errorf(deviceplugin.ErrEmptyResourceName)
+	}
+	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
+		return &pluginapi.Empty{}, fmt.Errorf(deviceplugin.ErrInvalidResourceName)
+	}
+
+	// TODO: for now, always accepts newest device plugin. Later may consider to
+	// add some policies here, e.g., verify whether an old device plugin with the
+	// same resource name is still alive to determine whether we want to accept
+	// the new registration.
+	go h.addEndpoint(r)
+
+	return &pluginapi.Empty{}, nil
 }
 
 // updateAllocatedDevices updates the list of GPUs in use.
@@ -251,7 +324,7 @@ type checkpointData struct {
 
 // Checkpoints device to container allocation information to disk.
 func (h *DevicePluginHandlerImpl) writeCheckpoint() error {
-	filepath := h.devicePluginManager.CheckpointFile()
+	filepath := checkpointFile(h.socketdir)
 	var data checkpointData
 	for resourceName, podDev := range h.allocatedDevices {
 		for podUID, conDev := range podDev {
@@ -272,7 +345,7 @@ func (h *DevicePluginHandlerImpl) writeCheckpoint() error {
 // Reads device to container allocation information from disk, and populates
 // h.allocatedDevices accordingly.
 func (h *DevicePluginHandlerImpl) readCheckpoint() error {
-	filepath := h.devicePluginManager.CheckpointFile()
+	filepath := checkpointFile(h.socketdir)
 	content, err := ioutil.ReadFile(filepath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read checkpoint file %q: %v", filepath, err)
@@ -290,4 +363,79 @@ func (h *DevicePluginHandlerImpl) readCheckpoint() error {
 		h.allocatedDevices[entry.ResourceName].insert(entry.PodUID, entry.ContainerName, entry.DeviceID)
 	}
 	return nil
+}
+
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		filePath := filepath.Join(dir, name)
+		if filePath == checkpointFile(dir) {
+			continue
+		}
+		stat, err := os.Stat(filePath)
+		if err != nil {
+			glog.Errorf("Failed to stat file %v: %v", filePath, err)
+			continue
+		}
+		if stat.IsDir() {
+			continue
+		}
+		err = os.RemoveAll(filePath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkpointFile returns device plugin checkpoint file path.
+func checkpointFile(dir string) string {
+	return filepath.Join(dir, "kubelet_internal_checkpoint")
+}
+
+func (h *DevicePluginHandlerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
+	// Stops existing endpoint if there is any.
+	h.Lock()
+	old, ok := h.endpoints[r.ResourceName]
+	h.Unlock()
+	if ok && old != nil {
+		old.Stop()
+	}
+
+	socketPath := filepath.Join(h.socketdir, r.Endpoint)
+	e, err := deviceplugin.NewEndpoint(socketPath, r.ResourceName, h.deviceMonitorCallback)
+	if err != nil {
+		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
+		return
+	}
+
+	stream, err := e.List()
+	if err != nil {
+		glog.Errorf("Failed to List devices for plugin %v: %v", r.ResourceName, err)
+		return
+	}
+
+	go func() {
+		e.ListAndWatch(stream)
+
+		h.Lock()
+		if old, ok := h.endpoints[r.ResourceName]; ok && old == e {
+			delete(h.endpoints, r.ResourceName)
+		}
+		glog.V(2).Infof("Unregistered endpoint %v", e)
+		h.Lock()
+	}()
+
+	h.Lock()
+	h.endpoints[r.ResourceName] = e
+	glog.V(2).Infof("Registered endpoint %v", e)
+	h.Unlock()
 }
