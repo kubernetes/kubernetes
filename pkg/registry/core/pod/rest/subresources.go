@@ -69,7 +69,7 @@ func (r *ProxyREST) Connect(ctx genericapirequest.Context, id string, opts runti
 	if err != nil {
 		return nil, err
 	}
-	location.Path = path.Join(location.Path, proxyOpts.Path)
+	location.Path = path.Join("/", location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
 	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
 }
