@@ -690,6 +690,7 @@ func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port 
 	if resp.StatusCode != 200 {
 		for _, code := range retriableErrCodes {
 			if resp.StatusCode == code {
+				Logf("Got non-success status %q when trying to access %s, but the error code is retriable", resp.Status, url)
 				return false, nil
 			}
 		}

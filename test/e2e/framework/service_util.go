@@ -485,27 +485,17 @@ func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func
 }
 
 func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
-	var service *v1.Service
 	Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
-	pollFunc := func() (bool, error) {
-		svc, err := j.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
-			return false, nil
+			return false
 		}
 		ip := svc.Status.LoadBalancer.Ingress[0].IP
 		if ip == "" || ip == existingIP {
-			return false, nil
+			return false
 		}
-		// Got a new IP.
-		service = svc
-		return true, nil
-	}
-	if err := wait.PollImmediate(Poll, timeout, pollFunc); err != nil {
-		Failf("Timeout waiting for service %q to have a new ingress IP", name)
-	}
+		return true
+	})
 	return service
 }
 
@@ -533,22 +523,13 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 }
 
 func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
-	var service *v1.Service
 	Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
-	pollFunc := func() (bool, error) {
-		svc, err := j.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) > 0 {
-			service = svc
-			return true, nil
+			return true
 		}
-		return false, nil
-	}
-	if err := wait.PollImmediate(Poll, timeout, pollFunc); err != nil {
-		Failf("Timeout waiting for service %q to have a load balancer", name)
-	}
+		return false
+	})
 	return service
 }
 
@@ -560,21 +541,31 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 		}
 	}()
 
-	var service *v1.Service
 	Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
+		if len(svc.Status.LoadBalancer.Ingress) == 0 {
+			return true
+		}
+		return false
+	})
+	return service
+}
+
+func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) *v1.Service {
+	var service *v1.Service
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		if len(svc.Status.LoadBalancer.Ingress) == 0 {
+		if conditionFn(svc) {
 			service = svc
 			return true, nil
 		}
 		return false, nil
 	}
 	if err := wait.PollImmediate(Poll, timeout, pollFunc); err != nil {
-		Failf("Timeout waiting for service %q to have no load balancer", name)
+		Failf("Timed out waiting for service %q to %s", name, message)
 	}
 	return service
 }
@@ -839,7 +830,11 @@ func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, p
 	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		return TestReachableHTTPWithRetriableErrorCodes(host, port, "/echo?msg=hello", "hello", retriableErrCodes)
 	}); err != nil {
-		Failf("Could not reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
+		if err == wait.ErrWaitTimeout {
+			Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
+		} else {
+			Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)
+		}
 	}
 }
 
