@@ -41,7 +41,7 @@ var (
 			Name: "apiserver_request_count",
 			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response contentType and code.",
 		},
-		[]string{"verb", "resource", "subresource", "client", "contentType", "code"},
+		[]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"},
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -50,7 +50,7 @@ var (
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"verb", "resource", "subresource"},
+		[]string{"verb", "resource", "subresource", "scope"},
 	)
 	requestLatenciesSummary = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -59,7 +59,7 @@ var (
 			// Make the sliding window of 1h.
 			MaxAge: time.Hour,
 		},
-		[]string{"verb", "resource", "subresource"},
+		[]string{"verb", "resource", "subresource", "scope"},
 	)
 	responseSizes = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -85,9 +85,9 @@ func Register() {
 // uppercase to be backwards compatible with existing monitoring tooling.
 func Monitor(verb, resource, subresource, scope, client, contentType string, httpCode, respSize int, reqStart time.Time) {
 	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
-	requestCounter.WithLabelValues(verb, resource, subresource, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(verb, resource, subresource).Observe(elapsed)
-	requestLatenciesSummary.WithLabelValues(verb, resource, subresource).Observe(elapsed)
+	requestCounter.WithLabelValues(verb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(verb, resource, subresource, scope).Observe(elapsed)
+	requestLatenciesSummary.WithLabelValues(verb, resource, subresource, scope).Observe(elapsed)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(verb, resource, subresource, scope).Observe(float64(respSize))
