@@ -106,6 +106,10 @@ func MonitorRequest(request *http.Request, verb, resource, subresource, scope, c
 			}
 		}
 	}
+	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
+	if verb == "WATCHLIST" {
+		reportedVerb = "WATCH"
+	}
 
 	client := cleanUserAgent(utilnet.GetHTTPClient(request))
 	Monitor(reportedVerb, resource, subresource, scope, client, contentType, httpCode, respSize, reqStart)
