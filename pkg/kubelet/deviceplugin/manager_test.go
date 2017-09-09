@@ -17,9 +17,8 @@ limitations under the License.
 package deviceplugin
 
 import (
-	"os"
-	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -27,33 +26,69 @@ import (
 )
 
 const (
-	msocketName = "/tmp/server.sock"
+	socketName       = "/tmp/device_plugin/server.sock"
+	pluginSocketName = "/tmp/device_plugin/device-plugin.sock"
+	testResourceName = "fake-domain/resource"
 )
 
 func TestNewManagerImpl(t *testing.T) {
-	wd, _ := os.Getwd()
-	socket := path.Join(wd, msocketName)
-
 	_, err := NewManagerImpl("", func(n string, a, u, r []*pluginapi.Device) {})
 	require.Error(t, err)
 
-	_, err = NewManagerImpl(socket, func(n string, a, u, r []*pluginapi.Device) {})
+	_, err = NewManagerImpl(socketName, func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	wd, _ := os.Getwd()
-	socket := path.Join(wd, msocketName)
-
-	_, err := NewManagerImpl(socket, func(n string, a, u, r []*pluginapi.Device) {})
-	require.NoError(t, err)
+	setup(t, []*pluginapi.Device{}, func(n string, a, u, r []*pluginapi.Device) {})
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, pluginSocket, serverSocket string, callback MonitorCallback) (Manager, *Stub) {
-	m, err := NewManagerImpl(serverSocket, callback)
+// Tests that the device plugin manager correctly handles registration and re-registration by
+// making sure that after registration, devices are correctly updated and if a re-registration
+// happens, we will NOT delete devices.
+func TestDevicePluginReRegistration(t *testing.T) {
+	devs := []*pluginapi.Device{
+		{ID: "Dev1", Health: pluginapi.Healthy},
+		{ID: "Dev2", Health: pluginapi.Healthy},
+	}
+
+	callbackCount := 0
+	callbackChan := make(chan int)
+	callback := func(n string, a, u, r []*pluginapi.Device) {
+		// Should be called twice, one for each plugin.
+		if callbackCount > 1 {
+			t.FailNow()
+		}
+		callbackCount++
+		callbackChan <- callbackCount
+	}
+	m, p1 := setup(t, devs, callback)
+	p1.Register(socketName, testResourceName)
+	// Wait for the first callback to be issued.
+	<-callbackChan
+	devices := m.Devices()
+	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
+
+	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
+	err := p2.Start()
+	require.NoError(t, err)
+	p2.Register(socketName, testResourceName)
+	// Wait for the second callback to be issued.
+	<-callbackChan
+
+	devices2 := m.Devices()
+	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
+	// Wait long enough to catch unexpected callbacks.
+	time.Sleep(5 * time.Second)
+}
+
+func setup(t *testing.T, devs []*pluginapi.Device, callback MonitorCallback) (Manager, *Stub) {
+	m, err := NewManagerImpl(socketName, callback)
+	require.NoError(t, err)
+	err = m.Start()
 	require.NoError(t, err)
 
-	p := NewDevicePluginStub(devs, pluginSocket)
+	p := NewDevicePluginStub(devs, pluginSocketName)
 	err = p.Start()
 	require.NoError(t, err)
 

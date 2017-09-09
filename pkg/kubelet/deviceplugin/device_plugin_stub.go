@@ -20,6 +20,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"time"
 
 	"golang.org/x/net/context"
@@ -84,6 +85,30 @@ func (m *Stub) Stop() error {
 	m.server.Stop()
 
 	return m.cleanup()
+}
+
+// Register registers the device plugin for the given resourceName with Kubelet.
+func (m *Stub) Register(kubeletEndpoint, resourceName string) error {
+	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(),
+		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
+			return net.DialTimeout("unix", addr, timeout)
+		}))
+	defer conn.Close()
+	if err != nil {
+		return err
+	}
+	client := pluginapi.NewRegistrationClient(conn)
+	reqt := &pluginapi.RegisterRequest{
+		Version:      pluginapi.Version,
+		Endpoint:     path.Base(m.socket),
+		ResourceName: resourceName,
+	}
+
+	_, err = client.Register(context.Background(), reqt)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
