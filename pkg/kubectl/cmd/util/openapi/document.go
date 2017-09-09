@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proto
+package openapi
 
 import (
 	"fmt"
@@ -22,6 +22,8 @@ import (
 
 	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	yaml "gopkg.in/yaml.v2"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func newSchemaError(path *Path, format string, a ...interface{}) error {
@@ -32,8 +34,12 @@ func newSchemaError(path *Path, format string, a ...interface{}) error {
 	return fmt.Errorf("SchemaError(%v): %v", path, err)
 }
 
-// VendorExtensionToMap converts openapi VendorExtension to a map.
-func VendorExtensionToMap(e []*openapi_v2.NamedAny) map[string]interface{} {
+// groupVersionKindExtensionKey is the key used to lookup the
+// GroupVersionKind value for an object definition from the
+// definition's "extensions" map.
+const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
+
+func vendorExtensionToMap(e []*openapi_v2.NamedAny) map[string]interface{} {
 	values := map[string]interface{}{}
 
 	for _, na := range e {
@@ -55,20 +61,67 @@ func VendorExtensionToMap(e []*openapi_v2.NamedAny) map[string]interface{} {
 	return values
 }
 
+// Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.
+func parseGroupVersionKind(s *openapi_v2.Schema) schema.GroupVersionKind {
+	extensionMap := vendorExtensionToMap(s.GetVendorExtension())
+
+	// Get the extensions
+	gvkExtension, ok := extensionMap[groupVersionKindExtensionKey]
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+
+	// gvk extension must be a list of 1 element.
+	gvkList, ok := gvkExtension.([]interface{})
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	if len(gvkList) != 1 {
+		return schema.GroupVersionKind{}
+
+	}
+	gvk := gvkList[0]
+
+	// gvk extension list must be a map with group, version, and
+	// kind fields
+	gvkMap, ok := gvk.(map[interface{}]interface{})
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	group, ok := gvkMap["group"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	version, ok := gvkMap["version"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	kind, ok := gvkMap["kind"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+
+	return schema.GroupVersionKind{
+		Group:   group,
+		Version: version,
+		Kind:    kind,
+	}
+}
+
 // Definitions is an implementation of `Resources`. It looks for
 // resources in an openapi Schema.
 type Definitions struct {
 	models    map[string]Schema
-	resources map[string]string
+	resources map[schema.GroupVersionKind]string
 }
 
 var _ Resources = &Definitions{}
 
 // NewOpenAPIData creates a new `Resources` out of the openapi document.
-func NewOpenAPIData(doc *openapi_v2.Document, getIdFromSchema func(s *openapi_v2.Schema) string) (Resources, error) {
+func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 	definitions := Definitions{
 		models:    map[string]Schema{},
-		resources: map[string]string{},
+		resources: map[schema.GroupVersionKind]string{},
 	}
 
 	// Save the list of all models first. This will allow us to
@@ -85,8 +138,10 @@ func NewOpenAPIData(doc *openapi_v2.Document, getIdFromSchema func(s *openapi_v2
 			return nil, err
 		}
 		definitions.models[namedSchema.GetName()] = schema
-		id := getIdFromSchema(namedSchema.GetValue())
-		definitions.resources[id] = namedSchema.GetName()
+		gvk := parseGroupVersionKind(namedSchema.GetValue())
+		if len(gvk.Kind) > 0 {
+			definitions.resources[gvk] = namedSchema.GetName()
+		}
 	}
 
 	return &definitions, nil
@@ -119,7 +174,7 @@ func (d *Definitions) parseReference(s *openapi_v2.Schema, path *Path) (Schema, 
 func (d *Definitions) parseBaseSchema(s *openapi_v2.Schema, path *Path) BaseSchema {
 	return BaseSchema{
 		Description: s.GetDescription(),
-		Extensions:  VendorExtensionToMap(s.GetVendorExtension()),
+		Extensions:  vendorExtensionToMap(s.GetVendorExtension()),
 		Path:        *path,
 	}
 }
@@ -237,7 +292,7 @@ func (d *Definitions) ParseSchema(s *openapi_v2.Schema, path *Path) (Schema, err
 
 // LookupResource is public through the interface of Resources. It
 // returns a visitable schema from the given group-version-kind.
-func (d *Definitions) LookupResource(gvk string) Schema {
+func (d *Definitions) LookupResource(gvk schema.GroupVersionKind) Schema {
 	modelName, found := d.resources[gvk]
 	if !found {
 		return nil

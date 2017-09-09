@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proto
+package openapi
 
 import (
 	"fmt"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Defines openapi types.
@@ -37,7 +39,7 @@ const (
 // Resources interface describe a resources provider, that can give you
 // resource based on group-version-kind.
 type Resources interface {
-	LookupResource(string) Schema
+	LookupResource(gvk schema.GroupVersionKind) Schema
 }
 
 // SchemaVisitor is an interface that you need to implement if you want

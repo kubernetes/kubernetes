@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+SRCS = peer-finder
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = pets/peer-finder
+export
 
-TAG = e2e
-PREFIX = gcr.io/google_containers/redis-install-3.2.0
+bin:
+	../../image-util.sh bin $(SRCS)
 
-container:
-	docker build --pull -t $(PREFIX):$(TAG) .
-
-push: container
-	gcloud docker -- push $(PREFIX):$(TAG)
-
-clean:
-	docker rmi $(PREFIX):$(TAG)
+.PHONY: bin

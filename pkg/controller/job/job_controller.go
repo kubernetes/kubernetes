@@ -51,7 +51,7 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
-const (
+var (
 	// DefaultJobBackOff is the max backoff period, exported for the e2e test
 	DefaultJobBackOff = 10 * time.Second
 	// MaxJobBackOff is the max backoff period, exported for the e2e test
@@ -64,7 +64,7 @@ type JobController struct {
 
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *batch.Job) error
-	syncHandler   func(jobKey string) error
+	syncHandler   func(jobKey string) (bool, error)
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced cache.InformerSynced
@@ -375,9 +375,11 @@ func (jm *JobController) processNextWorkItem() bool {
 	}
 	defer jm.queue.Done(key)
 
-	err := jm.syncHandler(key.(string))
+	forget, err := jm.syncHandler(key.(string))
 	if err == nil {
-		jm.queue.Forget(key)
+		if forget {
+			jm.queue.Forget(key)
+		}
 		return true
 	}
 
@@ -420,7 +422,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
-func (jm *JobController) syncJob(key string) error {
+func (jm *JobController) syncJob(key string) (bool, error) {
 	startTime := time.Now()
 	defer func() {
 		glog.V(4).Infof("Finished syncing job %q (%v)", key, time.Now().Sub(startTime))
@@ -428,26 +430,25 @@ func (jm *JobController) syncJob(key string) error {
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(ns) == 0 || len(name) == 0 {
-		return fmt.Errorf("invalid job key %q: either namespace or name is missing", key)
+		return false, fmt.Errorf("invalid job key %q: either namespace or name is missing", key)
 	}
 	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			glog.V(4).Infof("Job has been deleted: %v", key)
 			jm.expectations.DeleteExpectations(key)
-			return nil
+			return true, nil
 		}
-		return err
+		return false, err
 	}
 	job := *sharedJob
 
 	// if job was finished previously, we don't want to redo the termination
 	if IsJobFinished(&job) {
-		jm.queue.Forget(key)
-		return nil
+		return true, nil
 	}
 
 	// retrieve the previous number of retry
@@ -460,7 +461,7 @@ func (jm *JobController) syncJob(key string) error {
 
 	pods, err := jm.getPodsForJob(&job)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	activePods := controller.FilterActivePods(pods)
@@ -551,6 +552,7 @@ func (jm *JobController) syncJob(key string) error {
 		}
 	}
 
+	forget := false
 	// no need to update the job if the status hasn't changed since last time
 	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || len(job.Status.Conditions) != conditions {
 		job.Status.Active = active
@@ -558,19 +560,18 @@ func (jm *JobController) syncJob(key string) error {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
-			return err
+			return false, err
 		}
+
+		if jobHaveNewFailure && !IsJobFinished(&job) {
+			// returning an error will re-enqueue Job after the backoff period
+			return false, fmt.Errorf("failed pod(s) detected for job key %q", key)
+		}
+
+		forget = true
 	}
 
-	if jobHaveNewFailure {
-		// re-enqueue Job after the backoff period
-		jm.queue.AddRateLimited(key)
-	} else {
-		// if no new Failure the job backoff period can be reset
-		jm.queue.Forget(key)
-	}
-
-	return manageJobErr
+	return forget, manageJobErr
 }
 
 func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh chan<- error) {

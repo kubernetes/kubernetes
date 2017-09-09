@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -459,7 +458,7 @@ func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiD
 }
 
 // OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
-func (f *ring1Factory) OpenAPISchema() (oapi.Resources, error) {
+func (f *ring1Factory) OpenAPISchema() (openapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err

@@ -77,33 +77,33 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter) *Controller {
 	return &Controller{
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
 
-		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
-		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
+		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
 
 		SystemNamespaces:         []string{metav1.NamespaceSystem, metav1.NamespacePublic},
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    c.ServiceIPRange,
+		ServiceClusterIPRange:    c.ExtraConfig.ServiceIPRange,
 		ServiceClusterIPInterval: 3 * time.Minute,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    c.ServiceNodePortRange,
+		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
 		ServiceNodePortInterval: 3 * time.Minute,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
-		ServiceIP:                 c.APIServerServiceIP,
-		ServicePort:               c.APIServerServicePort,
-		ExtraServicePorts:         c.ExtraServicePorts,
-		ExtraEndpointPorts:        c.ExtraEndpointPorts,
+		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+		ServicePort:               c.ExtraConfig.APIServerServicePort,
+		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
+		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
 		PublicServicePort:         c.GenericConfig.ReadWritePort,
-		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
+		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}
 }
 

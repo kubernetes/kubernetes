@@ -420,7 +420,7 @@ func TestGCListWatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	lw := listWatcher(client, podResource)
-	lw.DisablePaging = true
+	lw.DisableChunking = true
 	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
 		t.Fatal(err)
 	}

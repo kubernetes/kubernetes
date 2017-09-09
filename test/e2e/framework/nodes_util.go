@@ -130,9 +130,9 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 }
 
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, enableKubeProxyDaemonSet bool) error {
+func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
 	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, "", enableKubeProxyDaemonSet); err != nil {
+	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
 		return err
 	}
 	// Wait for it to complete and validate nodes are healthy.

@@ -716,6 +716,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		Algorithm:           algo,
 		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
+		PodPreemptor:        &podPreemptor{f.client},
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodsHasSynced)
 		},
@@ -753,7 +754,7 @@ func (f *ConfigFactory) GetPriorityMetadataProducer() (algorithm.MetadataProduce
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.MetadataProducer, error) {
+func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
 	pluginArgs, err := f.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -990,4 +991,29 @@ func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) er
 		return err
 	}
 	return nil
+}
+
+type podPreemptor struct {
+	Client clientset.Interface
+}
+
+func (p *podPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
+	return p.Client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+}
+
+func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
+	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
+}
+
+//TODO(bsalamat): change this to patch PodStatus to avoid overwriting potential pending status updates.
+func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]string) error {
+	podCopy := pod.DeepCopy()
+	if podCopy.Annotations == nil {
+		podCopy.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		podCopy.Annotations[k] = v
+	}
+	_, err := p.Client.CoreV1().Pods(podCopy.Namespace).UpdateStatus(podCopy)
+	return err
 }

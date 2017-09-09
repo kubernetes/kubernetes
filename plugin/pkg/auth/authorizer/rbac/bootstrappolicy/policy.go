@@ -330,7 +330,8 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
 
 				// fundamental resources
-				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes", "pods").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding", "bindings").RuleOrDie(),
 				rbac.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 				// things that select pods

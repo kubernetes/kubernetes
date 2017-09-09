@@ -29,7 +29,6 @@ go_library(
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/install:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/registry:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/registry/wardle/fischer:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:go_default_library",

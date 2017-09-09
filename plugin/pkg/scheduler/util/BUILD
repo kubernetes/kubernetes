@@ -8,9 +8,16 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["backoff_utils_test.go"],
+    srcs = [
+        "backoff_utils_test.go",
+        "utils_test.go",
+    ],
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
+    deps = [
+        "//pkg/apis/scheduling:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+    ],
 )
 
 go_library(
@@ -23,6 +30,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

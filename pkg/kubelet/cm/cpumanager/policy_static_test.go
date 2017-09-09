@@ -66,6 +66,22 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAdd(t *testing.T) {
+	largeTopoBuilder := cpuset.NewBuilder()
+	largeTopoSock0Builder := cpuset.NewBuilder()
+	largeTopoSock1Builder := cpuset.NewBuilder()
+	largeTopo := *topoQuadSocketFourWayHT
+	for cpuid, val := range largeTopo.CPUDetails {
+		largeTopoBuilder.Add(cpuid)
+		if val.SocketID == 0 {
+			largeTopoSock0Builder.Add(cpuid)
+		} else if val.SocketID == 1 {
+			largeTopoSock1Builder.Add(cpuid)
+		}
+	}
+	largeTopoCPUSet := largeTopoBuilder.Result()
+	largeTopoSock0CPUSet := largeTopoSock0Builder.Result()
+	largeTopoSock1CPUSet := largeTopoSock1Builder.Result()
+
 	testCases := []staticPolicyTest{
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
@@ -223,6 +239,86 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("10000m", "10000m"),
+			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+		{
+			// All the CPUs from Socket 0 are available. Some CPUs from each
+			// Socket have been already assigned.
+			// Expect all CPUs from Socket 0.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocSock0",
+			topo:        topoQuadSocketFourWayHT,
+			containerID: "fakeID5",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID100": cpuset.NewCPUSet(3, 11, 4, 5, 6, 7),
+			},
+			stDefaultCPUSet: largeTopoCPUSet.Difference(cpuset.NewCPUSet(3, 11, 4, 5, 6, 7)),
+			pod:             makePod("72000m", "72000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         largeTopoSock0CPUSet,
+		},
+		{
+			// Only 2 full cores from three Sockets and some partial cores are available.
+			// Expect CPUs from the 2 full cores available from the three Sockets.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocAllFullCoresFromThreeSockets",
+			topo:        topoQuadSocketFourWayHT,
+			containerID: "fakeID5",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51,
+					53, 173, 113, 233, 54, 61)),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51, 53, 173, 113, 233, 54, 61),
+			pod:             makePod("12000m", "12000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(1, 25, 13, 38, 11, 35, 23, 48, 53, 173, 113, 233),
+		},
+		{
+			// All CPUs from Socket 1, 1 full core and some partial cores are available.
+			// Expect all CPUs from Socket 1 and the hyper-threads from the full core.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocAllSock1+FullCore",
+			topo:        topoQuadSocketFourWayHT,
+			containerID: "fakeID5",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID100": largeTopoCPUSet.Difference(largeTopoSock1CPUSet.Union(cpuset.NewCPUSet(10, 34, 22, 47, 53,
+					173, 61, 181, 108, 228, 115, 235))),
+			},
+			stDefaultCPUSet: largeTopoSock1CPUSet.Union(cpuset.NewCPUSet(10, 34, 22, 47, 53, 173, 61, 181, 108, 228,
+				115, 235)),
+			pod:         makePod("76000m", "76000m"),
+			expErr:      nil,
+			expCPUAlloc: true,
+			expCSet:     largeTopoSock1CPUSet.Union(cpuset.NewCPUSet(10, 34, 22, 47)),
+		},
+		{
+			// Only partial cores are available in the entire system.
+			// Expect allocation of all the CPUs from the partial cores.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocCPUs",
+			topo:        topoQuadSocketFourWayHT,
+			containerID: "fakeID5",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 67, 52),
+			pod:             makePod("5000m", "5000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(10, 11, 53, 67, 52),
+		},
+		{
+			// Only 7 CPUs are available.
+			// Pod requests 76 cores.
+			// Error is expect since available CPUs are less than the request.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, NoAlloc",
+			topo:        topoQuadSocketFourWayHT,
+			containerID: "fakeID5",
+			stAssignments: map[string]cpuset.CPUSet{
+				"fakeID100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52),
+			pod:             makePod("76000m", "76000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),

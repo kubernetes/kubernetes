@@ -193,7 +193,7 @@ func (cache *schedulerCache) addPod(pod *v1.Pod) {
 		n = NewNodeInfo()
 		cache.nodes[pod.Spec.NodeName] = n
 	}
-	n.addPod(pod)
+	n.AddPod(pod)
 }
 
 // Assumes that lock is already acquired.
@@ -208,7 +208,7 @@ func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
 // Assumes that lock is already acquired.
 func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	n := cache.nodes[pod.Spec.NodeName]
-	if err := n.removePod(pod); err != nil {
+	if err := n.RemovePod(pod); err != nil {
 		return err
 	}
 	if len(n.pods) == 0 && n.node == nil {

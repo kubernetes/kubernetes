@@ -324,7 +324,6 @@ pkg/registry/batch/cronjob/storage
 pkg/registry/batch/job
 pkg/registry/batch/job/storage
 pkg/registry/batch/rest
-pkg/registry/cachesize
 pkg/registry/certificates/certificates
 pkg/registry/certificates/certificates/storage
 pkg/registry/certificates/rest

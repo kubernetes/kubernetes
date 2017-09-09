@@ -14,15 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+// These tests are in a separate package to break cyclic dependency in tests.
+// Unstructured type depends on unstructured converter package but we want to test how the converter handles
+// the Unstructured type so we need to import both.
+
+package testing
 
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	conversionunstructured "k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Definte a number of test types.
@@ -72,14 +82,27 @@ type F struct {
 }
 
 type G struct {
-	Custom Custom `json:"custom"`
+	CustomValue1   CustomValue    `json:"customValue1"`
+	CustomValue2   *CustomValue   `json:"customValue2"`
+	CustomPointer1 CustomPointer  `json:"customPointer1"`
+	CustomPointer2 *CustomPointer `json:"customPointer2"`
 }
 
-type Custom struct {
+type CustomValue struct {
 	data []byte
 }
 
-func (c Custom) MarshalJSON() ([]byte, error) {
+// MarshalJSON has a value receiver on this type.
+func (c CustomValue) MarshalJSON() ([]byte, error) {
+	return c.data, nil
+}
+
+type CustomPointer struct {
+	data []byte
+}
+
+// MarshalJSON has a pointer receiver on this type.
+func (c *CustomPointer) MarshalJSON() ([]byte, error) {
 	return c.data, nil
 }
 
@@ -113,14 +136,14 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 
-	newUnstr, err := DefaultConverter.ToUnstructured(item)
+	newUnstr, err := conversionunstructured.DefaultConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = DefaultConverter.FromUnstructured(newUnstr, newObj)
+	err = conversionunstructured.DefaultConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
 		t.Errorf("FromUnstructured failed: %v", err)
 		return
@@ -136,6 +159,17 @@ func TestRoundTrip(t *testing.T) {
 	testCases := []struct {
 		obj interface{}
 	}{
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Foo",
+					"metadata": map[string]interface{}{
+						"name": "foo1",
+					},
+				},
+			},
+		},
 		{
 			// This (among others) tests nil map, slice and pointer.
 			obj: &C{
@@ -230,7 +264,7 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 		return
 	}
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = DefaultConverter.FromUnstructured(unstr, newObj)
+	err = conversionunstructured.DefaultConverter.FromUnstructured(unstr, newObj)
 	if (err != nil) != (expectedErr != nil) {
 		t.Errorf("Unexpected error in FromUnstructured: %v, expected: %v", err, expectedErr)
 	}
@@ -434,7 +468,7 @@ func TestFloatIntConversion(t *testing.T) {
 	unstr := map[string]interface{}{"fd": float64(3)}
 
 	var obj F
-	if err := DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
+	if err := conversionunstructured.DefaultConverter.FromUnstructured(unstr, &obj); err != nil {
 		t.Errorf("Unexpected error in FromUnstructured: %v", err)
 	}
 
@@ -469,18 +503,37 @@ func TestCustomToUnstructured(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		result, err := DefaultConverter.ToUnstructured(&G{Custom: Custom{data: []byte(tc.Data)}})
-		if err != nil {
-			t.Errorf("%s: %v", tc.Data, err)
-			continue
-		}
+		tc := tc
+		t.Run(tc.Data, func(t *testing.T) {
+			t.Parallel()
+			result, err := conversionunstructured.DefaultConverter.ToUnstructured(&G{
+				CustomValue1:   CustomValue{data: []byte(tc.Data)},
+				CustomValue2:   &CustomValue{data: []byte(tc.Data)},
+				CustomPointer1: CustomPointer{data: []byte(tc.Data)},
+				CustomPointer2: &CustomPointer{data: []byte(tc.Data)},
+			})
+			require.NoError(t, err)
+			for field, fieldResult := range result {
+				assert.Equal(t, tc.Expected, fieldResult, field)
+			}
+		})
+	}
+}
 
-		fieldResult := result["custom"]
-		if !reflect.DeepEqual(fieldResult, tc.Expected) {
-			t.Errorf("%s: expected %v, got %v", tc.Data, tc.Expected, fieldResult)
-			// t.Log("expected", spew.Sdump(tc.Expected))
-			// t.Log("actual", spew.Sdump(fieldResult))
-			continue
-		}
+func TestCustomToUnstructuredTopLevel(t *testing.T) {
+	// Only objects are supported at the top level
+	topLevelCases := []interface{}{
+		&CustomValue{data: []byte(`{"a":1}`)},
+		&CustomPointer{data: []byte(`{"a":1}`)},
+	}
+	expected := map[string]interface{}{"a": int64(1)}
+	for i, obj := range topLevelCases {
+		obj := obj
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			result, err := conversionunstructured.DefaultConverter.ToUnstructured(obj)
+			require.NoError(t, err)
+			assert.Equal(t, expected, result)
+		})
 	}
 }

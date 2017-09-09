@@ -126,8 +126,8 @@ func (am *addressManager) ensureAddressReservation() (string, error) {
 		Subnetwork:  am.subnetURL,
 	}
 
-	err := am.svc.ReserveBetaRegionAddress(newAddr, am.region)
-	if err == nil {
+	reserveErr := am.svc.ReserveBetaRegionAddress(newAddr, am.region)
+	if reserveErr == nil {
 		if newAddr.Address != "" {
 			glog.V(4).Infof("%v: successfully reserved IP %q with name %q", am.logPrefix, newAddr.Address, newAddr.Name)
 			return newAddr.Address, nil
@@ -140,24 +140,24 @@ func (am *addressManager) ensureAddressReservation() (string, error) {
 
 		glog.V(4).Infof("%v: successfully created address %q which reserved IP %q", am.logPrefix, addr.Name, addr.Address)
 		return addr.Address, nil
-	} else if !isHTTPErrorCode(err, http.StatusConflict) && !isHTTPErrorCode(err, http.StatusBadRequest) {
+	} else if !isHTTPErrorCode(reserveErr, http.StatusConflict) && !isHTTPErrorCode(reserveErr, http.StatusBadRequest) {
 		// If the IP is already reserved:
 		//    by an internal address: a StatusConflict is returned
 		//    by an external address: a BadRequest is returned
-		return "", err
+		return "", reserveErr
 	}
 
 	// If the target IP was empty, we cannot try to find which IP caused a conflict.
 	// If the name was already used, then the next sync will attempt deletion of that address.
 	if am.targetIP == "" {
-		return "", fmt.Errorf("failed to reserve address %q, err: %v", am.name, err)
+		return "", fmt.Errorf("failed to reserve address %q with no specific IP, err: %v", am.name, reserveErr)
 	}
 
 	// Reserving the address failed due to a conflict or bad request. The address manager just checked that no address
 	// exists with the name, so it may belong to the user.
 	addr, err := am.svc.GetBetaRegionAddressByIP(am.region, am.targetIP)
 	if err != nil {
-		return "", fmt.Errorf("could not find address with IP %q after getting conflict error while creating address: %q", am.targetIP, err)
+		return "", fmt.Errorf("failed to get address by IP %q after reservation attempt, err: %q, reservation err: %q", am.targetIP, err, reserveErr)
 	}
 
 	// Check that the address attributes are as required.
@@ -170,7 +170,7 @@ func (am *addressManager) ensureAddressReservation() (string, error) {
 		// it was re-created by this point. May be possible that two controllers are running.
 		glog.Warning("%v: address %q unexpectedly existed with IP %q.", am.logPrefix, addr.Name, am.targetIP)
 	} else {
-		// If the retrieved address is not named with the loadbalancer name, then the controller does not own it.
+		// If the retrieved address is not named with the loadbalancer name, then the controller does not own it, but will allow use of it.
 		glog.V(4).Infof("%v: address %q was already reserved with name: %q, description: %q", am.logPrefix, am.targetIP, addr.Name, addr.Description)
 		am.tryRelease = false
 	}
