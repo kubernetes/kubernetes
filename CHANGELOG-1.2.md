@@ -1,49 +1,49 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 - [v1.2.7](#v127)
   - [Downloads for v1.2.7](#downloads-for-v127)
-    - [Client Binaries](#client-binaries-54)
-    - [Server Binaries](#server-binaries-54)
+    - [Client Binaries](#client-binaries)
+    - [Server Binaries](#server-binaries)
   - [Changelog since v1.2.6](#changelog-since-v126)
-    - [Other notable changes](#other-notable-changes-56)
+    - [Other notable changes](#other-notable-changes)
 - [v1.2.6](#v126)
-  - [Downloads](#downloads-27)
+  - [Downloads for v1.2.6](#downloads-for-v126)
   - [Changelog since v1.2.5](#changelog-since-v125)
-    - [Other notable changes](#other-notable-changes-80)
+    - [Other notable changes](#other-notable-changes-1)
 - [v1.2.5](#v125)
-  - [Downloads](#downloads-31)
+  - [Downloads for v1.2.5](#downloads-for-v125)
   - [Changes since v1.2.4](#changes-since-v124)
-    - [Other notable changes](#other-notable-changes-83)
+    - [Other notable changes](#other-notable-changes-2)
 - [v1.2.4](#v124)
-  - [Downloads](#downloads-36)
+  - [Downloads for v1.2.4](#downloads-for-v124)
   - [Changes since v1.2.3](#changes-since-v123)
-    - [Other notable changes](#other-notable-changes-88)
+    - [Other notable changes](#other-notable-changes-3)
 - [v1.2.3](#v123)
-  - [Downloads](#downloads-38)
+  - [Downloads for v1.2.3](#downloads-for-v123)
   - [Changes since v1.2.2](#changes-since-v122)
-    - [Action Required](#action-required-27)
-    - [Other notable changes](#other-notable-changes-90)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes-4)
 - [v1.2.2](#v122)
-  - [Downloads](#downloads-40)
+  - [Downloads for v1.2.2](#downloads-for-v122)
   - [Changes since v1.2.1](#changes-since-v121)
-    - [Other notable changes](#other-notable-changes-92)
+    - [Other notable changes](#other-notable-changes-5)
 - [v1.2.1](#v121)
-  - [Downloads](#downloads-41)
+  - [Downloads for v1.2.1](#downloads-for-v121)
   - [Changes since v1.2.0](#changes-since-v120)
-    - [Other notable changes](#other-notable-changes-93)
+    - [Other notable changes](#other-notable-changes-6)
 - [v1.2.0](#v120)
-  - [Downloads](#downloads-43)
+  - [Downloads for v1.2.0](#downloads-for-v120)
   - [Changes since v1.1.1](#changes-since-v111)
-    - [Major Themes](#major-themes-3)
+    - [Major Themes](#major-themes)
     - [Other notable improvements](#other-notable-improvements)
-    - [Experimental Features](#experimental-features-3)
-    - [Action required](#action-required-29)
-    - [Known Issues](#known-issues-4)
+    - [Experimental Features](#experimental-features)
+    - [Action required](#action-required-1)
+    - [Known Issues](#known-issues)
       - [Docker Known Issues](#docker-known-issues)
         - [1.9.1](#191)
-    - [Provider-specific Notes](#provider-specific-notes-1)
+    - [Provider-specific Notes](#provider-specific-notes)
       - [Various](#various)
-      - [AWS](#aws-2)
-      - [GCE](#gce-2)
+      - [AWS](#aws)
+      - [GCE](#gce)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
@@ -92,7 +92,7 @@ filename | sha256 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.6
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -111,7 +111,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.5
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -137,7 +137,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.4
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -166,7 +166,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.3
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -205,7 +205,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.2
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -235,7 +235,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.1
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
@@ -281,7 +281,7 @@ binary | sha1 hash | md5 hash
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
 
-## Downloads
+## Downloads for v1.2.0
 
 binary | sha1 hash | md5 hash
 ------ | --------- | --------
