@@ -86,7 +86,7 @@ type legacyTestCase struct {
 	statusUpdated        bool
 	eventCreated         bool
 	verifyEvents         bool
-	useMetricsApi        bool
+	useMetricsAPI        bool
 	metricsTarget        []autoscalingv2.MetricSpec
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
@@ -319,7 +319,7 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 		var heapsterRawMemResponse []byte
 
-		if tc.useMetricsApi {
+		if tc.useMetricsAPI {
 			metrics := metricsapi.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
 				podMetric := metricsapi.PodMetrics{
@@ -530,7 +530,7 @@ func LegacyTestScaleUp(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -547,7 +547,7 @@ func LegacyTestScaleUpUnreadyLessScale(t *testing.T) {
 		reportedLevels:       []uint64{300, 500, 700},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
-		useMetricsApi:        true,
+		useMetricsAPI:        true,
 	}
 	tc.runTest(t)
 }
@@ -564,7 +564,7 @@ func LegacyTestScaleUpUnreadyNoScale(t *testing.T) {
 		reportedLevels:       []uint64{400, 500, 700},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
-		useMetricsApi:        true,
+		useMetricsAPI:        true,
 	}
 	tc.runTest(t)
 }
@@ -579,7 +579,7 @@ func LegacyTestScaleUpDeployment(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 		resource: &fakeResource{
 			name:       "test-dep",
 			apiVersion: "extensions/v1beta1",
@@ -599,7 +599,7 @@ func LegacyTestScaleUpReplicaSet(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{300, 500, 700},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 		resource: &fakeResource{
 			name:       "test-replicaset",
 			apiVersion: "extensions/v1beta1",
@@ -687,7 +687,7 @@ func LegacyTestScaleDown(t *testing.T) {
 		verifyCPUCurrent:    true,
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -725,7 +725,7 @@ func LegacyTestScaleDownIgnoresUnreadyPods(t *testing.T) {
 		verifyCPUCurrent:     true,
 		reportedLevels:       []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:        true,
+		useMetricsAPI:        true,
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 	}
 	tc.runTest(t)
@@ -740,7 +740,7 @@ func LegacyTestTolerance(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{1010, 1030, 1020},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -775,7 +775,7 @@ func LegacyTestMinReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{10, 95, 10},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -789,7 +789,7 @@ func LegacyTestZeroReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -803,7 +803,7 @@ func LegacyTestTooFewReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -817,7 +817,7 @@ func LegacyTestTooManyReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -831,7 +831,7 @@ func LegacyTestMaxReplicas(t *testing.T) {
 		CPUTarget:           90,
 		reportedLevels:      []uint64{8000, 9500, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -845,7 +845,7 @@ func LegacyTestSuperfluousMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{4000, 9500, 3000, 7000, 3200, 2000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -859,7 +859,7 @@ func LegacyTestMissingMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{400, 95},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -873,7 +873,7 @@ func LegacyTestEmptyMetrics(t *testing.T) {
 		CPUTarget:           100,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -886,7 +886,7 @@ func LegacyTestEmptyCPURequest(t *testing.T) {
 		desiredReplicas: 1,
 		CPUTarget:       100,
 		reportedLevels:  []uint64{200},
-		useMetricsApi:   true,
+		useMetricsAPI:   true,
 	}
 	tc.runTest(t)
 }
@@ -901,7 +901,7 @@ func LegacyTestEventCreated(t *testing.T) {
 		reportedLevels:      []uint64{200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.2")},
 		verifyEvents:        true,
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -916,7 +916,7 @@ func LegacyTestEventNotCreated(t *testing.T) {
 		reportedLevels:      []uint64{200, 200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.4"), resource.MustParse("0.4")},
 		verifyEvents:        true,
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -930,7 +930,7 @@ func LegacyTestMissingReports(t *testing.T) {
 		CPUTarget:           50,
 		reportedLevels:      []uint64{200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.2")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -944,7 +944,7 @@ func LegacyTestUpscaleCap(t *testing.T) {
 		CPUTarget:           10,
 		reportedLevels:      []uint64{100, 200, 300},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -966,7 +966,7 @@ func LegacyTestComputedToleranceAlgImplementation(t *testing.T) {
 
 	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
 	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
-	finalCpuPercentTarget := int32(target * 100)
+	finalCPUPercentTarget := int32(target * 100)
 	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
 
 	// i.e. .60 * 20 -> scaled down expectation.
@@ -978,7 +978,7 @@ func LegacyTestComputedToleranceAlgImplementation(t *testing.T) {
 		maxReplicas:     1000,
 		initialReplicas: startPods,
 		desiredReplicas: finalPods,
-		CPUTarget:       finalCpuPercentTarget,
+		CPUTarget:       finalCPUPercentTarget,
 		reportedLevels: []uint64{
 			totalUsedCPUOfAllPods / 10,
 			totalUsedCPUOfAllPods / 10,
@@ -1003,7 +1003,7 @@ func LegacyTestComputedToleranceAlgImplementation(t *testing.T) {
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 		},
-		useMetricsApi: true,
+		useMetricsAPI: true,
 	}
 
 	tc.runTest(t)
@@ -1011,8 +1011,8 @@ func LegacyTestComputedToleranceAlgImplementation(t *testing.T) {
 	// Reuse the data structure above, now testing "unscaling".
 	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
 	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
-	finalCpuPercentTarget = int32(target * 100)
-	tc.CPUTarget = finalCpuPercentTarget
+	finalCPUPercentTarget = int32(target * 100)
+	tc.CPUTarget = finalCPUPercentTarget
 	tc.initialReplicas = startPods
 	tc.desiredReplicas = startPods
 	tc.runTest(t)
@@ -1028,7 +1028,7 @@ func LegacyTestScaleUpRCImmediately(t *testing.T) {
 		verifyCPUCurrent:    false,
 		reportedLevels:      []uint64{0, 0, 0, 0},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 		lastScaleTime:       &time,
 	}
 	tc.runTest(t)
@@ -1044,7 +1044,7 @@ func LegacyTestScaleDownRCImmediately(t *testing.T) {
 		CPUTarget:           50,
 		reportedLevels:      []uint64{8000, 9500, 1000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsApi:       true,
+		useMetricsAPI:       true,
 		lastScaleTime:       &time,
 	}
 	tc.runTest(t)

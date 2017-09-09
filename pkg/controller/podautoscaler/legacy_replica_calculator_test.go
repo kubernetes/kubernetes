@@ -604,7 +604,7 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
 	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
-	finalCpuPercentTarget := int32(target * 100)
+	finalCPUPercentTarget := int32(target * 100)
 	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
 
 	// i.e. .60 * 20 -> scaled down expectation.
@@ -641,7 +641,7 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 				resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			},
 
-			targetUtilization:   finalCpuPercentTarget,
+			targetUtilization:   finalCPUPercentTarget,
 			expectedUtilization: int32(totalUsedCPUOfAllPods*100) / totalRequestedCPUOfAllPods,
 			expectedValue:       numContainersPerPod * totalUsedCPUOfAllPods / 10,
 		},
@@ -652,8 +652,8 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	// Reuse the data structure above, now testing "unscaling".
 	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
 	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
-	finalCpuPercentTarget = int32(target * 100)
-	tc.resource.targetUtilization = finalCpuPercentTarget
+	finalCPUPercentTarget = int32(target * 100)
+	tc.resource.targetUtilization = finalCPUPercentTarget
 	tc.currentReplicas = startPods
 	tc.expectedReplicas = startPods
 	tc.runTest(t)
