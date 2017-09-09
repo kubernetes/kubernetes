@@ -61,6 +61,9 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 			if requestInfo.Namespace != "" {
 				scope = "namespace"
 			}
+			if requestInfo.Name != "" {
+				scope = "resource"
+			}
 			if requestInfo.IsResourceRequest {
 				metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, http.StatusGatewayTimeout, 0, now)
 			} else {
