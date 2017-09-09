@@ -311,7 +311,7 @@ PROMETHEUS_TO_SD_PREFIX="${PROMETHEUS_TO_SD_PREFIX:-custom.googleapis.com}"
 ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"
 
 # TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
-# Optional: Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
+# Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 
 # Optional: duration of cluster signed certificates.
