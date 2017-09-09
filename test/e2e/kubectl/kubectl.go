@@ -99,21 +99,21 @@ var (
 )
 
 var testImages = struct {
-	FrontendImage     string
+	GBFrontendImage   string
 	PauseImage        string
 	NginxSlimImage    string
 	NginxSlimNewImage string
 	RedisImage        string
-	RedisslaveImage   string
+	GBRedisSlaveImage string
 	NautilusImage     string
 	KittenImage       string
 }{
-	imageutils.GetE2EImage(imageutils.Frontend),
+	imageutils.GetE2EImage(imageutils.GBFrontend),
 	imageutils.GetE2EImage(imageutils.Pause),
 	imageutils.GetE2EImage(imageutils.NginxSlim),
 	imageutils.GetE2EImage(imageutils.NginxSlimNew),
 	imageutils.GetE2EImage(imageutils.Redis),
-	imageutils.GetE2EImage(imageutils.Redisslave),
+	imageutils.GetE2EImage(imageutils.GBRedisSlave),
 	imageutils.GetE2EImage(imageutils.Nautilus),
 	imageutils.GetE2EImage(imageutils.Kitten),
 }
@@ -340,16 +340,17 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Guestbook application", func() {
 		forEachGBFile := func(run func(s string)) {
+			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"examples/guestbook/frontend-deployment.yaml",
-				"examples/guestbook/frontend-service.yaml",
-				"examples/guestbook/redis-master-deployment.yaml",
-				"examples/guestbook/redis-master-service.yaml",
-				"examples/guestbook/redis-slave-deployment.yaml",
-				"examples/guestbook/redis-slave-service.yaml",
+				"frontend-deployment.yaml.in",
+				"frontend-service.yaml",
+				"redis-master-deployment.yaml.in",
+				"redis-master-service.yaml",
+				"redis-slave-deployment.yaml.in",
+				"redis-slave-service.yaml",
 			} {
-				contents := generated.ReadOrDie(gbAppFile)
-				run(string(contents))
+				contents := substituteImageName(string(generated.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				run(contents)
 			}
 		}
 
