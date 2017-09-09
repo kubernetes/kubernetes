@@ -177,11 +177,6 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 	chainsToRemove := []utiliptables.Chain{}
 	for _, pm := range hostportMappings {
 		chainsToRemove = append(chainsToRemove, getHostportChain(id, pm))
-
-		// To preserve backward compatibility for k8s 1.5 or earlier.
-		// Need to remove hostport chains added by hostportSyncer if there is any
-		// TODO: remove this in 1.7
-		chainsToRemove = append(chainsToRemove, hostportChainName(pm, getPodFullName(podPortMapping)))
 	}
 
 	// remove rules that consists of target chains
