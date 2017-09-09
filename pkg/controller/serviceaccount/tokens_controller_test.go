@@ -428,8 +428,10 @@ func TestTokenCreation(t *testing.T) {
 		"added secret with serviceaccount": {
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
 
-			AddedSecret:     serviceAccountTokenSecret(),
-			ExpectedActions: []core.Action{},
+			AddedSecret: serviceAccountTokenSecret(),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
+			},
 		},
 		"added token secret without token data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutTokenData()},
@@ -439,6 +441,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"added token secret without ca data": {
@@ -449,6 +452,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"added token secret with mismatched ca data": {
@@ -459,7 +463,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
-			},
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default")},
 		},
 		"added token secret without namespace data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutNamespaceData()},
@@ -469,15 +473,16 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"added token secret with custom namespace data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithNamespaceData([]byte("custom"))},
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
 
-			AddedSecret:     serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
+			AddedSecret: serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 
@@ -493,8 +498,10 @@ func TestTokenCreation(t *testing.T) {
 		"updated secret with serviceaccount": {
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
 
-			UpdatedSecret:   serviceAccountTokenSecret(),
-			ExpectedActions: []core.Action{},
+			UpdatedSecret: serviceAccountTokenSecret(),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
+			},
 		},
 		"updated token secret without token data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithoutTokenData()},
@@ -504,6 +511,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"updated token secret without ca data": {
@@ -514,6 +522,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"updated token secret with mismatched ca data": {
@@ -524,6 +533,7 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"updated token secret without namespace data": {
@@ -534,15 +544,16 @@ func TestTokenCreation(t *testing.T) {
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 		"updated token secret with custom namespace data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithNamespaceData([]byte("custom"))},
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
 
-			UpdatedSecret:   serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
+			UpdatedSecret: serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
 
