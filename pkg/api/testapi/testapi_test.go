@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// TODO these tests don't add much value for testing things that have groups
+
 
 func TestResourcePathWithPrefix(t *testing.T) {
 	testCases := []struct {
@@ -39,10 +39,54 @@ func TestResourcePathWithPrefix(t *testing.T) {
 		{"prefix", "resource", "", "myresource", "/api/" + Default.GroupVersion().Version + "/prefix/resource/myresource"},
 		{"prefix", "resource", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource"},
 		{"prefix", "resource", "", "", "/api/" + Default.GroupVersion().Version + "/prefix/resource"},
+
+		{"prefix", "", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/prefix/namespaces/mynamespace/myresource"},
+		{"prefix", "", "", "myresource", "/api/" + Default.GroupVersion().Version + "/prefix/myresource"},
+		{"prefix", "", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/prefix/namespaces/mynamespace"},
+		{"prefix", "", "", "", "/api/" + Default.GroupVersion().Version + "/prefix"},
+
 		{"", "resource", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+		{"", "resource", "", "myresource", "/api/" + Default.GroupVersion().Version + "/resource/myresource"},
+		{"", "resource", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource"},
+		{"", "resource", "", "", "/api/" + Default.GroupVersion().Version + "/resource"},
+		{"", "", "mynamespace", "myresource", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/myresource"},
+		{"", "", "", "myresource", "/api/" + Default.GroupVersion().Version + "/myresource"},
+		{"", "", "mynamespace", "", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace"},
+		{"", "", "", "", "/api/" + Default.GroupVersion().Version},
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
+		}
+	}
+
+	testGroupCases := []struct {
+		prefix    string
+		resource  string
+		namespace string
+		name      string
+		expected  string
+	}{
+		{"prefix", "resource", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/resource"},
+		{"prefix", "", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace/myresource"},
+		{"prefix", "", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/myresource"},
+		{"prefix", "", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace"},
+		{"prefix", "", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix"},
+
+		{"", "resource", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+		{"", "resource", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource/myresource"},
+		{"", "resource", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/resource"},
+		{"", "resource", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource"},
+		{"", "", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/myresource"},
+		{"", "", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/myresource"},
+		{"", "", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace"},
+		{"", "", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version},
+	}
+	for _, item := range testGroupCases {
+		if actual := Admission.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
 		}
 	}
@@ -62,6 +106,23 @@ func TestResourcePath(t *testing.T) {
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
+		}
+	}
+
+	testGroupCases := []struct {
+		resource  string
+		namespace string
+		name      string
+		expected  string
+	}{
+		{"resource", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+		{"resource", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource/myresource"},
+		{"resource", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/resource"},
+		{"resource", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/resource"},
+	}
+	for _, item := range testGroupCases {
+		if actual := Admission.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 		}
 	}
