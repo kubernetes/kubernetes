@@ -28,6 +28,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/crio"
 	"github.com/google/cadvisor/container/docker"
 	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/container/rkt"
@@ -156,6 +157,15 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 		glog.Warningf("unable to connect to Rkt api service: %v", err)
 	}
 
+	crioClient, err := crio.Client()
+	if err != nil {
+		return nil, err
+	}
+	crioInfo, err := crioClient.Info()
+	if err != nil {
+		glog.Warningf("unable to connect to CRI-O api service: %v", err)
+	}
+
 	context := fs.Context{
 		Docker: fs.DockerContext{
 			Root:         docker.RootDir(),
@@ -163,6 +173,9 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 			DriverStatus: dockerStatus.DriverStatus,
 		},
 		RktPath: rktPath,
+		Crio: fs.CrioContext{
+			Root: crioInfo.StorageRoot,
+		},
 	}
 	fsInfo, err := fs.NewFsInfo(context)
 	if err != nil {
@@ -256,6 +269,11 @@ func (self *manager) Start() error {
 			return err
 		}
 		self.containerWatchers = append(self.containerWatchers, watcher)
+	}
+
+	err = crio.Register(self, self.fsInfo, self.ignoreMetrics)
+	if err != nil {
+		glog.Warningf("Registration of the crio container factory failed: %v", err)
 	}
 
 	err = systemd.Register(self, self.fsInfo, self.ignoreMetrics)

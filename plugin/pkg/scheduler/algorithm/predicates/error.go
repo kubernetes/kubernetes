@@ -25,6 +25,11 @@ import (
 var (
 	// The predicateName tries to be consistent as the predicate name used in DefaultAlgorithmProvider defined in
 	// defaults.go (which tend to be stable for backward compatibility)
+
+	// NOTE: If you add a new predicate failure error for a predicate that can never
+	// be made to pass by removing pods, or you change an existing predicate so that
+	// it can never be made to pass by removing pods, you need to add the predicate
+	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 	ErrDiskConflict              = newPredicateFailureError("NoDiskConflict")
 	ErrVolumeZoneConflict        = newPredicateFailureError("NoVolumeZoneConflict")
 	ErrNodeSelectorNotMatch      = newPredicateFailureError("MatchNodeSelector")

@@ -62,6 +62,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
+	// install apis
 	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
@@ -121,8 +122,6 @@ type Config struct {
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
 
-	// SharedInformerFactory provides shared informers for resources
-	SharedInformerFactory informers.SharedInformerFactory
 	//===========================================================================
 	// Fields you probably don't care about changing
 	//===========================================================================
@@ -186,6 +185,15 @@ type Config struct {
 	PublicAddress net.IP
 }
 
+type RecommendedConfig struct {
+	Config
+
+	// SharedInformerFactory provides shared informers for Kubernetes resources. This value is set by
+	// RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo. It uses an in-cluster client config
+	// by default, or the kubeconfig given with kubeconfig command line flag.
+	SharedInformerFactory informers.SharedInformerFactory
+}
+
 type SecureServingInfo struct {
 	// BindAddress is the ip:port to serve on
 	BindAddress string
@@ -238,6 +246,13 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+	}
+}
+
+// NewRecommendedConfig returns a RecommendedConfig struct with the default values
+func NewRecommendedConfig(codecs serializer.CodecFactory) *RecommendedConfig {
+	return &RecommendedConfig{
+		Config: *NewConfig(codecs),
 	}
 }
 
@@ -300,11 +315,23 @@ func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
 
 type completedConfig struct {
 	*Config
+
+	//===========================================================================
+	// values below here are filled in during completion
+	//===========================================================================
+
+	// SharedInformerFactory provides shared informers for resources
+	SharedInformerFactory informers.SharedInformerFactory
+}
+
+type CompletedConfig struct {
+	// Embed a private pointer that cannot be instantiated outside of this package.
+	*completedConfig
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
@@ -379,12 +406,13 @@ func (c *Config) Complete() completedConfig {
 		c.RequestInfoResolver = NewRequestInfoResolver(c)
 	}
 
-	return completedConfig{c}
+	return CompletedConfig{&completedConfig{c, informers}}
 }
 
-// SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+// Complete fills in any fields not set that are required to have valid data and can be derived
+// from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
+func (c *RecommendedConfig) Complete() CompletedConfig {
+	return c.Config.Complete(c.SharedInformerFactory)
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.

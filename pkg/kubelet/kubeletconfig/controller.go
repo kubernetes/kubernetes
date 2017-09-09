@@ -254,7 +254,8 @@ func (cc *Controller) initialize() error {
 	return nil
 }
 
-// localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig
+// localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig.
+// It also sets the local configOK condition to match the returned config.
 func (cc *Controller) localConfig() *kubeletconfig.KubeletConfiguration {
 	if cc.initConfig != nil {
 		cc.configOK.Set(status.CurInitMessage, status.CurInitOKReason, apiv1.ConditionTrue)
@@ -264,14 +265,14 @@ func (cc *Controller) localConfig() *kubeletconfig.KubeletConfiguration {
 	return cc.defaultConfig
 }
 
-// inTrial returns true if the time elapsed since the last modification of the current config exceeds `trialDur`, false otherwise
+// inTrial returns true if the time elapsed since the last modification of the current config does not exceed `trialDur`, false otherwise
 func (cc *Controller) inTrial(trialDur time.Duration) (bool, error) {
 	now := time.Now()
 	t, err := cc.checkpointStore.CurrentModified()
 	if err != nil {
 		return false, err
 	}
-	if now.Sub(t) > trialDur {
+	if now.Sub(t) <= trialDur {
 		return true, nil
 	}
 	return false, nil

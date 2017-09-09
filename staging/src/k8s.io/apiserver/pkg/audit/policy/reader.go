@@ -49,6 +49,10 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 		return nil, err.ToAggregate()
 	}
 
-	glog.V(4).Infof("Loaded %d audit policy rules from file %s\n", len(policy.Rules), filePath)
+	policyCnt := len(policy.Rules)
+	if policyCnt == 0 {
+		return nil, fmt.Errorf("loaded illegal policy with 0 rules from file %s", filePath)
+	}
+	glog.V(4).Infof("Loaded %d audit policy rules from file %s", policyCnt, filePath)
 	return policy, nil
 }

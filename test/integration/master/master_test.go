@@ -171,7 +171,7 @@ func TestStatus(t *testing.T) {
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis".: "Everything is forbidden."`,
+			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
 		},
 		{
 			name:         "401",
@@ -548,7 +548,7 @@ func TestServiceAlloc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
-	cfg.ServiceIPRange = *cidr
+	cfg.ExtraConfig.ServiceIPRange = *cidr
 	_, s, closeFn := framework.RunAMaster(cfg)
 	defer closeFn()
 

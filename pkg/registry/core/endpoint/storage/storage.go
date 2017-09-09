@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 )
 
@@ -40,7 +39,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		NewFunc:                  func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc:              func() runtime.Object { return &api.EndpointsList{} },
 		DefaultQualifiedResource: api.Resource("endpoints"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("endpoints"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,

@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/certificates:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/certificates/certificates:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

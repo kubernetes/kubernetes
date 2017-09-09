@@ -426,17 +426,29 @@ var (
 	falseBytes = []byte("false")
 )
 
-func toUnstructured(sv, dv reflect.Value) error {
-	st, dt := sv.Type(), dv.Type()
+func getMarshaler(v reflect.Value) (encodingjson.Marshaler, bool) {
+	// Check value receivers if v is not a pointer and pointer receivers if v is a pointer
+	if v.Type().Implements(marshalerType) {
+		return v.Interface().(encodingjson.Marshaler), true
+	}
+	// Check pointer receivers if v is not a pointer
+	if v.Kind() != reflect.Ptr && v.CanAddr() {
+		v = v.Addr()
+		if v.Type().Implements(marshalerType) {
+			return v.Interface().(encodingjson.Marshaler), true
+		}
+	}
+	return nil, false
+}
 
+func toUnstructured(sv, dv reflect.Value) error {
 	// Check if the object has a custom JSON marshaller/unmarshaller.
-	if st.Implements(marshalerType) {
+	if marshaler, ok := getMarshaler(sv); ok {
 		if sv.Kind() == reflect.Ptr && sv.IsNil() {
 			// We're done - we don't need to store anything.
 			return nil
 		}
 
-		marshaler := sv.Interface().(encodingjson.Marshaler)
 		data, err := marshaler.MarshalJSON()
 		if err != nil {
 			return err
@@ -496,6 +508,7 @@ func toUnstructured(sv, dv reflect.Value) error {
 		return nil
 	}
 
+	st, dt := sv.Type(), dv.Type()
 	switch st.Kind() {
 	case reflect.String:
 		if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {

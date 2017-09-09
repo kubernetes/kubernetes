@@ -116,7 +116,7 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 		// object doesn't exist
 		{"object doesn't exist",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "bogus", Namespace: "namespace", UID: "bogus"}}},
-			nil, "could not download ConfigMap"},
+			nil, "failed to download ConfigMap"},
 		// UID of downloaded object doesn't match UID of referent found via namespace/name
 		{"UID is incorrect for namespace/name",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "bogus"}}},

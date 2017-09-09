@@ -142,7 +142,7 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 	return pod
 }
 
-func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
+func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
 	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
 	return pm.GetMetadata(p, nodeInfo)
 }
@@ -3015,7 +3015,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 
-			var meta interface{} = nil
+			var meta algorithm.PredicateMetadata = nil
 
 			if !test.nometa {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)

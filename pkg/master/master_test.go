@@ -66,14 +66,16 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedInformerFactory, *assert.Assertions) {
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
 
 	config := &Config{
-		GenericConfig:           genericapiserver.NewConfig(api.Codecs),
-		APIResourceConfigSource: DefaultAPIResourceConfigSource(),
-		APIServerServicePort:    443,
-		MasterCount:             1,
+		GenericConfig: genericapiserver.NewConfig(api.Codecs),
+		ExtraConfig: ExtraConfig{
+			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+			APIServerServicePort:    443,
+			MasterCount:             1,
+		},
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(api.Registry)
@@ -95,16 +97,16 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 
 	kubeVersion := kubeversion.Get()
 	config.GenericConfig.Version = &kubeVersion
-	config.StorageFactory = storageFactory
+	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.GenericConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.EnableMetrics = true
-	config.EnableCoreControllers = false
-	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
-	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
+	config.ExtraConfig.EnableCoreControllers = false
+	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
+	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
@@ -113,9 +115,9 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	if err != nil {
 		t.Fatalf("unable to create client set due to %v", err)
 	}
-	config.GenericConfig.SharedInformerFactory = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
+	sharedInformers := informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
 
-	return server, *config, assert.New(t)
+	return server, *config, sharedInformers, assert.New(t)
 }
 
 // TestLegacyRestStorageStrategies ensures that all Storage objects which are using the generic registry Store have
@@ -126,12 +128,12 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	storageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:       masterCfg.StorageFactory,
-		ProxyTransport:       masterCfg.ProxyTransport,
-		KubeletClientConfig:  masterCfg.KubeletClientConfig,
-		EventTTL:             masterCfg.EventTTL,
-		ServiceIPRange:       masterCfg.ServiceIPRange,
-		ServiceNodePortRange: masterCfg.ServiceNodePortRange,
+		StorageFactory:       masterCfg.ExtraConfig.StorageFactory,
+		ProxyTransport:       masterCfg.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:  masterCfg.ExtraConfig.KubeletClientConfig,
+		EventTTL:             masterCfg.ExtraConfig.EventTTL,
+		ServiceIPRange:       masterCfg.ExtraConfig.ServiceIPRange,
+		ServiceNodePortRange: masterCfg.ExtraConfig.ServiceNodePortRange,
 		LoopbackClientConfig: masterCfg.GenericConfig.LoopbackClientConfig,
 	}
 
@@ -162,7 +164,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, _ := certStorageProvider.NewRESTStorage(masterCfg.ExtraConfig.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
 
 	exceptions := registrytest.StrategyExceptions{
 		HasExportStrategy: []string{
@@ -178,9 +180,9 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 }
 
 func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, assert := setUp(t)
+	etcdserver, config, sharedInformers, assert := setUp(t)
 
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
@@ -204,9 +206,9 @@ func limitedAPIResourceConfigSource() *serverstorage.ResourceConfig {
 
 // newLimitedMaster only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdserver, config, assert := setUp(t)
-	config.APIResourceConfigSource = limitedAPIResourceConfigSource()
-	master, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	etcdserver, config, sharedInformers, assert := setUp(t)
+	config.ExtraConfig.APIResourceConfigSource = limitedAPIResourceConfigSource()
+	master, err := config.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}

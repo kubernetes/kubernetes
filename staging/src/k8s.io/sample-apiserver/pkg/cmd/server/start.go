@@ -104,7 +104,7 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
@@ -119,13 +119,13 @@ func (o WardleServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
-	if err := o.Admission.ApplyTo(serverConfig, admissionInitializer); err != nil {
+	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, admissionInitializer); err != nil {
 		return nil, err
 	}
 
 	config := &apiserver.Config{
-		GenericConfig:         serverConfig,
-		SharedInformerFactory: informerFactory,
+		GenericConfig: serverConfig,
+		ExtraConfig:   apiserver.ExtraConfig{},
 	}
 	return config, nil
 }
@@ -142,7 +142,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	}
 
 	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
-		config.SharedInformerFactory.Start(context.StopCh)
+		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
 
