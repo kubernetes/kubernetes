@@ -65,6 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -5014,4 +5015,34 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 func IsRetryableAPIError(err error) bool {
 	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || apierrs.IsInternalError(err)
+}
+
+// DsFromManifest reads a .json/yaml file and returns the daemonset in it.
+func DsFromManifest(url string) *extensions.DaemonSet {
+	var controller extensions.DaemonSet
+	Logf("Parsing ds from %v", url)
+
+	var response *http.Response
+	var err error
+
+	for i := 1; i <= 5; i++ {
+		response, err = http.Get(url)
+		if err == nil && response.StatusCode == 200 {
+			break
+		}
+		time.Sleep(time.Duration(i) * time.Second)
+	}
+
+	Expect(err).NotTo(HaveOccurred())
+	Expect(response.StatusCode).To(Equal(200))
+	defer response.Body.Close()
+
+	data, err := ioutil.ReadAll(response.Body)
+	Expect(err).NotTo(HaveOccurred())
+
+	json, err := utilyaml.ToJSON(data)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
+	return &controller
 }
