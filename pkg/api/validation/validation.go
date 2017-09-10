@@ -993,7 +993,7 @@ var supportedHostPathTypes = sets.NewString(
 func validateHostPathType(hostPathType *api.HostPathType, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if !supportedHostPathTypes.Has(string(*hostPathType)) {
+	if hostPathType != nil && !supportedHostPathTypes.Has(string(*hostPathType)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath, hostPathType, supportedHostPathTypes.List()))
 	}
 
