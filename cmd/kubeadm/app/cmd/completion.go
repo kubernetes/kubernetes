@@ -45,7 +45,7 @@ const defaultBoilerPlate = `
 `
 
 var (
-	completion_long = dedent.Dedent(`
+	completionLong = dedent.Dedent(`
 		Output shell completion code for the specified shell (bash or zsh).
 		The shell code must be evalutated to provide interactive
 		completion of kubeadm commands.  This can be done by sourcing it from
@@ -63,7 +63,7 @@ var (
 
 		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
 
-	completion_example = dedent.Dedent(`
+	completionExample = dedent.Dedent(`
 		# Install bash completion on a Mac using homebrew
 		brew install bash-completion
 		printf "\n# Bash completion support\nsource $(brew --prefix)/etc/bash_completion\n" >> $HOME/.bash_profile
@@ -82,23 +82,24 @@ var (
 )
 
 var (
-	completion_shells = map[string]func(out io.Writer, cmd *cobra.Command) error{
+	completionShells = map[string]func(out io.Writer, cmd *cobra.Command) error{
 		"bash": runCompletionBash,
 		"zsh":  runCompletionZsh,
 	}
 )
 
+// NewCmdCompletion return command for executing "kubeadm completion" command
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
-	for s := range completion_shells {
+	for s := range completionShells {
 		shells = append(shells, s)
 	}
 
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
 		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
-		Long:    completion_long,
-		Example: completion_example,
+		Long:    completionLong,
+		Example: completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(out, boilerPlate, cmd, args)
 			kubeadmutil.CheckErr(err)
@@ -109,16 +110,17 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	return cmd
 }
 
+// RunCompletion checks given arguments and executes command
 func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("shell not specified.")
+		return fmt.Errorf("shell not specified")
 	}
 	if len(args) > 1 {
-		return fmt.Errorf("too many arguments. expected only the shell type.")
+		return fmt.Errorf("too many arguments. expected only the shell type")
 	}
-	run, found := completion_shells[args[0]]
+	run, found := completionShells[args[0]]
 	if !found {
-		return fmt.Errorf("unsupported shell type %q.", args[0])
+		return fmt.Errorf("unsupported shell type %q", args[0])
 	}
 
 	if len(boilerPlate) == 0 {
@@ -135,7 +137,7 @@ func runCompletionBash(out io.Writer, kubeadm *cobra.Command) error {
 }
 
 func runCompletionZsh(out io.Writer, kubeadm *cobra.Command) error {
-	zsh_initialization := `
+	zshInitialization := `
 __kubeadm_bash_source() {
 	alias shopt=':'
 	alias _expand=_bash_expand
@@ -276,18 +278,18 @@ __kubeadm_convert_bash_to_zsh() {
 	-e "s/\\\$(type${RWORD}/\$(__kubeadm_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `
-	out.Write([]byte(zsh_initialization))
+	out.Write([]byte(zshInitialization))
 
 	buf := new(bytes.Buffer)
 	kubeadm.GenBashCompletion(buf)
 	out.Write(buf.Bytes())
 
-	zsh_tail := `
+	zshTail := `
 BASH_COMPLETION_EOF
 }
 
 __kubeadm_bash_source <(__kubeadm_convert_bash_to_zsh)
 `
-	out.Write([]byte(zsh_tail))
+	out.Write([]byte(zshTail))
 	return nil
 }

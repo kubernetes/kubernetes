@@ -26,15 +26,21 @@ import (
 )
 
 const (
-	TokenIDBytes     = 3
+	// TokenIDBytes defines a number of bytes used for a token id
+	TokenIDBytes = 3
+	// TokenSecretBytes defines a number of bytes used for a secret
 	TokenSecretBytes = 8
 )
 
 var (
+	// TokenIDRegexpString defines token's id regular expression pattern
 	TokenIDRegexpString = "^([a-z0-9]{6})$"
-	TokenIDRegexp       = regexp.MustCompile(TokenIDRegexpString)
-	TokenRegexpString   = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
-	TokenRegexp         = regexp.MustCompile(TokenRegexpString)
+	// TokenIDRegexp is a compiled regular expression of TokenIDRegexpString
+	TokenIDRegexp = regexp.MustCompile(TokenIDRegexpString)
+	// TokenRegexpString defines id.secret regular expression pattern
+	TokenRegexpString = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
+	// TokenRegexp is a compiled regular expression of TokenRegexpString
+	TokenRegexp = regexp.MustCompile(TokenRegexpString)
 )
 
 func randBytes(length int) (string, error) {

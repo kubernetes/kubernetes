@@ -22,6 +22,8 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// MasterConfiguration contains a list of elements which make up master's
+// configuration object.
 type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -54,6 +56,7 @@ type MasterConfiguration struct {
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
+// API struct contains elements of API server address.
 type API struct {
 	// AdvertiseAddress sets the address for the API server to advertise.
 	AdvertiseAddress string `json:"advertiseAddress"`
@@ -61,18 +64,21 @@ type API struct {
 	BindPort int32 `json:"bindPort"`
 }
 
+// TokenDiscovery contains elements needed for token discovery
 type TokenDiscovery struct {
 	ID        string   `json:"id"`
 	Secret    string   `json:"secret"`
 	Addresses []string `json:"addresses"`
 }
 
+// Networking contains elements describing cluster's networking configuration
 type Networking struct {
 	ServiceSubnet string `json:"serviceSubnet"`
 	PodSubnet     string `json:"podSubnet"`
 	DNSDomain     string `json:"dnsDomain"`
 }
 
+// Etcd contains elements describing Etcd configuration
 type Etcd struct {
 	Endpoints []string          `json:"endpoints"`
 	CAFile    string            `json:"caFile"`
@@ -86,6 +92,7 @@ type Etcd struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// NodeConfiguration contains elements describing a particular node
 type NodeConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 

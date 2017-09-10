@@ -62,7 +62,7 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 		defaultCluster.CertificateAuthorityData,
 	)
 
-	client, err := kubeconfigutil.KubeConfigToClientSet(configFromClusterInfo)
+	client, err := kubeconfigutil.ToClientSet(configFromClusterInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +79,9 @@ func ValidateClusterInfo(clusterinfo *clientcmdapi.Config) (*clientcmdapi.Cluste
 				// In that case, trust the cluster admin and do not refresh the cluster-info credentials
 				fmt.Printf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
-			} else {
-				fmt.Printf("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
-				return false, nil
 			}
+			fmt.Printf("[discovery] Failed to validate the API Server's identity, will try again: [%v]\n", err)
+			return false, nil
 		}
 		return true, nil
 	})

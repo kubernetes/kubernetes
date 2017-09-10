@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 is the package that contains the libraries that drive the kubeadm binary.
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=kubeadm.k8s.io
 // +k8s:deepcopy-gen=package

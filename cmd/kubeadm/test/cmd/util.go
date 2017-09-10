@@ -27,6 +27,8 @@ import (
 
 // Forked from test/e2e/framework because the e2e framework is quite bloated
 // for our purposes here, and modified to remove undesired logging.
+
+// RunCmd is a utility function for kubeadm testing that executes a specified command
 func RunCmd(command string, args ...string) (string, string, error) {
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)

@@ -154,10 +154,12 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Join defines struct used by kubeadm join command
 type Join struct {
 	cfg *kubeadmapi.NodeConfiguration
 }
 
+// NewJoin instantiates Join struct with given arguments
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
@@ -192,6 +194,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	return &Join{cfg: cfg}, nil
 }
 
+// Validate validates mixed arguments passed to cobra.Command
 func (j *Join) Validate(cmd *cobra.Command) error {
 	if err := validation.ValidateMixedArguments(cmd.PersistentFlags()); err != nil {
 		return err
@@ -206,7 +209,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubeconfigutil.KubeConfigToClientSet(cfg)
+	client, err := kubeconfigutil.ToClientSet(cfg)
 	if err != nil {
 		return err
 	}
