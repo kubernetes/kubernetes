@@ -354,7 +354,7 @@ func TestLabelErrors(t *testing.T) {
 }
 
 func TestLabelForResourceFromFile(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,
@@ -439,7 +439,7 @@ func TestLabelLocal(t *testing.T) {
 }
 
 func TestLabelMultipleObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		APIRegistry:          api.Registry,

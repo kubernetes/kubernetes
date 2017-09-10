@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
-func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
+func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList, *api.ConfigMapList) {
 	pods := &api.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
@@ -88,7 +88,18 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			},
 		},
 	}
-	return pods, svc, rc
+	cm := &api.ConfigMapList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "19",
+		},
+		Items: []api.ConfigMap{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "cm1", Namespace: "test", ResourceVersion: "21"},
+			},
+		},
+	}
+
+	return pods, svc, rc, cm
 }
 
 func testComponentStatusData() *api.ComponentStatusList {
@@ -187,7 +198,7 @@ func TestGetSchemaObject(t *testing.T) {
 }
 
 func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -244,7 +255,7 @@ func testOpenAPISchemaData() (openapi.Resources, error) {
 }
 
 func TestGetObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -272,7 +283,7 @@ func TestGetObjects(t *testing.T) {
 func TestGetObjectsFiltered(t *testing.T) {
 	initTestErrorHandler(t)
 
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 	pods.Items[0].Status.Phase = api.PodFailed
 	first := &pods.Items[0]
 	second := &pods.Items[1]
@@ -449,7 +460,7 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _,_,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
@@ -476,7 +487,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 }
 
 func TestGetListObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -517,7 +528,7 @@ func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
 }
 
 func TestGetAllListObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -576,7 +587,7 @@ func TestGetListComponentStatus(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjects(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc, _,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -615,7 +626,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjectsAsList(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc,_,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
@@ -680,7 +691,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc,_,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -724,7 +735,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
-	_, svc, _ := testData()
+	_, svc,_,_ := testData()
 	node := &api.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -769,7 +780,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 }
 
 func TestGetByFormatForcesFlag(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}

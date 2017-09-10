@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -87,6 +88,8 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+
+	cmd.AddCommand(NewCmdReplaceConfigMap(f, out))
 
 	return cmd
 }
@@ -301,4 +304,63 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return fmt.Errorf("no objects passed to replace")
 	}
 	return nil
+}
+
+// ReplaceSubcommandOptions is an options struct to support replace subcommands
+type ReplaceSubcommandOptions struct {
+	// Name of resource being replaced
+	Name string
+	// StructuredGenerator is the resource generator for the object being replaced
+	StructuredGenerator kubectl.StructuredGenerator
+	OutputFormat string
+}
+
+// RunReplaceSubcommand executes a replace subcommand using the specified options
+func RunReplaceSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ReplaceSubcommandOptions) error {
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	obj, err := options.StructuredGenerator.StructuredGenerate()
+	if err != nil {
+		return err
+	}
+	mapper, typer := f.Object()
+	gvks, _, err := typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	gvk := gvks[0]
+	mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+	if err != nil {
+		return err
+	}
+	resourceMapper := &resource.Mapper{
+		ObjectTyper:  typer,
+		RESTMapper:   mapper,
+		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+	}
+	info, err := resourceMapper.InfoForObject(obj, nil)
+	if err != nil {
+		return err
+	}
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		return err
+	}
+	obj = info.Object
+
+	// Serialize the object with the annotation applied.
+	newObj, err := resource.NewHelper(info.Client, info.Mapping).Replace(namespace, info.Name, true, obj)
+	if err != nil {
+		return cmdutil.AddSourceToErr("replacing", info.Source, err)
+	}
+
+	info.Refresh(newObj, true)
+
+	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
+		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, false, "replaced")
+		return nil
+	}
+
+	return f.PrintObject(cmd, false, mapper, newObj, out)
 }

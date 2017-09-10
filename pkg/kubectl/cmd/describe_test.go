@@ -78,7 +78,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 }
 
 func TestDescribeObject(t *testing.T) {
-	_, _, rc := testData()
+	_, _, rc,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
@@ -112,7 +112,7 @@ func TestDescribeObject(t *testing.T) {
 }
 
 func TestDescribeListObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
@@ -133,7 +133,7 @@ func TestDescribeListObjects(t *testing.T) {
 }
 
 func TestDescribeObjectShowEvents(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
@@ -155,7 +155,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 }
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _,_ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
