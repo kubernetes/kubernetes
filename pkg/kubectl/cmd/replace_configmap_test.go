@@ -21,14 +21,14 @@ import (
 	"net/http"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestReplaceConfigMap(t *testing.T) {
-	_,_,_,cm := testData()
-	f, tf, codec,ns := cmdtesting.NewAPIFactory()
+	_, _, _, cm := testData()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		APIRegistry:          api.Registry,

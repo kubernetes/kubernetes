@@ -29,7 +29,7 @@ import (
 )
 
 func TestPatchObject(t *testing.T) {
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -61,7 +61,7 @@ func TestPatchObject(t *testing.T) {
 }
 
 func TestPatchObjectFromFile(t *testing.T) {
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -94,7 +94,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 }
 
 func TestPatchNoop(t *testing.T) {
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 	getObject := &svc.Items[0]
 	patchObject := &svc.Items[0]
 
@@ -147,7 +147,7 @@ func TestPatchNoop(t *testing.T) {
 }
 
 func TestPatchObjectFromFileOutput(t *testing.T) {
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 
 	svcCopy := svc.Items[0].DeepCopy()
 	if svcCopy.Labels == nil {

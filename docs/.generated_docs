@@ -88,8 +88,8 @@ docs/man/man1/kubectl-patch.1
 docs/man/man1/kubectl-plugin.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
-docs/man/man1/kubectl-replace.1
 docs/man/man1/kubectl-replace-configmap.1
+docs/man/man1/kubectl-replace.1
 docs/man/man1/kubectl-rolling-update.1
 docs/man/man1/kubectl-rollout-history.1
 docs/man/man1/kubectl-rollout-pause.1

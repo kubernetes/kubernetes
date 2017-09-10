@@ -446,7 +446,7 @@ func TestAnnotateErrors(t *testing.T) {
 }
 
 func TestAnnotateObject(t *testing.T) {
-	pods, _,_,_ := testData()
+	pods, _, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -497,7 +497,7 @@ func TestAnnotateObject(t *testing.T) {
 }
 
 func TestAnnotateObjectFromFile(t *testing.T) {
-	pods, _,_,_ := testData()
+	pods, _, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -579,7 +579,7 @@ func TestAnnotateLocal(t *testing.T) {
 }
 
 func TestAnnotateMultipleObjects(t *testing.T) {
-	pods, _, _,_ := testData()
+	pods, _, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}

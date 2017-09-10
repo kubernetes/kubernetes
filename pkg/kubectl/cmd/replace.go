@@ -25,10 +25,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -312,7 +312,7 @@ type ReplaceSubcommandOptions struct {
 	Name string
 	// StructuredGenerator is the resource generator for the object being replaced
 	StructuredGenerator kubectl.StructuredGenerator
-	OutputFormat string
+	OutputFormat        string
 }
 
 // RunReplaceSubcommand executes a replace subcommand using the specified options

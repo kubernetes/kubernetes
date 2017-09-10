@@ -40,7 +40,7 @@ func TestExtraArgsFail(t *testing.T) {
 
 func TestCreateObject(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -75,7 +75,7 @@ func TestCreateObject(t *testing.T) {
 
 func TestCreateMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc, rc,_ := testData()
+	_, svc, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -112,7 +112,7 @@ func TestCreateMultipleObject(t *testing.T) {
 
 func TestCreateDirectory(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 	rc.Items[0].Name = "name"
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()

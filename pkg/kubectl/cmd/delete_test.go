@@ -52,7 +52,7 @@ var fakecmd = &cobra.Command{
 
 func TestDeleteObjectByTuple(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -116,7 +116,7 @@ func hasExpectedOrphanDependents(body io.ReadCloser, expectedOrphanDependents *b
 // Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
 func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -166,7 +166,7 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 func TestDeleteNamedObject(t *testing.T) {
 	initTestErrorHandler(t)
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -217,7 +217,7 @@ func TestDeleteNamedObject(t *testing.T) {
 
 func TestDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -274,7 +274,7 @@ func (f *fakeReaperFactory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, e
 
 func TestDeleteObjectGraceZero(t *testing.T) {
 	initTestErrorHandler(t)
-	pods, _,_,_ := testData()
+	pods, _, _, _ := testData()
 
 	objectDeletionWaitInterval = time.Millisecond
 	count := 0
@@ -398,7 +398,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 
 func TestDeleteAllNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
@@ -447,7 +447,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 
@@ -489,7 +489,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 
 func TestDeleteMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc, rc,_ := testData()
+	_, svc, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -525,7 +525,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 
 func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc,_,_ := testData()
+	_, svc, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -571,7 +571,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
-	_, svc,rc,_ := testData()
+	_, svc, rc, _ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -609,7 +609,7 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 
 func TestDeleteDirectory(t *testing.T) {
 	initTestErrorHandler(t)
-	_, _, rc,_ := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -642,7 +642,7 @@ func TestDeleteDirectory(t *testing.T) {
 
 func TestDeleteMultipleSelector(t *testing.T) {
 	initTestErrorHandler(t)
-	pods, svc,_,_ := testData()
+	pods, svc, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}

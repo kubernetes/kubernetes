@@ -103,6 +103,6 @@ func ReplaceConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	return RunReplaceSubcommand(f, cmd, cmdOut, &ReplaceSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
-		OutputFormat:        cmdutil.GetFlagString	(cmd, "output"),
+		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
 }
