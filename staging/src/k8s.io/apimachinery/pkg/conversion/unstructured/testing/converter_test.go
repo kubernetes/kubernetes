@@ -21,6 +21,7 @@ limitations under the License.
 package testing
 
 import (
+	encodingjson "encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -462,6 +463,24 @@ func TestUnrecognized(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestDeepCopyJSON(t *testing.T) {
+	src := map[string]interface{}{
+		"a": nil,
+		"b": int64(123),
+		"c": map[string]interface{}{
+			"a": "b",
+		},
+		"d": []interface{}{
+			int64(1), int64(2),
+		},
+		"e": "estr",
+		"f": true,
+		"g": encodingjson.Number("123"),
+	}
+	deepCopy := conversionunstructured.DeepCopyJSON(src)
+	assert.Equal(t, src, deepCopy)
 }
 
 func TestFloatIntConversion(t *testing.T) {

@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -106,6 +107,8 @@ func NewConverter(mismatchDetection bool) Converter {
 	}
 }
 
+// FromUnstructured converts an object from map[string]interface{} representation into a concrete type.
+// It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 func (c *converterImpl) FromUnstructured(u map[string]interface{}, obj interface{}) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
@@ -388,19 +391,27 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	return nil
 }
 
+// ToUnstructured converts an object into map[string]interface{} representation.
+// It uses encoding/json/Marshaler if object implements it or reflection if not.
 func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
-	t := reflect.TypeOf(obj)
-	value := reflect.ValueOf(obj)
-	if t.Kind() != reflect.Ptr || value.IsNil() {
-		return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
+	var u map[string]interface{}
+	var err error
+	if unstr, ok := obj.(runtime.Unstructured); ok {
+		u = DeepCopyJSON(unstr.UnstructuredContent())
+	} else {
+		t := reflect.TypeOf(obj)
+		value := reflect.ValueOf(obj)
+		if t.Kind() != reflect.Ptr || value.IsNil() {
+			return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
+		}
+		u = map[string]interface{}{}
+		err = toUnstructured(value.Elem(), reflect.ValueOf(&u).Elem())
 	}
-	u := &map[string]interface{}{}
-	err := toUnstructured(value.Elem(), reflect.ValueOf(u).Elem())
 	if c.mismatchDetection {
-		newUnstr := &map[string]interface{}{}
-		newErr := toUnstructuredViaJSON(obj, newUnstr)
+		newUnstr := map[string]interface{}{}
+		newErr := toUnstructuredViaJSON(obj, &newUnstr)
 		if (err != nil) != (newErr != nil) {
-			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v", obj, err)
+			glog.Fatalf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr)
 		}
 		if err == nil && !apiequality.Semantic.DeepEqual(u, newUnstr) {
 			glog.Fatalf("ToUnstructured mismatch for %#v, diff: %v", u, diff.ObjectReflectDiff(u, newUnstr))
@@ -409,7 +420,34 @@ func (c *converterImpl) ToUnstructured(obj interface{}) (map[string]interface{},
 	if err != nil {
 		return nil, err
 	}
-	return *u, nil
+	return u, nil
+}
+
+// DeepCopyJSON deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
+// types produced by json.Unmarshal().
+func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
+	return deepCopyJSON(x).(map[string]interface{})
+}
+
+func deepCopyJSON(x interface{}) interface{} {
+	switch x := x.(type) {
+	case map[string]interface{}:
+		clone := make(map[string]interface{}, len(x))
+		for k, v := range x {
+			clone[k] = deepCopyJSON(v)
+		}
+		return clone
+	case []interface{}:
+		clone := make([]interface{}, len(x))
+		for i, v := range x {
+			clone[i] = deepCopyJSON(v)
+		}
+		return clone
+	case string, int64, bool, float64, nil, encodingjson.Number:
+		return x
+	default:
+		panic(fmt.Errorf("cannot deep copy %T", x))
+	}
 }
 
 func toUnstructuredViaJSON(obj interface{}, u *map[string]interface{}) error {

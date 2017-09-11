@@ -145,33 +145,13 @@ func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func deepCopyJSON(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = deepCopyJSON(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i := range x {
-			clone[i] = deepCopyJSON(x[i])
-		}
-		return clone
-	default:
-		// only non-pointer values (float64, int64, bool, string) are left. These can be copied by-value.
-		return x
-	}
-}
-
 func (in *Unstructured) DeepCopy() *Unstructured {
 	if in == nil {
 		return nil
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = deepCopyJSON(in.Object).(map[string]interface{})
+	out.Object = unstructured.DeepCopyJSON(in.Object)
 	return out
 }
 
@@ -181,7 +161,7 @@ func (in *UnstructuredList) DeepCopy() *UnstructuredList {
 	}
 	out := new(UnstructuredList)
 	*out = *in
-	out.Object = deepCopyJSON(in.Object).(map[string]interface{})
+	out.Object = unstructured.DeepCopyJSON(in.Object)
 	out.Items = make([]Unstructured, len(in.Items))
 	for i := range in.Items {
 		in.Items[i].DeepCopyInto(&out.Items[i])
