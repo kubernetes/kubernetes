@@ -89,7 +89,7 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-  isTransportEndpointNotConnected := false
+	isTransportEndpointNotConnected := false
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
 		isTransportEndpointNotConnected = IsTransportEndpointNotConnected(pathErr)
 		if !isTransportEndpointNotConnected {
@@ -102,21 +102,23 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 
 	var notMnt bool
 	var err error
-  if !isTransportEndpointNotConnected {
-    if extensiveMountPointCheck {
-      notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-    } else {
-      notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-    }
+	if !isTransportEndpointNotConnected {
+		if extensiveMountPointCheck {
+			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
+		} else {
+			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+		}
 
-    if err != nil {
-      return err
-    }
+		if err != nil {
+			return err
+		}
 
-    if notMnt {
-      glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-      return os.Remove(mountPath)
+		if notMnt {
+			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+			return os.Remove(mountPath)
+		}
 	}
+
 	// Unmount the mount path
 	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
 	if err := mounter.Unmount(mountPath); err != nil {
@@ -140,9 +142,9 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
-	} else if IsTransportEndpointNotConnected(err) {
+	}else if IsTransportEndpointNotConnected(err) {
 		return true, err
-	} else {
+	}else {
 		return false, err
 	}
 }
