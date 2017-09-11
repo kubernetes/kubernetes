@@ -56,20 +56,14 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqStart := time.Now()
 	proxyHandlerTraceID := rand.Int63()
 
-	var verb, apiResource, subresource, scope string
 	var httpCode int
-
+	var requestInfo *request.RequestInfo
 	defer func() {
 		responseLength := 0
 		if rw, ok := w.(*metrics.ResponseWriterDelegator); ok {
 			responseLength = rw.ContentLength()
 		}
-		metrics.Monitor(
-			verb, apiResource, subresource, scope,
-			net.GetHTTPClient(req),
-			w.Header().Get("Content-Type"),
-			httpCode, responseLength, reqStart,
-		)
+		metrics.Record(req, requestInfo, w.Header().Get("Content-Type"), httpCode, responseLength, time.Now().Sub(reqStart))
 	}()
 
 	ctx, ok := r.Mapper.Get(req)
@@ -79,7 +73,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	requestInfo, ok := request.RequestInfoFrom(ctx)
+	requestInfo, ok = request.RequestInfoFrom(ctx)
 	if !ok {
 		responsewriters.InternalError(w, req, errors.New("Error getting RequestInfo from context"))
 		httpCode = http.StatusInternalServerError
@@ -90,15 +84,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	verb = requestInfo.Verb
-	namespace, resource, subresource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Subresource, requestInfo.Parts
-	scope = "cluster"
-	if namespace != "" {
-		scope = "namespace"
-	}
-	if requestInfo.Name != "" {
-		scope = "resource"
-	}
+	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
 
 	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
@@ -125,7 +111,6 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	apiResource = resource
 
 	gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 

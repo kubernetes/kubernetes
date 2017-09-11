@@ -27,7 +27,7 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	//utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/request"
 
 	"github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
@@ -82,22 +82,27 @@ func Register() {
 	prometheus.MustRegister(responseSizes)
 }
 
-// Monitor records a request to the apiserver endpoints that follow the Kubernetes API conventions.  verb must be
-// uppercase to be backwards compatible with existing monitoring tooling.
-func Monitor(verb, resource, subresource, scope, client, contentType string, httpCode, respSize int, reqStart time.Time) {
-	elapsed := float64((time.Since(reqStart)) / time.Microsecond)
-	requestCounter.WithLabelValues(verb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
-	requestLatencies.WithLabelValues(verb, resource, subresource, scope).Observe(elapsed)
-	requestLatenciesSummary.WithLabelValues(verb, resource, subresource, scope).Observe(elapsed)
-	// We are only interested in response sizes of read requests.
-	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithLabelValues(verb, resource, subresource, scope).Observe(float64(respSize))
+// Record records a single request to the standard metrics endpoints. For use by handlers that perform their own
+// processing. All API paths should use InstrumentRouteFunc implicitly. Use this instead of MonitorRequest if
+// you already have a RequestInfo object.
+func Record(req *http.Request, requestInfo *request.RequestInfo, contentType string, code int, responseSizeInBytes int, elapsed time.Duration) {
+	scope := "cluster"
+	if requestInfo.Namespace != "" {
+		scope = "namespace"
+	}
+	if requestInfo.Name != "" {
+		scope = "resource"
+	}
+	if requestInfo.IsResourceRequest {
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, contentType, scope, code, responseSizeInBytes, elapsed)
+	} else {
+		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, contentType, scope, code, responseSizeInBytes, elapsed)
 	}
 }
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(request *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, reqStart time.Time) {
+func MonitorRequest(request *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := verb
 	if verb == "LIST" {
 		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
@@ -113,7 +118,14 @@ func MonitorRequest(request *http.Request, verb, resource, subresource, scope, c
 	}
 
 	client := cleanUserAgent(utilnet.GetHTTPClient(request))
-	Monitor(reportedVerb, resource, subresource, scope, client, contentType, httpCode, respSize, reqStart)
+	elapsedMicroseconds := float64(elapsed / time.Microsecond)
+	requestCounter.WithLabelValues(reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
+	requestLatencies.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
+	requestLatenciesSummary.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
+	// We are only interested in response sizes of read requests.
+	if verb == "GET" || verb == "LIST" {
+		responseSizes.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(float64(respSize))
+	}
 }
 
 func Reset() {
@@ -144,7 +156,7 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		routeFunc(request, response)
 
-		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), now)
+		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
 	})
 }
 
