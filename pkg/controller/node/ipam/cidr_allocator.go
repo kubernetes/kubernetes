@@ -62,7 +62,7 @@ const (
 	apiserverStartupGracePeriod = 10 * time.Minute
 
 	// The no. of NodeSpec updates NC can process concurrently.
-	cidrUpdateWorkers = 10
+	cidrUpdateWorkers = 30
 
 	// The max no. of NodeSpec updates that can be enqueued.
 	cidrUpdateQueueSize = 5000
