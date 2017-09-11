@@ -89,10 +89,10 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	isTransportEndpointNotConnected := false
+	isConnectionError := false
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
-		isTransportEndpointNotConnected = IsTransportEndpointNotConnected(pathErr)
-		if !isTransportEndpointNotConnected {
+		isConnectionError = IsConnectionError(pathErr)
+		if !isConnectionError {
 			return fmt.Errorf("Error checking if path exists: %v", pathErr)
 		}
 	} else if !pathExists {
@@ -102,7 +102,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 
 	var notMnt bool
 	var err error
-	if !isTransportEndpointNotConnected {
+	if !isConnectionError {
 		if extensiveMountPointCheck {
 			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
 		} else {
@@ -142,14 +142,14 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
-	}else if IsTransportEndpointNotConnected(err) {
+	}else if IsConnectionError(err) {
 		return true, err
 	}else {
 		return false, err
 	}
 }
 
-func IsTransportEndpointNotConnected(err error) bool {
+func IsConnectionError(err error) bool {
 	switch pe := err.(type) {
 	case nil:
 		return false
@@ -160,7 +160,7 @@ func IsTransportEndpointNotConnected(err error) bool {
 	case *os.SyscallError:
 		err = pe.Err
 	}
-	return err == syscall.ENOTCONN
+	return err == syscall.ENOTCONN || err == syscall.ESTALE
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
