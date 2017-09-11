@@ -116,8 +116,12 @@ func getKubeConfigSubCommands(out io.Writer, outDir string) []*cobra.Command {
 		cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored.")
 		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address or DNS name the API Server is accessible on.")
 		cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API Server is accessible on.")
+		cmd.Flags().StringVar(&cfg.ClusterName, "cluster-name", cfg.ClusterName, "Specify the cluster name.")
 		if properties.use == "all" || properties.use == "kubelet" {
 			cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name that the kubelet client cert should use.`)
+		}
+		if properties.use == "all" || properties.use == "admin" {
+			cmd.Flags().StringVar(&cfg.AdminUserName, "admin-user-name", cfg.AdminUserName, "Specify the admin user name")
 		}
 		if properties.use == "user" {
 			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig.")

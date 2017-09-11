@@ -111,6 +111,9 @@ func getCertsSubCommands() []*cobra.Command {
 			cmd.Flags().StringSliceVar(&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", []string{}, "Optional extra altnames to use for the API Server serving cert. Can be both IP addresses and dns names.")
 			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.")
 		}
+		if properties.use == "all" || properties.use == "ca" || properties.use == "front-proxy-ca" {
+			cmd.PersistentFlags().StringVar(&cfg.ClusterName, "cluster-name", "", "Specify the cluster name")
+		}
 
 		subCmds = append(subCmds, cmd)
 	}

@@ -28,7 +28,7 @@ import (
 // RetrieveValidatedClusterInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedClusterInfo(httpsURL string) (*clientcmdapi.Cluster, error) {
+func RetrieveValidatedClusterInfo(httpsURL, clustername string) (*clientcmdapi.Cluster, error) {
 	response, err := http.Get(httpsURL)
 	if err != nil {
 		return nil, err
@@ -44,5 +44,5 @@ func RetrieveValidatedClusterInfo(httpsURL string) (*clientcmdapi.Cluster, error
 	if err != nil {
 		return nil, err
 	}
-	return file.ValidateClusterInfo(clusterinfo)
+	return file.ValidateClusterInfo(clusterinfo, clustername)
 }

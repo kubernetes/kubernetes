@@ -183,6 +183,14 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		`Specify the node name`,
 	)
 	flagSet.StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		`Specify the cluster name`,
+	)
+	flagSet.StringVar(
+		&cfg.AdminUserName, "admin-user-name", cfg.AdminUserName,
+		`Specify the admin user name`,
+	)
+	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,
 		"The token to use for establishing bidirectional trust between nodes and masters.",
 	)

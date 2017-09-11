@@ -38,11 +38,13 @@ func TestPrintConfiguration(t *testing.T) {
 				KubernetesVersion: "v1.7.1",
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	adminUserName: ""
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
 	certificatesDir: ""
 	cloudProvider: ""
+	clusterName: ""
 	etcd:
 	  caFile: ""
 	  certFile: ""
@@ -70,11 +72,13 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	adminUserName: ""
 	api:
 	  advertiseAddress: ""
 	  bindPort: 0
 	certificatesDir: ""
 	cloudProvider: ""
+	clusterName: ""
 	etcd:
 	  caFile: ""
 	  certFile: ""

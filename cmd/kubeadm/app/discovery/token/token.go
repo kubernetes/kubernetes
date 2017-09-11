@@ -41,7 +41,7 @@ const BootstrapUser = "token-bootstrap-client"
 // RetrieveValidatedClusterInfo connects to the API Server and tries to fetch the cluster-info ConfigMap
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if rootCAPubKeys is not empty)
 // validating the cluster CA against a set of pinned public keys
-func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCAPubKeys []string) (*clientcmdapi.Cluster, error) {
+func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCAPubKeys []string, clustername string) (*clientcmdapi.Cluster, error) {
 	tokenId, tokenSecret, err := tokenutil.ParseToken(discoveryToken)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCA
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
 	baseKubeConfig := runForEndpointsAndReturnFirst(tokenAPIServers, func(endpoint string) (*clientcmdapi.Config, error) {
 
-		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint)
+		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, clustername)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 		insecureClient, err := kubeconfigutil.KubeConfigToClientSet(insecureBootstrapConfig)
@@ -125,7 +125,7 @@ func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCA
 		}
 
 		// Now that we know the proported cluster CA, connect back a second time validating with that CA
-		secureBootstrapConfig := buildSecureBootstrapKubeConfig(endpoint, clusterCABytes)
+		secureBootstrapConfig := buildSecureBootstrapKubeConfig(endpoint, clusterCABytes, clustername)
 		secureClient, err := kubeconfigutil.KubeConfigToClientSet(secureBootstrapConfig)
 		if err != nil {
 			return nil, err
@@ -162,18 +162,17 @@ func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCA
 }
 
 // buildInsecureBootstrapKubeConfig makes a KubeConfig object that connects insecurely to the API Server for bootstrapping purposes
-func buildInsecureBootstrapKubeConfig(endpoint string) *clientcmdapi.Config {
+func buildInsecureBootstrapKubeConfig(endpoint, clustername string) *clientcmdapi.Config {
 	masterEndpoint := fmt.Sprintf("https://%s", endpoint)
-	clusterName := "kubernetes"
-	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, clusterName, BootstrapUser, []byte{})
-	bootstrapConfig.Clusters[clusterName].InsecureSkipTLSVerify = true
+	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, clustername, BootstrapUser, []byte{})
+	bootstrapConfig.Clusters[clustername].InsecureSkipTLSVerify = true
 	return bootstrapConfig
 }
 
 // buildSecureBootstrapKubeConfig makes a KubeConfig object that connects securely to the API Server for bootstrapping purposes (validating with the specified CA)
-func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte) *clientcmdapi.Config {
+func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte, clustername string) *clientcmdapi.Config {
 	masterEndpoint := fmt.Sprintf("https://%s", endpoint)
-	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, "kubernetes", BootstrapUser, caCert)
+	bootstrapConfig := kubeconfigutil.CreateBasic(masterEndpoint, clustername, BootstrapUser, caCert)
 	return bootstrapConfig
 }
 
