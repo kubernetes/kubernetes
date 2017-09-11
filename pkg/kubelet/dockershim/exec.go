@@ -19,8 +19,6 @@ package dockershim
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -28,8 +26,6 @@ import (
 
 	"k8s.io/client-go/tools/remotecommand"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/term"
-	utilexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -38,9 +34,6 @@ import (
 type ExecHandler interface {
 	ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 }
-
-// NsenterExecHandler executes commands in Docker containers using nsenter.
-type NsenterExecHandler struct{}
 
 type dockerExitError struct {
 	Inspect *dockertypes.ContainerExecInspect
@@ -60,75 +53,6 @@ func (d *dockerExitError) Exited() bool {
 
 func (d *dockerExitError) ExitStatus() int {
 	return d.Inspect.ExitCode
-}
-
-// TODO should we support nsenter in a container, running with elevated privs and --pid=host?
-func (*NsenterExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
-	nsenter, err := exec.LookPath("nsenter")
-	if err != nil {
-		return fmt.Errorf("exec unavailable - unable to locate nsenter")
-	}
-
-	containerPid := container.State.Pid
-
-	// TODO what if the container doesn't have `env`???
-	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
-	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
-	args = append(args, container.Config.Env...)
-	args = append(args, cmd...)
-	command := exec.Command(nsenter, args...)
-	var cmdErr error
-	if tty {
-		p, err := kubecontainer.StartPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-			term.SetSize(p.Fd(), size)
-		})
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-
-		cmdErr = command.Wait()
-	} else {
-		if stdin != nil {
-			// Use an os.Pipe here as it returns true *os.File objects.
-			// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
-			// the call below to command.Run() can unblock because its Stdin is the read half
-			// of the pipe.
-			r, w, err := os.Pipe()
-			if err != nil {
-				return err
-			}
-			go io.Copy(w, stdin)
-
-			command.Stdin = r
-		}
-		if stdout != nil {
-			command.Stdout = stdout
-		}
-		if stderr != nil {
-			command.Stderr = stderr
-		}
-
-		cmdErr = command.Run()
-	}
-
-	if exitErr, ok := cmdErr.(*exec.ExitError); ok {
-		return &utilexec.ExitErrorWrapper{ExitError: exitErr}
-	}
-	return cmdErr
 }
 
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.

@@ -127,9 +127,8 @@ type Runtime interface {
 // DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
 // (exec/attach/port-forward) should be served directly by the Kubelet.
 type DirectStreamingRuntime interface {
-	// Runs the command in the container of the specified pod using nsenter.
-	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
-	// tty.
+	// Runs the command in the container of the specified pod. Attaches
+	// the processes stdin, stdout, and stderr. Optionally uses a tty.
 	ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port int32, stream io.ReadWriteCloser) error
