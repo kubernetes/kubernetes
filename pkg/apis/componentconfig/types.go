@@ -346,6 +346,9 @@ type KubeControllerManagerConfiguration struct {
 	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
 	// horizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
 	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
+	// horizontalPodAutoscalerTolerance is the tolerance for when
+	// resource usage suggests upscaling/downscaling
+	HorizontalPodAutoscalerTolerance float64
 	// deploymentControllerSyncPeriod is the period for syncing the deployments.
 	DeploymentControllerSyncPeriod metav1.Duration
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.

@@ -49,10 +49,6 @@ import (
 )
 
 var (
-	// Usage shoud exceed the tolerance before we start downscale or upscale the pods.
-	// TODO: make it a flag or HPA spec element.
-	tolerance = 0.1
-
 	scaleUpLimitFactor  = 2.0
 	scaleUpLimitMinimum = 4.0
 )

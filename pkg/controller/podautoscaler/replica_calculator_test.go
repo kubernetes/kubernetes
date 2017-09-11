@@ -247,6 +247,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,
 		podsGetter:    testClient.Core(),
+		tolerance:     defaultTestingTolerance,
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
@@ -727,7 +728,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	perPodRequested := totalRequestedCPUOfAllPods / startPods
 
 	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
-	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
+	target := math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .01
 	finalCPUPercentTarget := int32(target * 100)
 	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
 
@@ -775,7 +776,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	// Reuse the data structure above, now testing "unscaling".
 	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
-	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
+	target = math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .004
 	finalCPUPercentTarget = int32(target * 100)
 	tc.resource.targetUtilization = finalCPUPercentTarget
 	tc.currentReplicas = startPods
